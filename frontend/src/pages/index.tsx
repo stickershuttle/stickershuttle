@@ -27,8 +27,9 @@ export default function Home() {
         } else {
           setHello(json.data.hello);
         }
-      } catch (e: any) {
-        setError(e.message || "Failed to fetch");
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : String(e);
+        setError(message);
       } finally {
         setLoading(false);
       }
