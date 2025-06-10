@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+console.log("API_URL:", API_URL);
+
 export default function Home() {
   const [hello, setHello] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
@@ -21,11 +23,22 @@ export default function Home() {
             query: `query Hello { hello }`,
           }),
         });
-        const json = await res.json();
-        if (json.errors) {
-          setError(json.errors[0].message || "Unknown error");
-        } else {
-          setHello(json.data.hello);
+
+        if (!res.ok) {
+          throw new Error(`Network response was not ok: ${res.status} ${res.statusText}`);
+        }
+
+        const text = await res.text();
+        console.log("API raw response:", text);
+        try {
+          const json = JSON.parse(text);
+          if (json.errors) {
+            setError(json.errors[0].message || "Unknown error");
+          } else {
+            setHello(json.data.hello);
+          }
+        } catch {
+          throw new Error("API did not return valid JSON: " + text);
         }
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : String(e);
