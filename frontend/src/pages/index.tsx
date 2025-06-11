@@ -1,16 +1,12 @@
-import { useEffect, useState, useRef } from "react";
+import { useState, useRef } from "react";
 import Head from "next/head";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
 export default function Home() {
-  const [hello, setHello] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>("");
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [hasStarted, setHasStarted] = useState<boolean>(false);
   const [posterImage] = useState<string>("https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601387/d2b7fa8c-41a7-421a-9fde-3d7cf2b0a3a3.png");
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState<boolean>(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Commented out API call that was causing 405 errors
@@ -82,6 +78,14 @@ export default function Home() {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
         <link rel="icon" type="image/svg+xml" href="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591674/AlienSSFavicon_jlkmoi.svg" />
+        
+        {/* iOS Status Bar and Theme Color */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="theme-color" content="#030140" />
+        <meta name="msapplication-navbutton-color" content="#030140" />
+        <meta name="apple-mobile-web-app-title" content="Sticker Shuttle" />
+        
         <title>Sticker Shuttle - Custom Stickers & Vinyl Signs</title>
       </Head>
       
@@ -91,11 +95,15 @@ export default function Home() {
           <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto py-4 px-4">
             <div className="flex items-center justify-between">
               {/* Mobile/Tablet Hamburger Menu */}
-              <button className="lg:hidden text-white text-2xl" aria-label="Open menu">
+              <button 
+                className="lg:hidden text-white text-2xl z-50 relative" 
+                aria-label="Open menu"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              >
                 <div className="flex flex-col space-y-1">
-                  <div className="w-6 h-0.5 bg-white"></div>
-                  <div className="w-6 h-0.5 bg-white"></div>
-                  <div className="w-6 h-0.5 bg-white"></div>
+                  <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${isMobileMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
+                  <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${isMobileMenuOpen ? 'opacity-0' : ''}`}></div>
+                  <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${isMobileMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></div>
                 </div>
               </button>
 
@@ -277,6 +285,11 @@ export default function Home() {
                 <button 
                   className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105"
                 >
+                  📦 Products
+                </button>
+                <button 
+                  className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105"
+                >
                   Start Your Order →
                 </button>
                 <button 
@@ -304,6 +317,123 @@ export default function Home() {
           </div>
         </header>
 
+        {/* Mobile Menu Overlay */}
+        {isMobileMenuOpen && (
+          <div 
+            className="fixed inset-0 z-40 lg:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            <div className="absolute inset-0 bg-black bg-opacity-50" />
+          </div>
+        )}
+
+        {/* Mobile Menu Slide-out */}
+        <div 
+          className={`fixed top-0 left-0 h-full w-80 z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${
+            isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+          style={{ 
+            backgroundColor: 'rgba(3, 1, 64, 0.95)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}
+        >
+          <div className="p-6">
+            {/* Menu Header */}
+            <div className="flex items-center justify-between mb-8">
+              <img 
+                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
+                alt="Sticker Shuttle Logo" 
+                className="h-8 w-auto object-contain"
+              />
+              <button 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="text-white text-xl p-2"
+                aria-label="Close menu"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Search Bar for Mobile */}
+            <div className="mb-6">
+              <input 
+                type="text"
+                placeholder="Search sticker types..."
+                className="w-full px-4 py-3 rounded-lg font-medium text-white transition-all duration-200 focus:outline-none placeholder-gray-400"
+                style={{ 
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}
+              />
+            </div>
+
+            {/* Navigation Items */}
+            <nav className="space-y-2">
+              <button className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-10 transition-all duration-200 flex items-center">
+                <span className="mr-3">⚡</span>
+                Deals
+              </button>
+              <button className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-10 transition-all duration-200 flex items-center">
+                <span className="mr-3">📦</span>
+                Products
+              </button>
+              <button className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-10 transition-all duration-200 flex items-center">
+                <span className="mr-3">🎨</span>
+                Start Your Order
+              </button>
+              <button className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-10 transition-all duration-200 flex items-center">
+                <span className="mr-3">👤</span>
+                Log in
+              </button>
+              <button className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-10 transition-all duration-200 flex items-center">
+                <span className="mr-3">✨</span>
+                Signup
+              </button>
+            </nav>
+
+            {/* Sticker Types Quick Access */}
+            <div className="mt-8">
+              <h3 className="text-sm font-semibold text-white mb-4 px-4">Quick Access:</h3>
+              <div className="space-y-2">
+                <div className="flex items-center px-4 py-3 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200">
+                  <div className="w-8 h-8 mr-3 flex items-center justify-center">
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
+                      alt="Vinyl" 
+                      className="max-w-full max-h-full object-contain"
+                      style={{
+                        filter: 'drop-shadow(0 0 6px rgba(168, 242, 106, 0.4))'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-white text-sm font-medium">Vinyl Stickers</p>
+                    <p className="text-xs" style={{ color: 'rgb(168, 242, 106)' }}>Most Popular</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center px-4 py-3 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200">
+                  <div className="w-8 h-8 mr-3 flex items-center justify-center">
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
+                      alt="Holographic" 
+                      className="max-w-full max-h-full object-contain"
+                      style={{
+                        filter: 'drop-shadow(0 0 6px rgba(168, 85, 247, 0.4))'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-white text-sm font-medium">Holographic</p>
+                    <p className="text-xs" style={{ color: 'rgb(168, 85, 247)' }}>Premium</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Hero Section with Banner Background */}
         <section className="py-4">
           <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
@@ -317,13 +447,13 @@ export default function Home() {
               }}
             >
               <div className="text-center relative z-10">
-                <h1 className="text-5xl md:text-6xl font-bold mb-4">
-                  Tired of waiting weeks to<br />
-                  get your stickers?
+                <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-4">
+                  <span className="block sm:inline">Tired of waiting weeks</span>
+                  <span className="block sm:inline"> to get your stickers?</span>
                 </h1>
-                <p className="text-xl mb-6 text-purple-100">
-                  See why brands like Amazon, Nike Football, and thousands of others<br />
-                  trust us with their business.
+                <p className="text-lg sm:text-xl mb-6 text-purple-100">
+                  <span className="block sm:inline">See why brands like Amazon, Nike Football, and thousands of others</span>
+                  <span className="block sm:inline"> trust us with their business.</span>
                 </p>
                 <div className="flex flex-col items-center gap-4 mb-4">
                   <button 
@@ -1527,18 +1657,7 @@ export default function Home() {
           }
         `}</style>
 
-        {/* API Response Display (for testing) */}
-        {(loading || error || hello) && (
-          <div className="fixed bottom-4 right-4 bg-black bg-opacity-75 p-3 rounded max-w-xs">
-            {loading ? (
-              <p className="text-gray-400 text-sm">Loading API...</p>
-            ) : error ? (
-              <p className="text-red-400 text-sm">{error}</p>
-            ) : (
-              <p className="text-green-400 text-sm">API: {hello}</p>
-            )}
-          </div>
-        )}
+
       </div>
     </>
   );
