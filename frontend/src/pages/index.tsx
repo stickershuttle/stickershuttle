@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import Head from "next/head";
 
 export default function Home() {
@@ -7,45 +7,7 @@ export default function Home() {
   const [posterImage] = useState<string>("https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601387/d2b7fa8c-41a7-421a-9fde-3d7cf2b0a3a3.png");
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-  const [expandedStickerType, setExpandedStickerType] = useState<string | null>(null);
-  const [currentReviewIndex, setCurrentReviewIndex] = useState<number>(0);
   const videoRef = useRef<HTMLVideoElement>(null);
-
-  // Reviews data
-  const reviews = [
-    {
-      name: "Certified Garbage Rat",
-      product: "Matte Stickers & Vinyl Banners",
-      image: "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601651/unnamed_1_100x100_crop_center_ozo8lq.webp",
-      text: "We got one of our designs custom made into stickers and they definitely did not disappoint! We had previously been using another website but the speed and quality of sticker shuttle is far better than our stickers before. I would highly recommend!"
-    },
-    {
-      name: "Panda Reaper",
-      product: "Matte Vinyl Stickers",
-      image: "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601649/download_1_100x100_crop_center_z69tdh.avif",
-      text: "Everything was perfect. The sticker themselves is a great quality, and no blurriness on the design. Will be sticking with this company for future stickers!"
-    },
-    {
-      name: "Anita J",
-      product: "Matte Vinyl Stickers",
-      image: "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601646/unnamed_14467655-4d00-451c-bca6-b5be86af2814_100x100_crop_center_cmftk1.webp",
-      text: "Absolutely loved the quality and thickness of the stickers but what really made me excited was the ability to speak to the owner directly who provides amazing customer service and truly delivers on the timelines posted. Would recommend to anyone looking!"
-    },
-    {
-      name: "Rach Plants",
-      product: "Matte Stickers& Vinyl Banners",
-      image: "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601644/111_100x100_crop_center_ubs7st.avif",
-      text: "Incredible! They were able to not only make my business logo into great quality stickers, they also made my own photos into stickers!! I recommend them to everyone looking for custom stickers! Beautiful work, quality, attention to detail, communication! 10/10!"
-    }
-  ];
-
-  // Cycle through reviews every 5 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentReviewIndex((prev) => (prev + 1) % reviews.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [reviews.length]);
 
   // Commented out API call that was causing 405 errors
   // useEffect(() => {
