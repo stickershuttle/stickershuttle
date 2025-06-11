@@ -24,3 +24,34 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.headerButton {
+  background-color: #10104c;
+  border: 1px solid #171765;
+  box-shadow: 3px 3px 0px #0e0e42;
+}
+
+.primaryButton {
+  background-color: #ffd713;
+  color: #030140;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 3px 3px 0px #cfaf13;
+}
+
+.stickerCard {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.header-button {
+  background-color: #08084c !important;
+}
+
+header nav button {
+  background-color: #08084c;
+}
+
+h1 {
+  letter-spacing: -0.045em;
+}

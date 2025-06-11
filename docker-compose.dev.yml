@@ -1,0 +1,26 @@
+services:
+  api:
+    build: 
+      context: ./api
+    command: npm run dev
+    volumes:
+      - ./api:/app
+      - /app/node_modules
+    ports:
+      - "4000:4000"
+  
+  frontend:
+    build:
+      context: ./frontend
+      target: builder
+    command: npm run dev -- --hostname 0.0.0.0 --port 3000
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:4000
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
