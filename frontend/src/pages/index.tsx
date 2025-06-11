@@ -904,17 +904,17 @@ export default function Home() {
                 
                 <div className="space-y-4 mb-8">
                   <p className="text-gray-300 leading-relaxed">
-                    At Sticker Shuttle, we get what it's like to run a small business because we're in the same shuttle... or boat. 
-                    That's why we're so passionate about helping other small businesses. We print high-quality custom stickers 
+                    At Sticker Shuttle, we get what it&apos;s like to run a small business because we&apos;re in the same shuttle... or boat. 
+                    That&apos;s why we&apos;re so passionate about helping other small businesses. We print high-quality custom stickers 
                     and banners that not only launch your brand but also help you connect with your customers—all without 
                     breaking the bank.
                   </p>
                   
                   <p className="text-gray-300 leading-relaxed">
-                    When you work with us, you're not just getting amazing products made with care and precision—you're 
-                    supporting a local business that's all about community, creativity, and craftsmanship. Every sticker, banner, 
-                    and product we make is designed to help your business stand out and grow. By choosing us, you're part of a 
-                    bigger cycle of support that helps small businesses like yours thrive. Let's stick together and grow together!
+                    When you work with us, you&apos;re not just getting amazing products made with care and precision—you&apos;re 
+                    supporting a local business that&apos;s all about community, creativity, and craftsmanship. Every sticker, banner, 
+                    and product we make is designed to help your business stand out and grow. By choosing us, you&apos;re part of a 
+                    bigger cycle of support that helps small businesses like yours thrive. Let&apos;s stick together and grow together!
                   </p>
                 </div>
 
@@ -945,7 +945,7 @@ export default function Home() {
                 <span style={{filter: 'drop-shadow(0 0 10px rgba(34, 197, 94, 0.6)) drop-shadow(0 0 20px rgba(34, 197, 94, 0.4))', display: 'inline-block'}}>👽</span> Not a conspiracy theory...
               </h2>
               <p className="text-gray-300 text-lg">
-                And we're not aliens, that's why thousands of other businesses DO believe in us...
+                                    And we&apos;re not aliens, that&apos;s why thousands of other businesses DO believe in us...
               </p>
             </div>
 
@@ -1349,7 +1349,7 @@ export default function Home() {
                   Our mission
                 </h3>
                 <p className="text-gray-300 text-sm leading-relaxed mb-4">
-                  We're called Sticker Shuttle, what do you think our mission is? To get your stickers to you as fast as humanly possible. At no extra cost.
+                  We&apos;re called Sticker Shuttle, what do you think our mission is? To get your stickers to you as fast as humanly possible. At no extra cost.
                 </p>
                 
                 {/* Social Media Links */}
