@@ -13,45 +13,46 @@ export default function Home() {
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  useEffect(() => {
-    const fetchHello = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const res = await fetch(API_URL!, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            query: `query Hello { hello }`,
-          }),
-        });
+  // Commented out API call that was causing 405 errors
+  // useEffect(() => {
+  //   const fetchHello = async () => {
+  //     setLoading(true);
+  //     setError("");
+  //     try {
+  //       const res = await fetch(API_URL!, {
+  //         method: "POST",
+  //         headers: {
+  //           "Content-Type": "application/json",
+  //         },
+  //         body: JSON.stringify({
+  //           query: `query Hello { hello }`,
+  //         }),
+  //       });
 
-        if (!res.ok) {
-          throw new Error(`Network response was not ok: ${res.status} ${res.statusText}`);
-        }
+  //       if (!res.ok) {
+  //         throw new Error(`Network response was not ok: ${res.status} ${res.statusText}`);
+  //       }
 
-        const text = await res.text();
-        try {
-          const json = JSON.parse(text);
-          if (json.errors) {
-            setError(json.errors[0].message || "Unknown error");
-          } else {
-            setHello(json.data.hello);
-          }
-        } catch {
-          throw new Error("API did not return valid JSON: " + text);
-        }
-      } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : String(e);
-        setError(message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchHello();
-  }, []);
+  //       const text = await res.text();
+  //       try {
+  //         const json = JSON.parse(text);
+  //         if (json.errors) {
+  //           setError(json.errors[0].message || "Unknown error");
+  //         } else {
+  //           setHello(json.data.hello);
+  //         }
+  //       } catch {
+  //         throw new Error("API did not return valid JSON: " + text);
+  //       }
+  //     } catch (e: unknown) {
+  //       const message = e instanceof Error ? e.message : String(e);
+  //       setError(message);
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
+  //   fetchHello();
+  // }, []);
 
   const toggleVideo = () => {
     if (videoRef.current) {
