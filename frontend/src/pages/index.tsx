@@ -1,5 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import Head from "next/head";
+import { useRouter } from "next/router";
+import { getSupabase } from "../lib/supabase";
 
 export default function Home() {
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -7,48 +10,39 @@ export default function Home() {
   const [posterImage] = useState<string>("https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601387/d2b7fa8c-41a7-421a-9fde-3d7cf2b0a3a3.png");
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const router = useRouter();
 
-  // Commented out API call that was causing 405 errors
-  // useEffect(() => {
-  //   const fetchHello = async () => {
-  //     setLoading(true);
-  //     setError("");
-  //     try {
-  //       const res = await fetch(API_URL!, {
-  //         method: "POST",
-  //         headers: {
-  //           "Content-Type": "application/json",
-  //         },
-  //         body: JSON.stringify({
-  //           query: `query Hello { hello }`,
-  //         }),
-  //       });
+  useEffect(() => {
+    checkUser();
+  }, []);
 
-  //       if (!res.ok) {
-  //         throw new Error(`Network response was not ok: ${res.status} ${res.statusText}`);
-  //       }
+  const checkUser = async () => {
+    try {
+      if (typeof window !== 'undefined') {
+        const supabase = await getSupabase();
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user || null);
+      }
+    } catch (error) {
+      console.error('Error checking user:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  //       const text = await res.text();
-  //       try {
-  //         const json = JSON.parse(text);
-  //         if (json.errors) {
-  //           setError(json.errors[0].message || "Unknown error");
-  //         } else {
-  //           setHello(json.data.hello);
-  //         }
-  //       } catch {
-  //         throw new Error("API did not return valid JSON: " + text);
-  //       }
-  //     } catch (e: unknown) {
-  //       const message = e instanceof Error ? e.message : String(e);
-  //       setError(message);
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-  //   fetchHello();
-  // }, []);
+  const handleSignOut = async () => {
+    try {
+      const supabase = await getSupabase();
+      await supabase.auth.signOut();
+      setUser(null);
+      router.push('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   const toggleVideo = () => {
     if (videoRef.current) {
@@ -166,7 +160,7 @@ export default function Home() {
                       <h3 className="text-sm font-semibold text-white mb-2 px-2">Sticker Types:</h3>
                       <div className="space-y-1">
                         {/* Vinyl Stickers */}
-                        <div className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200 group">
+                        <Link href="/products/vinyl-stickers" className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200 group">
                           <div className="w-8 h-8 mr-3 flex items-center justify-center">
                             <img 
                               src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
@@ -181,7 +175,7 @@ export default function Home() {
                             <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Vinyl Stickers</p>
                             <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(168, 242, 106)' }}>Waterproof & UV Resistant</p>
                           </div>
-                        </div>
+                        </Link>
                         
                         {/* Holographic Stickers */}
                         <div className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200 group">
@@ -282,31 +276,57 @@ export default function Home() {
 
               {/* Desktop Navigation */}
               <nav className="hidden lg:flex items-center gap-4" style={{ letterSpacing: '-0.5px' }}>
-                <button 
-                  className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105"
+                <Link 
+                  href="/deals"
+                  className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105${router.pathname === '/deals' ? ' active' : ''}`}
                 >
                   ⚡ Deals
-                </button>
+                </Link>
                 <button 
                   className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105"
                 >
-                  📦 Products
+                  🚀 Shipping Process
                 </button>
-                <button 
-                  className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105"
+                <a 
+                  href="/products"
+                  className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 inline-block${router.pathname === '/products' ? ' active' : ''}`}
                 >
                   Start Your Order →
-                </button>
-                <button 
-                  className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105"
-                >
-                  Log in
-                </button>
-                <button 
-                  className="primaryButton px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105"
-                >
-                  Signup
-                </button>
+                </a>
+                {/* Conditional Authentication Navigation */}
+                {user ? (
+                  /* Logged In - Show Account Dashboard and Sign Out */
+                  <>
+                    <Link 
+                      href="/account/dashboard"
+                      className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 inline-block"
+                    >
+                      👨‍🚀 Account Dashboard
+                    </Link>
+                    <button 
+                      onClick={handleSignOut}
+                      className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105"
+                    >
+                      Sign Out
+                    </button>
+                  </>
+                ) : (
+                  /* Not Logged In - Show Login and Signup */
+                  <>
+                    <Link 
+                      href="/login"
+                      className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 inline-block"
+                    >
+                      Log in
+                    </Link>
+                    <Link 
+                      href="/signup"
+                      className="primaryButton px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 inline-block"
+                    >
+                      Signup
+                    </Link>
+                  </>
+                )}
                 <button 
                   className="headerButton px-3 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105"
                 >
@@ -377,7 +397,7 @@ export default function Home() {
             <div className="mb-8">
               <h3 className="text-sm font-semibold text-white mb-4 px-4">Sticker Types:</h3>
               <div className="space-y-2">
-                <div className="flex items-center px-4 py-3 rounded-lg hover:bg-white hover:bg-opacity-90 cursor-pointer transition-all duration-200 group">
+                <Link href="/products/vinyl-stickers" className="flex items-center px-4 py-3 rounded-lg hover:bg-white hover:bg-opacity-90 cursor-pointer transition-all duration-200 group">
                   <div className="w-8 h-8 mr-3 flex items-center justify-center">
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
@@ -392,7 +412,7 @@ export default function Home() {
                     <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Vinyl Stickers</p>
                     <p className="text-xs transition-colors duration-200 group-hover:text-gray-600" style={{ color: 'rgb(168, 242, 106)' }}>Most Popular</p>
                   </div>
-                </div>
+                </Link>
                 
                 <div className="flex items-center px-4 py-3 rounded-lg hover:bg-white hover:bg-opacity-90 cursor-pointer transition-all duration-200 group">
                   <div className="w-8 h-8 mr-3 flex items-center justify-center">
@@ -466,26 +486,62 @@ export default function Home() {
 
             {/* Navigation Items */}
             <nav className="space-y-2">
-              <button className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">
+              <Link href="/deals" className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">
                 <span className="mr-3">⚡</span>
                 Deals
-              </button>
+              </Link>
               <button className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">
-                <span className="mr-3">📦</span>
-                Products
+                <span className="mr-3">🚀</span>
+                Shipping Process
               </button>
-              <button className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">
+              <a href="/products" className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">
                 <span className="mr-3">🎨</span>
                 Start Your Order
-              </button>
-              <button className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">
-                <span className="mr-3">👤</span>
-                Log in
-              </button>
-              <button className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">
-                <span className="mr-3">✨</span>
-                Signup
-              </button>
+              </a>
+              {/* Conditional Authentication Navigation for Mobile */}
+              {user ? (
+                /* Logged In - Show Account Dashboard and Sign Out */
+                <>
+                  <Link 
+                    href="/account/dashboard" 
+                    className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <span className="mr-3">👨‍🚀</span>
+                    Account Dashboard
+                  </Link>
+                  <button 
+                    onClick={() => {
+                      handleSignOut();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center"
+                  >
+                    <span className="mr-3">🚪</span>
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                /* Not Logged In - Show Login and Signup */
+                <>
+                  <Link 
+                    href="/login" 
+                    className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <span className="mr-3">👤</span>
+                    Log in
+                  </Link>
+                  <Link 
+                    href="/signup" 
+                    className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <span className="mr-3">✨</span>
+                    Signup
+                  </Link>
+                </>
+              )}
             </nav>
           </div>
         </div>
@@ -503,7 +559,7 @@ export default function Home() {
               }}
             >
               <div className="text-center relative z-10">
-                <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-4 leading-none sm:leading-tight">
+                <h1 className="text-4xl sm:text-5xl md:text-6xl mb-4 leading-none sm:leading-tight" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
                   <span className="block sm:inline">Tired of waiting weeks</span>
                   <span className="block sm:inline md:block"> to get your stickers?</span>
                 </h1>
@@ -512,8 +568,9 @@ export default function Home() {
                   <span className="block sm:inline md:inline"> trust us with their business.</span>
                 </p>
                 <div className="flex flex-col items-center gap-4 mb-4">
-                  <button 
-                    className="px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-105"
+                  <a 
+                    href="/products"
+                    className="px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-105 inline-block"
                     style={{
                       backgroundColor: '#ffd713',
                       color: '#030140',
@@ -525,7 +582,7 @@ export default function Home() {
                     }}
                   >
                     Start Here →
-                  </button>
+                  </a>
                   <a 
                     href="#" 
                     className="text-white hover:text-purple-200 transition"
@@ -533,8 +590,18 @@ export default function Home() {
                     Order Sample Pack →
           </a>
         </div>
-                <div className="text-center text-sm text-purple-200 px-4">
-                  <span className="block sm:inline">EASY ONLINE ORDERING, PRINTED IN 24 HRS, FREE SHIPPING</span>
+                <div className="flex justify-center px-4">
+                  <div 
+                    className="px-4 py-1.5 rounded-full text-center text-xs font-medium text-white border shadow-lg transition-all duration-300 hover:scale-105"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.05) 100%)',
+                      backdropFilter: 'blur(20px) saturate(180%)',
+                      borderColor: 'rgba(255, 255, 255, 0.3)',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 3px rgba(0, 0, 0, 0.1)'
+                    }}
+                  >
+                    EASY ONLINE ORDERING, PRINTED IN 24 HRS, FREE SHIPPING
+                  </div>
                 </div>
               </div>
             </div>
@@ -544,9 +611,9 @@ export default function Home() {
         {/* Brands Section - Infinite Scroll */}
         <section className="py-4">
           <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
-            <div className="flex justify-center mb-6">
+            <div className="flex justify-center mb-4">
               <div 
-                className="px-6 py-2 rounded-full text-center text-lg text-gray-300"
+                className="px-4 py-1.5 rounded-full text-center text-sm text-gray-300"
                 style={{
                   backgroundColor: 'rgba(255, 255, 255, 0.05)',
                   backdropFilter: 'blur(10px)',
@@ -585,7 +652,7 @@ export default function Home() {
                 <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593604/ChickFilA-Icon-Web_anobg1.png" alt="Chick-fil-A" className="h-20 w-auto" />
                 <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_Nike_gmedyb.png" alt="Nike" className="h-20 w-auto" />
                 <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593671/StickerShuttle_Brands_XFinity_nz2obt.png" alt="Xfinity" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" className="h-20 w-auto" />
+                <img src="https://res.cloudiary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" className="h-20 w-auto" />
                 <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_SSPR_ewqax7.png" alt="SSPR" className="h-20 w-auto" />
                 <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593662/StickerShuttle_Brands_CGR_ryewlb.png" alt="CGR" className="h-20 w-auto" />
                 <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_WF_vrafue.png" alt="WF" className="h-20 w-auto" />
@@ -607,191 +674,16 @@ export default function Home() {
             {/* Desktop/Tablet Grid */}
             <div className="hidden md:grid md:grid-cols-5 gap-4 group/container">
               {/* Vinyl Stickers */}
-              <div 
-                className="vinyl-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden group-hover/container:blur-[2px] hover:!blur-none"
-                style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                }}
-              >
-                <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-3 transition-transform duration-500 ease-out">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
-                    alt="Vinyl Stickers" 
-                    className="w-full h-full object-contain"
-                    style={{
-                      filter: 'drop-shadow(0 0 12px rgba(168, 242, 106, 0.35)) drop-shadow(0 0 24px rgba(168, 242, 106, 0.21))'
-                    }}
-                  />
-                </div>
-                <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Vinyl Stickers →</h3>
-                
-                {/* Hover to show features on desktop */}
-                <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
-                  <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <ul className="text-gray-300 text-sm space-y-2 text-left">
-                      <li>💧 Waterproof & UV Resistant</li>
-                      <li>🛡️ Laminated with 7 yr protection</li>
-                      <li>🎯 Premium Vinyl Material</li>
-                      <li>🏠 Dishwasher Safe</li>
-                      <li>✂️ Custom Shapes Available</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              {/* Holographic Stickers */}
-              <div 
-                className="holographic-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden group-hover/container:blur-[2px] hover:!blur-none"
-                style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                }}
-              >
-                <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-3 transition-transform duration-500 ease-out">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
-                    alt="Holographic Stickers" 
-                    className="w-full h-full object-contain"
-                    style={{
-                      filter: 'drop-shadow(0 0 12px rgba(168, 85, 247, 0.35)) drop-shadow(0 0 24px rgba(168, 85, 247, 0.21))'
-                    }}
-                  />
-                </div>
-                <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Holographic Stickers →</h3>
-                
-                {/* Hover to show features on desktop */}
-                <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
-                  <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <ul className="text-gray-300 text-sm space-y-2 text-left">
-                      <li>🌈 Rainbow Holographic Effect</li>
-                      <li>🛡️ Laminated with 7 yr protection</li>
-                      <li>✨ Holographic Vinyl Material</li>
-                      <li>💎 Light-Reflecting Surface</li>
-                      <li>👁️ Eye-Catching Design</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              {/* Chrome Stickers */}
-              <div 
-                className="chrome-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden group-hover/container:blur-[2px] hover:!blur-none"
-                style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                }}
-              >
-                <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-2 transition-transform duration-500 ease-out">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
-                    alt="Chrome Stickers" 
-                    className="w-full h-full object-contain"
-                    style={{
-                      filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.28)) drop-shadow(0 0 12px rgba(180, 180, 180, 0.21)) drop-shadow(0 0 18px rgba(240, 240, 240, 0.14))'
-                    }}
-                  />
-                </div>
-                <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Chrome Stickers →</h3>
-                
-                {/* Hover to show features on desktop */}
-                <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
-                  <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <ul className="text-gray-300 text-sm space-y-2 text-left">
-                      <li>🪞 Mirror Chrome Finish</li>
-                      <li>🛡️ Laminated with 7 yr protection</li>
-                      <li>🔩 Metallic Polyester Film</li>
-                      <li>✨ High-Gloss Surface</li>
-                      <li>🚗 Automotive Grade</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              {/* Glitter Stickers */}
-              <div 
-                className="glitter-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden group-hover/container:blur-[2px] hover:!blur-none"
-                style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                }}
-              >
-                <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-2 transition-transform duration-500 ease-out">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
-                    alt="Glitter Stickers" 
-                    className="w-full h-full object-contain"
-                    style={{
-                      filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.35)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.21))'
-                    }}
-                  />
-                </div>
-                <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Glitter Stickers →</h3>
-                
-                {/* Hover to show features on desktop */}
-                <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
-                  <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <ul className="text-gray-300 text-sm space-y-2 text-left">
-                      <li>✨ Sparkly Glitter Finish</li>
-                      <li>🛡️ Laminated with 7 yr protection</li>
-                      <li>💫 Specialty Glitter Vinyl</li>
-                      <li>🎨 Textured Surface</li>
-                      <li>🌈 Multiple Colors Available</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              {/* Vinyl Banners */}
-              <div 
-                className="banner-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden group-hover/container:blur-[2px] hover:!blur-none"
-                style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                }}
-              >
-                <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-1 transition-transform duration-500 ease-out">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593724/Vinyl-Banner_c84nis.png" 
-                    alt="Vinyl Banners" 
-                    className="w-full h-full object-contain"
-                    style={{
-                      filter: 'drop-shadow(0 0 12px rgba(196, 181, 253, 0.35)) drop-shadow(0 0 24px rgba(196, 181, 253, 0.21))'
-                    }}
-                  />
-                </div>
-                <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Vinyl Banners →</h3>
-                
-                {/* Hover to show features on desktop */}
-                <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
-                  <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <ul className="text-gray-300 text-sm space-y-2 text-left">
-                      <li>💪 Heavy Duty 13oz Vinyl</li>
-                      <li>🛡️ Laminated with 7 yr protection</li>
-                      <li>🔗 Hemmed & Grommeted</li>
-                      <li>🌦️ UV & Weather Resistant</li>
-                      <li>📏 Custom Sizes Available</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Mobile Scrollable Cards */}
-            <div className="md:hidden overflow-x-auto pb-4">
-              <div className="flex space-x-4 w-max">
-                {/* Vinyl Stickers Mobile */}
-                <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                }}>
-                  <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
+              <Link href="/products/vinyl-stickers">
+                <div 
+                  className="vinyl-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden group-hover/container:blur-[2px] hover:!blur-none"
+                  style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}
+                >
+                  <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-3 transition-transform duration-500 ease-out">
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
                       alt="Vinyl Stickers" 
@@ -801,35 +693,71 @@ export default function Home() {
                       }}
                     />
                   </div>
-                  <h3 className="font-semibold text-white">Vinyl Stickers →</h3>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Vinyl Stickers →</h3>
+                  
+                  {/* Hover to show features on desktop */}
+                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
+                    <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        <span className="px-3 py-1 text-xs rounded-full bg-green-500/20 text-green-200 border border-green-400/50">💧 Waterproof & UV Resistant</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-green-500/20 text-green-200 border border-green-400/50">🛡️ Laminated with 7 yr protection</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-green-500/20 text-green-200 border border-green-400/50">🎯 Premium Vinyl Material</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-green-500/20 text-green-200 border border-green-400/50">🏠 Dishwasher Safe</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-green-500/20 text-green-200 border border-green-400/50">✂️ Custom Shapes Available</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              </Link>
 
-                {/* Holographic Stickers Mobile */}
-                <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                }}>
-                  <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
+              {/* Holographic Stickers */}
+              <Link href="/products/holographic-stickers">
+                <div 
+                  className="holographic-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden group-hover/container:blur-[2px] hover:!blur-none"
+                  style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}
+                >
+                  <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-3 transition-transform duration-500 ease-out">
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
                       alt="Holographic Stickers" 
                       className="w-full h-full object-contain"
                       style={{
-                        filter: 'drop-shadow(0 0 12px rgba(168, 85, 247, 0.5)) drop-shadow(0 0 24px rgba(168, 85, 247, 0.3))'
+                        filter: 'drop-shadow(0 0 12px rgba(168, 85, 247, 0.35)) drop-shadow(0 0 24px rgba(168, 85, 247, 0.21))'
                       }}
                     />
                   </div>
-                  <h3 className="font-semibold text-white">Holographic Stickers →</h3>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Holographic Stickers →</h3>
+                  
+                  {/* Hover to show features on desktop */}
+                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
+                    <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🌈 Rainbow Holographic Effect</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🛡️ Laminated with 7 yr protection</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">✨ Holographic Vinyl Material</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">💎 Light-Reflecting Surface</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">👁️ Eye-Catching Design</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              </Link>
 
-                {/* Chrome Stickers Mobile */}
-                <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                }}>
-                  <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
+              {/* Chrome Stickers */}
+              <Link href="/products/chrome-stickers">
+                <div 
+                  className="chrome-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden group-hover/container:blur-[2px] hover:!blur-none"
+                  style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}
+                >
+                  <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-2 transition-transform duration-500 ease-out">
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
                       alt="Chrome Stickers" 
@@ -839,46 +767,205 @@ export default function Home() {
                       }}
                     />
                   </div>
-                  <h3 className="font-semibold text-white">Chrome Stickers →</h3>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Chrome Stickers →</h3>
+                  
+                  {/* Hover to show features on desktop */}
+                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
+                    <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🪞 Mirror Chrome Finish</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🛡️ Laminated with 7 yr protection</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🔩 Metallic Polyester Film</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">✨ High-Gloss Surface</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🚗 Automotive Grade</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              </Link>
 
-                {/* Glitter Stickers Mobile */}
-                <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                }}>
-                  <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
+              {/* Glitter Stickers */}
+              <Link href="/products/glitter-stickers">
+                <div 
+                  className="glitter-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden group-hover/container:blur-[2px] hover:!blur-none"
+                  style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}
+                >
+                  <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-2 transition-transform duration-500 ease-out">
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
                       alt="Glitter Stickers" 
                       className="w-full h-full object-contain"
                       style={{
-                        filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.5)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.3))'
+                        filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.35)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.21))'
                       }}
                     />
                   </div>
-                  <h3 className="font-semibold text-white">Glitter Stickers →</h3>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Glitter Stickers →</h3>
+                  
+                  {/* Hover to show features on desktop */}
+                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
+                    <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">✨ Sparkly Glitter Finish</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">🛡️ Laminated with 7 yr protection</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">💫 Specialty Glitter Vinyl</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">🎨 Textured Surface</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">🌈 Multiple Colors Available</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              </Link>
 
-                {/* Vinyl Banners Mobile */}
-                <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                }}>
-                  <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
+              {/* Vinyl Banners */}
+              <Link href="/products/vinyl-banners">
+                <div 
+                  className="banner-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden group-hover/container:blur-[2px] hover:!blur-none"
+                  style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}
+                >
+                  <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-1 transition-transform duration-500 ease-out">
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593724/Vinyl-Banner_c84nis.png" 
                       alt="Vinyl Banners" 
                       className="w-full h-full object-contain"
                       style={{
-                        filter: 'drop-shadow(0 0 12px rgba(196, 181, 253, 0.5)) drop-shadow(0 0 24px rgba(196, 181, 253, 0.3))'
+                        filter: 'drop-shadow(0 0 12px rgba(196, 181, 253, 0.35)) drop-shadow(0 0 24px rgba(196, 181, 253, 0.21))'
                       }}
                     />
                   </div>
-                  <h3 className="font-semibold text-white">Vinyl Banners →</h3>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Vinyl Banners →</h3>
+                  
+                  {/* Hover to show features on desktop */}
+                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
+                    <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">💪 Heavy Duty 13oz Vinyl</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🛡️ Laminated with 7 yr protection</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🔗 Hemmed & Grommeted</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🌦️ UV & Weather Resistant</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">📏 Custom Sizes Available</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              </Link>
+            </div>
+
+            {/* Mobile Scrollable Cards */}
+            <div className="md:hidden overflow-x-auto pb-4">
+              <div className="flex space-x-4 w-max">
+                {/* Vinyl Stickers Mobile */}
+                <Link href="/products/vinyl-stickers">
+                  <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}>
+                    <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
+                        alt="Vinyl Stickers" 
+                        className="w-full h-full object-contain"
+                        style={{
+                          filter: 'drop-shadow(0 0 12px rgba(168, 242, 106, 0.35)) drop-shadow(0 0 24px rgba(168, 242, 106, 0.21))'
+                        }}
+                      />
+                    </div>
+                    <h3 className="font-semibold text-white">Vinyl<br/>Stickers →</h3>
+                  </div>
+                </Link>
+
+                {/* Holographic Stickers Mobile */}
+                <Link href="/products/holographic-stickers">
+                  <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}>
+                    <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
+                        alt="Holographic Stickers" 
+                        className="w-full h-full object-contain"
+                        style={{
+                          filter: 'drop-shadow(0 0 12px rgba(168, 85, 247, 0.5)) drop-shadow(0 0 24px rgba(168, 85, 247, 0.3))'
+                        }}
+                      />
+                    </div>
+                    <h3 className="font-semibold text-white">Holographic<br/>Stickers →</h3>
+                  </div>
+                </Link>
+
+                {/* Chrome Stickers Mobile */}
+                <Link href="/products/chrome-stickers">
+                  <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}>
+                    <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
+                        alt="Chrome Stickers" 
+                        className="w-full h-full object-contain"
+                        style={{
+                          filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.28)) drop-shadow(0 0 12px rgba(180, 180, 180, 0.21)) drop-shadow(0 0 18px rgba(240, 240, 240, 0.14))'
+                        }}
+                      />
+                    </div>
+                    <h3 className="font-semibold text-white">Chrome<br/>Stickers →</h3>
+                  </div>
+                </Link>
+
+                {/* Glitter Stickers Mobile */}
+                <Link href="/products/glitter-stickers">
+                  <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}>
+                    <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
+                        alt="Glitter Stickers" 
+                        className="w-full h-full object-contain"
+                        style={{
+                          filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.5)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.3))'
+                        }}
+                      />
+                    </div>
+                    <h3 className="font-semibold text-white">Glitter<br/>Stickers →</h3>
+                  </div>
+                </Link>
+
+                {/* Vinyl Banners Mobile */}
+                <Link href="/products/vinyl-banners">
+                  <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}>
+                    <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593724/Vinyl-Banner_c84nis.png" 
+                        alt="Vinyl Banners" 
+                        className="w-full h-full object-contain"
+                        style={{
+                          filter: 'drop-shadow(0 0 12px rgba(196, 181, 253, 0.5)) drop-shadow(0 0 24px rgba(196, 181, 253, 0.3))'
+                        }}
+                      />
+                    </div>
+                    <h3 className="font-semibold text-white">Vinyl<br/>Banners →</h3>
+                  </div>
+                </Link>
               </div>
             </div>
           </div>
@@ -995,14 +1082,16 @@ export default function Home() {
             <div className="flex flex-col space-y-6 lg:grid lg:grid-cols-2 lg:gap-8 lg:space-y-0 lg:items-stretch">
               {/* Video */}
               <div className="relative rounded-xl overflow-hidden cursor-pointer" onClick={toggleVideo}>
-                {/* Poster image - always present but hidden when video plays */}
-                {posterImage && (
+                {/* Custom poster that shows before video starts */}
+                {!hasStarted && (
                   <img 
                     src={posterImage}
                     alt="Video thumbnail"
-                    className="absolute inset-0 w-full h-full object-cover rounded-xl z-10"
+                    className="absolute inset-0 w-full rounded-xl z-30"
                     style={{ 
-                      display: hasStarted ? 'none' : 'block'
+                      height: '100%',
+                      minHeight: '400px',
+                      objectFit: 'cover'
                     }}
                   />
                 )}
@@ -1013,13 +1102,12 @@ export default function Home() {
                   style={{ 
                     height: '100%',
                     minHeight: '400px',
-                    objectFit: 'cover',
-                    display: hasStarted ? 'block' : 'none'
+                    objectFit: 'cover'
                   }}
                   onEnded={handleVideoEnded}
                   muted
                   playsInline
-                  preload="metadata"
+                  preload="none"
                 >
                   <source src="https://stickershuttle.com/cdn/shop/videos/c/vp/8f87f3238509493faba9ce1552b073de/8f87f3238509493faba9ce1552b073de.HD-1080p-7.2Mbps-38779776.mp4?v=0" type="video/mp4" />
                   Your browser does not support the video tag.
@@ -1027,7 +1115,7 @@ export default function Home() {
                 
                 {/* Custom Play Button Overlay - Only show when video hasn't started */}
                 {!hasStarted && (
-                  <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center rounded-xl z-30">
+                  <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center rounded-xl z-40">
                     <div className="w-20 h-20 bg-white bg-opacity-90 rounded-full flex items-center justify-center hover:bg-opacity-100 transition-all duration-200 transform hover:scale-105">
                       <div className="w-0 h-0 border-l-[16px] border-l-black border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
                     </div>
@@ -1106,16 +1194,9 @@ export default function Home() {
             {/* Header */}
             <div className="text-center mb-6 -mt-4 md:mt-0">
               <div className="flex justify-center mb-4">
-                <div 
-                  className="px-6 py-2 rounded-full text-center text-3xl font-bold text-white"
-                  style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)'
-                  }}
-                >
-                  <span style={{filter: 'drop-shadow(0 0 10px rgba(34, 197, 94, 0.6)) drop-shadow(0 0 20px rgba(34, 197, 94, 0.4))', display: 'inline-block'}}>👽</span> Not a conspiracy theory...
-                </div>
+                <h2 className="text-3xl font-bold text-white">
+                  <span style={{filter: 'drop-shadow(0 0 10px rgba(34, 197, 94, 0.6)) drop-shadow(0 0 20px rgba(34, 197, 94, 0.4))', display: 'inline-block'}}>👽</span> <span className="relative inline-block">Not<span className="absolute -bottom-1 left-0 right-0 h-1 bg-yellow-400 transform rotate-1 rounded-full"></span></span> a conspiracy theory...
+                </h2>
               </div>
               <p className="text-gray-300 text-lg">
                                     And we&apos;re not aliens, that&apos;s why thousands of other businesses DO believe in us...
@@ -1459,25 +1540,47 @@ export default function Home() {
                 </h3>
                 <ul className="space-y-3">
                   <li>
-                    <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200">
+                    <Link href="/deals" className="text-gray-300 hover:text-white transition-colors duration-200">
                       ⚡ Deals
-                    </a>
+                    </Link>
                   </li>
                   <li>
-                    <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200">
+                    <a href="/products" className="text-gray-300 hover:text-white transition-colors duration-200">
                       Start Your Order →
                     </a>
                   </li>
-                  <li>
-                    <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200">
-                      Log in
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200">
-                      Signup
-                    </a>
-                  </li>
+                  {user ? (
+                    /* Logged In - Show Account Dashboard and Sign Out */
+                    <>
+                      <li>
+                        <Link href="/account/dashboard" className="text-gray-300 hover:text-white transition-colors duration-200">
+                          👨‍🚀 Account Dashboard
+                        </Link>
+                      </li>
+                      <li>
+                        <button 
+                          onClick={handleSignOut}
+                          className="text-gray-300 hover:text-white transition-colors duration-200 text-left"
+                        >
+                          Sign Out
+                        </button>
+                      </li>
+                    </>
+                  ) : (
+                    /* Not Logged In - Show Login and Signup */
+                    <>
+                      <li>
+                        <Link href="/login" className="text-gray-300 hover:text-white transition-colors duration-200">
+                          Log in
+                        </Link>
+                      </li>
+                      <li>
+                        <Link href="/signup" className="text-gray-300 hover:text-white transition-colors duration-200">
+                          Signup
+                        </Link>
+                      </li>
+                    </>
+                  )}
                   <li>
                     <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200">
                       🛒 Cart
@@ -1710,6 +1813,42 @@ export default function Home() {
             100% { transform: scale(1.15) rotate(-3deg); }
           }
           
+          /* Header Button Styles - Match Header Component */
+          .headerButton {
+            background: rgba(255, 255, 255, 0.1) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            backdrop-filter: blur(10px) !important;
+          }
+
+          .headerButton:hover {
+            background: rgba(255, 255, 255, 0.2) !important;
+            border-color: rgba(255, 255, 255, 0.3) !important;
+          }
+          
+          /* Active page button styling */
+          .headerButton.active {
+            border: 0.5px solid #a855f7 !important;
+            background: rgba(168, 85, 247, 0.1) !important;
+            box-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3) !important;
+          }
+          
+          .headerButton.active:hover {
+            background: rgba(168, 85, 247, 0.2) !important;
+            border-color: #a855f7 !important;
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.6), 0 0 30px rgba(168, 85, 247, 0.4) !important;
+          }
+          
+          .primaryButton {
+            background: linear-gradient(135deg, #ffd713, #ffed4e);
+            color: #030140;
+            font-weight: bold;
+            border: none;
+          }
+          
+          .primaryButton:hover {
+            background: linear-gradient(135deg, #ffed4e, #ffd713);
+            transform: scale(1.05);
+          }
 
         `}</style>
 

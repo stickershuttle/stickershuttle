@@ -55,3 +55,10 @@ header nav button {
 h1 {
   letter-spacing: -0.045em;
 }
+
+/* Make mobile pages wider across the site */
+@media (max-width: 768px) {
+  .w-\[95\%\] {
+    width: 98% !important;
+  }
+}
