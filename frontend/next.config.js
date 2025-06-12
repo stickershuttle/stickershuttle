@@ -1,13 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Enable hot reloading in Docker
-  webpackDevMiddleware: config => {
-    config.watchOptions = {
-      poll: 1000,
-      aggregateTimeout: 300,
+  // For development with hot reloading (only in development)
+  ...(process.env.NODE_ENV === 'development' && {
+    webpack: (config, { dev }) => {
+      if (dev) {
+        config.watchOptions = {
+          poll: 1000,
+          aggregateTimeout: 300,
+        }
+      }
+      return config
     }
-    return config
-  },
+  }),
 }
 
 module.exports = nextConfig
