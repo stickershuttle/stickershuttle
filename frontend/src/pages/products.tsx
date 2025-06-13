@@ -158,42 +158,6 @@ export default function Products() {
               </div>
             </Link>
 
-            {/* Chrome Stickers */}
-            <Link href="/products/chrome-stickers">
-              <div 
-                className="text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
-                style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                }}
-              >
-                <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-1 transition-transform duration-500 ease-out">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
-                    alt="Chrome Stickers" 
-                    className="w-full h-full object-contain"
-                    style={{
-                      filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.28)) drop-shadow(0 0 12px rgba(180, 180, 180, 0.21)) drop-shadow(0 0 18px rgba(240, 240, 240, 0.14))'
-                    }}
-                  />
-                </div>
-                <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Chrome Stickers →</h3>
-                
-                <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
-                  <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🪞 Mirror Chrome Finish</span>
-                      <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🛡️ Laminated with 7 yr protection</span>
-                      <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🔩 Metallic Polyester Film</span>
-                      <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">✨ High-Gloss Surface</span>
-                      <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🚗 Automotive Grade</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Link>
-
             {/* Glitter Stickers */}
             <Link href="/products/glitter-stickers">
               <div 
@@ -230,8 +194,8 @@ export default function Products() {
               </div>
             </Link>
 
-            {/* Vinyl Banners */}
-            <Link href="/products/vinyl-banners">
+            {/* Chrome Stickers */}
+            <Link href="/products/chrome-stickers">
               <div 
                 className="text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
                 style={{ 
@@ -242,24 +206,96 @@ export default function Products() {
               >
                 <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-1 transition-transform duration-500 ease-out">
                   <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593724/Vinyl-Banner_c84nis.png" 
-                    alt="Vinyl Banners" 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
+                    alt="Chrome Stickers" 
+                    className="w-full h-full object-contain"
+                    style={{
+                      filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.28)) drop-shadow(0 0 12px rgba(180, 180, 180, 0.21)) drop-shadow(0 0 18px rgba(240, 240, 240, 0.14))'
+                    }}
+                  />
+                </div>
+                <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Chrome Stickers →</h3>
+                
+                <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
+                  <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🪞 Mirror Chrome Finish</span>
+                      <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🛡️ Laminated with 7 yr protection</span>
+                      <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🔩 Metallic Polyester Film</span>
+                      <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">✨ High-Gloss Surface</span>
+                      <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🚗 Automotive Grade</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Link>
+
+            {/* Clear Stickers */}
+            <Link href="/products/clear-stickers">
+              <div 
+                className="text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                style={{ 
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                }}
+              >
+                <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-1 transition-transform duration-500 ease-out">
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749849590/StickerShuttle_ClearIcon_zxjnqc.svg" 
+                    alt="Clear Stickers" 
+                    className="w-full h-full object-contain"
+                    style={{
+                      filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.35)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.21))'
+                    }}
+                  />
+                </div>
+                <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Clear Stickers →</h3>
+                
+                <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
+                  <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">🔍 Crystal Transparency</span>
+                      <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">🛡️ Laminated with 7 yr protection</span>
+                      <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">💎 Professional Clarity</span>
+                      <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">🌊 Seamless Blending</span>
+                      <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">🏆 Premium Clear Vinyl</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Link>
+
+            {/* Sticker Sheets */}
+            <Link href="/products/sticker-sheets">
+              <div 
+                className="text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                style={{ 
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                }}
+              >
+                <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-1 transition-transform duration-500 ease-out">
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749847809/StickerShuttle_StickerSheetsIcon_2_g61dty.svg" 
+                    alt="Sticker Sheets" 
                     className="w-full h-full object-contain"
                     style={{
                       filter: 'drop-shadow(0 0 12px rgba(196, 181, 253, 0.35)) drop-shadow(0 0 24px rgba(196, 181, 253, 0.21))'
                     }}
                   />
                 </div>
-                <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Vinyl Banners →</h3>
+                <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Sticker Sheets →</h3>
                 
                 <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
                   <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
                     <div className="flex flex-wrap gap-2 justify-center">
-                      <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">💪 Heavy Duty 13oz Vinyl</span>
+                      <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">📄 Multiple Stickers Per Sheet</span>
                       <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🛡️ Laminated with 7 yr protection</span>
-                      <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🔗 Hemmed & Grommeted</span>
+                      <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">✂️ Kiss-Cut for Easy Peeling</span>
                       <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🌦️ UV & Weather Resistant</span>
-                      <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">📏 Custom Sizes Available</span>
+                      <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">📏 Custom Sheet Layouts</span>
                     </div>
                   </div>
                 </div>
@@ -339,30 +375,6 @@ export default function Products() {
               </div>
             </Link>
 
-            <Link href="/products/chrome-stickers">
-              <div 
-                className="text-center rounded-xl p-6 flex flex-col" 
-                style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)',
-                  height: '220px'
-                }}
-              >
-                                <div className="w-28 h-28 mx-auto flex items-center justify-center mb-6">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
-                    alt="Chrome Stickers"
-                    className="w-full h-full object-contain"
-                    style={{
-                      filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.28)) drop-shadow(0 0 12px rgba(180, 180, 180, 0.21)) drop-shadow(0 0 18px rgba(240, 240, 240, 0.14))'
-                    }}
-                  />
-                </div>
-                <h3 className="font-semibold text-white text-sm mb-6">Chrome<br/>Stickers →</h3>
-              </div>
-            </Link>
-
             <Link href="/products/glitter-stickers">
               <div 
                 className="text-center rounded-xl p-6 flex flex-col" 
@@ -387,7 +399,55 @@ export default function Products() {
               </div>
             </Link>
 
-            <Link href="/products/vinyl-banners">
+            <Link href="/products/chrome-stickers">
+              <div 
+                className="text-center rounded-xl p-6 flex flex-col" 
+                style={{ 
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)',
+                  height: '220px'
+                }}
+              >
+                                <div className="w-28 h-28 mx-auto flex items-center justify-center mb-6">
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
+                    alt="Chrome Stickers"
+                    className="w-full h-full object-contain"
+                    style={{
+                      filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.28)) drop-shadow(0 0 12px rgba(180, 180, 180, 0.21)) drop-shadow(0 0 18px rgba(240, 240, 240, 0.14))'
+                    }}
+                  />
+                </div>
+                <h3 className="font-semibold text-white text-sm mb-6">Chrome<br/>Stickers →</h3>
+              </div>
+            </Link>
+
+            <Link href="/products/clear-stickers">
+              <div 
+                className="text-center rounded-xl p-6 flex flex-col" 
+                style={{ 
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)',
+                  height: '220px'
+                }}
+              >
+                                <div className="w-28 h-28 mx-auto flex items-center justify-center mb-6">
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749849590/StickerShuttle_ClearIcon_zxjnqc.svg" 
+                    alt="Clear Stickers"
+                    className="w-full h-full object-contain"
+                    style={{
+                      filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.5)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.3))'
+                    }}
+                  />
+                </div>
+                <h3 className="font-semibold text-white text-sm mb-6">Clear<br/>Stickers →</h3>
+              </div>
+            </Link>
+
+            <Link href="/products/sticker-sheets">
               <div 
                 className="text-center rounded-xl p-6 flex flex-col"
                 style={{ 
@@ -400,18 +460,103 @@ export default function Products() {
               >
                                 <div className="w-28 h-28 mx-auto flex items-center justify-center mb-6">
                   <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593724/Vinyl-Banner_c84nis.png" 
-                    alt="Vinyl Banners"
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749847809/StickerShuttle_StickerSheetsIcon_2_g61dty.svg" 
+                    alt="Sticker Sheets"
                     className="w-full h-full object-contain"
                     style={{
                       filter: 'drop-shadow(0 0 12px rgba(196, 181, 253, 0.5)) drop-shadow(0 0 24px rgba(196, 181, 253, 0.3))'
                     }}
                   />
                 </div>
-                <h3 className="font-semibold text-white text-sm mb-6">Vinyl<br/>Banners →</h3>
+                <h3 className="font-semibold text-white text-sm mb-6">Sticker<br/>Sheets →</h3>
               </div>
             </Link>
           </div>
+          </div>
+
+          {/* Signage Section */}
+          <div className="mt-16">
+            {/* Signage Title */}
+            <div className="text-center mb-8">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl text-white mb-4" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>Signage</h2>
+              <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+                Professional signage solutions for your business or event needs.
+              </p>
+            </div>
+
+            {/* Signage Desktop Grid */}
+            <div className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 group/container mb-16">
+              {/* Vinyl Banners */}
+              <Link href="/products/vinyl-banners">
+                <div 
+                  className="text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}
+                >
+                  <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-1 transition-transform duration-500 ease-out">
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593724/Vinyl-Banner_c84nis.png" 
+                      alt="Vinyl Banners" 
+                      className="w-full h-full object-contain"
+                      style={{
+                        filter: 'drop-shadow(0 0 12px rgba(196, 181, 253, 0.35)) drop-shadow(0 0 24px rgba(196, 181, 253, 0.21))'
+                      }}
+                    />
+                  </div>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Vinyl Banners →</h3>
+                  
+                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
+                    <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">💪 Heavy Duty 13oz Vinyl</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🔗 Hemmed & Grommeted</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🌦️ UV & Weather Resistant</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">📏 Custom Sizes Available</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🏢 Professional Grade</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            </div>
+
+            {/* Signage Mobile Grid */}
+            <div className="w-full mx-auto px-2 md:hidden mb-16">
+              <div 
+                style={{ 
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(1, 1fr)',
+                  gap: '16px'
+                }}
+              >
+                <Link href="/products/vinyl-banners">
+                  <div 
+                    className="text-center rounded-xl p-6 flex flex-col"
+                    style={{ 
+                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)',
+                      height: '220px'
+                    }}
+                  >
+                    <div className="w-28 h-28 mx-auto flex items-center justify-center mb-6">
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593724/Vinyl-Banner_c84nis.png" 
+                        alt="Vinyl Banners"
+                        className="w-full h-full object-contain"
+                        style={{
+                          filter: 'drop-shadow(0 0 12px rgba(196, 181, 253, 0.5)) drop-shadow(0 0 24px rgba(196, 181, 253, 0.3))'
+                        }}
+                      />
+                    </div>
+                    <h3 className="font-semibold text-white text-sm mb-6">Vinyl<br/>Banners →</h3>
+                  </div>
+                </Link>
+              </div>
+            </div>
           </div>
 
         </main>

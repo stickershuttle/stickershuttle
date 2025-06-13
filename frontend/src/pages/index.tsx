@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import Layout from "../components/Layout";
 import { useRouter } from "next/router";
 import { getSupabase } from "../lib/supabase";
@@ -99,7 +100,7 @@ export default function Home() {
                       borderRadius: '10px',
                       border: 'solid',
                       borderWidth: '0.03125rem',
-                      borderColor: '#e6c211'
+                      borderColor: '#8d9912'
                     }}
                   >
                     Start Here →
@@ -153,32 +154,32 @@ export default function Home() {
                 }}
               >
                 {/* First set of brands */}
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593661/StickerShuttle_Brands_AndHealth_bawirz.png" alt="AndHealth" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593675/Wahl-Icon-Web_tq0jqm.webp" alt="Wahl" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593600/Amazon-Go_by2gkb.png" alt="Amazon" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593604/ChickFilA-Icon-Web_anobg1.png" alt="Chick-fil-A" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_Nike_gmedyb.png" alt="Nike" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593671/StickerShuttle_Brands_XFinity_nz2obt.png" alt="Xfinity" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_SSPR_ewqax7.png" alt="SSPR" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593662/StickerShuttle_Brands_CGR_ryewlb.png" alt="CGR" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_WF_vrafue.png" alt="WF" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593666/StickerShuttle_Brands_UnoMas_ntorew.png" alt="UnoMas" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593610/LT-Icon_llqxai.png" alt="LT" className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593661/StickerShuttle_Brands_AndHealth_bawirz.png" alt="AndHealth" width={120} height={80} className="h-20 w-auto" priority />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593675/Wahl-Icon-Web_tq0jqm.webp" alt="Wahl" width={120} height={80} className="h-20 w-auto" priority />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593600/Amazon-Go_by2gkb.png" alt="Amazon" width={120} height={80} className="h-20 w-auto" priority />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593604/ChickFilA-Icon-Web_anobg1.png" alt="Chick-fil-A" width={120} height={80} className="h-20 w-auto" priority />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_Nike_gmedyb.png" alt="Nike" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593671/StickerShuttle_Brands_XFinity_nz2obt.png" alt="Xfinity" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_SSPR_ewqax7.png" alt="SSPR" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593662/StickerShuttle_Brands_CGR_ryewlb.png" alt="CGR" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_WF_vrafue.png" alt="WF" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593666/StickerShuttle_Brands_UnoMas_ntorew.png" alt="UnoMas" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593610/LT-Icon_llqxai.png" alt="LT" width={120} height={80} className="h-20 w-auto" />
                 
                 {/* Duplicate set for seamless loop */}
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593661/StickerShuttle_Brands_AndHealth_bawirz.png" alt="AndHealth" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593675/Wahl-Icon-Web_tq0jqm.webp" alt="Wahl" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593600/Amazon-Go_by2gkb.png" alt="Amazon" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593604/ChickFilA-Icon-Web_anobg1.png" alt="Chick-fil-A" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_Nike_gmedyb.png" alt="Nike" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593671/StickerShuttle_Brands_XFinity_nz2obt.png" alt="Xfinity" className="h-20 w-auto" />
-                <img src="https://res.cloudiary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_SSPR_ewqax7.png" alt="SSPR" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593662/StickerShuttle_Brands_CGR_ryewlb.png" alt="CGR" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_WF_vrafue.png" alt="WF" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593666/StickerShuttle_Brands_UnoMas_ntorew.png" alt="UnoMas" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593610/LT-Icon_llqxai.png" alt="LT" className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593661/StickerShuttle_Brands_AndHealth_bawirz.png" alt="AndHealth" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593675/Wahl-Icon-Web_tq0jqm.webp" alt="Wahl" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593600/Amazon-Go_by2gkb.png" alt="Amazon" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593604/ChickFilA-Icon-Web_anobg1.png" alt="Chick-fil-A" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_Nike_gmedyb.png" alt="Nike" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593671/StickerShuttle_Brands_XFinity_nz2obt.png" alt="Xfinity" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_SSPR_ewqax7.png" alt="SSPR" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593662/StickerShuttle_Brands_CGR_ryewlb.png" alt="CGR" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_WF_vrafue.png" alt="WF" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593666/StickerShuttle_Brands_UnoMas_ntorew.png" alt="UnoMas" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593610/LT-Icon_llqxai.png" alt="LT" width={120} height={80} className="h-20 w-auto" />
               </div>
               
               {/* Fade effects */}
@@ -342,8 +343,8 @@ export default function Home() {
                 </div>
               </Link>
 
-              {/* Vinyl Banners */}
-              <Link href="/products/vinyl-banners">
+              {/* Sticker Sheets */}
+              <Link href="/products/sticker-sheets">
                 <div 
                   className="banner-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden group-hover/container:blur-[2px] hover:!blur-none"
                   style={{ 
@@ -354,25 +355,25 @@ export default function Home() {
                 >
                   <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-1 transition-transform duration-500 ease-out">
                     <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593724/Vinyl-Banner_c84nis.png" 
-                      alt="Vinyl Banners" 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749847809/StickerShuttle_StickerSheetsIcon_2_g61dty.svg" 
+                      alt="Sticker Sheets" 
                       className="w-full h-full object-contain"
                       style={{
                         filter: 'drop-shadow(0 0 12px rgba(196, 181, 253, 0.35)) drop-shadow(0 0 24px rgba(196, 181, 253, 0.21))'
                       }}
                     />
                   </div>
-                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Vinyl Banners →</h3>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Sticker Sheets →</h3>
                   
                   {/* Hover to show features on desktop */}
                   <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
                     <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
                       <div className="flex flex-wrap gap-2 justify-center">
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">💪 Heavy Duty 13oz Vinyl</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">📄 Multiple Stickers Per Sheet</span>
                         <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🛡️ Laminated with 7 yr protection</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🔗 Hemmed & Grommeted</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">✂️ Kiss-Cut for Easy Peeling</span>
                         <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🌦️ UV & Weather Resistant</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">📏 Custom Sizes Available</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">📏 Custom Sheet Layouts</span>
                       </div>
                     </div>
                   </div>
@@ -467,8 +468,8 @@ export default function Home() {
                   </div>
                 </Link>
 
-                {/* Vinyl Banners Mobile */}
-                <Link href="/products/vinyl-banners">
+                {/* Sticker Sheets Mobile */}
+                <Link href="/products/sticker-sheets">
                   <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -476,15 +477,15 @@ export default function Home() {
                   }}>
                     <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
                       <img 
-                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593724/Vinyl-Banner_c84nis.png" 
-                        alt="Vinyl Banners" 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749847809/StickerShuttle_StickerSheetsIcon_2_g61dty.svg" 
+                        alt="Sticker Sheets" 
                         className="w-full h-full object-contain"
                         style={{
                           filter: 'drop-shadow(0 0 12px rgba(196, 181, 253, 0.5)) drop-shadow(0 0 24px rgba(196, 181, 253, 0.3))'
                         }}
                       />
                     </div>
-                    <h3 className="font-semibold text-white">Vinyl<br/>Banners →</h3>
+                    <h3 className="font-semibold text-white">Sticker<br/>Sheets →</h3>
                   </div>
                 </Link>
               </div>
@@ -671,7 +672,7 @@ export default function Home() {
                     boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
                     border: 'solid',
                     borderWidth: '0.03125rem',
-                    borderColor: '#e6c211'
+                    borderColor: '#8d9912'
                   }}
                 >
                   Order your stickers today →
@@ -1014,14 +1015,14 @@ export default function Home() {
                   <Link href="/login">
                     <button 
                       className="px-8 py-3 font-semibold text-lg transition-all duration-300 transform hover:scale-105 rounded-lg"
-                                             style={{
-                         backgroundColor: '#ffd713',
-                         color: '#030140',
-                         boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
-                         border: 'solid',
-                         borderWidth: '0.03125rem',
-                         borderColor: '#e6c211'
-                       }}
+                      style={{
+                        backgroundColor: '#ffd713',
+                        color: '#030140',
+                        boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
+                        border: 'solid',
+                        borderWidth: '0.03125rem',
+                        borderColor: '#8d9912'
+                      }}
                     >
                       Login
                     </button>
@@ -1029,15 +1030,7 @@ export default function Home() {
                   
                   <Link href="/signup">
                     <button className="px-8 py-3 font-semibold text-lg text-white hover:text-gray-200 transition-all duration-300 hover:scale-105 rounded-lg border border-gray-400 hover:border-gray-300">
-                      New Customer? <span 
-                        className="text-yellow-400" 
-                                                style={{
-                           textShadow: '0 0 2px rgba(255, 215, 19, 0.16), 0 0 4px rgba(255, 215, 19, 0.12)',
-                           filter: 'drop-shadow(0 0 1px rgba(255, 215, 19, 0.1))'
-                         }}
-                      >
-                        Sign Up
-                      </span>
+                      New Customer? Sign Up
                     </button>
                   </Link>
                 </div>
