@@ -198,7 +198,7 @@ export default function Home() {
               {/* Vinyl Stickers */}
               <Link href="/products/vinyl-stickers">
                 <div 
-                  className="vinyl-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden group-hover/container:blur-[2px] hover:!blur-none"
+                  className="vinyl-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
                   style={{ 
                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -222,8 +222,7 @@ export default function Home() {
                     <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
                       <div className="flex flex-wrap gap-2 justify-center">
                         <span className="px-3 py-1 text-xs rounded-full bg-green-500/20 text-green-200 border border-green-400/50">💧 Waterproof & UV Resistant</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-green-500/20 text-green-200 border border-green-400/50">🛡️ Laminated with 7 yr protection</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-green-500/20 text-green-200 border border-green-400/50">🎯 Premium Vinyl Material</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-green-500/20 text-green-200 border border-green-400/50">🛡️ Laminated with 5+ yr protection</span>
                         <span className="px-3 py-1 text-xs rounded-full bg-green-500/20 text-green-200 border border-green-400/50">🏠 Dishwasher Safe</span>
                         <span className="px-3 py-1 text-xs rounded-full bg-green-500/20 text-green-200 border border-green-400/50">✂️ Custom Shapes Available</span>
                       </div>
@@ -235,7 +234,7 @@ export default function Home() {
               {/* Holographic Stickers */}
               <Link href="/products/holographic-stickers">
                 <div 
-                  className="holographic-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden group-hover/container:blur-[2px] hover:!blur-none"
+                  className="holographic-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
                   style={{ 
                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -258,48 +257,10 @@ export default function Home() {
                   <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
                     <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
                       <div className="flex flex-wrap gap-2 justify-center">
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🌈 Rainbow Holographic Effect</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🛡️ Laminated with 7 yr protection</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">✨ Holographic Vinyl Material</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">💎 Light-Reflecting Surface</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">👁️ Eye-Catching Design</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-
-              {/* Chrome Stickers */}
-              <Link href="/products/chrome-stickers">
-                <div 
-                  className="chrome-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden group-hover/container:blur-[2px] hover:!blur-none"
-                  style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                  }}
-                >
-                  <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-2 transition-transform duration-500 ease-out">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
-                      alt="Chrome Stickers" 
-                      className="w-full h-full object-contain"
-                      style={{
-                        filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.28)) drop-shadow(0 0 12px rgba(180, 180, 180, 0.21)) drop-shadow(0 0 18px rgba(240, 240, 240, 0.14))'
-                      }}
-                    />
-                  </div>
-                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Chrome Stickers →</h3>
-                  
-                  {/* Hover to show features on desktop */}
-                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
-                    <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                      <div className="flex flex-wrap gap-2 justify-center">
-                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🪞 Mirror Chrome Finish</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🛡️ Laminated with 7 yr protection</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🔩 Metallic Polyester Film</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">✨ High-Gloss Surface</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🚗 Automotive Grade</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">💧 Waterproof & UV Resistant</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🛡️ Laminated with 5+ yr protection</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">💪 Durable & Resistant</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">👁️ Eye Catching Design</span>
                       </div>
                     </div>
                   </div>
@@ -309,7 +270,7 @@ export default function Home() {
               {/* Glitter Stickers */}
               <Link href="/products/glitter-stickers">
                 <div 
-                  className="glitter-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden group-hover/container:blur-[2px] hover:!blur-none"
+                  className="glitter-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
                   style={{ 
                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -332,11 +293,46 @@ export default function Home() {
                   <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
                     <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
                       <div className="flex flex-wrap gap-2 justify-center">
-                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">✨ Sparkly Glitter Finish</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">🛡️ Laminated with 7 yr protection</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">💫 Specialty Glitter Vinyl</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">🎨 Textured Surface</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">🌈 Multiple Colors Available</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">💧 Waterproof & UV Resistant</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">🛡️ Laminated with 5+ yr protection</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">🤍 White Ink Capable</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">💎 Rare Sticker Type</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+
+              {/* Chrome Stickers */}
+              <Link href="/products/chrome-stickers">
+                <div 
+                  className="chrome-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}
+                >
+                  <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-2 transition-transform duration-500 ease-out">
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
+                      alt="Chrome Stickers" 
+                      className="w-full h-full object-contain"
+                      style={{
+                        filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.28)) drop-shadow(0 0 12px rgba(180, 180, 180, 0.21)) drop-shadow(0 0 18px rgba(240, 240, 240, 0.14))'
+                      }}
+                    />
+                  </div>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Chrome Stickers →</h3>
+                  
+                  {/* Hover to show features on desktop */}
+                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
+                    <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">💧 Waterproof & UV Resistant</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🛡️ Laminated with 5+ yr protection</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🤍 White Ink Capable</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🪞 Matte or Gloss</span>
                       </div>
                     </div>
                   </div>
@@ -346,7 +342,7 @@ export default function Home() {
               {/* Sticker Sheets */}
               <Link href="/products/sticker-sheets">
                 <div 
-                  className="banner-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden group-hover/container:blur-[2px] hover:!blur-none"
+                  className="banner-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
                   style={{ 
                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -369,11 +365,10 @@ export default function Home() {
                   <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
                     <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
                       <div className="flex flex-wrap gap-2 justify-center">
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">💧 Waterproof & UV Resistant</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🛡️ Laminated with 5+ yr protection</span>
                         <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">📄 Multiple Stickers Per Sheet</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🛡️ Laminated with 7 yr protection</span>
                         <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">✂️ Kiss-Cut for Easy Peeling</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🌦️ UV & Weather Resistant</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">📏 Custom Sheet Layouts</span>
                       </div>
                     </div>
                   </div>
@@ -426,27 +421,6 @@ export default function Home() {
                   </div>
                 </Link>
 
-                {/* Chrome Stickers Mobile */}
-                <Link href="/products/chrome-stickers">
-                  <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                  }}>
-                    <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
-                      <img 
-                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
-                        alt="Chrome Stickers" 
-                        className="w-full h-full object-contain"
-                        style={{
-                          filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.28)) drop-shadow(0 0 12px rgba(180, 180, 180, 0.21)) drop-shadow(0 0 18px rgba(240, 240, 240, 0.14))'
-                        }}
-                      />
-                    </div>
-                    <h3 className="font-semibold text-white">Chrome<br/>Stickers →</h3>
-                  </div>
-                </Link>
-
                 {/* Glitter Stickers Mobile */}
                 <Link href="/products/glitter-stickers">
                   <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
@@ -465,6 +439,27 @@ export default function Home() {
                       />
                     </div>
                     <h3 className="font-semibold text-white">Glitter<br/>Stickers →</h3>
+                  </div>
+                </Link>
+
+                {/* Chrome Stickers Mobile */}
+                <Link href="/products/chrome-stickers">
+                  <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}>
+                    <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
+                        alt="Chrome Stickers" 
+                        className="w-full h-full object-contain"
+                        style={{
+                          filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.28)) drop-shadow(0 0 12px rgba(180, 180, 180, 0.21)) drop-shadow(0 0 18px rgba(240, 240, 240, 0.14))'
+                        }}
+                      />
+                    </div>
+                    <h3 className="font-semibold text-white">Chrome<br/>Stickers →</h3>
                   </div>
                 </Link>
 
@@ -984,23 +979,39 @@ export default function Home() {
         </section>
 
         {/* Quick Login Banner */}
-        <section className="py-8">
+        <section className="py-4">
           <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
             <div 
               className="rounded-2xl p-8 text-center relative overflow-hidden"
               style={{
-                background: 'linear-gradient(135deg, rgba(255, 215, 19, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
-                backdropFilter: 'blur(20px)'
+                boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
               }}
             >
-              {/* Background decoration */}
-              <div className="absolute inset-0 opacity-10">
-                <div className="absolute top-4 left-4 w-12 h-12 border-2 border-yellow-400 rounded-full"></div>
-                <div className="absolute bottom-4 right-4 w-8 h-8 border-2 border-purple-400 rounded-full"></div>
-                <div className="absolute top-1/2 left-1/4 w-6 h-6 bg-yellow-400 rounded-full blur-sm"></div>
-                <div className="absolute top-1/4 right-1/3 w-4 h-4 bg-purple-400 rounded-full blur-sm"></div>
+              {/* Background decoration - Stars */}
+              <div className="absolute inset-0 opacity-20">
+                {/* Top stars */}
+                <div className="absolute top-6 left-8 text-yellow-400 text-lg">⭐</div>
+                <div className="absolute top-4 left-1/4 text-white text-sm">✨</div>
+                <div className="absolute top-8 right-1/4 text-purple-400 text-base">⭐</div>
+                <div className="absolute top-6 right-8 text-blue-400 text-sm">✨</div>
+                
+                {/* Middle stars */}
+                <div className="absolute top-1/2 left-6 text-green-400 text-sm">⭐</div>
+                <div className="absolute top-1/2 right-6 text-pink-400 text-base">✨</div>
+                <div className="absolute top-1/3 left-12 text-orange-400 text-xs">⭐</div>
+                <div className="absolute top-2/3 right-12 text-cyan-400 text-sm">✨</div>
+                
+                {/* Bottom stars */}
+                <div className="absolute bottom-6 left-1/3 text-yellow-400 text-sm">✨</div>
+                <div className="absolute bottom-8 left-16 text-purple-400 text-xs">⭐</div>
+                <div className="absolute bottom-4 right-1/3 text-white text-base">⭐</div>
+                <div className="absolute bottom-6 right-16 text-blue-400 text-sm">✨</div>
+                
+                {/* Corner stars */}
+                <div className="absolute top-12 left-1/2 text-green-400 text-xs">⭐</div>
+                <div className="absolute bottom-12 left-1/2 text-pink-400 text-sm">✨</div>
               </div>
 
               <div className="relative z-10">
@@ -1030,7 +1041,7 @@ export default function Home() {
                   
                   <Link href="/signup">
                     <button className="px-8 py-3 font-semibold text-lg text-white hover:text-gray-200 transition-all duration-300 hover:scale-105 rounded-lg border border-gray-400 hover:border-gray-300">
-                      New Customer? Sign Up
+                      New Customer? <span className="text-yellow-400">Sign Up</span>
                     </button>
                   </Link>
                 </div>
