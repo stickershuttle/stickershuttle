@@ -54,6 +54,36 @@ export default function Login() {
     }
   };
 
+  const handleOAuthLogin = async (provider: string) => {
+    if (provider.toLowerCase() !== 'google') {
+      alert(`${provider} login coming soon!`);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const supabase = await getSupabase();
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/account/dashboard`
+        }
+      });
+
+      if (error) {
+        console.error('OAuth error:', error);
+        setError(error.message);
+        setLoading(false);
+      }
+      // If successful, user will be redirected by Supabase
+    } catch (err: any) {
+      console.error('OAuth error:', err);
+      setError(err.message || 'An error occurred during OAuth login');
+      setLoading(false);
+    }
+  };
+
   const thirdPartyProviders = [
     {
       name: 'Google',
@@ -149,7 +179,10 @@ export default function Login() {
                 {thirdPartyProviders.map((provider) => (
                   <button
                     key={provider.name}
-                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-white/20 bg-white/5 hover:bg-white/10 transition-all duration-200 transform hover:scale-105"
+                    type="button"
+                    onClick={() => handleOAuthLogin(provider.name)}
+                    disabled={loading}
+                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-white/20 bg-white/5 hover:bg-white/10 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <img 
                       src={provider.icon} 
@@ -305,7 +338,10 @@ export default function Login() {
                   {thirdPartyProviders.map((provider) => (
                     <button
                       key={provider.name}
-                      className="flex items-center justify-center gap-2 px-6 py-4 rounded-lg border border-white/20 bg-white/5 hover:bg-white/10 transition-all duration-200 transform hover:scale-105"
+                      type="button"
+                      onClick={() => handleOAuthLogin(provider.name)}
+                      disabled={loading}
+                      className="flex items-center justify-center gap-2 px-6 py-4 rounded-lg border border-white/20 bg-white/5 hover:bg-white/10 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <img 
                         src={provider.icon} 
