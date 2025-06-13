@@ -18,7 +18,7 @@ interface BasePricing {
   price: number
 }
 
-interface StickerCalculatorProps {
+interface HolographicStickerCalculatorProps {
   initialBasePricing: BasePricing[]
   realPricingData?: {
     basePricing: BasePriceRow[];
@@ -26,7 +26,7 @@ interface StickerCalculatorProps {
   } | null
 }
 
-export default function StickerCalculator({ initialBasePricing, realPricingData }: StickerCalculatorProps) {
+export default function HolographicStickerCalculator({ initialBasePricing, realPricingData }: HolographicStickerCalculatorProps) {
   const { addToCart } = useCart();
   const router = useRouter();
   const [basePricing, setBasePricing] = useState<BasePricing[]>(initialBasePricing)
@@ -37,6 +37,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
   const [customHeight, setCustomHeight] = useState("")
   const [selectedQuantity, setSelectedQuantity] = useState("100")
   const [customQuantity, setCustomQuantity] = useState("")
+  const [selectedWhiteOption, setSelectedWhiteOption] = useState("color-only")
   const [sendProof, setSendProof] = useState(true)
   const [uploadLater, setUploadLater] = useState(false)
   const [rushOrder, setRushOrder] = useState(false)
@@ -125,7 +126,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
       setTotalPrice("")
       setCostPerSticker("")
     }
-  }, [selectedSize, customWidth, customHeight, selectedQuantity, customQuantity, rushOrder])
+  }, [selectedSize, customWidth, customHeight, selectedQuantity, customQuantity, selectedWhiteOption, rushOrder])
 
   useEffect(() => {
     console.log("Recalculating price due to size or quantity change")
@@ -159,6 +160,14 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     let totalPrice = 0
     let pricePerSticker = 0
 
+    // Get white option pricing modifier
+    const whiteOptionModifiers = {
+      'color-only': 1.0,
+      'partial-white': 1.05,
+      'full-white': 1.1
+    };
+    const whiteOptionMultiplier = whiteOptionModifiers[selectedWhiteOption as keyof typeof whiteOptionModifiers] || 1.0;
+
     // Try to use real pricing data first
     if (realPricingData && realPricingData.basePricing && realPricingData.quantityDiscounts) {
       console.log('Using real pricing data for calculation');
@@ -171,11 +180,15 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
         rushOrder
       );
       
-      console.log(`Real Pricing - Quantity: ${qty}, Area: ${area}, Total: $${realResult.totalPrice.toFixed(2)}, Per sticker: $${realResult.finalPricePerSticker.toFixed(2)}`);
+      // Apply white option modifier
+      const adjustedTotal = realResult.totalPrice * whiteOptionMultiplier;
+      const adjustedPerSticker = realResult.finalPricePerSticker * whiteOptionMultiplier;
+      
+      console.log(`Real Pricing - Quantity: ${qty}, Area: ${area}, White Option: ${selectedWhiteOption} (${whiteOptionMultiplier}x), Total: $${adjustedTotal.toFixed(2)}, Per sticker: $${adjustedPerSticker.toFixed(2)}`);
       
       return {
-        total: realResult.totalPrice,
-        perSticker: realResult.finalPricePerSticker
+        total: adjustedTotal,
+        perSticker: adjustedPerSticker
       };
     }
 
@@ -202,7 +215,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     }
 
     const discountMultiplier = discountMap[qty] || 1.0
-    pricePerSticker = scaledBasePrice * discountMultiplier
+    pricePerSticker = scaledBasePrice * discountMultiplier * whiteOptionMultiplier
     totalPrice = pricePerSticker * qty
 
     if (rushOrder) {
@@ -211,7 +224,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     }
 
     console.log(
-      `Legacy Pricing - Quantity: ${qty}, Area: ${area}, Total price: $${totalPrice.toFixed(2)}, Price per sticker: $${pricePerSticker.toFixed(2)}`,
+      `Legacy Pricing - Quantity: ${qty}, Area: ${area}, White Option: ${selectedWhiteOption} (${whiteOptionMultiplier}x), Total price: $${totalPrice.toFixed(2)}, Price per sticker: $${pricePerSticker.toFixed(2)}`,
     )
 
     return {
@@ -344,12 +357,12 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     const cartItem = {
       id: generateCartItemId(),
       product: {
-        id: "vinyl-stickers",
-        sku: "SS-VS-001",
-        name: "Vinyl Stickers",
-        category: "vinyl-stickers" as const,
-        description: "Premium custom vinyl stickers with durable, weatherproof material",
-        shortDescription: "Premium vinyl stickers built to last",
+        id: "holographic-stickers",
+        sku: "SS-HS-001",
+        name: "Holographic Stickers",
+        category: "holographic-stickers" as const,
+        description: "Custom holographic stickers with mesmerizing rainbow effects",
+        shortDescription: "Holographic stickers with eye-catching brilliance",
         basePrice: perSticker,
         pricingModel: "per-unit" as const,
         images: [],
@@ -362,7 +375,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
         updatedAt: new Date().toISOString(),
       },
       customization: {
-        productId: "vinyl-stickers",
+        productId: "holographic-stickers",
         selections: {
           cut: { type: "shape" as const, value: selectedCut, displayValue: selectedCut, priceImpact: 0 },
           material: { type: "finish" as const, value: selectedMaterial, displayValue: selectedMaterial, priceImpact: 0 },
@@ -372,6 +385,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
             displayValue: selectedSize === "Custom size" ? `${customWidth}"x${customHeight}"` : selectedSize,
             priceImpact: 0 
           },
+          whiteOption: { type: "white-base" as const, value: selectedWhiteOption, displayValue: selectedWhiteOption, priceImpact: 0 },
           proof: { type: "finish" as const, value: sendProof, displayValue: sendProof ? "Send Proof" : "No Proof", priceImpact: 0 },
           rush: { type: "finish" as const, value: rushOrder, displayValue: rushOrder ? "Rush Order" : "Standard", priceImpact: rushOrder ? total * 0.4 : 0 }
         },
@@ -393,8 +407,6 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     // Redirect to cart page
     router.push('/cart');
   };
-
-
 
   return (
     <div className="transition-colors duration-200">
@@ -874,6 +886,101 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
             </div>
           </div>
 
+          {/* White Options Section */}
+          <div className="mb-6">
+            <div className="container-style p-6 transition-colors duration-200">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
+                <span className="text-blue-400">⚪</span>
+                White Options
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Color Only */}
+                <button
+                  onClick={() => setSelectedWhiteOption("color-only")}
+                  className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
+                    ${
+                      selectedWhiteOption === "color-only"
+                        ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
+                        : "hover:bg-white/10 border-white/20 text-white/80"
+                    }`}
+                >
+                  <div className="flex items-center mb-2">
+                    <div className="text-2xl mr-3">🎨</div>
+                    <h3 className="font-semibold text-white">
+                      Color Only
+                    </h3>
+                  </div>
+                  <p className="text-gray-300 text-sm mb-2">
+                    Default option. We will only print the colors your provided, minus white.
+                  </p>
+                  <div className="flex items-center text-sm">
+                    <span className="text-green-400 font-medium">✅ Standard Pricing</span>
+                  </div>
+                  {selectedWhiteOption === "color-only" && (
+                    <span className="absolute top-1 right-2 text-[10px] text-blue-300 font-medium">Selected</span>
+                  )}
+                </button>
+
+                {/* Partial White Ink */}
+                <button
+                  onClick={() => setSelectedWhiteOption("partial-white")}
+                  className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
+                    ${
+                      selectedWhiteOption === "partial-white"
+                        ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
+                        : "hover:bg-white/10 border-white/20 text-white/80"
+                    }`}
+                >
+                  <div className="flex items-center mb-2">
+                    <div className="text-2xl mr-3">👩‍🦳</div>
+                    <h3 className="font-semibold text-white">
+                      Partial White Ink
+                    </h3>
+                  </div>
+                  <p className="text-gray-300 text-sm mb-2">
+                    Also a great option when adding specific white elements to your design.
+                  </p>
+                  <div className="flex items-center text-sm">
+                    <span className="text-yellow-400 font-medium">+5% pricing</span>
+                  </div>
+                  {selectedWhiteOption === "partial-white" && (
+                    <span className="absolute top-1 right-2 text-[10px] text-blue-300 font-medium">Selected</span>
+                  )}
+                </button>
+
+                {/* Full White Ink */}
+                <button
+                  onClick={() => setSelectedWhiteOption("full-white")}
+                  className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
+                    ${
+                      selectedWhiteOption === "full-white"
+                        ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
+                        : "hover:bg-white/10 border-white/20 text-white/80"
+                    }`}
+                >
+                  <div className="flex items-center mb-2">
+                    <div className="text-2xl mr-3">⚪</div>
+                    <h3 className="font-semibold text-white">
+                      Full White Ink
+                    </h3>
+                  </div>
+                  <p className="text-gray-300 text-sm mb-2">
+                    <strong>Caution:</strong> This is best if you only want the offset border to be holographic.
+                  </p>
+                  <div className="flex items-center text-sm">
+                    <span className="text-yellow-400 font-medium">+10% pricing</span>
+                  </div>
+                  {selectedWhiteOption === "full-white" && (
+                    <span className="absolute top-1 right-2 text-[10px] text-blue-300 font-medium">Selected</span>
+                  )}
+                </button>
+              </div>
+
+              
+            </div>
+          </div>
+
           {/* Bottom Section */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             {/* Artwork Upload */}
@@ -1125,27 +1232,17 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="space-y-3">
-            {/* Add to Cart Button */}
-            <button 
-              onClick={handleAddToCart}
-              disabled={!totalPrice || (!uploadedFile && !uploadLater)} 
-              className="w-full bg-yellow-400 text-black font-semibold py-4 px-6 rounded-xl text-lg hover:bg-yellow-300 transition-all duration-300 shadow-[0_0_15px_rgba(255,234,55,0.5)] button-interactive hover:shadow-[0_0_25px_rgba(255,234,55,0.7)] hover:scale-105 relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-            >
-              <span className="relative z-10 flex items-center justify-center gap-2">
-                🛒 {!uploadedFile && !uploadLater ? "Please Upload Artwork or Select Upload Later" : "Add to Cart"}
-              </span>
-              <div className="absolute inset-0 bg-gradient-to-r from-yellow-300 to-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            </button>
-
-            {/* Helpful text */}
-            <div className="text-center py-2">
-              <p className="text-white/60 text-sm">
-                Item will be added to your cart for review before checkout
-              </p>
-            </div>
-          </div>
+          {/* Enhanced Order Button */}
+          <button 
+            onClick={handleAddToCart}
+            disabled={!totalPrice || (!uploadedFile && !uploadLater)} 
+            className="w-full bg-yellow-400 text-black font-semibold py-4 px-6 rounded-xl text-lg hover:bg-yellow-300 transition-all duration-300 mb-4 shadow-[0_0_15px_rgba(255,234,55,0.5)] button-interactive hover:shadow-[0_0_25px_rgba(255,234,55,0.7)] hover:scale-105 relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+          >
+            <span className="relative z-10 flex items-center justify-center gap-2">
+              🛒 {!uploadedFile && !uploadLater ? "Please Upload Artwork or Select Upload Later" : "Add to Cart"}
+            </span>
+            <div className="absolute inset-0 bg-gradient-to-r from-yellow-300 to-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          </button>
         </div>
       </div>
     </div>

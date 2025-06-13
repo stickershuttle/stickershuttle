@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import Head from "next/head";
+import Layout from "../components/Layout";
 import { useRouter } from "next/router";
 import { getSupabase } from "../lib/supabase";
 
@@ -66,486 +66,7 @@ export default function Home() {
   };
 
   return (
-    <>
-      <Head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
-        <link rel="icon" type="image/svg+xml" href="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591674/AlienSSFavicon_jlkmoi.svg" />
-        
-        {/* iOS Status Bar and Theme Color */}
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="theme-color" content="#030140" />
-        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#030140" />
-        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#030140" />
-        <meta name="msapplication-navbutton-color" content="#030140" />
-        <meta name="apple-mobile-web-app-title" content="Sticker Shuttle" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-        
-        <title>Sticker Shuttle - Custom Stickers & Vinyl Signs</title>
-      </Head>
-      
-      <div className="min-h-screen text-white relative" style={{ backgroundColor: '#030140', fontFamily: 'Inter, sans-serif' }}>
-
-
-        {/* Header */}
-        <header className="w-full relative z-10" style={{ backgroundColor: '#030140' }}>
-          <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto py-4 px-4">
-            <div className="flex items-center justify-between">
-              {/* Mobile/Tablet Hamburger Menu */}
-              <button 
-                className="lg:hidden text-white text-2xl z-50 relative" 
-                aria-label="Open menu"
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              >
-                <div className="flex flex-col space-y-1">
-                  <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${isMobileMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
-                  <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${isMobileMenuOpen ? 'opacity-0' : ''}`}></div>
-                  <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${isMobileMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></div>
-                </div>
-              </button>
-
-              {/* Logo - Centered on mobile/tablet, left on desktop */}
-              <div className="flex items-center lg:justify-start justify-center flex-1 lg:flex-initial">
-                <img 
-                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
-                  alt="Sticker Shuttle Logo" 
-                  className="h-12 w-auto object-contain logo-hover cursor-pointer"
-                  style={{ maxWidth: 'none' }}
-                />
-              </div>
-
-              {/* Desktop Search Bar */}
-              <div className="hidden lg:flex flex-1 items-center gap-2 relative" style={{ marginLeft: '20px', marginRight: '20px' }}>
-                <input 
-                  type="text"
-                  placeholder="Go on.. create your universe 🧑‍🚀"
-                  className="headerButton flex-1 px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform focus:scale-101 focus:outline-none placeholder-gray-400"
-                  onFocus={() => setIsSearchDropdownOpen(true)}
-                  onBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 150)}
-                />
-                <button 
-                  className="headerButton px-3 py-2 font-medium text-white transition-all duration-200 transform hover:scale-105 rounded-lg"
-                  style={{ backgroundColor: '#030140' }}
-                  aria-label="Search"
-                >
-                  <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    fill="none" 
-                    viewBox="0 0 24 24" 
-                    strokeWidth={2} 
-                    stroke="currentColor" 
-                    className="w-5 h-5"
-                  >
-                    <path 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                      d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 15.803a7.5 7.5 0 0 0 10.607 0Z" 
-                    />
-                  </svg>
-                </button>
-                
-                {/* Search Dropdown */}
-                {isSearchDropdownOpen && (
-                  <div 
-                    className="absolute top-full left-0 right-8 mt-2 rounded-lg z-50 shadow-lg"
-                    style={{ 
-                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      backdropFilter: 'blur(10px)'
-                    }}
-                  >
-                    <div className="p-2">
-                      <h3 className="text-sm font-semibold text-white mb-2 px-2">Sticker Types:</h3>
-                      <div className="space-y-1">
-                        {/* Vinyl Stickers */}
-                        <Link href="/products/vinyl-stickers" className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200 group">
-                          <div className="w-8 h-8 mr-3 flex items-center justify-center">
-                            <img 
-                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
-                              alt="Vinyl" 
-                              className="max-w-full max-h-full object-contain"
-                              style={{
-                                filter: 'drop-shadow(0 0 6px rgba(168, 242, 106, 0.4))'
-                              }}
-                            />
-                          </div>
-                          <div>
-                            <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Vinyl Stickers</p>
-                            <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(168, 242, 106)' }}>Waterproof & UV Resistant</p>
-                          </div>
-                        </Link>
-                        
-                        {/* Holographic Stickers */}
-                        <div className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200 group">
-                          <div className="w-8 h-8 mr-3 flex items-center justify-center">
-                            <img 
-                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
-                              alt="Holographic" 
-                              className="max-w-full max-h-full object-contain"
-                              style={{
-                                filter: 'drop-shadow(0 0 6px rgba(168, 85, 247, 0.4))'
-                              }}
-                            />
-                          </div>
-                          <div>
-                            <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Holographic Stickers</p>
-                            <p 
-                              className="text-xs transition-colors duration-200 group-hover:text-gray-700" 
-                              style={{ 
-                                background: 'linear-gradient(45deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3)',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                                backgroundClip: 'text'
-                              }}
-                            >
-                              Rainbow Holographic Effect
-                            </p>
-                          </div>
-                        </div>
-                        
-                        {/* Chrome Stickers */}
-                        <div className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200 group">
-                          <div className="w-8 h-8 mr-3 flex items-center justify-center">
-                            <img 
-                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
-                              alt="Chrome" 
-                              className="max-w-full max-h-full object-contain"
-                              style={{
-                                filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.4))'
-                              }}
-                            />
-                          </div>
-                          <div>
-                            <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Chrome Stickers</p>
-                            <p 
-                              className="text-xs transition-colors duration-200 group-hover:text-gray-700" 
-                              style={{ 
-                                background: 'linear-gradient(45deg, #dcdcdc, #ffffff, #c0c0c0, #f0f0f0, #e8e8e8)',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                                backgroundClip: 'text'
-                              }}
-                            >
-                              Mirror Chrome Finish
-                            </p>
-                          </div>
-                        </div>
-                        
-                        {/* Glitter Stickers */}
-                        <div className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200 group">
-                          <div className="w-8 h-8 mr-3 flex items-center justify-center">
-                            <img 
-                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
-                              alt="Glitter" 
-                              className="max-w-full max-h-full object-contain"
-                              style={{
-                                filter: 'drop-shadow(0 0 6px rgba(59, 130, 246, 0.4))'
-                              }}
-                            />
-                          </div>
-                          <div>
-                            <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Glitter Stickers</p>
-                            <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(59, 130, 246)' }}>Sparkly Glitter Finish</p>
-                          </div>
-                        </div>
-                        
-                        {/* Vinyl Banners */}
-                        <div className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200 group">
-                          <div className="w-8 h-8 mr-3 flex items-center justify-center">
-                            <img 
-                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593724/Vinyl-Banner_c84nis.png" 
-                              alt="Vinyl Banners" 
-                              className="max-w-full max-h-full object-contain"
-                              style={{
-                                filter: 'drop-shadow(0 0 6px rgba(196, 181, 253, 0.4))'
-                              }}
-                            />
-                          </div>
-                          <div>
-                            <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Vinyl Banners</p>
-                            <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(196, 181, 253)' }}>Heavy Duty 13oz Vinyl</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Desktop Navigation */}
-              <nav className="hidden lg:flex items-center gap-4" style={{ letterSpacing: '-0.5px' }}>
-                <Link 
-                  href="/deals"
-                  className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105${router.pathname === '/deals' ? ' active' : ''}`}
-                >
-                  ⚡ Deals
-                </Link>
-                <button 
-                  className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105"
-                >
-                  🚀 Shipping Process
-                </button>
-                <a 
-                  href="/products"
-                  className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 inline-block${router.pathname === '/products' ? ' active' : ''}`}
-                >
-                  Start Your Order →
-                </a>
-                {/* Conditional Authentication Navigation */}
-                {user ? (
-                  /* Logged In - Show Account Dashboard and Sign Out */
-                  <>
-                    <Link 
-                      href="/account/dashboard"
-                      className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 inline-block"
-                    >
-                      👨‍🚀 Account Dashboard
-                    </Link>
-                    <button 
-                      onClick={handleSignOut}
-                      className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105"
-                    >
-                      Sign Out
-                    </button>
-                  </>
-                ) : (
-                  /* Not Logged In - Show Login and Signup */
-                  <>
-                    <Link 
-                      href="/login"
-                      className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 inline-block"
-                    >
-                      Log in
-                    </Link>
-                    <Link 
-                      href="/signup"
-                      className="primaryButton px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 inline-block"
-                    >
-                      Signup
-                    </Link>
-                  </>
-                )}
-                <button 
-                  className="headerButton px-3 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105"
-                >
-                  🛒
-                </button>
-              </nav>
-
-              {/* Mobile/Tablet Cart Icon */}
-              <button className="lg:hidden headerButton px-3 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105">
-                🛒
-              </button>
-            </div>
-          </div>
-        </header>
-
-        {/* Mobile Menu Overlay */}
-        {isMobileMenuOpen && (
-          <div 
-            className="fixed inset-0 z-40 lg:hidden"
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            <div className="absolute inset-0 bg-black bg-opacity-50" />
-          </div>
-        )}
-
-        {/* Mobile Menu Slide-out */}
-        <div 
-          className={`fixed top-0 left-0 h-full w-80 z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${
-            isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
-          style={{ 
-            backgroundColor: 'rgba(3, 1, 64, 0.95)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255, 255, 255, 0.2)'
-          }}
-        >
-          <div className="p-6">
-            {/* Menu Header */}
-            <div className="flex items-center justify-between mb-8">
-              <img 
-                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
-                alt="Sticker Shuttle Logo" 
-                className="h-8 w-auto object-contain"
-              />
-              <button 
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="text-white text-xl p-2"
-                aria-label="Close menu"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Search Bar for Mobile */}
-            <div className="mb-6">
-              <input 
-                type="text"
-                placeholder="Search sticker types..."
-                className="w-full px-4 py-3 rounded-lg font-medium text-white transition-all duration-200 focus:outline-none placeholder-gray-400"
-                style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
-                }}
-              />
-            </div>
-
-            {/* Sticker Types Quick Access - At Top */}
-            <div className="mb-8">
-              <h3 className="text-sm font-semibold text-white mb-4 px-4">Sticker Types:</h3>
-              <div className="space-y-2">
-                <Link href="/products/vinyl-stickers" className="flex items-center px-4 py-3 rounded-lg hover:bg-white hover:bg-opacity-90 cursor-pointer transition-all duration-200 group">
-                  <div className="w-8 h-8 mr-3 flex items-center justify-center">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
-                      alt="Vinyl" 
-                      className="max-w-full max-h-full object-contain"
-                      style={{
-                        filter: 'drop-shadow(0 0 6px rgba(168, 242, 106, 0.4))'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Vinyl Stickers</p>
-                    <p className="text-xs transition-colors duration-200 group-hover:text-gray-600" style={{ color: 'rgb(168, 242, 106)' }}>Most Popular</p>
-                  </div>
-                </Link>
-                
-                <div className="flex items-center px-4 py-3 rounded-lg hover:bg-white hover:bg-opacity-90 cursor-pointer transition-all duration-200 group">
-                  <div className="w-8 h-8 mr-3 flex items-center justify-center">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
-                      alt="Holographic" 
-                      className="max-w-full max-h-full object-contain"
-                      style={{
-                        filter: 'drop-shadow(0 0 6px rgba(168, 85, 247, 0.4))'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Holographic</p>
-                    <p className="text-xs transition-colors duration-200 group-hover:text-gray-600" style={{ color: 'rgb(168, 85, 247)' }}>Premium</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center px-4 py-3 rounded-lg hover:bg-white hover:bg-opacity-90 cursor-pointer transition-all duration-200 group">
-                  <div className="w-8 h-8 mr-3 flex items-center justify-center">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
-                      alt="Chrome" 
-                      className="max-w-full max-h-full object-contain"
-                      style={{
-                        filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.4))'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Chrome</p>
-                    <p className="text-xs transition-colors duration-200 group-hover:text-gray-600" style={{ color: 'rgb(220, 220, 220)' }}>Mirror Finish</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center px-4 py-3 rounded-lg hover:bg-white hover:bg-opacity-90 cursor-pointer transition-all duration-200 group">
-                  <div className="w-8 h-8 mr-3 flex items-center justify-center">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
-                      alt="Glitter" 
-                      className="max-w-full max-h-full object-contain"
-                      style={{
-                        filter: 'drop-shadow(0 0 6px rgba(59, 130, 246, 0.4))'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Glitter</p>
-                    <p className="text-xs transition-colors duration-200 group-hover:text-gray-600" style={{ color: 'rgb(59, 130, 246)' }}>Sparkly</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center px-4 py-3 rounded-lg hover:bg-white hover:bg-opacity-90 cursor-pointer transition-all duration-200 group">
-                  <div className="w-8 h-8 mr-3 flex items-center justify-center">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593724/Vinyl-Banner_c84nis.png" 
-                      alt="Vinyl Banners" 
-                      className="max-w-full max-h-full object-contain"
-                      style={{
-                        filter: 'drop-shadow(0 0 6px rgba(196, 181, 253, 0.4))'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Vinyl Banners</p>
-                    <p className="text-xs transition-colors duration-200 group-hover:text-gray-600" style={{ color: 'rgb(196, 181, 253)' }}>Heavy Duty</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Navigation Items */}
-            <nav className="space-y-2">
-              <Link href="/deals" className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">
-                <span className="mr-3">⚡</span>
-                Deals
-              </Link>
-              <button className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">
-                <span className="mr-3">🚀</span>
-                Shipping Process
-              </button>
-              <a href="/products" className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">
-                <span className="mr-3">🎨</span>
-                Start Your Order
-              </a>
-              {/* Conditional Authentication Navigation for Mobile */}
-              {user ? (
-                /* Logged In - Show Account Dashboard and Sign Out */
-                <>
-                  <Link 
-                    href="/account/dashboard" 
-                    className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <span className="mr-3">👨‍🚀</span>
-                    Account Dashboard
-                  </Link>
-                  <button 
-                    onClick={() => {
-                      handleSignOut();
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center"
-                  >
-                    <span className="mr-3">🚪</span>
-                    Sign Out
-                  </button>
-                </>
-              ) : (
-                /* Not Logged In - Show Login and Signup */
-                <>
-                  <Link 
-                    href="/login" 
-                    className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <span className="mr-3">👤</span>
-                    Log in
-                  </Link>
-                  <Link 
-                    href="/signup" 
-                    className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <span className="mr-3">✨</span>
-                    Signup
-                  </Link>
-                </>
-              )}
-            </nav>
-          </div>
-        </div>
-
+    <Layout title="Sticker Shuttle - Custom Stickers & Vinyl Signs">
         {/* Hero Section with Banner Background */}
         <section className="py-4">
           <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
@@ -559,7 +80,7 @@ export default function Home() {
               }}
             >
               <div className="text-center relative z-10">
-                <h1 className="text-4xl sm:text-5xl md:text-6xl mb-4 leading-none sm:leading-tight" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
+                <h1 className="text-4xl sm:text-5xl md:text-6xl mb-4 leading-none" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
                   <span className="block sm:inline">Tired of waiting weeks</span>
                   <span className="block sm:inline md:block"> to get your stickers?</span>
                 </h1>
@@ -578,7 +99,7 @@ export default function Home() {
                       borderRadius: '10px',
                       border: 'solid',
                       borderWidth: '0.03125rem',
-                      borderColor: '#8d9912'
+                      borderColor: '#e6c211'
                     }}
                   >
                     Start Here →
@@ -1082,32 +603,18 @@ export default function Home() {
             <div className="flex flex-col space-y-6 lg:grid lg:grid-cols-2 lg:gap-8 lg:space-y-0 lg:items-stretch">
               {/* Video */}
               <div className="relative rounded-xl overflow-hidden cursor-pointer" onClick={toggleVideo}>
-                {/* Custom poster that shows before video starts */}
-                {!hasStarted && (
-                  <img 
-                    src={posterImage}
-                    alt="Video thumbnail"
-                    className="absolute inset-0 w-full rounded-xl z-30"
-                    style={{ 
-                      height: '100%',
-                      minHeight: '400px',
-                      objectFit: 'cover'
-                    }}
-                  />
-                )}
-                
                 <video 
                   ref={videoRef}
-                  className="w-full rounded-xl relative z-20"
+                  className="w-full rounded-xl"
                   style={{ 
-                    height: '100%',
                     minHeight: '400px',
                     objectFit: 'cover'
                   }}
                   onEnded={handleVideoEnded}
-                  muted
                   playsInline
-                  preload="none"
+                  preload="metadata"
+                  poster="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601387/d2b7fa8c-41a7-421a-9fde-3d7cf2b0a3a3.png"
+                  controls={hasStarted}
                 >
                   <source src="https://stickershuttle.com/cdn/shop/videos/c/vp/8f87f3238509493faba9ce1552b073de/8f87f3238509493faba9ce1552b073de.HD-1080p-7.2Mbps-38779776.mp4?v=0" type="video/mp4" />
                   Your browser does not support the video tag.
@@ -1115,18 +622,9 @@ export default function Home() {
                 
                 {/* Custom Play Button Overlay - Only show when video hasn't started */}
                 {!hasStarted && (
-                  <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center rounded-xl z-40">
-                    <div className="w-20 h-20 bg-white bg-opacity-90 rounded-full flex items-center justify-center hover:bg-opacity-100 transition-all duration-200 transform hover:scale-105">
+                  <div className="absolute inset-0 flex items-center justify-center rounded-xl">
+                    <div className="w-20 h-20 bg-white bg-opacity-90 rounded-full flex items-center justify-center hover:bg-opacity-100 transition-all duration-200 transform hover:scale-105 shadow-lg">
                       <div className="w-0 h-0 border-l-[16px] border-l-black border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Pause Overlay - Show play button when paused (but video has started) */}
-                {hasStarted && !isPlaying && (
-                  <div className="absolute inset-0 flex items-center justify-center z-30">
-                    <div className="w-16 h-16 bg-white bg-opacity-80 rounded-full flex items-center justify-center hover:bg-opacity-100 transition-all duration-200 transform hover:scale-105">
-                      <div className="w-0 h-0 border-l-[12px] border-l-black border-t-[9px] border-t-transparent border-b-[9px] border-b-transparent ml-1"></div>
                     </div>
                   </div>
                 )}
@@ -1139,7 +637,8 @@ export default function Home() {
                   backgroundColor: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
                   boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)',
-                  minHeight: '400px'
+                  minHeight: '400px',
+                  height: '100%'
                 }}
               >
                 <div className="flex items-center mb-6">
@@ -1154,31 +653,25 @@ export default function Home() {
                   <h2 className="text-3xl font-bold text-white">Free shipping, always.</h2>
                 </div>
                 
-                <div className="space-y-4 mb-8">
+                <div className="space-y-4 mb-8 flex-grow">
                   <p className="text-gray-300 leading-relaxed">
-                    At Sticker Shuttle, we get what it&apos;s like to run a small business because we&apos;re in the same shuttle... or boat. 
-                    That&apos;s why we&apos;re so passionate about helping other small businesses. We print high-quality custom stickers 
-                    and banners that not only launch your brand but also help you connect with your customers—all without 
-                    breaking the bank.
+                    At Sticker Shuttle, we get what it&apos;s like to run a small business. That&apos;s why we&apos;re passionate about helping other small businesses with high-quality custom stickers and banners that launch your brand and connect with customers—all without breaking the bank.
                   </p>
                   
                   <p className="text-gray-300 leading-relaxed">
-                    When you work with us, you&apos;re not just getting amazing products made with care and precision—you&apos;re 
-                    supporting a local business that&apos;s all about community, creativity, and craftsmanship. Every sticker, banner, 
-                    and product we make is designed to help your business stand out and grow. By choosing us, you&apos;re part of a 
-                    bigger cycle of support that helps small businesses like yours thrive. Let&apos;s stick together and grow together!
+                    When you work with us, you&apos;re supporting a local business that&apos;s all about community, creativity, and craftsmanship. Let&apos;s stick together and grow together!
                   </p>
                 </div>
 
                 <button 
-                  className="px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-105 rounded-lg"
+                  className="px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-105 rounded-lg mt-auto"
                   style={{
                     backgroundColor: '#ffd713',
                     color: '#030140',
                     boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
                     border: 'solid',
                     borderWidth: '0.03125rem',
-                    borderColor: '#8d9912'
+                    borderColor: '#e6c211'
                   }}
                 >
                   Order your stickers today →
@@ -1189,10 +682,10 @@ export default function Home() {
         </section>
 
         {/* Testimonials Section */}
-        <section className="py-2">
+        <section className="py-8">
           <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
             {/* Header */}
-            <div className="text-center mb-6 -mt-4 md:mt-0">
+            <div className="text-center mb-6 mt-4">
               <div className="flex justify-center mb-4">
                 <h2 className="text-3xl font-bold text-white">
                   <span style={{filter: 'drop-shadow(0 0 10px rgba(34, 197, 94, 0.6)) drop-shadow(0 0 20px rgba(34, 197, 94, 0.4))', display: 'inline-block'}}>👽</span> <span className="relative inline-block">Not<span className="absolute -bottom-1 left-0 right-0 h-1 bg-yellow-400 transform rotate-1 rounded-full"></span></span> a conspiracy theory...
@@ -1489,191 +982,69 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Footer */}
-        <footer className="py-12 mt-8" style={{ backgroundColor: '#030140', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+        {/* Quick Login Banner */}
+        <section className="py-8">
           <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-              {/* Quick Links */}
-              <div>
-                <h3 className="text-white font-semibold text-lg mb-4 flex items-center">
-                  <span className="mr-2">🔗</span>
-                  Quick links
-                </h3>
-                <ul className="space-y-3">
-                  <li>
-                    <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
-                      <span className="mr-2">🚚</span>
-                      Shipping Process
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
-                      <span className="mr-2">💰</span>
-                      Profit Margin Calculator
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
-                      <span className="mr-2">📱</span>
-                      QR Code Generator
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
-                      <span className="mr-2">📝</span>
-                      Blog Posts
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
-                      <span className="mr-2">📞</span>
-                      Contact Us
-                    </a>
-                  </li>
-                </ul>
+            <div 
+              className="rounded-2xl p-8 text-center relative overflow-hidden"
+              style={{
+                background: 'linear-gradient(135deg, rgba(255, 215, 19, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+                backdropFilter: 'blur(20px)'
+              }}
+            >
+              {/* Background decoration */}
+              <div className="absolute inset-0 opacity-10">
+                <div className="absolute top-4 left-4 w-12 h-12 border-2 border-yellow-400 rounded-full"></div>
+                <div className="absolute bottom-4 right-4 w-8 h-8 border-2 border-purple-400 rounded-full"></div>
+                <div className="absolute top-1/2 left-1/4 w-6 h-6 bg-yellow-400 rounded-full blur-sm"></div>
+                <div className="absolute top-1/4 right-1/3 w-4 h-4 bg-purple-400 rounded-full blur-sm"></div>
               </div>
 
-              {/* Header Menu */}
-              <div>
-                <h3 className="text-white font-semibold text-lg mb-4">
-                  Shop
-                </h3>
-                <ul className="space-y-3">
-                  <li>
-                    <Link href="/deals" className="text-gray-300 hover:text-white transition-colors duration-200">
-                      ⚡ Deals
-                    </Link>
-                  </li>
-                  <li>
-                    <a href="/products" className="text-gray-300 hover:text-white transition-colors duration-200">
-                      Start Your Order →
-                    </a>
-                  </li>
-                  {user ? (
-                    /* Logged In - Show Account Dashboard and Sign Out */
-                    <>
-                      <li>
-                        <Link href="/account/dashboard" className="text-gray-300 hover:text-white transition-colors duration-200">
-                          👨‍🚀 Account Dashboard
-                        </Link>
-                      </li>
-                      <li>
-                        <button 
-                          onClick={handleSignOut}
-                          className="text-gray-300 hover:text-white transition-colors duration-200 text-left"
-                        >
-                          Sign Out
-                        </button>
-                      </li>
-                    </>
-                  ) : (
-                    /* Not Logged In - Show Login and Signup */
-                    <>
-                      <li>
-                        <Link href="/login" className="text-gray-300 hover:text-white transition-colors duration-200">
-                          Log in
-                        </Link>
-                      </li>
-                      <li>
-                        <Link href="/signup" className="text-gray-300 hover:text-white transition-colors duration-200">
-                          Signup
-                        </Link>
-                      </li>
-                    </>
-                  )}
-                  <li>
-                    <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200">
-                      🛒 Cart
-                    </a>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Info */}
-              <div>
-                <h3 className="text-white font-semibold text-lg mb-4">
-                  Info
-                </h3>
-                <ul className="space-y-3">
-                  <li>
-                    <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200">
-                      Terms of Service
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200">
-                      Refund policy
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200">
-                      Privacy Policy
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200">
-                      Shipping Policy
-                    </a>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Our Mission */}
-              <div>
-                <h3 className="text-white font-semibold text-lg mb-4 flex items-center">
-                  <span className="mr-2">🚀</span>
-                  Our mission
-                </h3>
-                <p className="text-gray-300 text-sm leading-relaxed mb-4">
-                  We&apos;re called Sticker Shuttle, what do you think our mission is? To get your stickers to you as fast as humanly possible. At no extra cost.
+              <div className="relative z-10">
+                <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+                  Already a customer?
+                </h2>
+                <p className="text-gray-300 text-lg mb-6 max-w-2xl mx-auto">
+                  Quick login to track your orders, reorder favorites, and access exclusive customer perks.
                 </p>
                 
-                {/* Social Media Links */}
-                <div className="flex space-x-4">
-                  <a 
-                    href="https://www.instagram.com/stickershuttle/" 
-          target="_blank"
-          rel="noopener noreferrer"
-                    className="text-gray-300 hover:text-white transition-colors duration-200"
-                  >
-                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-                    </svg>
-        </a>
-        <a
-                    href="https://www.youtube.com/@stickershuttle" 
-          target="_blank"
-          rel="noopener noreferrer"
-                    className="text-gray-300 hover:text-white transition-colors duration-200"
-                  >
-                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                    </svg>
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer Bottom */}
-            <div className="mt-12 pt-8" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-              <div className="flex flex-col md:flex-row items-center justify-between">
-                {/* Logo */}
-                <div className="mb-4 md:mb-0">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
-                    alt="Sticker Shuttle Logo" 
-                    className="h-10 w-auto object-contain footer-logo-hover cursor-pointer"
-                  />
-                </div>
-                
-                {/* Copyright */}
-                <div className="text-white text-opacity-10 text-sm">
-                  © 2025 Sticker Shuttle
+                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                  <Link href="/login">
+                    <button 
+                      className="px-8 py-3 font-semibold text-lg transition-all duration-300 transform hover:scale-105 rounded-lg"
+                                             style={{
+                         backgroundColor: '#ffd713',
+                         color: '#030140',
+                         boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
+                         border: 'solid',
+                         borderWidth: '0.03125rem',
+                         borderColor: '#e6c211'
+                       }}
+                    >
+                      Login
+                    </button>
+                  </Link>
+                  
+                  <Link href="/signup">
+                    <button className="px-8 py-3 font-semibold text-lg text-white hover:text-gray-200 transition-all duration-300 hover:scale-105 rounded-lg border border-gray-400 hover:border-gray-300">
+                      New Customer? <span 
+                        className="text-yellow-400" 
+                                                style={{
+                           textShadow: '0 0 2px rgba(255, 215, 19, 0.16), 0 0 4px rgba(255, 215, 19, 0.12)',
+                           filter: 'drop-shadow(0 0 1px rgba(255, 215, 19, 0.1))'
+                         }}
+                      >
+                        Sign Up
+                      </span>
+                    </button>
+                  </Link>
                 </div>
               </div>
             </div>
           </div>
-      </footer>
+        </section>
 
         {/* Custom CSS for infinite scroll animation */}
         <style jsx>{`
@@ -1783,34 +1154,12 @@ export default function Home() {
             animation: logo-bounce 0.6s ease-in-out;
           }
           
-          .footer-logo-hover {
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-          }
-          
-          .footer-logo-hover:hover {
-            transform: scale(1.15) rotate(-3deg);
-            filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.8)) 
-                    drop-shadow(0 0 30px rgba(59, 130, 246, 0.5))
-                    drop-shadow(0 0 45px rgba(220, 220, 220, 0.4));
-            animation: footer-logo-wiggle 0.8s ease-in-out;
-          }
-          
           @keyframes logo-bounce {
             0% { transform: scale(1.1) rotate(5deg) translateY(0px); }
             25% { transform: scale(1.12) rotate(6deg) translateY(-3px); }
             50% { transform: scale(1.15) rotate(4deg) translateY(-5px); }
             75% { transform: scale(1.12) rotate(7deg) translateY(-2px); }
             100% { transform: scale(1.1) rotate(5deg) translateY(0px); }
-          }
-          
-          @keyframes footer-logo-wiggle {
-            0% { transform: scale(1.15) rotate(-3deg); }
-            15% { transform: scale(1.18) rotate(-5deg); }
-            30% { transform: scale(1.16) rotate(-1deg); }
-            45% { transform: scale(1.19) rotate(-6deg); }
-            60% { transform: scale(1.17) rotate(-2deg); }
-            75% { transform: scale(1.18) rotate(-4deg); }
-            100% { transform: scale(1.15) rotate(-3deg); }
           }
           
           /* Header Button Styles - Match Header Component */
@@ -1851,9 +1200,6 @@ export default function Home() {
           }
 
         `}</style>
-
-
-    </div>
-    </>
+    </Layout>
   );
 }

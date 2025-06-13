@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import Head from "next/head";
-import Header from "./Header";
+import UniversalHeader from "./UniversalHeader";
+import UniversalFooter from "./UniversalFooter";
 
 interface LayoutProps {
   children: ReactNode;
@@ -30,10 +31,11 @@ export default function Layout({ children, title = "Sticker Shuttle - Custom Sti
       </Head>
       
       <div className="min-h-screen text-white relative" style={{ backgroundColor: '#030140', fontFamily: 'Inter, sans-serif' }}>
-        <Header />
+        <UniversalHeader />
         <main>
           {children}
         </main>
+        <UniversalFooter />
       </div>
     </>
   );

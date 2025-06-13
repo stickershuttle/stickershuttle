@@ -122,20 +122,20 @@ export default function Login() {
         ></div>
       </div>
       
-      <div className="min-h-screen flex items-center justify-center px-4 relative z-10" style={{ backgroundColor: 'transparent' }}>
+      <div className="min-h-screen flex items-start justify-center px-4 relative z-10 pt-8" style={{ backgroundColor: 'transparent' }}>
         {/* Mobile Layout */}
         <div className="lg:hidden max-w-md mx-auto w-full">
           {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
+          <div className="text-center mb-4" style={{ paddingTop: '2px' }}>
+            <h1 className="text-2xl font-bold text-white mb-2" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
               Welcome Back
             </h1>
-            <p className="text-gray-300">Log in to your account and continue your mission</p>
+            <p className="text-gray-300 text-sm">Log in to your account and continue your mission</p>
           </div>
 
           {/* Login Card */}
           <div 
-            className="rounded-2xl p-8 shadow-xl"
+            className="rounded-2xl p-4 shadow-xl"
             style={{
               backgroundColor: 'rgba(255, 255, 255, 0.08)',
               backdropFilter: 'blur(20px)',
@@ -143,42 +143,37 @@ export default function Login() {
             }}
           >
             {/* Third Party Login Options */}
-            <div className="mb-8">
-              <p className="text-sm text-gray-300 text-center mb-4">Quick log in with:</p>
-              <div className="grid grid-cols-2 gap-3">
+            <div className="mb-4">
+              <p className="text-sm text-gray-300 text-center mb-3">Quick log in with:</p>
+              <div className="grid grid-cols-2 gap-2">
                 {thirdPartyProviders.map((provider) => (
                   <button
                     key={provider.name}
-                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-white/20 bg-white/5 hover:bg-white/10 transition-all duration-200 transform hover:scale-105"
+                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-white/20 bg-white/5 hover:bg-white/10 transition-all duration-200 transform hover:scale-105"
                   >
                     <img 
                       src={provider.icon} 
                       alt={provider.name} 
-                      className="w-5 h-5 object-contain"
+                      className="w-4 h-4 object-contain"
                       style={{ filter: provider.name === 'Apple' ? 'invert(1)' : 'none' }}
                     />
-                    <span className="text-white text-sm font-medium">{provider.name}</span>
+                    <span className="text-white text-xs font-medium">{provider.name}</span>
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Divider */}
-            <div className="relative mb-8">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-600"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-transparent text-gray-400">Or log in with</span>
-              </div>
+            <div className="text-center mb-4">
+              <span className="text-gray-400 text-sm">Or log in with</span>
             </div>
 
             {/* Method Toggle */}
-            <div className="flex rounded-lg p-1 mb-6" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
+            <div className="flex rounded-lg p-1 mb-4" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
               <button
                 type="button"
                 onClick={() => setLoginMethod('email')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
+                className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all duration-200 ${
                   loginMethod === 'email'
                     ? 'bg-purple-600 text-white shadow-md'
                     : 'text-gray-300 hover:text-white'
@@ -189,7 +184,7 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => setLoginMethod('phone')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
+                className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all duration-200 ${
                   loginMethod === 'phone'
                     ? 'bg-purple-600 text-white shadow-md'
                     : 'text-gray-300 hover:text-white'
@@ -200,11 +195,11 @@ export default function Login() {
             </div>
 
             {/* Login Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3">
               {/* Email or Phone Field */}
               {loginMethod === 'email' ? (
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
                     Email Address
                   </label>
                   <input
@@ -213,14 +208,14 @@ export default function Login() {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-4 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                     placeholder="john@example.com"
                     required
                   />
                 </div>
               ) : (
                 <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-300 mb-2">
+                  <label htmlFor="phone" className="block text-sm font-medium text-gray-300 mb-1">
                     Phone Number
                   </label>
                   <input
@@ -229,7 +224,7 @@ export default function Login() {
                     name="phone"
                     value={formData.phone}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-4 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                     placeholder="+1 (555) 123-4567"
                     required
                   />
@@ -238,7 +233,7 @@ export default function Login() {
 
               {/* Password Field */}
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
                   Password
                 </label>
                 <input
@@ -247,7 +242,7 @@ export default function Login() {
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                  className="w-full px-4 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                   placeholder="Enter your password"
                   required
                 />
@@ -283,7 +278,7 @@ export default function Login() {
             </form>
 
             {/* Sign Up Link */}
-            <div className="mt-6 text-center">
+            <div className="mt-4 text-center">
               <p className="text-gray-400 text-sm">
                 Don't have an account?{' '}
                 <Link href="/signup" className="text-purple-400 hover:text-purple-300 transition-colors duration-200 font-medium">
@@ -291,30 +286,11 @@ export default function Login() {
                 </Link>
               </p>
             </div>
-
-            {/* Trust Indicators */}
-            <div className="text-center mt-6">
-              <p className="text-gray-400 text-sm mb-3">Trusted by thousands of creators</p>
-              <div className="flex justify-center gap-4 text-xs text-white">
-                <div className="flex items-center gap-1">
-                  <span>✨</span>
-                  <span>Premium Materials</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span>🚚</span>
-                  <span>Free Shipping</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span>⭐</span>
-                  <span>5-Star Reviews</span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
         {/* Desktop Layout */}
-        <div className="hidden lg:flex items-start justify-center w-full -mt-16">
+        <div className="hidden lg:flex items-start justify-center w-full min-h-screen pt-24">
           <div className="w-full max-w-6xl mx-auto grid grid-cols-2 gap-12 items-center">
             {/* Left Column - Third Party Options */}
             <div>

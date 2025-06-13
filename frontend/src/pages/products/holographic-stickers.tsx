@@ -1,10 +1,10 @@
 import Layout from "@/components/Layout";
-import StickerCalculator from "@/components/vinyl-sticker-calculator";
+import HolographicStickerCalculator from "@/components/holographic-sticker-calculator";
 import FloatingChatWidget from "@/components/FloatingChatWidget";
 import { useState, useEffect } from "react";
 import { loadRealPricingData, BasePriceRow, QuantityDiscountRow } from "@/utils/real-pricing";
 
-export default function VinylStickers() {
+export default function HolographicStickers() {
   const [realPricingData, setRealPricingData] = useState<{
     basePricing: BasePriceRow[];
     quantityDiscounts: QuantityDiscountRow[];
@@ -51,14 +51,14 @@ export default function VinylStickers() {
   ];
 
   return (
-    <Layout title="Vinyl Stickers - Waterproof & UV Resistant | Sticker Shuttle">
+    <Layout title="Holographic Stickers - Iridescent & Eye-Catching | Sticker Shuttle">
       {/* Hero Section with Banner Background */}
       <section className="py-2 md:py-4">
         <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
           <div 
             className="bg-white bg-opacity-5 backdrop-blur-sm rounded-2xl pt-12 pb-8 px-4 md:p-12 relative overflow-hidden"
             style={{
-              backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749652894/StickerShuttle_Banner_PurpleCustomStickers_zxst8r.webp)',
+              backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749652826/StickerShuttle_Banner_CustomStickers_g73u56.jpg)',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat'
@@ -106,10 +106,10 @@ export default function VinylStickers() {
               {/* Desktop Title and Subtitle */}
               <div className="hidden md:block mb-4">
                 <h1 className="text-3xl sm:text-4xl md:text-5xl leading-none mb-2" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
-                  Vinyl Stickers
+                  Holographic Stickers
                 </h1>
                 <p className="text-gray-300 text-base">
-                  Perfect for any application. The perfect sticker.
+                  Mesmerizing rainbow effects. Eye-catching brilliance.
                 </p>
               </div>
 
@@ -147,19 +147,39 @@ export default function VinylStickers() {
               {/* Mobile Title and Subtitle */}
               <div className="md:hidden mb-4 text-center">
                 <h1 className="text-4xl leading-none whitespace-nowrap mb-2" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
-                  Vinyl Stickers
+                  Holographic Stickers
                 </h1>
                 <p className="text-gray-300 text-sm">
-                  Perfect for any application. The perfect sticker.
+                  Mesmerizing rainbow effects. Eye-catching brilliance.
                 </p>
               </div>
               {/* Desktop Description */}
               <p className="hidden md:block text-base sm:text-lg mb-6 text-purple-100 max-w-3xl">
-                Premium vinyl stickers perfect for laptops, water bottles, and outdoor use - waterproof, scratch-resistant, and dishwasher safe.
+                Stunning holographic stickers that shift and shimmer with rainbow colors - perfect for making your designs stand out with iridescent brilliance.
               </p>
               
               {/* Mobile Pills Description */}
               <div className="md:hidden flex flex-wrap justify-center gap-2 mb-4">
+                <span 
+                  className="px-3 py-1 text-xs rounded-full font-medium"
+                  style={{
+                    background: 'rgba(168, 242, 106, 0.2)',
+                    color: 'white',
+                    border: '1px solid rgba(168, 242, 106, 0.4)'
+                  }}
+                >
+                  🌈 Holographic
+                </span>
+                <span 
+                  className="px-3 py-1 text-xs rounded-full font-medium"
+                  style={{
+                    background: 'rgba(168, 242, 106, 0.2)',
+                    color: 'white',
+                    border: '1px solid rgba(168, 242, 106, 0.4)'
+                  }}
+                >
+                  ✨ Iridescent
+                </span>
                 <span 
                   className="px-3 py-1 text-xs rounded-full font-medium"
                   style={{
@@ -178,27 +198,7 @@ export default function VinylStickers() {
                     border: '1px solid rgba(168, 242, 106, 0.4)'
                   }}
                 >
-                  ☀️ UV Resistant
-                </span>
-                <span 
-                  className="px-3 py-1 text-xs rounded-full font-medium"
-                  style={{
-                    background: 'rgba(168, 242, 106, 0.2)',
-                    color: 'white',
-                    border: '1px solid rgba(168, 242, 106, 0.4)'
-                  }}
-                >
-                  🏠 Dishwasher Safe
-                </span>
-                <span 
-                  className="px-3 py-1 text-xs rounded-full font-medium"
-                  style={{
-                    background: 'rgba(168, 242, 106, 0.2)',
-                    color: 'white',
-                    border: '1px solid rgba(168, 242, 106, 0.4)'
-                  }}
-                >
-                  ⭐ Premium Vinyl
+                  ⭐ Premium Quality
                 </span>
               </div>
 
@@ -251,7 +251,7 @@ export default function VinylStickers() {
               ⚠️ {pricingError} - Using fallback pricing data
             </div>
           )}
-                     <StickerCalculator 
+                     <HolographicStickerCalculator 
              initialBasePricing={basePricing} 
              realPricingData={realPricingData}
            />
@@ -263,7 +263,7 @@ export default function VinylStickers() {
         <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
           <div className="flex flex-col space-y-4 md:grid md:grid-cols-3 md:gap-4 md:space-y-0">
             
-            {/* Waterproof & UV Resistant */}
+            {/* Holographic Effect */}
             <div 
               className="rounded-xl p-6"
               style={{ 
@@ -279,16 +279,16 @@ export default function VinylStickers() {
                     filter: 'drop-shadow(0 0 10px rgba(168, 242, 106, 0.5)) drop-shadow(0 0 20px rgba(168, 242, 106, 0.3))'
                   }}
                 >
-                  💧
+                  🌈
                 </div>
                 <h3 className="font-semibold">
-                  <span className="text-white">Waterproof & UV Resistant</span>
-                  <span className="text-gray-300">, indoor & outdoor use.</span>
+                  <span className="text-white">Holographic Effect</span>
+                  <span className="text-gray-300">, rainbow shimmer & shine.</span>
                 </h3>
               </div>
             </div>
 
-            {/* Premium Vinyl Material */}
+            {/* Premium Iridescent Material */}
             <div 
               className="rounded-xl p-6"
               style={{ 
@@ -304,11 +304,11 @@ export default function VinylStickers() {
                     filter: 'drop-shadow(0 0 10px rgba(168, 242, 106, 0.5)) drop-shadow(0 0 20px rgba(168, 242, 106, 0.3))'
                   }}
                 >
-                  ⭐
+                  ✨
                 </div>
                 <h3 className="font-semibold">
-                  <span className="text-white">Premium 70lb Vinyl</span>
-                  <span className="text-gray-300">, thick & durable.</span>
+                  <span className="text-white">Premium Iridescent</span>
+                  <span className="text-gray-300">, eye-catching brilliance.</span>
                 </h3>
               </div>
             </div>

@@ -51,15 +51,15 @@ export default function Deals() {
                 </div>
                 
 
-                <p className="text-lg text-orange-400 mb-4 mt-1">
+                <p className="text-lg text-orange-400 mb-4 mt-1 font-bold" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
                   🔥 Limited Time Deal
                 </p>
                 
-                <h1 className="text-4xl sm:text-5xl md:text-6xl mb-4 leading-none sm:leading-tight relative" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
+                <h1 className="text-5xl sm:text-6xl md:text-7xl mb-4 md:mb-8 leading-none relative" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
                   <span className="block">100 custom</span>
-                  <span className="block">stickers for $29</span>
+                  <span className="block">stickers for <span className="whitespace-nowrap">$29</span></span>
                 </h1>
-                <div className="flex flex-wrap justify-center gap-3 mb-6">
+                <div className="flex flex-wrap justify-center gap-3 mb-6 md:mb-10">
                   <div 
                     className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium"
                     style={{
@@ -93,16 +93,13 @@ export default function Deals() {
                   >
                     🚀 Ships Next Day
                   </div>
-                </div>
-                
-                {/* Conspiracy Theory Pill */}
-                <div className="mb-6 -mt-4 md:mt-0">
                   <div 
-                    className="inline-block px-3 md:px-6 py-2 rounded-full text-center text-xs md:text-sm text-gray-300"
+                    className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap"
                     style={{
                       backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                      backdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                      backdropFilter: 'blur(15px)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      color: '#d1d5db'
                     }}
                   >
                     👽 Not a conspiracy theory, just great deals.
@@ -119,7 +116,8 @@ export default function Deals() {
                       borderRadius: '10px',
                       border: 'solid',
                       borderWidth: '0.03125rem',
-                      borderColor: '#8d9912'
+                      borderColor: '#8d9912',
+                      transform: 'scale(1.1)'
                     }}
                   >
                     Order Now →
@@ -266,11 +264,40 @@ export default function Deals() {
 
             {/* Mobile Swipeable Reviews */}
             <div className="md:hidden overflow-x-auto pb-4 relative">
-              <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#030140] to-transparent pointer-events-none z-10"></div>
-              <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#030140] to-transparent pointer-events-none z-10"></div>
               
-              <div className="flex space-x-4 w-max" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                {/* Mobile Reviews - Same content as desktop but in scrollable format */}
+              <div className="flex space-x-4 w-max" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', paddingLeft: 'calc(2.5vw + 1rem)', paddingRight: '50vw' }}>
+                {/* Last review (positioned before first for endless scroll effect) */}
+                <div 
+                  className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
+                  style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}
+                >
+                  <div className="flex items-center mb-4">
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601644/111_100x100_crop_center_ubs7st.avif" 
+                      alt="Rach Plants"
+                      className="w-12 h-12 rounded-full mr-3"
+                    />
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
+                      alt="Google"
+                      className="w-8 h-8 ml-auto"
+                    />
+                  </div>
+                  <h3 className="text-white font-semibold mb-1">Rach Plants</h3>
+                  <p className="text-gray-400 text-sm mb-3">Matte Stickers& Vinyl Banners</p>
+                  <div className="flex mb-4">
+                    <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
+                  </div>
+                  <p className="text-gray-300 text-sm leading-relaxed flex-grow">
+                    Incredible! They were able to not only make my business logo into great quality stickers, they also made my own photos into stickers!! I recommend them to everyone looking for custom stickers! Beautiful work, quality, attention to detail, communication! 10/10!
+                  </p>
+                </div>
+
+                {/* First review - Now centered */}
                 <div 
                   className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
                   style={{ 
@@ -300,7 +327,161 @@ export default function Deals() {
                     We got one of our designs custom made into stickers and they definitely did not disappoint! We had previously been using another website but the speed and quality of sticker shuttle is far better than our stickers before. I would highly recommend!
                   </p>
                 </div>
-                {/* Additional mobile reviews here */}
+
+                {/* Second review */}
+                <div 
+                  className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
+                  style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}
+                >
+                  <div className="flex items-center mb-4">
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601649/download_1_100x100_crop_center_z69tdh.avif" 
+                      alt="Panda Reaper"
+                      className="w-12 h-12 rounded-full mr-3"
+                    />
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
+                      alt="Google"
+                      className="w-8 h-8 ml-auto"
+                    />
+                  </div>
+                  <h3 className="text-white font-semibold mb-1">Panda Reaper</h3>
+                  <p className="text-gray-400 text-sm mb-3">Matte Vinyl Stickers</p>
+                  <div className="flex mb-4">
+                    <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
+                  </div>
+                  <p className="text-gray-300 text-sm leading-relaxed flex-grow">
+                    Everything was perfect. The sticker themselves is a great quality, and no blurriness on the design. Will be sticking with this company for future stickers!
+                  </p>
+                </div>
+
+                {/* Third review */}
+                <div 
+                  className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
+                  style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}
+                >
+                  <div className="flex items-center mb-4">
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601646/unnamed_14467655-4d00-451c-bca6-b5be86af2814_100x100_crop_center_cmftk1.webp" 
+                      alt="Anita J"
+                      className="w-12 h-12 rounded-full mr-3"
+                    />
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
+                      alt="Google"
+                      className="w-8 h-8 ml-auto"
+                    />
+                  </div>
+                  <h3 className="text-white font-semibold mb-1">Anita J</h3>
+                  <p className="text-gray-400 text-sm mb-3">Matte Vinyl Stickers</p>
+                  <div className="flex mb-4">
+                    <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
+                  </div>
+                  <p className="text-gray-300 text-sm leading-relaxed flex-grow">
+                    Absolutely loved the quality and thickness of the stickers but what really made me excited was the ability to speak to the owner directly who provides amazing customer service and truly delivers on the timelines posted. Would recommend to anyone looking!
+                  </p>
+                </div>
+
+                {/* Fourth review */}
+                <div 
+                  className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
+                  style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}
+                >
+                  <div className="flex items-center mb-4">
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601644/111_100x100_crop_center_ubs7st.avif" 
+                      alt="Rach Plants"
+                      className="w-12 h-12 rounded-full mr-3"
+                    />
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
+                      alt="Google"
+                      className="w-8 h-8 ml-auto"
+                    />
+                  </div>
+                  <h3 className="text-white font-semibold mb-1">Rach Plants</h3>
+                  <p className="text-gray-400 text-sm mb-3">Matte Stickers& Vinyl Banners</p>
+                  <div className="flex mb-4">
+                    <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
+                  </div>
+                  <p className="text-gray-300 text-sm leading-relaxed flex-grow">
+                    Incredible! They were able to not only make my business logo into great quality stickers, they also made my own photos into stickers!! I recommend them to everyone looking for custom stickers! Beautiful work, quality, attention to detail, communication! 10/10!
+                  </p>
+                </div>
+
+                {/* Duplicate first review for seamless loop */}
+                <div 
+                  className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
+                  style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}
+                >
+                  <div className="flex items-center mb-4">
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601651/unnamed_1_100x100_crop_center_ozo8lq.webp" 
+                      alt="Certified Garbage Rat"
+                      className="w-12 h-12 rounded-full mr-3"
+                    />
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
+                      alt="Google"
+                      className="w-8 h-8 ml-auto"
+                    />
+                  </div>
+                  <h3 className="text-white font-semibold mb-1">Certified Garbage Rat</h3>
+                  <p className="text-gray-400 text-sm mb-3">Matte Stickers & Vinyl Banners</p>
+                  <div className="flex mb-4">
+                    <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
+                  </div>
+                  <p className="text-gray-300 text-sm leading-relaxed flex-grow">
+                    We got one of our designs custom made into stickers and they definitely did not disappoint! We had previously been using another website but the speed and quality of sticker shuttle is far better than our stickers before. I would highly recommend!
+                  </p>
+                </div>
+
+                {/* Duplicate second review for seamless loop */}
+                <div 
+                  className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
+                  style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  }}
+                >
+                  <div className="flex items-center mb-4">
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601649/download_1_100x100_crop_center_z69tdh.avif" 
+                      alt="Panda Reaper"
+                      className="w-12 h-12 rounded-full mr-3"
+                    />
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
+                      alt="Google"
+                      className="w-8 h-8 ml-auto"
+                    />
+                  </div>
+                  <h3 className="text-white font-semibold mb-1">Panda Reaper</h3>
+                  <p className="text-gray-400 text-sm mb-3">Matte Vinyl Stickers</p>
+                  <div className="flex mb-4">
+                    <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
+                  </div>
+                  <p className="text-gray-300 text-sm leading-relaxed flex-grow">
+                    Everything was perfect. The sticker themselves is a great quality, and no blurriness on the design. Will be sticking with this company for future stickers!
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -365,87 +546,7 @@ export default function Deals() {
           </div>
         </section>
 
-        {/* Footer */}
-        <footer className="py-12 mt-8" style={{ backgroundColor: '#030140', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-          <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-              
-              {/* Company Info */}
-              <div>
-                <h3 className="text-white font-semibold mb-4">Sticker Shuttle</h3>
-                <p className="text-gray-400 text-sm mb-4">
-                  Custom stickers and vinyl signs printed in 24 hours with free shipping.
-                </p>
-                <div className="flex space-x-4">
-                  <a href="#" className="text-gray-400 hover:text-white transition">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/>
-                    </svg>
-                  </a>
-                  <a href="#" className="text-gray-400 hover:text-white transition">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M22.46 6c-.77.35-1.6.58-2.46.69.88-.53 1.56-1.37 1.88-2.38-.83.5-1.75.85-2.72 1.05C18.37 4.5 17.26 4 16 4c-2.35 0-4.27 1.92-4.27 4.29 0 .34.04.67.11.98C8.28 9.09 5.11 7.38 3 4.79c-.37.63-.58 1.37-.58 2.15 0 1.49.75 2.81 1.91 3.56-.71 0-1.37-.2-1.95-.5v.03c0 2.08 1.48 3.82 3.44 4.21a4.22 4.22 0 0 1-1.93.07 4.28 4.28 0 0 0 4 2.98 8.521 8.521 0 0 1-5.33 1.84c-.34 0-.68-.02-1.02-.06C3.44 20.29 5.7 21 8.12 21 16 21 20.33 14.46 20.33 8.79c0-.19 0-.37-.01-.56.84-.6 1.56-1.36 2.14-2.23z"/>
-                    </svg>
-                  </a>
-                </div>
-              </div>
 
-              {/* Products */}
-              <div>
-                <h3 className="text-white font-semibold mb-4">Products</h3>
-                <ul className="space-y-2 text-sm">
-                  <li><a href="#" className="text-gray-400 hover:text-white transition">Vinyl Stickers</a></li>
-                  <li><a href="#" className="text-gray-400 hover:text-white transition">Holographic Stickers</a></li>
-                  <li><a href="#" className="text-gray-400 hover:text-white transition">Chrome Stickers</a></li>
-                  <li><a href="#" className="text-gray-400 hover:text-white transition">Glitter Stickers</a></li>
-                  <li><a href="#" className="text-gray-400 hover:text-white transition">Vinyl Banners</a></li>
-                </ul>
-              </div>
-
-              {/* Support */}
-              <div>
-                <h3 className="text-white font-semibold mb-4">Support</h3>
-                <ul className="space-y-2 text-sm">
-                  <li><a href="#" className="text-gray-400 hover:text-white transition">Contact Us</a></li>
-                  <li><a href="#" className="text-gray-400 hover:text-white transition">Order Status</a></li>
-                  <li><a href="#" className="text-gray-400 hover:text-white transition">Shipping Info</a></li>
-                  <li><a href="#" className="text-gray-400 hover:text-white transition">Returns</a></li>
-                  <li><a href="#" className="text-gray-400 hover:text-white transition">FAQ</a></li>
-                  <li><Link href="/signup" className="text-gray-400 hover:text-white transition">Signup</Link></li>
-                </ul>
-              </div>
-
-              {/* Contact */}
-              <div>
-                <h3 className="text-white font-semibold mb-4">Contact</h3>
-                <ul className="space-y-2 text-sm text-gray-400">
-                  <li>📧 hello@stickershuttle.com</li>
-                  <li>📞 (555) 123-4567</li>
-                  <li>📍 123 Sticker St, Print City, PC 12345</li>
-                </ul>
-              </div>
-
-            </div>
-
-            {/* Footer Bottom */}
-            <div className="border-t border-gray-700 mt-8 pt-6 flex flex-col md:flex-row justify-between items-center">
-              <div className="flex items-center mb-4 md:mb-0">
-                <img 
-                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
-                  alt="Sticker Shuttle" 
-                  className="h-10 w-auto object-contain footer-logo-hover cursor-pointer"
-                />
-              </div>
-              <div className="text-gray-400 text-sm text-center md:text-right">
-                <p>&copy; 2024 Sticker Shuttle. All rights reserved.</p>
-                <div className="flex space-x-4 mt-2 justify-center md:justify-end">
-                  <a href="#" className="hover:text-white transition">Privacy Policy</a>
-                  <a href="#" className="hover:text-white transition">Terms of Service</a>
-                </div>
-              </div>
-            </div>
-          </div>
-        </footer>
 
                     {/* Styles */}
             <style jsx>{`
@@ -473,19 +574,7 @@ export default function Deals() {
                 transform: scale(1.05);
               }
 
-              .footer-logo-hover {
-                transition: transform 0.3s ease;
-              }
 
-              .footer-logo-hover:hover {
-                animation: footer-logo-wiggle 0.8s ease-in-out;
-              }
-
-              @keyframes footer-logo-wiggle {
-                0%, 100% { transform: rotate(0deg); }
-                25% { transform: rotate(-5deg); }
-                75% { transform: rotate(5deg); }
-              }
 
               /* Hero Animation Keyframes */
               @keyframes float {

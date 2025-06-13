@@ -13,3 +13,5 @@ services:
       - api
     environment:
       - NEXT_PUBLIC_API_URL=http://api:4000
+      - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=dxcnvqk6b
+      - NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=sticker-uploads

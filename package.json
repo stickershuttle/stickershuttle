@@ -1,5 +1,22 @@
 {
+  "name": "sticker-shuttle-website",
+  "version": "1.0.0",
+  "description": "Sticker Shuttle Website with Frontend and API",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:frontend\"",
+    "dev:clean": "taskkill /IM node.exe /F 2>nul & npm run dev",
+    "dev:api": "cd api && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "start": "npm run dev",
+    "install:all": "npm install && cd api && npm install && cd ../frontend && npm install",
+    "build": "cd frontend && npm run build",
+    "docker:dev": "docker-compose -f docker-compose.dev.yml up --build",
+    "docker:stop": "docker-compose -f docker-compose.dev.yml down"
+  },
   "dependencies": {
     "lucide-react": "^0.514.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   }
 }

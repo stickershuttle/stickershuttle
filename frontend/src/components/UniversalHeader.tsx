@@ -3,42 +3,57 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { getSupabase } from '../lib/supabase';
+import CartIndicator from './CartIndicator';
 
-export default function Header() {
+export default function UniversalHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState<boolean>(false);
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [dotCount, setDotCount] = useState<number>(1);
+  const [loading, setLoading] = useState(false);
+  const [authError, setAuthError] = useState<boolean>(false);
   const router = useRouter();
 
   useEffect(() => {
-    checkUser();
+    let isMounted = true;
+    
+    // Only check user on client-side
+    if (typeof window !== 'undefined') {
+      const loadUser = async () => {
+        try {
+          const supabase = await getSupabase();
+          const { data: { session }, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error('Error checking user session:', error);
+            if (isMounted) {
+              setUser(null);
+              setAuthError(true);
+            }
+          } else {
+            if (isMounted) setUser(session?.user || null);
+          }
+        } catch (error) {
+          console.error('Error checking user:', error);
+          if (isMounted) {
+            setUser(null);
+            setAuthError(true);
+          }
+        } finally {
+          // Only update state if component is still mounted
+          if (isMounted) {
+            setLoading(false);
+          }
+        }
+      };
+      
+      loadUser();
+    }
+    
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      isMounted = false;
+    };
   }, []);
-
-  // Animate the dots for "blast off" message on products page
-  useEffect(() => {
-    if (router.pathname === '/products') {
-      const interval = setInterval(() => {
-        setDotCount(prev => prev >= 3 ? 1 : prev + 1);
-      }, 500);
-      return () => clearInterval(interval);
-    }
-  }, [router.pathname]);
-
-  const checkUser = async () => {
-    try {
-      if (typeof window !== 'undefined') {
-        const supabase = await getSupabase();
-        const { data: { session } } = await supabase.auth.getSession();
-        setUser(session?.user || null);
-      }
-    } catch (error) {
-      console.error('Error checking user:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSignOut = async () => {
     try {
@@ -58,11 +73,21 @@ export default function Header() {
     }, 100);
   };
 
+  // Debug: Log current route
+  useEffect(() => {
+    console.log('Current router.pathname:', router.pathname);
+    console.log('Current router.asPath:', router.asPath);
+  }, [router.pathname, router.asPath]);
+
+  // Determine visibility for authentication UI elements
+  const showAccountDashboard = user && !authError && !loading;
+  const showLoginSignupButtons = !showAccountDashboard;
+
   return (
     <>
     <header className="w-full relative z-50" style={{ backgroundColor: '#030140' }}>
       <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto py-4 px-4">
-        <div className="flex items-center justify-between relative">
+        <div className="flex items-center justify-between relative" style={{ paddingTop: '2px' }}>
           {/* Mobile/Tablet Left Side - Hamburger */}
           <div className="lg:hidden flex items-center">
             <button 
@@ -78,9 +103,8 @@ export default function Header() {
             </button>
           </div>
 
-          {/* Desktop Left Side - Hamburger + Logo */}
+          {/* Desktop Left Side - Logo */}
           <div className="hidden lg:flex items-center">
-            {/* Desktop Logo (in normal flow) */}
             <div className="lg:mr-6">
               <Link href="/">
                 <img 
@@ -99,7 +123,7 @@ export default function Header() {
               <img 
                 src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
                 alt="Sticker Shuttle Logo" 
-                className="h-12 w-auto object-contain logo-hover cursor-pointer"
+                className="h-12 w-auto object-contain cursor-pointer"
                 style={{ maxWidth: 'none' }}
               />
             </Link>
@@ -107,39 +131,20 @@ export default function Header() {
 
           {/* Mobile/Tablet Right Side - Cart */}
           <div className="lg:hidden flex items-center">
-            <button 
-              className="headerButton px-3 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105"
-              aria-label="Shopping cart"
-            >
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                strokeWidth={1.5} 
-                stroke="currentColor" 
-                className="w-5 h-5"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" 
-                />
-              </svg>
-            </button>
+            <CartIndicator />
           </div>
 
           {/* Desktop Search Bar */}
-          <div className="hidden lg:flex flex-1 items-center gap-2 relative search-dropdown-container" style={{ marginRight: '20px' }}>
+          <div className="hidden lg:flex flex-1 items-center relative search-dropdown-container mx-4">
             <input 
               type="text"
               placeholder="Go on.. create your universe 🧑‍🚀"
-              className="headerButton flex-1 px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform focus:scale-101 focus:outline-none placeholder-gray-400"
+              className="headerButton flex-1 px-4 py-2 pr-12 rounded-lg font-medium text-white transition-all duration-200 transform focus:scale-101 focus:outline-none placeholder-gray-400"
               onFocus={() => setIsSearchDropdownOpen(true)}
               onBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 300)}
             />
             <button 
-              className="headerButton px-3 py-2 font-medium text-white transition-all duration-200 transform hover:scale-105 rounded-lg"
-              style={{ backgroundColor: '#030140' }}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white transition-all duration-200 hover:scale-110"
               aria-label="Search"
             >
               <svg 
@@ -330,65 +335,37 @@ export default function Header() {
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center gap-4 ml-auto">
-            <nav className="flex items-center gap-4" style={{ letterSpacing: '-0.5px' }}>
+          <nav className="hidden lg:flex items-center gap-4" style={{ letterSpacing: '-0.5px' }}>
             <Link 
               href="/deals"
-              className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105${router.pathname === '/deals' ? ' active' : ''}`}
+              className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105${router.pathname === '/deals' || router.asPath === '/deals' ? ' active' : ''}`}
+              style={router.pathname === '/deals' || router.asPath === '/deals' ? {
+                border: '0.5px solid #a855f7',
+                background: 'rgba(168, 85, 247, 0.2)',
+                boxShadow: '0 0 12px rgba(168, 85, 247, 0.48), 0 0 24px rgba(168, 85, 247, 0.32)',
+                color: '#c084fc'
+              } : {}}
             >
               ⚡ Deals
             </Link>
-            <button 
-              className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105"
-            >
-              🚀 Shipping Process
-            </button>
-            {router.pathname === '/products' ? (
-              <span 
-                className="headerButton active px-4 py-2 rounded-lg font-medium text-purple-400 transition-all duration-200 transform inline-block" 
-                style={{ 
-                  width: '220px',
-                  height: '40px',
-                  border: '0.5px solid #a855f7',
-                  backgroundColor: 'rgba(168, 85, 247, 0.1)',
-                  borderColor: '#a855f7',
-                  textAlign: 'center',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                🚀 Preparing for blast off{'.'.repeat(dotCount)}
-              </span>
-            ) : (
-              <a 
-                href="/products"
-                className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 inline-block"
-              >
-                Start Your Order →
-              </a>
-            )}
             
-            {/* Conditional Authentication Navigation */}
-            {user ? (
-              /* Logged In - Show Account Dashboard and Sign Out */
-              <>
-                <Link 
-                  href="/account/dashboard"
-                  className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 inline-block"
-                >
-                  👨‍🚀 Account Dashboard
-                </Link>
-                <button 
-                  onClick={handleSignOut}
-                  className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105"
-                >
-                  Sign Out
-                </button>
-              </>
+            {/* Authentication Navigation - Show login/signup by default unless user verified */}
+            {showAccountDashboard ? (
+              // Logged In and Verified - Show Account Dashboard
+              <Link 
+                href="/account/dashboard"
+                className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 inline-block${router.pathname === '/account/dashboard' || router.asPath === '/account/dashboard' || router.pathname.startsWith('/account') ? ' active' : ''}`}
+                style={(router.pathname === '/account/dashboard' || router.asPath === '/account/dashboard' || router.pathname.startsWith('/account')) ? {
+                  border: '0.5px solid #a855f7',
+                  background: 'rgba(168, 85, 247, 0.2)',
+                  boxShadow: '0 0 12px rgba(168, 85, 247, 0.48), 0 0 24px rgba(168, 85, 247, 0.32)',
+                  color: '#c084fc'
+                } : {}}
+              >
+                👨‍🚀 Account Dashboard
+              </Link>
             ) : (
-              /* Not Logged In - Show Login and Signup */
+              // Default state - Show Login and Signup
               <>
                 <Link 
                   href="/login"
@@ -399,36 +376,15 @@ export default function Header() {
                 <Link 
                   href="/signup"
                   className="primaryButton px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 inline-block"
-                  onClick={(e) => {
-                    console.log('Desktop signup clicked');
-                  }}
                 >
                   Signup
                 </Link>
               </>
             )}
             
-            <button 
-              className="headerButton px-3 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105"
-              aria-label="Shopping cart"
-            >
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                strokeWidth={1.5} 
-                stroke="currentColor" 
-                className="w-5 h-5"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" 
-                />
-              </svg>
-            </button>
-            </nav>
-          </div>
+            {/* Cart Icon */}
+            <CartIndicator />
+          </nav>
         </div>
       </div>
 
@@ -483,7 +439,7 @@ export default function Header() {
             />
           </div>
 
-          {/* Sticker Types Quick Access - At Top */}
+          {/* Sticker Types Quick Access */}
           <div className="mb-8">
             <h3 className="text-sm font-semibold text-white mb-4 px-4">Sticker Types:</h3>
             <div className="space-y-2">
@@ -576,41 +532,22 @@ export default function Header() {
 
           {/* Navigation Items */}
           <nav className="space-y-2">
-            <Link href="/deals" className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">
+            <Link 
+              href="/deals" 
+              className={`w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center${router.pathname === '/deals' || router.asPath === '/deals' ? ' bg-purple-500 bg-opacity-20 border-l-4 border-purple-400' : ''}`} 
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
               <span className="mr-3">⚡</span>
               Deals
             </Link>
-            <button className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">
-              <span className="mr-3">🚀</span>
-              Shipping Process
-            </button>
-            {router.pathname === '/products' ? (
-              <span 
-                className="w-full text-left px-4 py-3 rounded-lg text-purple-400 transition-all duration-200 flex items-center" 
-                style={{ 
-                  width: '280px',
-                  border: '0.5px solid #a855f7',
-                  backgroundColor: 'rgba(168, 85, 247, 0.1)',
-                  borderColor: '#a855f7'
-                }}
-              >
-                <span className="mr-3">🚀</span>
-                <span style={{ width: '220px', whiteSpace: 'nowrap' }}>Preparing for blast off{'.'.repeat(dotCount)}</span>
-              </span>
-            ) : (
-              <a href="/products" className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">
-                <span className="mr-3">🎨</span>
-                Start Your Order
-              </a>
-            )}
             
-            {/* Conditional Authentication Navigation for Mobile */}
-            {user ? (
-              /* Logged In - Show Account Dashboard and Sign Out */
+            {/* Mobile Authentication Navigation - Show login/signup by default unless user verified */}
+            {showAccountDashboard ? (
+              /* Logged In and Verified - Show Account Dashboard and Sign Out */
               <>
                 <Link 
                   href="/account/dashboard" 
-                  className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center"
+                  className={`w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center${router.pathname === '/account/dashboard' || router.asPath === '/account/dashboard' || router.pathname.startsWith('/account') ? ' bg-purple-500 bg-opacity-20 border-l-4 border-purple-400' : ''}`}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   <span className="mr-3">👨‍🚀</span>
@@ -628,7 +565,7 @@ export default function Header() {
                 </button>
               </>
             ) : (
-              /* Not Logged In - Show Login and Signup */
+              /* Default state - Show Login and Signup */
               <>
                 <Link 
                   href="/login" 
@@ -641,10 +578,7 @@ export default function Header() {
                 <Link 
                   href="/signup" 
                   className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center"
-                  onClick={(e) => {
-                    console.log('Mobile signup clicked');
-                    setIsMobileMenuOpen(false);
-                  }}
+                  onClick={() => setIsMobileMenuOpen(false)}
                 >
                   <span className="mr-3">✨</span>
                   Signup
@@ -655,30 +589,20 @@ export default function Header() {
         </div>
       </div>
     </header>
-    
+
+    {/* Logo Animation Styles - Desktop Only */}
     <style jsx>{`
-      /* Logo animations - mobile-friendly */
       .logo-hover {
-        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        transform: scale(1);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       }
       
-      /* Desktop hover animation */
-      @media (hover: hover) and (pointer: fine) {
+      @media (min-width: 1024px) {
         .logo-hover:hover {
           transform: scale(1.1) rotate(5deg);
           filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.6)) 
                   drop-shadow(0 0 40px rgba(168, 242, 106, 0.4))
                   drop-shadow(0 0 60px rgba(168, 85, 247, 0.3));
           animation: logo-bounce 0.6s ease-in-out;
-        }
-      }
-      
-      /* Mobile tap animation */
-      @media (hover: none) and (pointer: coarse) {
-        .logo-hover:active {
-          transform: scale(0.95);
-          transition: transform 0.1s ease-in-out;
         }
       }
       
@@ -689,7 +613,8 @@ export default function Header() {
         75% { transform: scale(1.12) rotate(7deg) translateY(-2px); }
         100% { transform: scale(1.1) rotate(5deg) translateY(0px); }
       }
-      
+
+      /* Header Button Styles */
       .headerButton {
         background: rgba(255, 255, 255, 0.1) !important;
         border: 1px solid rgba(255, 255, 255, 0.2) !important;
@@ -704,14 +629,16 @@ export default function Header() {
       /* Active page button styling */
       .headerButton.active {
         border: 0.5px solid #a855f7 !important;
-        background: rgba(168, 85, 247, 0.1) !important;
-        box-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3) !important;
+        background: rgba(168, 85, 247, 0.2) !important;
+        box-shadow: 0 0 12px rgba(168, 85, 247, 0.48), 0 0 24px rgba(168, 85, 247, 0.32) !important;
+        color: #c084fc !important;
       }
       
       .headerButton.active:hover {
-        background: rgba(168, 85, 247, 0.2) !important;
-        border-color: #a855f7 !important;
-        box-shadow: 0 0 15px rgba(168, 85, 247, 0.6), 0 0 30px rgba(168, 85, 247, 0.4) !important;
+        background: rgba(168, 85, 247, 0.3) !important;
+        border-color: #c084fc !important;
+        box-shadow: 0 0 16px rgba(168, 85, 247, 0.64), 0 0 32px rgba(168, 85, 247, 0.4) !important;
+        color: #e0c3fc !important;
       }
       
       .primaryButton {
@@ -724,37 +651,6 @@ export default function Header() {
       .primaryButton:hover {
         background: linear-gradient(135deg, #ffed4e, #ffd713);
         transform: scale(1.05);
-      }
-
-      /* Prevent layout shifts */
-      .no-underline {
-        text-decoration: none !important;
-      }
-      
-      .no-underline:hover {
-        text-decoration: none !important;
-      }
-      
-      /* Ensure dropdown doesn't cause horizontal scroll */
-      .search-dropdown-container {
-        position: relative;
-        overflow: visible;
-      }
-      
-      /* Prevent any shifts when links are clicked */
-      a[href^="/products/"] {
-        display: block;
-        text-decoration: none;
-        border: none;
-        outline: none;
-      }
-      
-      a[href^="/products/"]:focus,
-      a[href^="/products/"]:active,
-      a[href^="/products/"]:visited {
-        text-decoration: none;
-        border: none;
-        outline: none;
       }
     `}</style>
     </>

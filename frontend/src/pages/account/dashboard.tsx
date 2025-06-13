@@ -383,6 +383,25 @@ export default function Dashboard() {
     setShowContactForm(true);
   };
 
+  const handleLogout = async () => {
+    try {
+      const supabase = await getSupabase();
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Error logging out:', error);
+        alert('Error logging out. Please try again.');
+        return;
+      }
+
+      // Redirect to login page
+      router.push('/login?message=You have been logged out successfully');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      alert('Error logging out. Please try again.');
+    }
+  };
+
 
 
   const handleProofAction = async (action: string, orderId?: string) => {
@@ -487,9 +506,12 @@ export default function Dashboard() {
                     disabled={reorderingId === order.id}
                     className="button-interactive relative px-4 py-3 rounded-xl flex items-center gap-3 transition-all border backdrop-blur-md hover:bg-yellow-400/20 border-yellow-400/40 text-white/90 font-normal cursor-pointer hover:scale-[1.02] duration-300 shadow-lg"
                     style={{
-                      background: reorderingId === order.id ? '#666' : 'linear-gradient(135deg, #ffd713, #ffed4e)',
+                      backgroundColor: reorderingId === order.id ? '#666' : '#ffd713',
                       color: '#030140',
-                      boxShadow: '0 0 20px rgba(255, 215, 19, 0.4), 0 4px 16px rgba(0, 0, 0, 0.2)'
+                      boxShadow: reorderingId === order.id ? 'none' : '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
+                      border: 'solid',
+                      borderWidth: '0.03125rem',
+                      borderColor: reorderingId === order.id ? '#666' : '#e6c211'
                     }}
                   >
                     {reorderingId === order.id ? (
@@ -522,7 +544,7 @@ export default function Dashboard() {
                       <img 
                         src={item.image} 
                         alt={item.name}
-                        className="w-12 h-12 rounded-lg object-contain bg-white/10 p-1"
+                        className="w-12 h-12 rounded-lg object-cover bg-white/10 border border-white/10"
                       />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-white text-sm truncate">{item.name}</p>
@@ -628,9 +650,12 @@ export default function Dashboard() {
                 disabled={reorderingId === order.id}
                 className="px-4 py-2 rounded-lg font-bold transition-all duration-200 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 style={{
-                  background: reorderingId === order.id ? '#666' : 'linear-gradient(135deg, #ffd713, #ffed4e)',
+                  backgroundColor: reorderingId === order.id ? '#666' : '#ffd713',
                   color: '#030140',
-                  boxShadow: '0 0 20px rgba(255, 215, 19, 0.4), 0 4px 16px rgba(0, 0, 0, 0.2)'
+                  boxShadow: reorderingId === order.id ? 'none' : '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
+                  border: 'solid',
+                  borderWidth: '0.03125rem',
+                  borderColor: reorderingId === order.id ? '#666' : '#e6c211'
                 }}
               >
                 {reorderingId === order.id ? (
@@ -824,7 +849,7 @@ export default function Dashboard() {
                     <img 
                       src={item.image} 
                       alt={item.name}
-                      className="w-12 h-12 rounded-lg object-contain bg-white/10 p-1"
+                      className="w-12 h-12 rounded-lg object-cover bg-white/10 border border-white/10"
                     />
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-white text-sm truncate">{item.name}</p>
@@ -839,9 +864,12 @@ export default function Dashboard() {
                   disabled={reorderingId === order.id}
                   className="px-4 py-2 rounded-lg font-bold transition-all duration-200 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   style={{
-                    background: reorderingId === order.id ? '#666' : 'linear-gradient(135deg, #ffd713, #ffed4e)',
+                    backgroundColor: reorderingId === order.id ? '#666' : '#ffd713',
                     color: '#030140',
-                    boxShadow: '0 0 20px rgba(255, 215, 19, 0.4), 0 4px 16px rgba(0, 0, 0, 0.2)'
+                    boxShadow: reorderingId === order.id ? 'none' : '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
+                    border: 'solid',
+                    borderWidth: '0.03125rem',
+                    borderColor: reorderingId === order.id ? '#666' : '#e6c211'
                   }}
                 >
                   {reorderingId === order.id ? (
@@ -957,9 +985,12 @@ export default function Dashboard() {
                     disabled={reorderingId === design.lastOrderId}
                     className="py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-300 hover:scale-105 shadow-lg"
                     style={{
-                      background: reorderingId === design.lastOrderId ? '#666' : 'linear-gradient(135deg, #ffd713, #ffed4e)',
+                      backgroundColor: reorderingId === design.lastOrderId ? '#666' : '#ffd713',
                       color: '#030140',
-                      boxShadow: '0 0 15px rgba(255, 215, 19, 0.4)'
+                      boxShadow: reorderingId === design.lastOrderId ? 'none' : '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
+                      border: 'solid',
+                      borderWidth: '0.03125rem',
+                      borderColor: reorderingId === design.lastOrderId ? '#666' : '#e6c211'
                     }}
                   >
                     {reorderingId === design.lastOrderId ? (
@@ -1678,7 +1709,7 @@ export default function Dashboard() {
                           <img 
                             src={item.image} 
                             alt={item.name}
-                            className="w-12 h-12 rounded-lg object-contain bg-white/10 p-1"
+                            className="w-12 h-12 rounded-lg object-cover bg-white/10 border border-white/10"
                           />
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-white text-sm truncate">{item.name}</p>
@@ -1702,8 +1733,12 @@ export default function Dashboard() {
                       disabled={reorderingId === lastDeliveredOrder.id}
                       className="px-6 py-3 rounded-lg font-bold transition-all duration-200 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[140px]"
                       style={{
-                        background: reorderingId === lastDeliveredOrder.id ? '#666' : 'linear-gradient(135deg, #ffd713, #ffed4e)',
-                        color: '#030140'
+                        backgroundColor: reorderingId === lastDeliveredOrder.id ? '#666' : '#ffd713',
+                        color: '#030140',
+                        boxShadow: reorderingId === lastDeliveredOrder.id ? 'none' : '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
+                        border: 'solid',
+                        borderWidth: '0.03125rem',
+                        borderColor: reorderingId === lastDeliveredOrder.id ? '#666' : '#e6c211'
                       }}
                     >
                       {reorderingId === lastDeliveredOrder.id ? (
@@ -1810,8 +1845,12 @@ export default function Dashboard() {
                           disabled={reorderingId === order.id}
                           className="flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg font-bold transition-all duration-200 transform hover:scale-105 shadow-lg disabled:opacity-50 text-xs sm:text-sm text-center"
                           style={{
-                            background: reorderingId === order.id ? '#666' : 'linear-gradient(135deg, #ffd713, #ffed4e)',
-                            color: '#030140'
+                            backgroundColor: reorderingId === order.id ? '#666' : '#ffd713',
+                            color: '#030140',
+                            boxShadow: reorderingId === order.id ? 'none' : '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
+                            border: 'solid',
+                            borderWidth: '0.03125rem',
+                            borderColor: reorderingId === order.id ? '#666' : '#e6c211'
                           }}
                         >
                           {reorderingId === order.id ? 'Adding...' : '🔄 Reorder'}
@@ -2306,6 +2345,33 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </button>
+
+                    {/* Logout Button */}
+                    <button 
+                      onClick={handleLogout}
+                      className="block rounded-lg p-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 w-full text-left mt-4 border-t border-white/10 pt-6"
+                      style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                        backdropFilter: 'blur(20px)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)'
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg"
+                             style={{
+                               background: 'linear-gradient(135deg, #6b7280, #9ca3af)',
+                               boxShadow: '0 4px 16px rgba(107, 114, 128, 0.3)'
+                             }}>
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-white text-sm">🚪 Log Out</h4>
+                          <p className="text-xs text-gray-300">End session</p>
+                        </div>
+                      </div>
+                    </button>
                   </div>
                 </div>
 
@@ -2392,6 +2458,33 @@ export default function Dashboard() {
                       <div>
                         <h4 className="font-semibold text-white text-sm">⚠️ Raise a Concern</h4>
                         <p className="text-xs text-gray-300">Report an issue</p>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Mobile Logout Button */}
+                  <button 
+                    onClick={handleLogout}
+                    className="block rounded-lg p-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 w-full text-left mt-4 border-t border-white/10 pt-6"
+                    style={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                      backdropFilter: 'blur(20px)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)'
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg"
+                           style={{
+                             background: 'linear-gradient(135deg, #6b7280, #9ca3af)',
+                             boxShadow: '0 4px 16px rgba(107, 114, 128, 0.3)'
+                           }}>
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-white text-sm">🚪 Log Out</h4>
+                        <p className="text-xs text-gray-300">End session</p>
                       </div>
                     </div>
                   </button>
@@ -2571,7 +2664,7 @@ export default function Dashboard() {
                                     <img 
                                       src={order.items[0].image} 
                                       alt={order.items[0].name}
-                                      className="w-12 h-12 rounded-lg object-contain bg-white/10 p-1"
+                                      className="w-12 h-12 rounded-lg object-cover bg-white/10 border border-white/10"
                                     />
                                   </div>
                                   <div className="flex-1 min-w-0">
