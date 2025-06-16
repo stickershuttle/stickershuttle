@@ -1,4 +1,8 @@
-require('dotenv').config();
+// Load environment variables from multiple possible locations
+require('dotenv').config({ path: '../.env.local' });  // When running from api/
+require('dotenv').config({ path: './.env.local' });   // When running from root
+require('dotenv').config({ path: './.env' });         // API-specific env
+require('dotenv').config();                           // System env
 
 const shopifyConfig = {
   // Configuration from environment variables only

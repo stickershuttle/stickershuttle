@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "description": "Sticker Shuttle Website with Frontend and API",
   "scripts": {
-    "dev": "concurrently \"npm run dev:api\" \"npm run dev:frontend\"",
+    "dev": "npm run kill:ports && concurrently \"npm run dev:api\" \"npm run dev:frontend\"",
     "dev:clean": "taskkill /IM node.exe /F 2>nul & npm run dev",
+    "kill:ports": "powershell -ExecutionPolicy Bypass -File ./kill-ports.ps1",
     "dev:api": "cd api && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "start": "npm run dev",
