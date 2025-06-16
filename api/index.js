@@ -30,7 +30,7 @@ app.use('/webhooks', webhookHandlers);
 app.get('/health', (req, res) => {
   res.json({
     message: 'Sticker Shuttle API is running! 🚀',
-    version: '1.0.0',
+    version: '1.0.1',
     endpoints: {
       graphql: '/',
       upload: '/api/upload'
