@@ -10,7 +10,6 @@ const { validateConfig } = require('./shopify-config');
 const uploadRoutes = require('./upload-routes');
 const webhookHandlers = require('./webhook-handlers');
 const supabaseClient = require('./supabase-client');
-const ShopifyOrderSync = require('./sync-shopify-orders');
 
 // Initialize Express app
 const app = express();
