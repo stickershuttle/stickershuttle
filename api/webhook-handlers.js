@@ -11,17 +11,42 @@ router.use(express.raw({ type: 'application/json' }));
 // Orders Created - When a new order is placed
 router.post('/orders-create', async (req, res) => {
   try {
-    const order = JSON.parse(req.body);
-    console.log('📦 Webhook: Order Created', order.id, order.name);
-
-    if (supabaseClient.isReady()) {
-      await syncOrderToSupabase(order, 'created');
+    // Handle different body formats
+    let order;
+    try {
+      if (typeof req.body === 'string') {
+        order = JSON.parse(req.body);
+      } else if (Buffer.isBuffer(req.body)) {
+        order = JSON.parse(req.body.toString());
+      } else {
+        order = req.body;
+      }
+    } catch (parseError) {
+      console.error('❌ Failed to parse webhook body:', parseError);
+      return res.status(400).send('Invalid JSON');
     }
 
+    console.log('📦 Webhook: Order Created', order?.id, order?.name);
+
+    // Quick response
     res.status(200).send('OK');
+
+    // Process asynchronously
+    if (order?.id && supabaseClient.isReady()) {
+      setImmediate(async () => {
+        try {
+          await syncOrderToSupabase(order, 'created');
+        } catch (asyncError) {
+          console.error('❌ Async order creation processing failed:', asyncError);
+        }
+      });
+    }
+
   } catch (error) {
-    console.error('Error processing orders/create webhook:', error);
-    res.status(500).send('Error processing webhook');
+    console.error('❌ Critical error in orders/create webhook:', error);
+    if (!res.headersSent) {
+      res.status(500).send('Webhook processing failed');
+    }
   }
 });
 
@@ -45,31 +70,68 @@ router.post('/orders-updated', async (req, res) => {
 // Orders Paid - When payment is completed
 router.post('/orders-paid', async (req, res) => {
   try {
-    const order = JSON.parse(req.body);
-    console.log('💰 Webhook: Order Paid', order.id, order.name);
-
-    if (supabaseClient.isReady()) {
-      // Check if this is a cart order (either with metadata or tagged as cart-order)
-      const cartMetadata = extractCartMetadata(order.note);
-      const isCartOrder = cartMetadata || (order.tags && order.tags.includes('cart-order')) || 
-                         (order.note && order.note.includes('🛒 CART ORDER'));
-      
-      if (isCartOrder) {
-        console.log('🛒 Processing cart order payment for:', order.name);
-        await updateDraftOrderToRealOrder(order, cartMetadata, order);
+    console.log('💰 Webhook: Order Paid webhook received');
+    console.log('📊 Raw body type:', typeof req.body);
+    console.log('📊 Raw body length:', req.body?.length || 'N/A');
+    
+    // Handle different body formats
+    let order;
+    try {
+      if (typeof req.body === 'string') {
+        order = JSON.parse(req.body);
+      } else if (Buffer.isBuffer(req.body)) {
+        order = JSON.parse(req.body.toString());
       } else {
-        // Regular order status update for non-cart orders
-        await updateOrderStatus(order.id, {
-          financial_status: 'paid',
-          order_status: 'Creating Proofs'
-        });
+        order = req.body; // Already parsed
       }
+    } catch (parseError) {
+      console.error('❌ Failed to parse webhook body:', parseError);
+      console.log('Raw body:', req.body?.toString()?.substring(0, 200) + '...');
+      return res.status(400).send('Invalid JSON');
     }
 
+    if (!order || !order.id) {
+      console.error('❌ Invalid order data received');
+      return res.status(400).send('Invalid order data');
+    }
+
+    console.log('💰 Processing order payment:', order.id, order.name);
+
+    // Quick response to prevent timeout
     res.status(200).send('OK');
+
+    // Process webhook asynchronously to prevent timeouts
+    setImmediate(async () => {
+      try {
+        if (supabaseClient.isReady()) {
+          // Check if this is a cart order (either with metadata or tagged as cart-order)
+          const cartMetadata = extractCartMetadata(order.note);
+          const isCartOrder = cartMetadata || (order.tags && order.tags.includes('cart-order')) || 
+                             (order.note && order.note.includes('🛒 CART ORDER'));
+          
+          if (isCartOrder) {
+            console.log('🛒 Processing cart order payment for:', order.name);
+            await updateDraftOrderToRealOrder(order, cartMetadata, order);
+          } else {
+            console.log('📝 Processing regular order payment for:', order.name);
+            await updateOrderStatus(order.id, {
+              financial_status: 'paid',
+              order_status: 'Creating Proofs'
+            });
+          }
+        } else {
+          console.error('❌ Supabase client not ready');
+        }
+      } catch (asyncError) {
+        console.error('❌ Async webhook processing failed:', asyncError);
+      }
+    });
+
   } catch (error) {
-    console.error('Error processing orders/paid webhook:', error);
-    res.status(500).send('Error processing webhook');
+    console.error('❌ Critical error in orders/paid webhook:', error);
+    if (!res.headersSent) {
+      res.status(500).send('Webhook processing failed');
+    }
   }
 });
 
