@@ -2,7 +2,8 @@ import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 import { onError } from '@apollo/client/link/error';
 import { from } from '@apollo/client';
 
-// Production API URL on Railway
+// TEMPORARY: Use local API until Railway environment variables are configured
+// Production API URL on Railway (currently down due to missing env vars)
 const PRODUCTION_API_URL = 'https://stickershuttle-production.up.railway.app';
 
 // Use production URL by default, fallback to localhost in development
@@ -12,13 +13,18 @@ const getApiUrl = () => {
     return process.env.NEXT_PUBLIC_API_URL;
   }
   
-  // If in development mode, use localhost
-  if (process.env.NODE_ENV === 'development') {
-    return 'http://localhost:4000';
-  }
+  // TEMPORARY FIX: Always use localhost for now until Railway is configured
+  // This means you need to run your API locally: cd api && npm run dev
+  return 'http://localhost:4000';
   
-  // Otherwise use production URL
-  return PRODUCTION_API_URL;
+  // Original logic (commented out until Railway is fixed):
+  // // If in development mode, use localhost
+  // if (process.env.NODE_ENV === 'development') {
+  //   return 'http://localhost:4000';
+  // }
+  // 
+  // // Otherwise use production URL
+  // return PRODUCTION_API_URL;
 };
 
 const httpLink = createHttpLink({
