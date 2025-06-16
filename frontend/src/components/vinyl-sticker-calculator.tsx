@@ -927,8 +927,8 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
                 </div>
               ) : (
                 <div className="border border-green-400/50 rounded-xl p-4 bg-green-500/10 backdrop-blur-md">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative z-10">
                         <img
                           src={uploadedFile.secure_url}
@@ -945,14 +945,14 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
                           📄
                         </div>
                       </div>
-                      <div>
-                        <p className="text-green-200 font-medium">{uploadedFile.original_filename}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-green-200 font-medium truncate">{uploadedFile.original_filename}</p>
                         <p className="text-green-300/80 text-sm">
                           {(uploadedFile.bytes / 1024 / 1024).toFixed(2)} MB • {uploadedFile.format.toUpperCase()}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <button
                         onClick={() => document.getElementById('file-input')?.click()}
                         className="text-blue-300 hover:text-blue-200 p-2 hover:bg-blue-500/20 rounded-lg transition-colors cursor-pointer"

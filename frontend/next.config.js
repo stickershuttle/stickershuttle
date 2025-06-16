@@ -13,9 +13,16 @@ const nextConfig = {
     }
   }),
   
-  // Add image domains configuration
+  // Add image remote patterns configuration (updated from deprecated domains)
   images: {
-    domains: ['res.cloudinary.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+        port: '',
+        pathname: '/**',
+      },
+    ],
   },
 
   // Allow ESLint errors during build (treat as warnings)

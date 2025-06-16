@@ -6,8 +6,11 @@ services:
     volumes:
       - ./api:/app
       - /app/node_modules
+      - ./.env.local:/app/.env.local
     ports:
       - "4000:4000"
+    env_file:
+      - .env.local
     restart: unless-stopped
   
   frontend:
@@ -16,18 +19,18 @@ services:
       target: builder
     command: npm run dev -- --hostname 0.0.0.0 --port 3000
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:4000
       - WATCHPACK_POLLING=true
       - CHOKIDAR_USEPOLLING=true
       - FORCE_COLOR=1
-      - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=dxcnvqk6b
-      - NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=ml_default
     volumes:
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
+      - ./.env.local:/app/.env.local
     ports:
       - "3000:3000"
+    env_file:
+      - .env.local
     depends_on:
       - api
     restart: unless-stopped

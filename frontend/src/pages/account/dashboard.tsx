@@ -10,6 +10,7 @@ import { useLazyQuery } from '@apollo/client';
 import { GET_ORDER_BY_ID } from '../../lib/shopify-mutations';
 import useInvoiceGenerator, { InvoiceData } from '../../components/InvoiceGenerator';
 import ErrorBoundary from '../../components/ErrorBoundary';
+import dynamic from 'next/dynamic';
 
 // Using real order data only - no more sample/demo data
 
@@ -40,7 +41,7 @@ interface Order {
   _fullOrderData?: any;
 }
 
-export default function Dashboard() {
+function Dashboard() {
   const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
   const { processEnhancedCheckout, loading: checkoutLoading, error: checkoutError } = useCheckout();
@@ -4405,9 +4406,18 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      </ErrorBoundary>
+            </ErrorBoundary>
     </Layout>
 
     </>
-  );
-} 
+      );
+  }
+  
+  // Disable static generation for this page to prevent build-time GraphQL errors
+  export async function getServerSideProps() {
+    return {
+      props: {}
+    };
+  }
+  
+  export default Dashboard;

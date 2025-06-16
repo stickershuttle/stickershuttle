@@ -2,7 +2,7 @@ import Layout from "@/components/Layout";
 import { useCart } from "@/components/CartContext";
 import Link from "next/link";
 import Image from "next/image";
-import ShopifyCheckoutButton from "@/components/ShopifyCheckoutButton";
+import CartCheckoutButton from "@/components/CartCheckoutButton";
 import { CartItem } from "@/types/product";
 import { useState, useEffect, useRef } from "react";
 import { 
@@ -299,81 +299,7 @@ const calculateDeliveryDate = (totalQuantity: number, hasRushOrder: boolean) => 
   };
 };
 
-// Convert cart items to Shopify checkout format
-const createCheckoutItemsFromCart = (cart: CartItem[]) => {
-  return cart.map((item) => ({
-    title: `${item.product.name} - Custom Configuration`,
-    price: item.totalPrice,
-    quantity: 1,
-    sku: `${item.product.sku}-CUSTOM`,
-  }));
-};
 
-// Create customer info with all cart item configurations
-const createCustomerInfoFromCart = (cart: CartItem[]) => {
-  const cartDetails = cart.map((item, index) => {
-    const configDetails = [];
-    
-    // Add item header
-    configDetails.push(`--- ITEM ${index + 1}: ${item.product.name} ---`);
-    
-    // Add core configuration
-    Object.entries(item.customization.selections || {}).forEach(([key, sel]) => {
-      if (sel && sel.displayValue) {
-        const emoji = getOptionEmoji(sel.type || '', sel.value);
-        configDetails.push(`${emoji} ${formatOptionName(sel.type || '')}: ${sel.displayValue}`);
-      }
-    });
-    
-    // Add quantity and pricing
-    configDetails.push(`#️⃣ Quantity: ${item.quantity}`);
-    configDetails.push(`💰 Unit Price: $${item.unitPrice.toFixed(2)}`);
-    configDetails.push(`💎 Total: $${item.totalPrice.toFixed(2)}`);
-    
-    // Add artwork if present
-    if (item.customization.customFiles && item.customization.customFiles.length > 0) {
-      configDetails.push('', '🔗 Cloudinary URL:', '', item.customization.customFiles[0]);
-    }
-    
-    // Add custom notes if present
-    if (item.customization.notes && item.customization.notes.trim()) {
-      configDetails.push('', '📝 Additional Instructions:', item.customization.notes.trim());
-    }
-    
-    configDetails.push(''); // Empty line between items
-    return configDetails.join('\n');
-  });
-
-  const cartTotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
-  const itemCount = cart.length;
-  
-  // Create comprehensive order notes
-  const orderNote = [
-    `🛒 CART ORDER - ${itemCount} item${itemCount > 1 ? 's' : ''}`,
-    `💎 Cart Total: $${cartTotal.toFixed(2)}`,
-    '',
-    ...cartDetails
-  ].join('\n');
-
-  // Create tags from all cart items
-  const allTags = cart.map(item => {
-    const selections = item.customization.selections || {};
-    const tags = [item.product.category as string];
-    
-    Object.values(selections).forEach(sel => {
-      if (sel && typeof sel.value === 'string') {
-        tags.push(sel.value.toLowerCase().replace(/[^a-z0-9]/g, '-'));
-      }
-    });
-    
-    return tags.join(',');
-  }).join(',');
-
-  return {
-    note: orderNote,
-    tags: `cart-order,items-${itemCount},${allTags}`
-  };
-};
 
 // Helper function to format option name
 const formatOptionName = (type: string) => {
@@ -1726,25 +1652,54 @@ export default function CartPage() {
 
                      {/* Checkout Actions */}
                      <div className="space-y-3">
-                       <ShopifyCheckoutButton
-                         items={createCheckoutItemsFromCart(updatedCart)}
-                         customerInfo={createCustomerInfoFromCart(updatedCart)}
+                       {/* Enhanced Checkout Button - NEW Phase 2 Implementation */}
+                       <CartCheckoutButton
+                         cartItems={updatedCart}
                          className="w-full px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center gap-2 text-lg checkout-button-yellow"
                          onCheckoutStart={() => {
-                           console.log('🚀 Starting cart checkout with:', updatedCart.length, 'items');
-                           // Clear cart when checkout begins (user redirected to Shopify)
+                           console.log('🚀 Starting enhanced cart checkout with user context:', updatedCart.length, 'items');
+                         }}
+                         onCheckoutSuccess={() => {
+                           console.log('✅ Enhanced checkout successful - clearing cart and redirecting to dashboard');
+                           clearCart();
+                           
+                           // Show immediate success feedback
+                           const successMessage = document.createElement('div');
+                           successMessage.innerHTML = `
+                             <div style="position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #10b981, #34d399); color: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 10000; max-width: 300px;">
+                               <div style="font-weight: bold; margin-bottom: 4px;">🎉 Order Complete!</div>
+                               <div style="font-size: 14px; opacity: 0.9;">Redirecting to your dashboard...</div>
+                             </div>
+                           `;
+                           document.body.appendChild(successMessage);
+                           
                            setTimeout(() => {
-                             clearCart();
-                             console.log('✅ Cart cleared after successful checkout redirect');
-                           }, 2000); // Small delay to ensure redirect happens first
+                             document.body.removeChild(successMessage);
+                           }, 5000);
                          }}
                          onCheckoutError={(error) => {
-                           console.error('❌ Cart checkout error:', error);
-                           alert(`Checkout Error: ${error}`);
+                           console.error('❌ Enhanced checkout error:', error);
+                           
+                           // Show user-friendly error message
+                           const errorMessage = document.createElement('div');
+                           errorMessage.innerHTML = `
+                             <div style="position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #ef4444, #f87171); color: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 10000; max-width: 300px;">
+                               <div style="font-weight: bold; margin-bottom: 4px;">❌ Checkout Error</div>
+                               <div style="font-size: 14px; opacity: 0.9;">${error}</div>
+                             </div>
+                           `;
+                           document.body.appendChild(errorMessage);
+                           
+                           setTimeout(() => {
+                             document.body.removeChild(errorMessage);
+                           }, 7000);
                          }}
                        >
                          💳 Go to Checkout
-                       </ShopifyCheckoutButton>
+                       </CartCheckoutButton>
+                       
+
+                       
                        <button 
                          onClick={clearCart} 
                          className="w-full px-4 py-2 rounded-lg text-white/90 hover:bg-white/20 transition-colors flex items-center justify-center gap-2 backdrop-blur-sm"
