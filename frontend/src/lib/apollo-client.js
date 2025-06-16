@@ -2,8 +2,27 @@ import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 import { onError } from '@apollo/client/link/error';
 import { from } from '@apollo/client';
 
+// Production API URL on Railway
+const PRODUCTION_API_URL = 'https://stickershuttle-production.up.railway.app';
+
+// Use production URL by default, fallback to localhost in development
+const getApiUrl = () => {
+  // If explicit environment variable is set, use it
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  
+  // If in development mode, use localhost
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:4000';
+  }
+  
+  // Otherwise use production URL
+  return PRODUCTION_API_URL;
+};
+
 const httpLink = createHttpLink({
-  uri: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
+  uri: getApiUrl(),
 });
 
 // Error link to log GraphQL errors
@@ -16,6 +35,11 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
 
   if (networkError) {
     console.error(`❌ Network error: ${networkError}`);
+    
+    // If we're trying to connect to localhost in production, show helpful error
+    if (networkError.message.includes('localhost') && process.env.NODE_ENV === 'production') {
+      console.error(`🚨 Production is trying to connect to localhost! Check API URL configuration.`);
+    }
   }
 });
 
@@ -57,7 +81,9 @@ const client = new ApolloClient({
   },
 });
 
-console.log('🔗 Apollo Client configured with URI:', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000');
+const finalApiUrl = getApiUrl();
+console.log('🔗 Apollo Client configured with URI:', finalApiUrl);
+console.log('🌍 Environment:', process.env.NODE_ENV);
 
 // Clear cache in development to avoid stale error states
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
