@@ -26,16 +26,22 @@ app.use('/api', uploadRoutes);
 // Add webhook routes
 app.use('/webhooks', webhookHandlers);
 
-// Health check route (moved to /health to avoid conflict with GraphQL)
+// Add health check before Apollo setup
 app.get('/health', (req, res) => {
-  res.json({
-    message: 'Sticker Shuttle API is running! 🚀',
-    version: '1.0.1',
-    endpoints: {
-      graphql: '/',
-      upload: '/api/upload'
-    },
-    status: 'healthy'
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    service: 'Sticker Shuttle API',
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Add a simple test endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Sticker Shuttle API is running',
+    graphql: '/graphql',
+    health: '/health'
   });
 });
 
@@ -957,26 +963,40 @@ const server = new ApolloServer({
 
 // 4. Start server with Express + Apollo
 async function startServer() {
-  await server.start();
-  server.applyMiddleware({ app, path: '/' }); // GraphQL Playground at root
+  try {
+    await server.start();
+    server.applyMiddleware({ app, path: '/graphql' }); // GraphQL at /graphql
 
-  const PORT = process.env.PORT || 4000;
-  
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running at http://localhost:${PORT}`);
-    console.log(`🚀 GraphQL Playground: http://localhost:${PORT}/`);
-    console.log(`📁 File upload endpoint: http://localhost:${PORT}/api/upload`);
-    console.log(`💚 Health check: http://localhost:${PORT}/health`);
+    const PORT = process.env.PORT || 4000;
     
-    // Validate Shopify configuration
-    if (validateConfig()) {
-      console.log('✅ Shopify configuration is valid');
-    } else {
-      console.log('⚠️  Please configure your Shopify API credentials');
-    }
-  });
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running at http://localhost:${PORT}`);
+      console.log(`🚀 GraphQL Playground: http://localhost:${PORT}/graphql`);
+      console.log(`📁 File upload endpoint: http://localhost:${PORT}/api/upload`);
+      console.log(`💚 Health check: http://localhost:${PORT}/health`);
+      
+      // Validate Shopify configuration
+      if (validateConfig()) {
+        console.log('✅ Shopify configuration is valid');
+      } else {
+        console.log('⚠️  Please configure your Shopify API credentials');
+        console.log('⚠️  API will start but GraphQL features may not work properly');
+      }
+    });
+  } catch (error) {
+    console.error('❌ Failed to start Apollo Server:', error);
+    
+    // Start basic Express server even if Apollo fails
+    const PORT = process.env.PORT || 4000;
+    app.listen(PORT, () => {
+      console.log(`🚀 Basic server running at http://localhost:${PORT}`);
+      console.log(`💚 Health check: http://localhost:${PORT}/health`);
+      console.log('⚠️  GraphQL is not available due to configuration issues');
+    });
+  }
 }
 
 startServer().catch(error => {
-  console.error('Failed to start server:', error);
+  console.error('❌ Complete server startup failed:', error);
+  process.exit(1);
 });

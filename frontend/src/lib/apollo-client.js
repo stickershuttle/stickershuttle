@@ -22,7 +22,7 @@ const getApiUrl = () => {
 };
 
 const httpLink = createHttpLink({
-  uri: getApiUrl(),
+  uri: `${getApiUrl()}/graphql`,
 });
 
 // Error link to log GraphQL errors
