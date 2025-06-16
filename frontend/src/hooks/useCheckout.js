@@ -75,10 +75,18 @@ export const useCheckout = () => {
       });
 
       const result = orderData.processCartOrder;
-      console.log('✅ Phase 2: Order processed successfully:', result);
+      console.log('📊 Phase 2: Order processing result:', result);
 
       if (!result.success) {
-        throw new Error(result.message || 'Order processing failed');
+        console.error('❌ Order processing failed with errors:', result.errors);
+        console.error('❌ Error message:', result.message);
+        
+        // Show detailed error message if available
+        let detailedError = result.message || 'Order processing failed';
+        if (result.errors && result.errors.length > 0) {
+          detailedError += '\nDetails: ' + result.errors.join(', ');
+        }
+        throw new Error(detailedError);
       }
 
       // Step 3: Get checkout URL from Shopify order

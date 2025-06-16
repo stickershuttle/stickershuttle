@@ -484,15 +484,19 @@ const resolvers = {
         
         console.log('📡 Calling supabaseClient.getUserOrders...');
         const rpcData = await supabaseClient.getUserOrders(userId);
-        console.log('📊 RPC data received:', rpcData.length, 'orders');
+        console.log('📊 RPC data received:', rpcData.length, 'total orders');
+        
+        // Filter to only show paid orders in dashboard (hide draft orders with financial_status = 'pending')
+        const paidOrders = rpcData.filter(order => order.financial_status === 'paid');
+        console.log('💰 Filtered to paid orders:', paidOrders.length, 'of', rpcData.length, 'total');
         
         // Debug: Log the first order's items to see the actual structure
-        if (rpcData.length > 0 && rpcData[0].items) {
-          console.log('🔍 First order items structure:', JSON.stringify(rpcData[0].items, null, 2));
+        if (paidOrders.length > 0 && paidOrders[0].items) {
+          console.log('🔍 First paid order items structure:', JSON.stringify(paidOrders[0].items, null, 2));
         }
         
         // Map RPC function results to match GraphQL schema expectations (camelCase field names)
-        return rpcData.map(order => {
+        return paidOrders.map(order => {
           // Calculate order total from items since RPC doesn't provide order-level total
           const calculatedTotal = (order.items || []).reduce((sum, item) => {
             const itemTotal = Number(item.total_price) || 0;
@@ -727,28 +731,21 @@ const resolvers = {
           errors.push(`Shopify order creation failed: ${shopifyError.message}`);
         }
 
-        // Step 2: Create Supabase order record for tracking (including draft orders)
-        // Draft orders will show in dashboard until payment is completed
+        // Step 2: Create Supabase order record for ALL orders (both draft and paid)
+        // Dashboard will filter to only show paid orders
         if (shopifyOrder && supabaseClient.isReady()) {
           try {
-            // Set initial status based on order type
-            let initialStatus = 'Awaiting Payment';
-            let financialStatus = 'pending';
+            const isDraft = shopifyOrder.name.startsWith('#D');
+            console.log(isDraft ? '📋 Creating Supabase record for draft order:' : '✅ Creating Supabase record for paid order:', shopifyOrder.name);
             
-            // If it's a real paid order (not draft), set to Creating Proofs
-            if (!shopifyOrder.name.startsWith('#D')) {
-              initialStatus = 'Creating Proofs';
-              financialStatus = shopifyOrder.financial_status || 'pending';
-            }
-
             const customerOrderData = {
               user_id: input.userId || null,
               guest_email: input.guestEmail || input.customerInfo.email,
               shopify_order_id: shopifyOrder.id.toString(), // Ensure string format for consistency
               shopify_order_number: shopifyOrder.name,
-              order_status: initialStatus,  // Awaiting Payment for drafts, Creating Proofs for paid
+              order_status: isDraft ? 'Awaiting Payment' : 'Creating Proofs',  // Draft orders await payment, paid orders start workflow
               fulfillment_status: 'unfulfilled',
-              financial_status: financialStatus,
+              financial_status: isDraft ? 'pending' : (shopifyOrder.financial_status || 'paid'),
               subtotal_price: parseFloat(shopifyOrder.subtotal_price),
               total_tax: parseFloat(shopifyOrder.total_tax || '0'),
               total_price: parseFloat(shopifyOrder.total_price),
@@ -767,7 +764,7 @@ const resolvers = {
 
             // The createCustomerOrder method now has built-in duplicate prevention
             customerOrder = await supabaseClient.createCustomerOrder(customerOrderData);
-            console.log('✅ Customer order created/found:', customerOrder.id, 'Status:', initialStatus);
+            console.log('✅ Customer order created/found:', customerOrder?.id, 'Status:', customerOrderData.order_status);
 
             // Step 3: Create order items with calculator data
             if (customerOrder) {
@@ -802,7 +799,9 @@ const resolvers = {
           customerOrder,
           shopifyOrder,
           message: errors.length === 0 
-            ? 'Order processed successfully!' 
+            ? (shopifyOrder?.name.startsWith('#D') 
+              ? 'Draft order created and tracked - awaiting payment' 
+              : 'Paid order processed successfully!')
             : 'Order created with some issues',
           errors: errors.length > 0 ? errors : null
         };
