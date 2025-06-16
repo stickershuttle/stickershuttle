@@ -613,28 +613,15 @@ const resolvers = {
       }
     },
 
-    // Sync Shopify orders
+    // Sync Shopify orders - TEMPORARILY DISABLED (missing sync module)
     syncShopifyOrders: async (_, { userId, email }) => {
-      try {
-        console.log('🔄 Syncing Shopify orders for user:', userId, 'email:', email);
-        const orderSync = new ShopifyOrderSync();
-        const result = await orderSync.syncOrdersByEmail(email, userId);
-        
-        return {
-          success: true,
-          synced: result.synced,
-          total: result.total,
-          message: result.message
-        };
-      } catch (error) {
-        console.error('❌ Error syncing Shopify orders:', error);
-        return {
-          success: false,
-          synced: 0,
-          total: 0,
-          message: `Failed to sync orders: ${error.message}`
-        };
-      }
+      console.log('⚠️ Sync functionality temporarily disabled');
+      return {
+        success: false,
+        synced: 0,
+        total: 0,
+        message: 'Sync functionality temporarily disabled'
+      };
     },
   },
 
