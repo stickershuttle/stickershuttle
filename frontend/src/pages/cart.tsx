@@ -44,6 +44,12 @@ const capitalize = (str: string): string => {
 
 // Calculate area from size string
 const calculateAreaFromSize = (sizeString: string, customWidth?: string, customHeight?: string): number => {
+  // Defensive check for undefined or null sizeString
+  if (!sizeString) {
+    console.warn('calculateAreaFromSize: sizeString is undefined, using default Medium size');
+    return PRESET_SIZES.medium.sqInches; // Default to 9 sq in (3" × 3")
+  }
+  
   if (sizeString.includes("Custom") && customWidth && customHeight) {
     const w = parseFloat(customWidth) || 0;
     const h = parseFloat(customHeight) || 0;
@@ -68,6 +74,16 @@ const calculateItemPricing = (
   quantity: number, 
   pricingData: { basePricing: BasePriceRow[]; quantityDiscounts: QuantityDiscountRow[] } | null
 ) => {
+  // Debug logging for cart item structure
+  if (!item.customization?.selections?.size?.displayValue) {
+    console.warn('Cart item missing size data:', {
+      itemId: item.id,
+      productName: item.product?.name || 'Unknown',
+      selections: item.customization?.selections,
+      customization: item.customization
+    });
+  }
+  
   const area = calculateAreaFromSize(
     item.customization.selections?.size?.displayValue || "Medium (3\")",
     item.customization.selections?.size?.value?.includes('x') ? 

@@ -14,6 +14,7 @@ export async function getSupabase() {
       auth: {
         signUp: () => Promise.resolve({ data: null, error: new Error('SSR Mock') }),
         signInWithPassword: () => Promise.resolve({ data: null, error: new Error('SSR Mock') }),
+        getSession: () => Promise.resolve({ data: { session: null } }),
       }
     };
   }
@@ -27,18 +28,53 @@ export async function getSupabase() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     
-    // Debug logging
-    console.log('Environment variables check:');
-    console.log('NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl);
-    console.log('NEXT_PUBLIC_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'Set (hidden)' : 'Not set');
+    // Check if we have placeholder values
+    const hasPlaceholderValues = 
+      supabaseUrl === 'your_supabase_url' || 
+      supabaseAnonKey === 'your_supabase_anon_key' ||
+      !supabaseUrl || 
+      !supabaseAnonKey;
     
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.error('Missing Supabase environment variables!');
-      console.error('Make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your .env.local file');
-      throw new Error('Supabase configuration is missing. Please check your environment variables.');
+    if (hasPlaceholderValues) {
+      console.warn('Supabase not configured - using mock client for development');
+      return {
+        auth: {
+          signUp: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
+          signInWithPassword: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
+          getSession: () => Promise.resolve({ data: { session: null } }),
+          signOut: () => Promise.resolve({ error: null }),
+        },
+        from: () => ({
+          select: () => Promise.resolve({ data: [], error: null }),
+          insert: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
+          update: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
+        }),
+      };
     }
     
-    supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+    try {
+      supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+    } catch (error) {
+      console.error('Failed to create Supabase client:', error);
+      console.error('URL:', supabaseUrl);
+      console.error('Key:', supabaseAnonKey ? 'Set (hidden)' : 'Not set');
+      
+      // Return a mock client for development/testing
+      console.warn('Returning mock Supabase client for development');
+      return {
+        auth: {
+          signUp: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
+          signInWithPassword: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
+          getSession: () => Promise.resolve({ data: { session: null } }),
+          signOut: () => Promise.resolve({ error: null }),
+        },
+        from: () => ({
+          select: () => Promise.resolve({ data: [], error: null }),
+          insert: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
+          update: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
+        }),
+      };
+    }
   }
   
   return supabaseClient;
