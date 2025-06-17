@@ -92,6 +92,12 @@ export default function ClearStickerCalculator({ initialBasePricing, realPricing
 
   // Extract size in inches from size string
   const getSizeInInches = (sizeString: string) => {
+    // Defensive check for undefined or null sizeString
+    if (!sizeString) {
+      console.warn('getSizeInInches: sizeString is undefined, using default 3 inches');
+      return 3;
+    }
+    
     if (sizeString === "Custom size") return 0
     
     // Handle new format: "Small (2″ × 2″)"
