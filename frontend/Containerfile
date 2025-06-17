@@ -1,0 +1,21 @@
+# frontend/Containerfile
+
+# Development version - single stage for hot reload
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+RUN npm install
+
+# Copy source code
+COPY . .
+
+# Fix permissions
+RUN chmod +x node_modules/.bin/*
+
+EXPOSE 3000
+
+# Use development command with hot reload
+CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0"] 

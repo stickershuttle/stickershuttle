@@ -2,6 +2,7 @@ services:
   api:
     build: 
       context: ./api
+      dockerfile: Containerfile
     command: npm run dev
     volumes:
       - ./api:/app
@@ -16,6 +17,7 @@ services:
   frontend:
     build:
       context: ./frontend
+      dockerfile: Containerfile
       target: builder
     command: npm run dev -- --hostname 0.0.0.0 --port 3000
     environment:
@@ -33,4 +35,4 @@ services:
       - .env.local
     depends_on:
       - api
-    restart: unless-stopped
+    restart: unless-stopped 

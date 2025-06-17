@@ -1,12 +1,16 @@
 version: "3.8"
 services:
   api:
-    build: ./api
+    build:
+      context: ./api
+      dockerfile: Containerfile
     ports:
       - "4000:4000"
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Containerfile
     ports:
       - "3000:3000"
     depends_on:
@@ -14,4 +18,4 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://api:4000
       - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=dxcnvqk6b
-      - NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=sticker-uploads
+      - NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=sticker-uploads 

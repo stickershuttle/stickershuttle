@@ -125,11 +125,11 @@ router.post('/orders-paid', async (req, res) => {
             await updateDraftOrderToRealOrder(order, cartMetadata, order);
           } else {
             console.log('📝 Processing regular order payment for:', order.name);
-            // For regular orders, we need to create the Supabase record since it doesn't exist yet
+            // For regular orders, first try to sync normally
             await syncOrderToSupabase(order, 'created');
           }
           
-          // FALLBACK: Ensure the paid order exists in Supabase regardless of path taken
+          // CRITICAL: Always ensure the paid order exists and is properly marked as paid
           await ensurePaidOrderInSupabase(order);
           
         } else {
@@ -293,11 +293,12 @@ async function syncOrderToSupabase(shopifyOrder, eventType) {
       // Check if order already exists (in case of duplicate webhooks)
       const { data: existingOrder } = await client
         .from('customer_orders')
-        .select('id')
+        .select('id, financial_status, order_status')
         .eq('shopify_order_id', shopifyOrder.id.toString())
         .single();
 
       if (!existingOrder) {
+        // Create new order record
         const { data: newOrder, error } = await client
           .from('customer_orders')
           .insert([orderData])
@@ -307,10 +308,27 @@ async function syncOrderToSupabase(shopifyOrder, eventType) {
         if (error) {
           console.error('Error inserting order:', error);
         } else {
-          console.log('✅ Real order synced to Supabase:', shopifyOrder.name);
+          console.log(`✅ Order synced to Supabase: ${shopifyOrder.name} (${shopifyOrder.financial_status || 'pending'})`);
           
           // Create order items from Shopify line items
           await createOrderItemsFromShopifyLineItems(newOrder.id, shopifyOrder);
+        }
+      } else {
+        // Order exists, update it to ensure latest data
+        console.log(`🔄 Order already exists, updating: ${shopifyOrder.name}`);
+        
+        const { error: updateError } = await client
+          .from('customer_orders')
+          .update({
+            ...orderData,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingOrder.id);
+
+        if (updateError) {
+          console.error('Error updating existing order:', updateError);
+        } else {
+          console.log(`✅ Existing order updated: ${shopifyOrder.name}`);
         }
       }
     } else {
@@ -424,7 +442,60 @@ async function ensurePaidOrderInSupabase(shopifyOrder) {
         console.log('✅ Order already exists and is paid:', shopifyOrder.name);
       }
     } else {
-      // Order doesn't exist - create it
+      // Order doesn't exist by Shopify ID - check if there's a draft order for this customer that should be updated
+      const customerEmail = shopifyOrder.customer?.email || shopifyOrder.email;
+      
+      if (customerEmail) {
+        console.log('🔍 Looking for draft order to update for customer:', customerEmail);
+        
+        // Look for recent draft orders for this customer that are awaiting payment
+        const { data: draftOrders, error: draftError } = await client
+          .from('customer_orders')
+          .select('id, shopify_order_number, total_price, order_created_at')
+          .eq('customer_email', customerEmail)
+          .eq('order_status', 'Awaiting Payment')
+          .eq('financial_status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(5); // Check recent draft orders
+
+        if (!draftError && draftOrders && draftOrders.length > 0) {
+          // Find matching draft order by similar total price (within $0.01)
+          const matchingDraft = draftOrders.find(draft => {
+            const priceDiff = Math.abs(parseFloat(draft.total_price) - parseFloat(shopifyOrder.total_price));
+            return priceDiff < 0.01;
+          });
+
+          if (matchingDraft) {
+            console.log('🔄 Found matching draft order to update:', matchingDraft.shopify_order_number, '→', shopifyOrder.name);
+            
+            const { error: updateDraftError } = await client
+              .from('customer_orders')
+              .update({
+                shopify_order_id: shopifyOrder.id.toString(), // Update with real Shopify order ID
+                shopify_order_number: shopifyOrder.name, // Update with real order number
+                order_status: 'Creating Proofs', // Change from 'Awaiting Payment'
+                financial_status: 'paid',
+                fulfillment_status: shopifyOrder.fulfillment_status || 'unfulfilled',
+                subtotal_price: parseFloat(shopifyOrder.subtotal_price),
+                total_tax: parseFloat(shopifyOrder.total_tax || '0'),
+                total_price: parseFloat(shopifyOrder.total_price),
+                shipping_address: shopifyOrder.shipping_address,
+                billing_address: shopifyOrder.billing_address,
+                order_updated_at: shopifyOrder.updated_at || new Date().toISOString()
+              })
+              .eq('id', matchingDraft.id);
+
+            if (updateDraftError) {
+              console.error('❌ Error updating draft order:', updateDraftError);
+            } else {
+              console.log('✅ Draft order updated to paid order:', matchingDraft.shopify_order_number, '→', shopifyOrder.name);
+              return; // Exit early since we updated the existing draft
+            }
+          }
+        }
+      }
+      
+      // No existing order or draft found - create new paid order record
       console.log('🆕 Creating missing paid order record:', shopifyOrder.name);
       
       const orderData = {

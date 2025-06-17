@@ -23,8 +23,8 @@ A full-stack custom sticker ordering platform with real-time pricing, file uploa
 - **Deployment**: Railway
 
 ### Infrastructure
-- **Development**: Docker Compose with multi-stage builds
-- **Production**: Docker containers
+- **Development**: Podman Compose with multi-stage builds
+- **Production**: Podman containers
 - **CI/CD**: GitHub Actions
 - **Domains**: 
   - Production: `stickershuttle.com`
@@ -34,7 +34,7 @@ A full-stack custom sticker ordering platform with real-time pricing, file uploa
 
 ### Prerequisites
 - Node.js 18+
-- Docker & Docker Compose (optional)
+- Podman & podman-compose (optional)
 - Git
 
 ### Installation
@@ -69,14 +69,14 @@ A full-stack custom sticker ordering platform with real-time pricing, file uploa
    npm run dev:frontend # Frontend on http://localhost:3000
    ```
 
-### Docker Development
+### Podman Development
 
 ```bash
-# Start with Docker
-npm run docker:dev
+# Start with Podman
+npm run podman:dev
 
-# Stop Docker containers
-npm run docker:stop
+# Stop Podman containers
+npm run podman:stop
 ```
 
 ## 📁 Project Structure
@@ -87,7 +87,7 @@ sticker-shuttle-website/
 │   ├── index.js                  # Apollo Server setup
 │   ├── shopify-client.js         # Shopify API integration
 │   ├── upload-routes.js          # File upload handling
-│   ├── Dockerfile               # API container config
+│   ├── Containerfile            # API container config
 │   └── uploads/                 # Local file storage
 ├── frontend/                     # Next.js Frontend
 │   ├── src/
@@ -98,11 +98,11 @@ sticker-shuttle-website/
 │   │   ├── types/               # TypeScript types
 │   │   └── utils/               # Helper functions
 │   ├── public/                  # Static assets & pricing data
-│   ├── Dockerfile              # Frontend container config
+│   ├── Containerfile           # Frontend container config
 │   └── next.config.js          # Next.js configuration
 ├── .github/workflows/           # CI/CD pipelines
-├── docker-compose.yml          # Production containers
-├── docker-compose.dev.yml      # Development with hot reload
+├── podman-compose.yml          # Production containers
+├── podman-compose.dev.yml      # Development with hot reload
 └── README.md                   # You are here!
 ```
 
@@ -120,9 +120,10 @@ npm run dev:clean        # Kill existing processes and restart
 # Building
 npm run build            # Build frontend for production
 
-# Docker
-npm run docker:dev       # Start development with Docker
-npm run docker:stop      # Stop Docker containers
+# Podman
+npm run podman:dev       # Start development with Podman
+npm run podman:stop      # Stop Podman containers
+npm run podman:prod      # Start production with Podman
 ```
 
 ### Key Features
@@ -142,7 +143,7 @@ npm run docker:stop      # Stop Docker containers
 
 - **Push to `main` branch** triggers automated deployment
 - **Frontend**: GitHub Actions → Vercel
-- **Backend**: GitHub Actions → Docker Registry → Railway
+- **Backend**: GitHub Actions → Container Registry → Railway
 
 ### Manual Deployment
 

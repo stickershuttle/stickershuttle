@@ -200,7 +200,7 @@ class EnvironmentTester {
         console.log('📋 Local API not running. Here are startup options:');
         console.log('   Option 1: ./start-local-api.bat');
         console.log('   Option 2: cd api && npm run dev');
-        console.log('   Option 3: npm run docker:dev');
+        console.log('   Option 3: npm run podman:dev');
       }
       
       // Check if local frontend is running
@@ -210,7 +210,7 @@ class EnvironmentTester {
         console.log('📋 Local Frontend not running. Here are startup options:');
         console.log('   Option 1: ./start-local-frontend.bat');
         console.log('   Option 2: cd frontend && npm run dev');
-        console.log('   Option 3: npm run docker:dev');
+        console.log('   Option 3: npm run podman:dev');
       }
       
     } catch (error) {

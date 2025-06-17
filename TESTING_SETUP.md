@@ -25,9 +25,9 @@ cd api; npm run dev
 cd frontend; npm run dev
 ```
 
-#### Option 3: Docker Development (Recommended for consistency)
+#### Option 3: Podman Development (Recommended for consistency)
 ```bash
-npm run docker:dev
+npm run podman:dev
 ```
 
 ### 🔧 Local Configuration
@@ -157,7 +157,7 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 // Production testing  
 NEXT_PUBLIC_API_URL=https://stickershuttle-production.up.railway.app
 
-// Docker development
+// Podman development
 NEXT_PUBLIC_API_URL=http://api:4000
 ```
 

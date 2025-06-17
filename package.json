@@ -11,8 +11,11 @@
     "start": "npm run dev",
     "install:all": "npm install && cd api && npm install && cd ../frontend && npm install",
     "build": "cd frontend && npm run build",
-    "docker:dev": "docker-compose -f docker-compose.dev.yml up --build",
-    "docker:stop": "docker-compose -f docker-compose.dev.yml down"
+    "podman:dev": "podman compose -f podman-compose.dev.yml up --build",
+    "podman:fullstack": "start-podman-fullstack.bat",
+    "podman:stop": "podman compose -f podman-compose.dev.yml down",
+    "podman:stop-all": "podman stop sticker-api sticker-frontend",
+    "podman:prod": "podman compose -f podman-compose.yml up --build"
   },
   "dependencies": {
     "axios": "^1.10.0",
