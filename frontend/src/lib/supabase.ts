@@ -24,8 +24,19 @@ export async function getSupabase() {
       await loadSupabaseFromCDN();
     }
     
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    // Debug logging
+    console.log('Environment variables check:');
+    console.log('NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl);
+    console.log('NEXT_PUBLIC_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'Set (hidden)' : 'Not set');
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('Missing Supabase environment variables!');
+      console.error('Make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your .env.local file');
+      throw new Error('Supabase configuration is missing. Please check your environment variables.');
+    }
     
     supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
   }

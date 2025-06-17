@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useLazyQuery } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client';
 import { getSupabase } from '../lib/supabase';
-import { GET_USER_ORDERS, CLAIM_GUEST_ORDERS, SYNC_SHOPIFY_ORDERS } from '../lib/shopify-mutations';
+import { GET_USER_ORDERS, CLAIM_GUEST_ORDERS } from '../lib/order-mutations';
 
 export const useDashboardData = () => {
   console.log('🚀 DASHBOARD HOOK LOADED - VERSION 2.0'); // Debug to ensure hook is reloaded
@@ -27,20 +27,6 @@ export const useDashboardData = () => {
 
   // Mutation for claiming guest orders
   const [claimGuestOrders] = useMutation(CLAIM_GUEST_ORDERS);
-
-  // Lazy query for syncing Shopify orders
-  const [syncShopifyOrders, { loading: syncLoading }] = useLazyQuery(SYNC_SHOPIFY_ORDERS, {
-    onCompleted: (data) => {
-      if (data?.syncShopifyOrders?.success) {
-        console.log(`✅ Synced ${data.syncShopifyOrders.synced} Shopify orders`);
-        // Refetch orders after sync
-        refetchOrders();
-      }
-    },
-    onError: (error) => {
-      console.error('❌ Error syncing Shopify orders:', error);
-    }
-  });
 
   // Check user authentication
   useEffect(() => {
@@ -84,9 +70,8 @@ export const useDashboardData = () => {
               console.error('❌ Network error:', claimError.networkError);
             }
 
-            // Temporarily disabled automatic sync to prevent duplicates
-            // TODO: Re-enable once sync logic is fixed to update instead of create
-            console.log('ℹ️ Automatic Shopify sync disabled to prevent duplicates');
+            // No need for Shopify sync anymore - all orders come from Stripe webhooks
+            console.log('✅ Using Stripe order data - no sync needed');
           }
         }
       } catch (error) {
@@ -172,30 +157,18 @@ export const useDashboardData = () => {
             type: typeof orderTotal
           });
           
-          // Create mission number using exact Shopify order number
+          // Create mission number using order ID
           const getMissionNumber = (order) => {
-            // Check both camelCase and snake_case field names
-            const shopifyOrderNumber = order.shopifyOrderNumber || order.shopify_order_number;
-            const shopifyOrderId = order.shopifyOrderId || order.shopify_order_id;
-            
+            // Use the order's internal ID as the mission number
             console.log(`🎯 DEBUG: Mission number for order ${order.id}:`, {
-              shopifyOrderNumber: shopifyOrderNumber,
-              shopifyOrderId: shopifyOrderId,
-              orderId: order.id
+              orderId: order.id,
+              orderNumber: order.orderNumber
             });
             
-            // Use the exact Shopify order number if available
-            if (shopifyOrderNumber) {
-              // Remove any # prefix and return the exact number
-              const cleanNumber = shopifyOrderNumber.replace(/^#/, '');
-              console.log(`✅ Using exact Shopify order number: ${cleanNumber}`);
-              return cleanNumber;
-            }
-            
-            // If no Shopify order number, use the Shopify order ID
-            if (shopifyOrderId) {
-              console.log(`⚠️ Using Shopify order ID: ${shopifyOrderId}`);
-              return shopifyOrderId.toString();
+            // Use the order number if available, otherwise use the internal ID
+            if (order.orderNumber) {
+              console.log(`✅ Using order number: ${order.orderNumber}`);
+              return order.orderNumber;
             }
             
             // Fallback to our internal order ID
@@ -203,20 +176,20 @@ export const useDashboardData = () => {
             return order.id;
           };
 
-                      const missionId = getMissionNumber(order);
-            console.log(`🎯 FINAL MISSION ID: ${missionId} for order ${order.id}`);
-            
-            const transformedOrder = {
+          const missionId = getMissionNumber(order);
+          console.log(`🎯 FINAL MISSION ID: ${missionId} for order ${order.id}`);
+          
+          const transformedOrder = {
             id: order.id, // Keep original order ID
-            shopifyOrderNumber: order.shopifyOrderNumber || order.shopify_order_number, // Preserve Shopify order number
-            shopifyOrderId: order.shopifyOrderId || order.shopify_order_id, // Preserve Shopify order ID
+            orderNumber: order.orderNumber, // Preserve order number
+            stripePaymentIntentId: order.stripePaymentIntentId, // Preserve Stripe payment intent
             date: order.orderCreatedAt || order.createdAt || new Date().toISOString(),
             status: mapOrderStatus(order.orderStatus, order.fulfillmentStatus),
             total: orderTotal, // Use the calculated total
             trackingNumber: order.trackingNumber || null,
             proofUrl: null, // TODO: Add proof URL logic
             
-            // Keep full order data for invoice (including original IDs)
+            // Keep full order data for invoice
             _fullOrderData: order,
             
             items: (order.items || [])
@@ -257,12 +230,11 @@ export const useDashboardData = () => {
           
           console.log(`🎯 TRANSFORMED ORDER:`, {
             id: transformedOrder.id,
-            shopifyOrderNumber: transformedOrder.shopifyOrderNumber,
-            shopifyOrderId: transformedOrder.shopifyOrderId,
-            originalShopifyOrderNumber: order.shopifyOrderNumber,
-            originalShopify_order_number: order.shopify_order_number,
-            originalShopifyOrderId: order.shopifyOrderId,
-            originalShopify_order_id: order.shopify_order_id
+            orderNumber: transformedOrder.orderNumber,
+            stripePaymentIntentId: transformedOrder.stripePaymentIntentId,
+            originalOrderNumber: order.orderNumber,
+            originalStripePaymentIntentId: order.stripePaymentIntentId,
+            originalOrderId: order.id
           });
           
           return transformedOrder;
@@ -361,20 +333,10 @@ export const useDashboardData = () => {
     user,
     userLoading,
     orders,
-    ordersLoading: userLoading || ordersLoading || syncLoading,
+    ordersLoading: userLoading || ordersLoading,
     ordersError,
     refreshOrders,
     hasOrders: orders.length > 0,
-    isLoggedIn: !!user,
-    syncShopifyOrders: () => {
-      if (user) {
-        syncShopifyOrders({
-          variables: {
-            userId: user.id,
-            email: user.email
-          }
-        });
-      }
-    }
+    isLoggedIn: !!user
   };
 }; 

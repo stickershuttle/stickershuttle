@@ -5,11 +5,10 @@ require('dotenv').config();
 const { ApolloServer, gql } = require('apollo-server-express');
 const express = require('express');
 const cors = require('cors');
-const ShopifyClient = require('./shopify-client');
-const { validateConfig } = require('./shopify-config');
 const uploadRoutes = require('./upload-routes');
-const webhookHandlers = require('./webhook-handlers');
 const supabaseClient = require('./supabase-client');
+const stripeClient = require('./stripe-client');
+const stripeWebhookHandlers = require('./stripe-webhook-handlers');
 
 // Initialize Express app
 const app = express();
@@ -23,8 +22,8 @@ app.use(cors({
 // Add upload routes
 app.use('/api', uploadRoutes);
 
-// Add webhook routes
-app.use('/webhooks', webhookHandlers);
+// Add Stripe webhook routes (before body parsing middleware)
+app.use('/webhooks', stripeWebhookHandlers);
 
 // Add health check before Apollo setup
 app.get('/health', (req, res) => {
@@ -45,62 +44,26 @@ app.get('/', (req, res) => {
   });
 });
 
-// Initialize Shopify client
-const shopify = new ShopifyClient();
-
 // 1. Schema
 const typeDefs = gql`
   type Query {
     hello: String
-    getDraftOrder(id: ID!): DraftOrder
-    getAllDraftOrders(limit: Int, status: String): [DraftOrder]
-    getProduct(id: ID!): Product
-    getProductVariants(productId: ID!): [ProductVariant]
     
     # Customer order queries
     getUserOrders(userId: ID!): [CustomerOrder]
     getOrderById(id: ID!): CustomerOrder
-    syncShopifyOrders(userId: ID!, email: String!): SyncResult
-    
-    # Webhook queries
-    setupWebhooks(baseUrl: String!): [WebhookResult]
+    claimGuestOrders(userId: ID!, email: String!): ClaimResult
   }
 
   type Mutation {
-    createDraftOrder(input: DraftOrderInput!): DraftOrder
-    completeDraftOrder(id: ID!): DraftOrder
-    updateDraftOrder(id: ID!, input: DraftOrderUpdateInput!): DraftOrder
-    deleteDraftOrder(id: ID!): DeleteResult
-    createCheckoutUrl(draftOrderId: ID!): CheckoutUrlResult
-    
     # Customer order mutations
     createCustomerOrder(input: CustomerOrderInput!): CustomerOrder
-    processCartOrder(input: CartOrderInput!): OrderProcessResult
-    updateOrderStatus(shopifyOrderId: String!, statusUpdate: OrderStatusInput!): CustomerOrder
+    updateOrderStatus(orderId: String!, statusUpdate: OrderStatusInput!): CustomerOrder
     claimGuestOrders(userId: ID!, email: String!): ClaimResult
     
-    # Webhook management
-    setupWebhooks(baseUrl: String!): [WebhookResult]
-  }
-
-  type DraftOrder {
-    id: ID!
-    order_id: ID
-    name: String
-    customer: Customer
-    shipping_address: Address
-    billing_address: Address
-    line_items: [LineItem]
-    subtotal_price: String
-    total_tax: String
-    total_price: String
-    currency: String
-    invoice_url: String
-    status: String
-    created_at: String
-    updated_at: String
-    note: String
-    tags: String
+    # Stripe mutations
+    createStripeCheckoutSession(input: StripeCheckoutInput!): StripeCheckoutResult
+    processStripeCartOrder(input: CartOrderInput!): StripeOrderProcessResult
   }
 
   type Customer {
@@ -124,58 +87,9 @@ const typeDefs = gql`
     phone: String
   }
 
-  type LineItem {
-    id: ID
-    variant_id: ID
-    product_id: ID
-    title: String
-    variant_title: String
-    sku: String
-    quantity: Int
-    price: String
-    grams: Int
-  }
-
   type DeleteResult {
     success: Boolean!
     message: String
-  }
-
-  type CheckoutUrlResult {
-    checkoutUrl: String!
-    draftOrderId: ID!
-    totalPrice: String
-  }
-
-  type Product {
-    id: ID!
-    title: String
-    handle: String
-    product_type: String
-    vendor: String
-    tags: String
-    status: String
-    images: [ProductImage]
-    variants: [ProductVariant]
-  }
-
-  type ProductImage {
-    id: ID
-    src: String
-    alt: String
-  }
-
-  type ProductVariant {
-    id: ID!
-    product_id: ID
-    title: String
-    price: String
-    sku: String
-    inventory_quantity: Int
-    inventory_management: String
-    inventory_policy: String
-    weight: Float
-    weight_unit: String
   }
 
   # Customer Order Types
@@ -183,8 +97,9 @@ const typeDefs = gql`
     id: ID!
     userId: ID
     guestEmail: String
-    shopifyOrderId: String
-    shopifyOrderNumber: String
+    stripePaymentIntentId: String
+    stripeCheckoutSessionId: String
+    orderNumber: String
     orderStatus: String
     fulfillmentStatus: String
     financialStatus: String
@@ -213,7 +128,7 @@ const typeDefs = gql`
   type OrderItem {
     id: ID!
     customerOrderId: ID!
-    shopifyLineItemId: String
+    stripeLineItemId: String
     productId: String!
     productName: String!
     productCategory: String
@@ -231,65 +146,13 @@ const typeDefs = gql`
     updatedAt: String
   }
 
-  type OrderProcessResult {
-    success: Boolean!
-    customerOrder: CustomerOrder
-    shopifyOrder: DraftOrder
-    message: String
-    errors: [String]
-  }
-
   type ClaimResult {
     success: Boolean!
     claimedOrdersCount: Int!
     message: String
   }
 
-  type SyncResult {
-    success: Boolean!
-    synced: Int!
-    total: Int!
-    message: String
-  }
-
-  # Webhook Types
-  type Webhook {
-    id: ID!
-    topic: String!
-    address: String!
-    format: String!
-    created_at: String
-    updated_at: String
-  }
-
-  type WebhookResult {
-    topic: String!
-    success: Boolean!
-    webhook: Webhook
-    error: String
-  }
-
   scalar JSON
-
-  input DraftOrderInput {
-    lineItems: [LineItemInput!]!
-    customer: CustomerInput
-    shippingAddress: AddressInput
-    billingAddress: AddressInput
-    email: String
-    note: String
-    tags: String
-  }
-
-  input DraftOrderUpdateInput {
-    lineItems: [LineItemInput]
-    customer: CustomerInput
-    shippingAddress: AddressInput
-    billingAddress: AddressInput
-    email: String
-    note: String
-    tags: String
-  }
 
   input CustomerInput {
     email: String
@@ -311,22 +174,12 @@ const typeDefs = gql`
     phone: String
   }
 
-  input LineItemInput {
-    variant_id: ID
-    product_id: ID
-    title: String!
-    quantity: Int!
-    price: String!
-    sku: String
-    grams: Int
-  }
-
   # Customer Order Input Types
   input CustomerOrderInput {
     userId: ID
     guestEmail: String
-    shopifyOrderId: String!
-    shopifyOrderNumber: String
+    stripePaymentIntentId: String
+    stripeCheckoutSessionId: String
     orderStatus: String
     fulfillmentStatus: String
     financialStatus: String
@@ -386,6 +239,44 @@ const typeDefs = gql`
     trackingCompany: String
     trackingUrl: String
   }
+
+  # Stripe types
+  type StripeCheckoutResult {
+    success: Boolean!
+    sessionId: String
+    checkoutUrl: String
+    totalAmount: Int
+    message: String
+    error: String
+  }
+
+  type StripeOrderProcessResult {
+    success: Boolean!
+    sessionId: String
+    checkoutUrl: String
+    customerOrder: CustomerOrder
+    message: String
+    errors: [String]
+  }
+
+  input StripeCheckoutInput {
+    lineItems: [StripeLineItemInput!]!
+    successUrl: String!
+    cancelUrl: String!
+    customerEmail: String
+    userId: ID
+    metadata: JSON
+  }
+
+  input StripeLineItemInput {
+    name: String!
+    description: String
+    unitPrice: Float!
+    quantity: Int!
+    productId: String
+    sku: String
+    calculatorSelections: JSON
+  }
 `;
 
 // 2. Resolvers
@@ -394,8 +285,9 @@ const resolvers = {
   CustomerOrder: {
     userId: (parent) => parent.user_id || parent.userId,
     guestEmail: (parent) => parent.guest_email || parent.guestEmail,
-    shopifyOrderId: (parent) => parent.shopify_order_id || parent.shopifyOrderId,
-    shopifyOrderNumber: (parent) => parent.shopify_order_number || parent.shopifyOrderNumber,
+    stripePaymentIntentId: (parent) => parent.stripe_payment_intent_id || parent.stripePaymentIntentId,
+    stripeCheckoutSessionId: (parent) => parent.stripe_checkout_session_id || parent.stripeCheckoutSessionId,
+    orderNumber: (parent) => parent.order_number || parent.orderNumber,
     orderStatus: (parent) => parent.order_status || parent.orderStatus,
     fulfillmentStatus: (parent) => parent.fulfillment_status || parent.fulfillmentStatus,
     financialStatus: (parent) => parent.financial_status || parent.financialStatus,
@@ -421,7 +313,7 @@ const resolvers = {
 
   OrderItem: {
     customerOrderId: (parent) => parent.customer_order_id || parent.customerOrderId,
-    shopifyLineItemId: (parent) => parent.shopify_line_item_id || parent.shopifyLineItemId,
+    stripeLineItemId: (parent) => parent.stripe_line_item_id || parent.stripeLineItemId,
     productId: (parent) => parent.product_id || parent.productId || 'custom-product',
     productName: (parent) => parent.product_name || parent.productName || 'Custom Product',
     productCategory: (parent) => parent.product_category || parent.productCategory,
@@ -438,41 +330,8 @@ const resolvers = {
   },
 
   Query: {
-    hello: () => 'Hello, Sticker Shuttle with Shopify Integration!',
+    hello: () => 'Hello, Sticker Shuttle API with Stripe Payments!',
     
-    getDraftOrder: async (_, { id }) => {
-      try {
-        return await shopify.getDraftOrder(id);
-      } catch (error) {
-        throw new Error(error.message);
-      }
-    },
-
-    getAllDraftOrders: async (_, { limit, status }) => {
-      try {
-        return await shopify.getAllDraftOrders({ limit, status });
-      } catch (error) {
-        throw new Error(error.message);
-      }
-    },
-
-    getProduct: async (_, { id }) => {
-      try {
-        return await shopify.getProduct(id);
-      } catch (error) {
-        throw new Error(error.message);
-      }
-    },
-
-    getProductVariants: async (_, { productId }) => {
-      try {
-        return await shopify.getProductVariants(productId);
-      } catch (error) {
-        throw new Error(error.message);
-      }
-    },
-
-    // Customer order queries
     getUserOrders: async (_, { userId }) => {
       try {
         console.log('🔍 getUserOrders called with userId:', userId);
@@ -532,8 +391,9 @@ const resolvers = {
             id: String(order.order_id), // Ensure string ID
             userId: String(userId), // Ensure string ID
             guestEmail: null, // RPC doesn't return this
-            shopifyOrderId: order.shopify_order_id || null,
-            shopifyOrderNumber: order.shopify_order_number || null,
+            stripePaymentIntentId: null, // RPC doesn't return this
+            stripeCheckoutSessionId: null, // RPC doesn't return this
+            orderNumber: null, // RPC doesn't return this
             orderStatus: order.order_status || 'Processing',
             fulfillmentStatus: order.fulfillment_status || 'unfulfilled',
             financialStatus: order.financial_status || 'pending',
@@ -560,7 +420,7 @@ const resolvers = {
             items: (order.items || []).map(item => ({
               id: String(item.id || `item-${Date.now()}-${Math.random()}`), // Ensure string ID
               customerOrderId: String(order.order_id), // Ensure string ID
-              shopifyLineItemId: null, // RPC doesn't include this in items
+              stripeLineItemId: null, // RPC doesn't include this in items
               productId: String(item.product_id || 'custom-product'), // Ensure non-null string
               productName: String(item.product_name || 'Custom Product'), // Ensure non-null string
               productCategory: item.product_category || 'custom',
@@ -614,73 +474,27 @@ const resolvers = {
       }
     },
 
-    // Webhook management
-    setupWebhooks: async (_, { baseUrl }) => {
+    claimGuestOrders: async (_, { userId, email }) => {
       try {
-        return await shopify.setupOrderWebhooks(baseUrl);
+        if (!supabaseClient.isReady()) {
+          throw new Error('Order service is currently unavailable');
+        }
+        const claimedCount = await supabaseClient.claimGuestOrders(userId, email);
+        return {
+          success: true,
+          claimedOrdersCount: claimedCount,
+          message: claimedCount > 0 
+            ? `Successfully claimed ${claimedCount} orders`
+            : 'No guest orders found to claim'
+        };
       } catch (error) {
+        console.error('Error claiming guest orders:', error);
         throw new Error(error.message);
       }
-    },
-
-    // Sync Shopify orders - TEMPORARILY DISABLED (missing sync module)
-    syncShopifyOrders: async (_, { userId, email }) => {
-      console.log('⚠️ Sync functionality temporarily disabled');
-      return {
-        success: false,
-        synced: 0,
-        total: 0,
-        message: 'Sync functionality temporarily disabled'
-      };
     },
   },
 
   Mutation: {
-    createDraftOrder: async (_, { input }) => {
-      try {
-        console.log('📝 GraphQL createDraftOrder input:', JSON.stringify(input, null, 2));
-        const result = await shopify.createDraftOrder(input);
-        console.log('✅ Draft order created successfully:', result.id);
-        return result;
-      } catch (error) {
-        console.error('❌ GraphQL createDraftOrder error:', error.message);
-        throw new Error(error.message);
-      }
-    },
-
-    completeDraftOrder: async (_, { id }) => {
-      try {
-        return await shopify.completeDraftOrder(id);
-      } catch (error) {
-        throw new Error(error.message);
-      }
-    },
-
-    updateDraftOrder: async (_, { id, input }) => {
-      try {
-        return await shopify.updateDraftOrder(id, input);
-      } catch (error) {
-        throw new Error(error.message);
-      }
-    },
-
-    deleteDraftOrder: async (_, { id }) => {
-      try {
-        return await shopify.deleteDraftOrder(id);
-      } catch (error) {
-        throw new Error(error.message);
-      }
-    },
-
-    createCheckoutUrl: async (_, { draftOrderId }) => {
-      try {
-        return await shopify.createCheckoutUrl(draftOrderId);
-      } catch (error) {
-        throw new Error(error.message);
-      }
-    },
-
-    // Customer order mutations
     createCustomerOrder: async (_, { input }) => {
       try {
         if (!supabaseClient.isReady()) {
@@ -693,130 +507,12 @@ const resolvers = {
       }
     },
 
-    processCartOrder: async (_, { input }) => {
-      try {
-        console.log('🛒 Processing cart order...', JSON.stringify(input, null, 2));
-        
-        const errors = [];
-        let shopifyOrder = null;
-        let customerOrder = null;
-
-        // Step 1: Create Shopify draft order
-        try {
-          const shopifyInput = {
-            lineItems: input.cartItems.map(item => ({
-              title: `${item.productName} - Custom Configuration`,
-              quantity: item.quantity,
-              price: item.unitPrice.toString(),
-              sku: item.sku || `${item.productId}-CUSTOM`
-            })),
-            customer: {
-              email: input.customerInfo.email,
-              first_name: input.customerInfo.firstName,
-              last_name: input.customerInfo.lastName,
-              phone: input.customerInfo.phone
-            },
-            // Only include addresses if they have meaningful data
-            ...(input.shippingAddress?.address1 && { shippingAddress: input.shippingAddress }),
-            ...(input.billingAddress?.address1 && { billingAddress: input.billingAddress }),
-            email: input.customerInfo.email,
-            note: generateOrderNote(input.cartItems, input.orderNote),
-            tags: generateOrderTags(input.cartItems)
-          };
-
-          shopifyOrder = await shopify.createDraftOrder(shopifyInput);
-          console.log('✅ Shopify draft order created:', shopifyOrder.id);
-        } catch (shopifyError) {
-          console.error('❌ Shopify order creation failed:', shopifyError);
-          errors.push(`Shopify order creation failed: ${shopifyError.message}`);
-        }
-
-        // Step 2: Create Supabase order record for ALL orders (both draft and paid)
-        // Dashboard will filter to only show paid orders
-        if (shopifyOrder && supabaseClient.isReady()) {
-          try {
-            const isDraft = shopifyOrder.name.startsWith('#D');
-            console.log(isDraft ? '📋 Creating Supabase record for draft order:' : '✅ Creating Supabase record for paid order:', shopifyOrder.name);
-            
-            const customerOrderData = {
-              user_id: input.userId || null,
-              guest_email: input.guestEmail || input.customerInfo.email,
-              shopify_order_id: shopifyOrder.id.toString(), // Ensure string format for consistency
-              shopify_order_number: shopifyOrder.name,
-              order_status: isDraft ? 'Awaiting Payment' : 'Creating Proofs',  // Draft orders await payment, paid orders start workflow
-              fulfillment_status: 'unfulfilled',
-              financial_status: isDraft ? 'pending' : (shopifyOrder.financial_status || 'paid'),
-              subtotal_price: parseFloat(shopifyOrder.subtotal_price),
-              total_tax: parseFloat(shopifyOrder.total_tax || '0'),
-              total_price: parseFloat(shopifyOrder.total_price),
-              currency: shopifyOrder.currency,
-              customer_first_name: input.customerInfo.firstName,
-              customer_last_name: input.customerInfo.lastName,
-              customer_email: input.customerInfo.email,
-              customer_phone: input.customerInfo.phone,
-              shipping_address: input.shippingAddress,
-              billing_address: input.billingAddress || input.shippingAddress,
-              order_tags: generateOrderTags(input.cartItems).split(','),
-              order_note: input.orderNote,
-              order_created_at: new Date().toISOString(),
-              order_updated_at: new Date().toISOString()
-            };
-
-            // The createCustomerOrder method now has built-in duplicate prevention
-            customerOrder = await supabaseClient.createCustomerOrder(customerOrderData);
-            console.log('✅ Customer order created/found:', customerOrder?.id, 'Status:', customerOrderData.order_status);
-
-            // Step 3: Create order items with calculator data
-            if (customerOrder) {
-              const orderItems = input.cartItems.map(item => ({
-                customer_order_id: customerOrder.id,
-                product_id: item.productId,
-                product_name: item.productName,
-                product_category: item.productCategory,
-                sku: item.sku,
-                quantity: item.quantity,
-                unit_price: item.unitPrice,
-                total_price: item.totalPrice,
-                calculator_selections: item.calculatorSelections,
-                custom_files: item.customFiles || [],
-                customer_notes: item.customerNotes,
-                instagram_handle: item.instagramHandle,
-                instagram_opt_in: item.instagramOptIn || false,
-                fulfillment_status: 'unfulfilled'
-              }));
-
-              await supabaseClient.createOrderItems(orderItems);
-              console.log('✅ Order items created');
-            }
-          } catch (supabaseError) {
-            console.error('❌ Supabase order creation failed:', supabaseError);
-            errors.push(`Order tracking setup failed: ${supabaseError.message}`);
-          }
-        }
-
-        return {
-          success: errors.length === 0,
-          customerOrder,
-          shopifyOrder,
-          message: errors.length === 0 
-            ? (shopifyOrder?.name.startsWith('#D') 
-              ? 'Draft order created and tracked - awaiting payment' 
-              : 'Paid order processed successfully!')
-            : 'Order created with some issues',
-          errors: errors.length > 0 ? errors : null
-        };
-      } catch (error) {
-        console.error('❌ Cart order processing failed:', error);
-        throw new Error(error.message);
-      }
-    },
-
-    updateOrderStatus: async (_, { shopifyOrderId, statusUpdate }) => {
+    updateOrderStatus: async (_, { orderId, statusUpdate }) => {
       try {
         if (!supabaseClient.isReady()) {
           throw new Error('Order service is currently unavailable');
         }
-        return await supabaseClient.updateOrderStatus(shopifyOrderId, statusUpdate);
+        return await supabaseClient.updateOrderStatus(orderId, statusUpdate);
       } catch (error) {
         console.error('Error updating order status:', error);
         throw new Error(error.message);
@@ -839,6 +535,205 @@ const resolvers = {
       } catch (error) {
         console.error('Error claiming guest orders:', error);
         throw new Error(error.message);
+      }
+    },
+
+    // Stripe mutations
+    createStripeCheckoutSession: async (_, { input }) => {
+      try {
+        if (!stripeClient.isReady()) {
+          throw new Error('Payment service is currently unavailable');
+        }
+        
+        const result = await stripeClient.createCheckoutSession({
+          lineItems: input.lineItems,
+          successUrl: input.successUrl,
+          cancelUrl: input.cancelUrl,
+          customerEmail: input.customerEmail,
+          userId: input.userId,
+          metadata: input.metadata,
+          currency: 'usd'
+        });
+        
+        return {
+          success: result.success,
+          sessionId: result.sessionId,
+          checkoutUrl: result.checkoutUrl,
+          totalAmount: result.totalAmount,
+          message: result.success ? 'Checkout session created successfully' : 'Failed to create checkout session',
+          error: result.error
+        };
+      } catch (error) {
+        console.error('Error creating Stripe checkout session:', error);
+        return {
+          success: false,
+          message: 'Failed to create checkout session',
+          error: error.message
+        };
+      }
+    },
+
+    processStripeCartOrder: async (_, { input }) => {
+      try {
+        console.log('🎯 Processing Stripe cart order...');
+        
+        const errors = [];
+        let checkoutSession = null;
+        let customerOrder = null;
+
+        // Step 1: Prepare order in Supabase (as pending payment)
+        if (supabaseClient.isReady()) {
+          try {
+            const customerOrderData = {
+              user_id: input.userId || null,
+              guest_email: input.guestEmail || input.customerInfo.email,
+              order_status: 'Awaiting Payment',
+              fulfillment_status: 'unfulfilled',
+              financial_status: 'pending',
+              subtotal_price: input.cartItems.reduce((sum, item) => sum + item.totalPrice, 0),
+              total_tax: 0, // Will be updated after Stripe checkout
+              total_price: input.cartItems.reduce((sum, item) => sum + item.totalPrice, 0),
+              currency: 'USD',
+              customer_first_name: input.customerInfo.firstName,
+              customer_last_name: input.customerInfo.lastName,
+              customer_email: input.customerInfo.email,
+              customer_phone: input.customerInfo.phone,
+              shipping_address: input.shippingAddress,
+              billing_address: input.billingAddress || input.shippingAddress,
+              order_tags: generateOrderTags(input.cartItems).split(','),
+              order_note: input.orderNote,
+              order_created_at: new Date().toISOString(),
+              order_updated_at: new Date().toISOString()
+            };
+
+            customerOrder = await supabaseClient.createCustomerOrder(customerOrderData);
+            console.log('✅ Customer order created:', customerOrder?.id);
+
+            // Create order items
+            if (customerOrder) {
+              const orderItems = input.cartItems.map(item => ({
+                order_id: customerOrder.id,
+                product_id: item.productId,
+                product_name: item.productName,
+                product_category: item.productCategory,
+                sku: item.sku,
+                quantity: item.quantity,
+                unit_price: item.unitPrice,
+                total_price: item.totalPrice,
+                calculator_selections: item.calculatorSelections,
+                custom_files: item.customFiles || [],
+                customer_notes: item.customerNotes,
+                instagram_handle: item.instagramHandle,
+                instagram_opt_in: item.instagramOptIn || false,
+                fulfillment_status: 'unfulfilled'
+              }));
+
+              await supabaseClient.createOrderItems(orderItems);
+              console.log('✅ Order items created');
+            }
+          } catch (supabaseError) {
+            console.error('❌ Supabase order creation failed:', supabaseError);
+            errors.push(`Order tracking setup failed: ${supabaseError.message}`);
+          }
+        } else {
+          console.error('❌ Supabase client is not ready');
+          errors.push('Order tracking service is not available');
+        }
+
+        // Step 2: Create Stripe checkout session
+        if (stripeClient.isReady() && errors.length === 0) {
+          try {
+            console.log('🔍 Stripe client is ready, creating checkout session...');
+            const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            
+            const checkoutData = {
+              lineItems: input.cartItems.map(item => ({
+                name: item.productName,
+                description: `${item.productName} - Custom Configuration`,
+                unitPrice: item.unitPrice,
+                quantity: item.quantity,
+                productId: item.productId,
+                sku: item.sku,
+                calculatorSelections: item.calculatorSelections
+              })),
+              successUrl: `${baseUrl}/order-success`,
+              cancelUrl: `${baseUrl}/cart`,
+              customerEmail: input.customerInfo.email,
+              userId: input.userId,
+              customerOrderId: customerOrder?.id,
+              orderNote: generateOrderNote(input.cartItems, input.orderNote),
+              cartMetadata: {
+                customFiles: input.cartItems[0]?.customFiles || [],
+                customerNotes: input.cartItems[0]?.customerNotes || '',
+                instagramHandle: input.cartItems[0]?.instagramHandle || '',
+                instagramOptIn: input.cartItems[0]?.instagramOptIn || false
+              }
+            };
+
+            console.log('📊 Checkout data prepared:', JSON.stringify({
+              lineItemsCount: checkoutData.lineItems.length,
+              customerEmail: checkoutData.customerEmail,
+              successUrl: checkoutData.successUrl,
+              firstItem: checkoutData.lineItems[0]
+            }, null, 2));
+
+            const sessionResult = await stripeClient.createCheckoutSession(checkoutData);
+            
+            if (sessionResult.success) {
+              checkoutSession = sessionResult;
+              console.log('✅ Stripe checkout session created:', sessionResult.sessionId);
+              
+              // Update order with Stripe session ID
+              if (customerOrder && supabaseClient.isReady()) {
+                const client = supabaseClient.getServiceClient();
+                await client
+                  .from('orders_main')
+                  .update({ 
+                    stripe_session_id: sessionResult.sessionId,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', customerOrder.id);
+              }
+            } else {
+              console.error('❌ Stripe session creation failed:', sessionResult);
+              errors.push('Failed to create payment session');
+            }
+          } catch (stripeError) {
+            console.error('❌ Stripe checkout creation failed:', stripeError);
+            console.error('Full error details:', stripeError.stack);
+            errors.push(`Payment session creation failed: ${stripeError.message}`);
+          }
+        } else {
+          if (!stripeClient.isReady()) {
+            console.error('❌ Stripe client is not ready');
+            errors.push('Payment service is not available');
+          }
+        }
+
+        // Always return a valid response object
+        return {
+          success: errors.length === 0 && checkoutSession?.success === true,
+          sessionId: checkoutSession?.sessionId || null,
+          checkoutUrl: checkoutSession?.checkoutUrl || null,
+          customerOrder: customerOrder || null,
+          message: errors.length === 0 
+            ? 'Checkout session created successfully'
+            : 'Order created with some issues',
+          errors: errors.length > 0 ? errors : null
+        };
+      } catch (error) {
+        console.error('❌ Stripe cart order processing failed:', error);
+        console.error('Full error stack:', error.stack);
+        
+        // Always return a valid response object even on critical errors
+        return {
+          success: false,
+          sessionId: null,
+          checkoutUrl: null,
+          customerOrder: null,
+          message: `Critical error: ${error.message}`,
+          errors: [error.message]
+        };
       }
     }
   }
@@ -954,8 +849,8 @@ const server = new ApolloServer({
   context: ({ req }) => {
     // You can add authentication context here later
     return {
-      shopify,
-      supabase: supabaseClient
+      supabase: supabaseClient,
+      stripe: stripeClient
     };
   }
 });
@@ -973,13 +868,20 @@ async function startServer() {
       console.log(`🚀 GraphQL Playground: http://localhost:${PORT}/graphql`);
       console.log(`📁 File upload endpoint: http://localhost:${PORT}/api/upload`);
       console.log(`💚 Health check: http://localhost:${PORT}/health`);
+      console.log(`💳 Stripe webhooks: http://localhost:${PORT}/webhooks/stripe`);
       
-      // Validate Shopify configuration
-      if (validateConfig()) {
-        console.log('✅ Shopify configuration is valid');
+      // Check Stripe configuration
+      if (stripeClient.isReady()) {
+        console.log('✅ Stripe payment system is configured');
       } else {
-        console.log('⚠️  Please configure your Shopify API credentials');
-        console.log('⚠️  API will start but GraphQL features may not work properly');
+        console.log('⚠️  Stripe is not configured - payment features will not work');
+      }
+      
+      // Check Supabase configuration  
+      if (supabaseClient.isReady()) {
+        console.log('✅ Supabase database is configured');
+      } else {
+        console.log('⚠️  Supabase is not configured - order tracking will not work');
       }
     });
   } catch (error) {

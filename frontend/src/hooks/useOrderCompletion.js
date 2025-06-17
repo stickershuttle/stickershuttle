@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
-import { useQuery } from '@apollo/client';
-import { GET_USER_ORDERS } from '../lib/shopify-mutations';
+import { useQuery, useLazyQuery } from '@apollo/client';
+import { GET_USER_ORDERS } from '../lib/order-mutations';
 import { getSupabase } from '../lib/supabase';
 
 export const useOrderCompletion = () => {

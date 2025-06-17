@@ -1,6 +1,6 @@
 # Sticker Shuttle Website 🚀
 
-A full-stack custom sticker ordering platform with real-time pricing, file uploads, and Shopify integration.
+A full-stack custom sticker ordering platform with real-time pricing, file uploads, and Stripe payment integration.
 
 ## 🛠️ Tech Stack
 
@@ -18,7 +18,7 @@ A full-stack custom sticker ordering platform with real-time pricing, file uploa
 - **Runtime**: Node.js 18
 - **Framework**: Express.js
 - **GraphQL**: Apollo Server
-- **E-commerce**: Shopify Admin API integration
+- **E-commerce**: Stripe Checkout integration
 - **File Storage**: Local uploads with Cloudinary
 - **Deployment**: Railway
 
@@ -129,11 +129,11 @@ npm run podman:prod      # Start production with Podman
 ### Key Features
 
 - **🎨 Product Customization**: Interactive calculators for vinyl stickers, holographic stickers, and more
-- **📊 Real-time Pricing**: CSV-based pricing with quantity discounts and rush order options
+- **📊 Real-time Pricing**: Dynamic calculator for various sticker types
 - **📁 File Upload**: Drag-and-drop file upload with support for AI, SVG, PNG, JPG, PSD formats
 - **🛒 Shopping Cart**: Full cart management with customization options
-- **💳 Shopify Integration**: Direct checkout through Shopify draft orders
-- **👤 User Authentication**: Supabase-powered user accounts and profiles
+- **💳 Stripe Integration**: Stripe Checkout integration for payments
+- **👤 User Authentication**: Supabase Auth with account dashboard
 - **📱 Responsive Design**: Mobile-first responsive design with Tailwind CSS
 - **⚡ Real-time Updates**: GraphQL subscriptions and optimistic updates
 
@@ -163,7 +163,7 @@ railway up
 - GraphQL API endpoint
 
 **Backend** (Railway Dashboard):
-- Shopify API credentials
+- Stripe API credentials
 - Database connections
 - File upload settings
 
@@ -215,7 +215,7 @@ For setup issues or questions:
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Next.js App   │────│   Apollo API    │────│   Shopify API   │
+│   Next.js App   │────│   Apollo API    │────│   Stripe API   │
 │     (Vercel)    │    │   (Railway)     │    │   (E-commerce)  │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       

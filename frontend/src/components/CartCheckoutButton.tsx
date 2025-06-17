@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { getSupabase } from '@/lib/supabase';
-import { useCheckout } from '@/hooks/useCheckout';
+import { useStripeCheckout } from '@/hooks/useStripeCheckout';
 import { useOrderCompletion } from '@/hooks/useOrderCompletion';
 
 interface CartCheckoutButtonProps {
@@ -23,7 +23,7 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
 }) => {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
-  const { processEnhancedCheckout, loading, error } = useCheckout();
+  const { processCheckout, loading, error } = useStripeCheckout();
   const { startMonitoring, stopMonitoring, isMonitoring } = useOrderCompletion();
 
   // Helper function to capitalize first name
@@ -103,7 +103,7 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
         await startMonitoring();
       }
 
-      const result = await processEnhancedCheckout(
+      const result = await processCheckout(
         cartItems,
         customerInfo,
         shippingAddress,

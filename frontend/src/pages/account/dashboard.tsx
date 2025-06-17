@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import Layout from "@/components/Layout";
-import Link from "next/link";
+import Layout from '@/components/Layout';
+import Link from 'next/link';
 import { getSupabase } from '../../lib/supabase';
 import { useDashboardData } from '../../hooks/useDashboardData';
-import { useCheckout } from '../../hooks/useCheckout';
 import OrderInvoice from '../../components/OrderInvoice';
 import { useLazyQuery } from '@apollo/client';
-import { GET_ORDER_BY_ID } from '../../lib/shopify-mutations';
+import { GET_ORDER_BY_ID } from '../../lib/order-mutations';
 import useInvoiceGenerator, { InvoiceData } from '../../components/InvoiceGenerator';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import dynamic from 'next/dynamic';
@@ -44,7 +43,7 @@ interface Order {
 function Dashboard() {
   const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
-  const { processEnhancedCheckout, loading: checkoutLoading, error: checkoutError } = useCheckout();
+
   
   // NEW: Use real dashboard data
   const {
@@ -55,8 +54,7 @@ function Dashboard() {
     ordersError,
     refreshOrders,
     hasOrders,
-    isLoggedIn,
-    syncShopifyOrders
+    isLoggedIn
   } = useDashboardData();
 
   // NEW: Lazy query for fetching full order details
@@ -488,21 +486,11 @@ function Dashboard() {
 
         console.log('🚀 Direct reorder checkout with items:', checkoutItems.length);
 
-        // Use the existing checkout hook for direct Shopify checkout
-        const result = await processEnhancedCheckout(
-          checkoutItems,
-          customerInfo,
-          shippingAddress,
-          null, // billing address
-          `Reorder of original order ${reorderOrderData.id}`
-        );
-
-        if (!result.success) {
-          throw new Error(result.error || 'Checkout failed');
-        }
-
-        // processEnhancedCheckout will handle the redirect to Shopify
-        console.log('✅ Direct reorder checkout initiated successfully');
+        // TODO: Implement reorder with Stripe checkout
+        alert('Reorder functionality is coming soon! We\'re updating our checkout system.');
+        
+        // For now, redirect to products page so they can manually reorder
+        router.push('/products');
         
       } catch (error) {
         console.error('Error processing direct reorder checkout:', error);

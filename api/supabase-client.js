@@ -80,18 +80,17 @@ class SupabaseClient {
         const client = this.getServiceClient();
         
         try {
-            // Check if an order with this Shopify order ID already exists
-            if (orderData.shopify_order_id) {
-                const existingOrder = await this.findOrderByShopifyId(orderData.shopify_order_id);
-                if (existingOrder) {
-                    console.log(`⏭️ Order with Shopify ID ${orderData.shopify_order_id} already exists - skipping duplicate creation`);
-                    return existingOrder;
+            // Remove any undefined values
+            const cleanOrderData = Object.entries(orderData).reduce((acc, [key, value]) => {
+                if (value !== undefined) {
+                    acc[key] = value;
                 }
-            }
+                return acc;
+            }, {});
 
             const { data, error } = await client
-                .from('customer_orders')
-                .insert([orderData])
+                .from('orders_main')
+                .insert([cleanOrderData])
                 .select()
                 .single();
 
@@ -102,13 +101,19 @@ class SupabaseClient {
                     return await this.findOrderByShopifyId(orderData.shopify_order_id);
                 }
                 console.error('Failed to create customer order:', error);
+                console.error('Error details:', {
+                    code: error.code,
+                    message: error.message,
+                    details: error.details,
+                    hint: error.hint
+                });
                 return null;
             }
 
             console.log('✅ Customer order created:', data.id);
             return data;
         } catch (error) {
-            console.error('Error creating customer order:', error);
+            console.error('Error in createCustomerOrder:', error);
             return null;
         }
     }
@@ -127,20 +132,20 @@ class SupabaseClient {
 
         try {
             // Check if items already exist for this order
-            if (orderItems.length > 0 && orderItems[0].customer_order_id) {
+            if (orderItems.length > 0 && orderItems[0].order_id) {
                 const { data: existingItems, error: checkError } = await client
-                    .from('order_items')
+                    .from('order_items_new')
                     .select('id')
-                    .eq('customer_order_id', orderItems[0].customer_order_id);
+                    .eq('order_id', orderItems[0].order_id);
 
                 if (!checkError && existingItems && existingItems.length > 0) {
-                    console.log(`⏭️ Order items already exist for order ${orderItems[0].customer_order_id} - skipping duplicate creation`);
+                    console.log(`⏭️ Order items already exist for order ${orderItems[0].order_id} - skipping duplicate creation`);
                     return existingItems;
                 }
             }
 
             const { data, error } = await client
-                .from('order_items')
+                .from('order_items_new')
                 .insert(orderItems)
                 .select();
 
@@ -152,7 +157,7 @@ class SupabaseClient {
             console.log(`✅ Created ${data.length} order items`);
             return data;
         } catch (error) {
-            console.error('Error creating order items:', error);
+            console.error('Error in createOrderItems:', error);
             return null;
         }
     }
@@ -198,9 +203,9 @@ class SupabaseClient {
     }
 
     /**
-     * Update order status from Shopify webhook
+     * Update order status from Stripe webhook
      */
-    async updateOrderStatus(shopifyOrderId, statusUpdates) {
+    async updateOrderStatus(orderId, statusUpdates) {
         if (!this.isConfigured) {
             console.warn('Supabase not configured - skipping order status update');
             return null;
@@ -210,12 +215,12 @@ class SupabaseClient {
 
         try {
             const { data, error } = await client
-                .from('customer_orders')
+                .from('orders_main')
                 .update({
                     ...statusUpdates,
                     updated_at: new Date().toISOString()
                 })
-                .eq('shopify_order_id', shopifyOrderId)
+                .eq('id', orderId)
                 .select()
                 .single();
 
@@ -278,7 +283,7 @@ class SupabaseClient {
 
         try {
             const { data, error } = await client
-                .from('customer_orders')
+                .from('orders_main')
                 .select('*')
                 .eq('shopify_order_id', shopifyOrderId)
                 .single();
@@ -310,7 +315,7 @@ class SupabaseClient {
         try {
             const client = this.getServiceClient();
             const { data, error } = await client
-                .from('customer_orders')
+                .from('orders_main')
                 .select('count')
                 .limit(1);
 
