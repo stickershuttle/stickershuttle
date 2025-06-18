@@ -44,6 +44,36 @@ app.get('/', (req, res) => {
   });
 });
 
+// Add webhook diagnostic endpoint
+app.get('/webhooks/test', async (req, res) => {
+  const diagnostics = {
+    webhook_configured: !!process.env.STRIPE_WEBHOOK_SECRET,
+    webhook_secret_prefix: process.env.STRIPE_WEBHOOK_SECRET ? process.env.STRIPE_WEBHOOK_SECRET.substring(0, 10) + '...' : 'NOT SET',
+    supabase_configured: supabaseClient.isReady(),
+    stripe_configured: stripeClient.isReady(),
+    timestamp: new Date().toISOString()
+  };
+
+  // Try to get recent pending orders
+  if (supabaseClient.isReady()) {
+    try {
+      const client = supabaseClient.getServiceClient();
+      const { data: pendingOrders } = await client
+        .from('orders_main')
+        .select('id, financial_status, order_status, created_at')
+        .eq('financial_status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      diagnostics.recent_pending_orders = pendingOrders || [];
+    } catch (error) {
+      diagnostics.pending_orders_error = error.message;
+    }
+  }
+
+  res.json(diagnostics);
+});
+
 // 1. Schema
 const typeDefs = gql`
   type Query {
@@ -286,7 +316,7 @@ const resolvers = {
     userId: (parent) => parent.user_id || parent.userId,
     guestEmail: (parent) => parent.guest_email || parent.guestEmail,
     stripePaymentIntentId: (parent) => parent.stripe_payment_intent_id || parent.stripePaymentIntentId,
-    stripeCheckoutSessionId: (parent) => parent.stripe_checkout_session_id || parent.stripeCheckoutSessionId,
+    stripeCheckoutSessionId: (parent) => parent.stripe_session_id || parent.stripeCheckoutSessionId,
     orderNumber: (parent) => parent.order_number || parent.orderNumber,
     orderStatus: (parent) => parent.order_status || parent.orderStatus,
     fulfillmentStatus: (parent) => parent.fulfillment_status || parent.fulfillmentStatus,
@@ -312,7 +342,7 @@ const resolvers = {
   },
 
   OrderItem: {
-    customerOrderId: (parent) => parent.customer_order_id || parent.customerOrderId,
+    customerOrderId: (parent) => parent.order_id || parent.customerOrderId,
     stripeLineItemId: (parent) => parent.stripe_line_item_id || parent.stripeLineItemId,
     productId: (parent) => parent.product_id || parent.productId || 'custom-product',
     productName: (parent) => parent.product_name || parent.productName || 'Custom Product',
@@ -454,10 +484,10 @@ const resolvers = {
         }
         const client = supabaseClient.getServiceClient();
         const { data, error } = await client
-          .from('customer_orders')
+          .from('orders_main')
           .select(`
             *,
-            items:order_items(*)
+            items:order_items_new(*)
           `)
           .eq('id', id)
           .single();
@@ -576,12 +606,16 @@ const resolvers = {
     processStripeCartOrder: async (_, { input }) => {
       try {
         console.log('🎯 Processing Stripe cart order...');
+        console.log('📊 Input received:', JSON.stringify(input, null, 2));
         
         const errors = [];
         let checkoutSession = null;
         let customerOrder = null;
 
         // Step 1: Prepare order in Supabase (as pending payment)
+        console.log('🔍 Checking Supabase client status...');
+        console.log('Supabase ready?', supabaseClient.isReady());
+        
         if (supabaseClient.isReady()) {
           try {
             const customerOrderData = {
@@ -606,8 +640,12 @@ const resolvers = {
               order_updated_at: new Date().toISOString()
             };
 
+            console.log('📝 Order data prepared:', JSON.stringify(customerOrderData, null, 2));
+            console.log('🚀 Calling supabaseClient.createCustomerOrder...');
+            
             customerOrder = await supabaseClient.createCustomerOrder(customerOrderData);
             console.log('✅ Customer order created:', customerOrder?.id);
+            console.log('📊 Full order response:', JSON.stringify(customerOrder, null, 2));
 
             // Create order items
             if (customerOrder) {

@@ -60,7 +60,7 @@ BEGIN
     FROM 
         orders_main om
     LEFT JOIN 
-        order_items_new oi ON om.id = oi.customer_order_id
+        order_items_new oi ON om.id = oi.order_id
     WHERE 
         om.user_id = user_uuid
     GROUP BY 

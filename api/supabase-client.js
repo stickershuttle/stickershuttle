@@ -7,10 +7,17 @@ require('dotenv').config();                           // System env
 
 class SupabaseClient {
     constructor() {
+        console.log('🔧 [SupabaseClient] Constructor called');
+        
         // Get environment variables
         this.supabaseUrl = process.env.SUPABASE_URL;
         this.supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
         this.supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+
+        console.log('🔧 [SupabaseClient] Environment variables:');
+        console.log('  - SUPABASE_URL:', this.supabaseUrl ? 'Set' : 'NOT SET');
+        console.log('  - SUPABASE_SERVICE_ROLE_KEY:', this.supabaseServiceKey ? 'Set (length: ' + this.supabaseServiceKey.length + ')' : 'NOT SET');
+        console.log('  - SUPABASE_ANON_KEY:', this.supabaseAnonKey ? 'Set' : 'NOT SET');
 
         // Validate configuration
         if (!this.supabaseUrl || !this.supabaseServiceKey) {
@@ -21,6 +28,7 @@ class SupabaseClient {
         }
 
         try {
+            console.log('🔧 [SupabaseClient] Creating service role client...');
             // Create service role client (for server-side operations)
             this.serviceClient = createClient(this.supabaseUrl, this.supabaseServiceKey, {
                 auth: {
@@ -72,12 +80,16 @@ class SupabaseClient {
      * Includes duplicate prevention to avoid creating multiple orders for the same Shopify order
      */
     async createCustomerOrder(orderData) {
+        console.log('📌 [SupabaseClient] createCustomerOrder called');
+        console.log('📌 [SupabaseClient] isConfigured:', this.isConfigured);
+        
         if (!this.isConfigured) {
             console.warn('Supabase not configured - skipping order creation');
             return null;
         }
 
         const client = this.getServiceClient();
+        console.log('📌 [SupabaseClient] Got service client');
         
         try {
             // Remove any undefined values
@@ -87,12 +99,18 @@ class SupabaseClient {
                 }
                 return acc;
             }, {});
+            
+            console.log('📌 [SupabaseClient] Clean order data:', JSON.stringify(cleanOrderData, null, 2));
+            console.log('📌 [SupabaseClient] About to insert into orders_main...');
 
             const { data, error } = await client
                 .from('orders_main')
                 .insert([cleanOrderData])
                 .select()
                 .single();
+
+            console.log('📌 [SupabaseClient] Insert result - data:', data);
+            console.log('📌 [SupabaseClient] Insert result - error:', error);
 
             if (error) {
                 // Check if error is due to unique constraint violation

@@ -64,6 +64,38 @@ router.post('/stripe', async (req, res) => {
   }
 });
 
+// Test endpoint to manually process a checkout session
+router.post('/test-process-session/:sessionId', async (req, res) => {
+  try {
+    console.log('🧪 Test endpoint: Processing session', req.params.sessionId);
+    
+    if (!stripeClient.isReady()) {
+      return res.status(500).json({ error: 'Stripe not configured' });
+    }
+
+    // Fetch the session from Stripe
+    const session = await stripeClient.getCheckoutSession(req.params.sessionId);
+    
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // Manually trigger the webhook handler
+    await handleCheckoutSessionCompleted(session);
+    
+    res.json({ 
+      success: true, 
+      message: 'Session processed',
+      sessionId: session.id,
+      paymentStatus: session.payment_status,
+      customerOrderId: session.metadata?.customerOrderId
+    });
+  } catch (error) {
+    console.error('Test processing error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Handle successful checkout session
 async function handleCheckoutSessionCompleted(session) {
   console.log('💰 Checkout session completed:', session.id);
@@ -102,7 +134,7 @@ async function handleCheckoutSessionCompleted(session) {
         .from('orders_main')
         .update({
           stripe_payment_intent_id: fullSession.payment_intent,
-          stripe_checkout_session_id: session.id,
+          stripe_session_id: session.id,
           order_status: 'Creating Proofs',
           financial_status: 'paid',
           order_number: orderNumber,
@@ -137,14 +169,13 @@ async function handleCheckoutSessionCompleted(session) {
         for (const lineItem of fullSession.line_items.data) {
           const itemMetadata = lineItem.price.product.metadata || {};
           
-          // Update order items with Stripe line item ID
+          // Update order items with timestamp
           await client
-            .from('order_items')
+            .from('order_items_new')
             .update({
-              stripe_line_item_id: lineItem.id,
               updated_at: new Date().toISOString()
             })
-            .eq('customer_order_id', existingOrderId)
+            .eq('order_id', existingOrderId)
             .eq('product_id', itemMetadata.productId || 'custom-product');
         }
       }
@@ -160,7 +191,7 @@ async function handleCheckoutSessionCompleted(session) {
       user_id: metadata.userId !== 'guest' ? metadata.userId : null,
       guest_email: metadata.userId === 'guest' ? customer.email : null,
       stripe_payment_intent_id: fullSession.payment_intent,
-      stripe_checkout_session_id: session.id,
+      stripe_session_id: session.id,
       order_status: 'Creating Proofs',
       financial_status: 'paid',
       fulfillment_status: 'unfulfilled',
@@ -196,8 +227,7 @@ async function handleCheckoutSessionCompleted(session) {
           const itemMetadata = lineItem.price.product.metadata || {};
           
           return {
-            customer_order_id: order.id,
-            stripe_line_item_id: lineItem.id,
+            order_id: order.id,
             product_id: itemMetadata.productId || 'custom-product',
             product_name: lineItem.description || lineItem.price.product.name,
             product_category: itemMetadata.category || 'Custom Stickers',
@@ -257,7 +287,7 @@ async function handleChargeRefunded(charge) {
     // Find order by payment intent ID
     const client = supabaseClient.getServiceClient();
     const { data: orders } = await client
-      .from('customer_orders')
+      .from('orders_main')
       .select('id')
       .eq('stripe_payment_intent_id', paymentIntentId);
     
