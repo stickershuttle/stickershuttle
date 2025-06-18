@@ -107,8 +107,13 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
     if (sizeString.includes('X-Large')) return 5
     
     // Fallback to old format
-    const match = sizeString.match(/$$(\d+)"$$/)
-    return match ? Number.parseInt(match[1]) : 3
+    try {
+      const match = sizeString.match(/(\d+)"/)
+      return match ? Number.parseInt(match[1]) : 3
+    } catch (error) {
+      console.warn('getSizeInInches: Error parsing size string:', error);
+      return 3
+    }
   }
 
   const updatePricing = useCallback(() => {

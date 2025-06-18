@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Never assume the API keys or any other key isnt in the env or local env files. They are in there. the file are in there but you cant seem them in cursor or git because they are ignore. Never make temporary env file. I never use placeholder apis or keys. 

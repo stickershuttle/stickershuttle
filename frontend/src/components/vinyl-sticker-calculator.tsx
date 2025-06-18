@@ -91,9 +91,9 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
 
   // Extract size in inches from size string
   const getSizeInInches = (sizeString: string) => {
-    // Defensive check for undefined or null sizeString
-    if (!sizeString) {
-      console.warn('getSizeInInches: sizeString is undefined, using default 3 inches');
+    // Defensive check for undefined, null, or non-string values
+    if (!sizeString || typeof sizeString !== 'string') {
+      console.warn('getSizeInInches: sizeString is undefined or not a string, using default 3 inches', sizeString);
       return 3;
     }
     
@@ -106,8 +106,13 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     if (sizeString.includes('X-Large')) return 5
     
     // Fallback to old format
-    const match = sizeString.match(/$$(\d+)"$$/)
-    return match ? Number.parseInt(match[1]) : 3
+    try {
+      const match = sizeString.match(/(\d+)"/)
+      return match ? Number.parseInt(match[1]) : 3
+    } catch (error) {
+      console.warn('getSizeInInches: Error parsing size string:', error);
+      return 3
+    }
   }
 
   const updatePricing = useCallback(() => {
