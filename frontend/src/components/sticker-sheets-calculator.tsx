@@ -105,6 +105,11 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
   }
 
   const updatePricing = useCallback(() => {
+    // Skip if component not mounted or during SSR
+    if (typeof window === 'undefined') {
+      return;
+    }
+    
     const area = calculateArea(selectedSize, customWidth, customHeight)
     const quantity =
       selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
@@ -134,6 +139,12 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
 
   // Calculate area based on size
   const calculateArea = (size: string, customW = "", customH = "") => {
+    // Defensive check for SSR
+    if (!size || typeof size !== 'string') {
+      console.warn('calculateArea: size is undefined or not a string, using default 4" × 6"', size);
+      return 24; // Default to 4" × 6" = 24 sq in
+    }
+    
     if (size === "Custom size") {
       const w = Number.parseFloat(customW) || 0
       const h = Number.parseFloat(customH) || 0
