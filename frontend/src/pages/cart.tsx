@@ -1711,7 +1711,7 @@ export default function CartPage() {
                            }, 7000);
                          }}
                        >
-                         💳 Go to Checkout
+                         Go to Checkout
                        </CartCheckoutButton>
                        
 
