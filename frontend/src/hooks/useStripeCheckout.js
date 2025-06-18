@@ -74,6 +74,10 @@ export const useStripeCheckout = () => {
       }
 
       // Step 3: Get Stripe instance
+      if (!stripePromise) {
+        throw new Error('Stripe is not configured. Please check NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY environment variable.');
+      }
+      
       const stripe = await stripePromise;
       
       if (!stripe) {

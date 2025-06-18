@@ -74,6 +74,11 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
     onCheckoutStart?.();
 
     try {
+      // Check if Stripe is configured
+      if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+        throw new Error('Stripe is not configured. Please set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY in your environment variables.');
+      }
+      
       console.log('🚀 Phase 2: Direct enhanced checkout...');
       console.log('👤 User context:', user ? `Logged in as ${capitalizeFirstName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User')}` : 'Guest user');
       
