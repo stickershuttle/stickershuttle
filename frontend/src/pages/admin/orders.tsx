@@ -204,6 +204,9 @@ export default function AdminOrders() {
   const [sendingProofs, setSendingProofs] = useState(false);
   const [proofsSent, setProofsSent] = useState<{ [key: string]: boolean }>({});
   const [newProofsCount, setNewProofsCount] = useState<{ [key: string]: number }>({});
+  const [hoveredOrderId, setHoveredOrderId] = useState<string | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [showProofNotesTooltip, setShowProofNotesTooltip] = useState(false);
 
   // Helper function to select an order and update URL
   const selectOrder = (order: Order) => {
@@ -681,6 +684,38 @@ export default function AdminOrders() {
     printWindow.onload = () => {
       printWindow.print();
     };
+  };
+
+  // Get proof notes for tooltip
+  const getProofNotes = (order: Order) => {
+    if (!order.proofs || order.proofs.length === 0) return null;
+    
+    const notes = [];
+    for (const proof of order.proofs) {
+      if (proof.adminNotes) {
+        notes.push({ type: 'admin', text: proof.adminNotes, proofTitle: proof.proofTitle });
+      }
+      if (proof.customerNotes) {
+        notes.push({ type: 'customer', text: proof.customerNotes, proofTitle: proof.proofTitle });
+      }
+    }
+    
+    return notes.length > 0 ? notes : null;
+  };
+
+  // Handle mouse enter for proof status tooltip
+  const handleProofStatusMouseEnter = (e: React.MouseEvent, order: Order) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setTooltipPosition({
+      x: rect.left + rect.width / 2,
+      y: rect.top - 10
+    });
+    setHoveredOrderId(order.id);
+  };
+
+  // Handle mouse leave for proof status tooltip
+  const handleProofStatusMouseLeave = () => {
+    setHoveredOrderId(null);
   };
 
   if (loading || !isAdmin) {
@@ -1329,7 +1364,11 @@ export default function AdminOrders() {
                             >
                               {/* Status */}
                               <td className="pl-6 pr-3 py-4">
-                                <div className="flex items-center gap-2.5">
+                                <div 
+                                  className="flex items-center gap-2.5 cursor-help"
+                                  onMouseEnter={(e) => handleProofStatusMouseEnter(e, order)}
+                                  onMouseLeave={handleProofStatusMouseLeave}
+                                >
                                   <div
                                     className={`rounded-full ${getProofStatusColor(getProofStatus(order))}`}
                                     style={{
@@ -1573,7 +1612,11 @@ export default function AdminOrders() {
 
                   {/* Status Badge and Action Buttons */}
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2.5">
+                    <div 
+                      className="flex items-center gap-2.5 cursor-help"
+                      onMouseEnter={(e) => handleProofStatusMouseEnter(e, selectedOrder)}
+                      onMouseLeave={handleProofStatusMouseLeave}
+                    >
                       <div
                         className={`rounded-full ${getProofStatusColor(getProofStatus(selectedOrder))}`}
                         style={{
@@ -1616,6 +1659,43 @@ export default function AdminOrders() {
                     </button>
                   </div>
                 </div>
+
+                {/* Proof Notes Section */}
+                {getProofNotes(selectedOrder) && (
+                  <div 
+                    className="rounded-lg p-4 mb-6"
+                    style={{
+                      backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                      border: '1px solid rgba(59, 130, 246, 0.2)'
+                    }}
+                  >
+                    <h3 className="text-sm font-semibold text-blue-300 mb-3 flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-1.586l-4 4z" />
+                      </svg>
+                      Proof Notes
+                    </h3>
+                    <div className="space-y-2">
+                      {getProofNotes(selectedOrder)!.map((note, index) => (
+                        <div key={index} className="text-sm">
+                          <div className="flex items-start gap-2">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              note.type === 'admin' 
+                                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
+                                : 'bg-green-500/20 text-green-300 border border-green-500/30'
+                            }`}>
+                              {note.type === 'admin' ? 'Admin' : 'Customer'}
+                            </span>
+                            {note.proofTitle && (
+                              <span className="text-xs text-gray-400">({note.proofTitle})</span>
+                            )}
+                          </div>
+                          <p className="text-gray-300 mt-1 ml-0">{note.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Two-column layout */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -2201,6 +2281,75 @@ export default function AdminOrders() {
             )}
           </div>
         </div>
+
+        {/* Proof Status Tooltip */}
+        {hoveredOrderId && (
+          <div
+            className="fixed z-50 pointer-events-none"
+            style={{
+              left: `${tooltipPosition.x}px`,
+              top: `${tooltipPosition.y}px`,
+              transform: 'translate(-50%, -100%)'
+            }}
+          >
+            <div
+              className="rounded-lg p-3 shadow-xl max-w-xs"
+              style={{
+                backgroundColor: 'rgba(3, 1, 64, 0.95)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                backdropFilter: 'blur(10px)'
+              }}
+            >
+              {(() => {
+                const order = filteredOrders.find(o => o.id === hoveredOrderId) || selectedOrder;
+                const notes = getProofNotes(order);
+                
+                if (!notes || notes.length === 0) {
+                  return (
+                    <div className="text-sm text-gray-300">
+                      No proof notes available
+                    </div>
+                  );
+                }
+                
+                return (
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-blue-300 mb-2">Proof Notes:</div>
+                    {notes.map((note, index) => (
+                      <div key={index} className="text-sm">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                            note.type === 'admin' 
+                              ? 'bg-purple-500/20 text-purple-300' 
+                              : 'bg-green-500/20 text-green-300'
+                          }`}>
+                            {note.type === 'admin' ? 'Admin' : 'Customer'}
+                          </span>
+                          {note.proofTitle && (
+                            <span className="text-xs text-gray-400">({note.proofTitle})</span>
+                          )}
+                        </div>
+                        <p className="text-gray-300 text-xs leading-relaxed">{note.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+              
+              {/* Tooltip Arrow */}
+              <div
+                className="absolute top-full left-1/2 transform -translate-x-1/2"
+                style={{
+                  width: 0,
+                  height: 0,
+                  borderLeft: '6px solid transparent',
+                  borderRight: '6px solid transparent',
+                  borderTop: '6px solid rgba(3, 1, 64, 0.95)'
+                }}
+              ></div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );
