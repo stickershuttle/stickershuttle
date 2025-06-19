@@ -154,7 +154,7 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
       const validation = validateFile(file);
       console.log('✅ Validation result for', file.name, ':', validation);
       
-      if (!validation.isValid) {
+      if (!validation.valid) {
         return {
           id: Math.random().toString(36).substr(2, 9),
           file,
@@ -205,6 +205,34 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
     setProofFiles(prev => prev.map(p => 
       p.id === proofId ? { ...p, uploading: true, progress: 0 } : p
     ));
+
+    // Check for CutContour1 layer if it's a PDF
+    let cutContourInfo = null;
+    if (proofFileParam.file.type === 'application/pdf' || proofFileParam.file.name.toLowerCase().endsWith('.pdf')) {
+      try {
+        const { analyzePDFForCutLines } = await import('../utils/pdf-layer-detection');
+        cutContourInfo = await analyzePDFForCutLines(proofFileParam.file);
+        
+        if (cutContourInfo.hasCutLines && cutContourInfo.layerInfo.cutContourDimensions) {
+          const dims = cutContourInfo.layerInfo.cutContourDimensions;
+          console.log(`🎯 ADMIN: CutContour1 layer detected in ${proofFileParam.file.name}`);
+          console.log(`📏 ADMIN: Cut dimensions: ${dims.widthInches}" × ${dims.heightInches}"`);
+          console.log(`📊 ADMIN: Bounding box: x=${dims.boundingBox.x}, y=${dims.boundingBox.y}, w=${dims.boundingBox.width}, h=${dims.boundingBox.height}`);
+          
+          // Show admin notification
+          if (isAdmin) {
+            alert(`✅ CutContour1 Layer Detected!\n\nDimensions: ${dims.widthInches}" × ${dims.heightInches}"\n\nBounding Box:\nX: ${dims.boundingBox.x}\nY: ${dims.boundingBox.y}\nWidth: ${dims.boundingBox.width} pts\nHeight: ${dims.boundingBox.height} pts`);
+          }
+        } else {
+          console.log(`⚠️ ADMIN: No CutContour1 layer found in ${proofFileParam.file.name}`);
+          if (isAdmin) {
+            console.log(`📋 ADMIN: Available layers: ${cutContourInfo.layerInfo.layerNames.join(', ') || 'None'}`);
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not analyze PDF for cut contours:', error);
+      }
+    }
 
     try {
       // Upload to Cloudinary with "proofs" folder
@@ -406,7 +434,7 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
         const file = e.target.files?.[0];
         if (file) {
           const validation = validateFile(file);
-          if (validation.isValid) {
+          if (validation.valid) {
             handleReplaceProof(proofId, file);
           } else {
             alert(validation.error);

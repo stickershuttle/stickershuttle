@@ -6,6 +6,16 @@ interface LayerInfo {
   layerNames: string[];
   cutContourColor?: string;
   totalLayers: number;
+  cutContourDimensions?: {
+    widthInches: number;
+    heightInches: number;
+    boundingBox: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+  };
 }
 
 export async function detectCutContourLayers(file: File): Promise<LayerInfo> {
@@ -29,7 +39,8 @@ export async function detectCutContourLayers(file: File): Promise<LayerInfo> {
     const optionalContentConfig = await pdf.getOptionalContentConfig();
     
     if (optionalContentConfig) {
-      const groups = optionalContentConfig.getGroups();
+      // Get all groups from the optional content config
+      const groups = (optionalContentConfig as any).getGroups?.() || [];
       layerInfo.totalLayers = groups.length;
       
       for (const group of groups) {
@@ -41,6 +52,59 @@ export async function detectCutContourLayers(file: File): Promise<LayerInfo> {
             groupName.toLowerCase().includes('cut contour 1') ||
             groupName.toLowerCase().includes('cutcontour_1')) {
           layerInfo.hasCutContour = true;
+          
+          // Try to get dimensions from the cut contour layer
+          try {
+            const page = await pdf.getPage(1);
+            const viewport = page.getViewport({ scale: 1.0 });
+            const operatorList = await page.getOperatorList();
+            
+            // Analyze the operator list for path operations that might be cut contours
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            let foundCutContourPaths = false;
+            
+            for (let i = 0; i < operatorList.fnArray.length; i++) {
+              const fn = operatorList.fnArray[i];
+              const args = operatorList.argsArray[i];
+              
+              // Look for path operations (moveTo, lineTo, curveTo, etc.)
+              if (fn === pdfjsLib.OPS.moveTo || fn === pdfjsLib.OPS.lineTo) {
+                if (args && args.length >= 2) {
+                  const x = args[0];
+                  const y = args[1];
+                  minX = Math.min(minX, x);
+                  minY = Math.min(minY, y);
+                  maxX = Math.max(maxX, x);
+                  maxY = Math.max(maxY, y);
+                  foundCutContourPaths = true;
+                }
+              }
+            }
+            
+            if (foundCutContourPaths && minX !== Infinity) {
+              const widthPoints = maxX - minX;
+              const heightPoints = maxY - minY;
+              
+              // Convert points to inches (72 points = 1 inch)
+              const widthInches = widthPoints / 72;
+              const heightInches = heightPoints / 72;
+              
+              layerInfo.cutContourDimensions = {
+                widthInches: Math.round(widthInches * 100) / 100,
+                heightInches: Math.round(heightInches * 100) / 100,
+                boundingBox: {
+                  x: minX,
+                  y: minY,
+                  width: widthPoints,
+                  height: heightPoints
+                }
+              };
+              
+              console.log(`🔍 CutContour1 detected! Dimensions: ${layerInfo.cutContourDimensions.widthInches}" × ${layerInfo.cutContourDimensions.heightInches}"`);
+            }
+          } catch (dimensionError) {
+            console.warn('Could not extract cut contour dimensions:', dimensionError);
+          }
         }
       }
     }

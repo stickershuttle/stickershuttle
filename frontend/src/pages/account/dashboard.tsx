@@ -2202,19 +2202,17 @@ function Dashboard() {
                                       !defaultCutSelection.displayValue.toLowerCase().includes('through');
                     
                     return (
-                      <div className="mb-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
-                        <div className="flex items-center gap-3">
-                          <div 
-                            className="w-5 h-5 rounded border-2 flex-shrink-0" 
-                            style={{ 
-                              borderColor: isGreenCut ? '#91c848' : '#6b7280', 
-                              backgroundColor: 'transparent' 
-                            }}
-                          ></div>
-                          <span className="text-sm font-medium text-white">
-                            This is the cut line, it will not show up on the print.
-                          </span>
-                        </div>
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                        <div 
+                          className="w-5 h-5 rounded border-2 flex-shrink-0" 
+                          style={{ 
+                            borderColor: isGreenCut ? '#91c848' : '#6b7280', 
+                            backgroundColor: 'transparent' 
+                          }}
+                        ></div>
+                        <span className="text-xs font-medium text-white whitespace-nowrap">
+                          This is the cut line, it will not show up on the print.
+                        </span>
                       </div>
                     );
                   })()}
