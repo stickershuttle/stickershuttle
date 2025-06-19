@@ -1,6 +1,8 @@
 import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
+import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
 import { from } from '@apollo/client';
+import { getSupabase } from './supabase';
 
 // TEMPORARY: Use local API until Railway environment variables are configured
 // Production API URL on Railway (currently down due to missing env vars)
@@ -31,6 +33,24 @@ const httpLink = createHttpLink({
   uri: `${getApiUrl()}/graphql`,
 });
 
+// Auth link to add authorization header
+const authLink = setContext(async (_, { headers }) => {
+  try {
+    const supabase = await getSupabase();
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    return {
+      headers: {
+        ...headers,
+        authorization: session?.access_token ? `Bearer ${session.access_token}` : '',
+      }
+    };
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    return { headers };
+  }
+});
+
 // Error link to log GraphQL errors
 const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
   if (graphQLErrors) {
@@ -50,7 +70,7 @@ const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) 
 });
 
 const client = new ApolloClient({
-  link: from([errorLink, httpLink]),
+  link: from([errorLink, authLink, httpLink]),
   cache: new InMemoryCache({
     // TEMP FIX: More aggressive cache policies to fix order number display issue
     typePolicies: {

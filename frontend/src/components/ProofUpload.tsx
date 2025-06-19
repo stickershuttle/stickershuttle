@@ -69,6 +69,20 @@ const REMOVE_PROOF = gql`
   }
 `;
 
+// GraphQL mutation to add admin notes
+const ADD_PROOF_NOTES = gql`
+  mutation AddProofNotes($orderId: ID!, $proofId: ID!, $adminNotes: String, $customerNotes: String) {
+    addProofNotes(orderId: $orderId, proofId: $proofId, adminNotes: $adminNotes, customerNotes: $customerNotes) {
+      id
+      proofs {
+        id
+        adminNotes
+        customerNotes
+      }
+    }
+  }
+`;
+
 interface ProofFile {
   id: string;
   file: File;
@@ -86,9 +100,11 @@ interface ProofUploadProps {
   proofStatus?: string;
   existingProofs?: any[];
   isAdmin?: boolean; // Flag to show admin-only features
+  orderItems?: any[]; // Order items to get size information
+  hideCutLinesSection?: boolean; // Flag to hide the cut lines section
 }
 
-export default function ProofUpload({ orderId, onProofUploaded, proofStatus, existingProofs = [], isAdmin = false }: ProofUploadProps) {
+export default function ProofUpload({ orderId, onProofUploaded, proofStatus, existingProofs = [], isAdmin = false, orderItems = [], hideCutLinesSection = false }: ProofUploadProps) {
   console.log('🏗️ ProofUpload component mounted with:', {
     orderId,
     proofStatus,
@@ -104,6 +120,9 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
   const [proofsSent, setProofsSent] = useState(false);
   const [removingProof, setRemovingProof] = useState<string | null>(null);
   const [replacingProof, setReplacingProof] = useState<string | null>(null);
+  const [pdfAnalysisResults, setPdfAnalysisResults] = useState<{[key: string]: any}>({});
+  const [editingNote, setEditingNote] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState<string>('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replaceFileInputRef = useRef<HTMLInputElement>(null);
@@ -112,6 +131,7 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
   const [sendProofs] = useMutation(SEND_PROOFS);
   const [replaceProofFile] = useMutation(REPLACE_PROOF_FILE);
   const [removeProof] = useMutation(REMOVE_PROOF);
+  const [addProofNotes] = useMutation(ADD_PROOF_NOTES);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -207,30 +227,61 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
     ));
 
     // Check for CutContour1 layer if it's a PDF
-    let cutContourInfo = null;
+    let cutContourInfo: any = null;
     if (proofFileParam.file.type === 'application/pdf' || proofFileParam.file.name.toLowerCase().endsWith('.pdf')) {
       try {
-        const { analyzePDFForCutLines } = await import('../utils/pdf-layer-detection');
-        cutContourInfo = await analyzePDFForCutLines(proofFileParam.file);
+        console.log(`🔍 ADMIN: Analyzing PDF ${proofFileParam.file.name} for cut contour layers...`);
         
-        if (cutContourInfo.hasCutLines && cutContourInfo.layerInfo.cutContourDimensions) {
-          const dims = cutContourInfo.layerInfo.cutContourDimensions;
-          console.log(`🎯 ADMIN: CutContour1 layer detected in ${proofFileParam.file.name}`);
-          console.log(`📏 ADMIN: Cut dimensions: ${dims.widthInches}" × ${dims.heightInches}"`);
-          console.log(`📊 ADMIN: Bounding box: x=${dims.boundingBox.x}, y=${dims.boundingBox.y}, w=${dims.boundingBox.width}, h=${dims.boundingBox.height}`);
-          
-          // Show admin notification
-          if (isAdmin) {
-            alert(`✅ CutContour1 Layer Detected!\n\nDimensions: ${dims.widthInches}" × ${dims.heightInches}"\n\nBounding Box:\nX: ${dims.boundingBox.x}\nY: ${dims.boundingBox.y}\nWidth: ${dims.boundingBox.width} pts\nHeight: ${dims.boundingBox.height} pts`);
+        // Try to import the new pdf-lib analysis utility
+        let analyzePDFCutContour;
+        try {
+          const pdfModule = await import('../utils/pdf-cutcontour-detection');
+          analyzePDFCutContour = pdfModule.analyzePDFCutContour;
+        } catch (importError) {
+          console.error('Failed to import pdf-lib analysis module:', importError);
+          throw new Error('PDF analysis module failed to load. This might be due to a browser compatibility issue.');
+        }
+        
+        cutContourInfo = await analyzePDFCutContour(proofFileParam.file);
+        
+        console.log(`📊 ADMIN: PDF Analysis Results for ${proofFileParam.file.name}:`);
+        console.log(`📋 ADMIN: Total layers found: ${cutContourInfo.layersFound.length}`);
+        console.log(`📋 ADMIN: Layer names: ${cutContourInfo.layersFound.join(', ') || 'None detected'}`);
+        console.log(`📋 ADMIN: Spot colors: ${cutContourInfo.spotColorsFound.join(', ') || 'None detected'}`);
+        console.log(`🎯 ADMIN: CutContour detected: ${cutContourInfo.hasCutContour ? 'YES' : 'NO'}`);
+        
+        // Store PDF analysis results for display
+        setPdfAnalysisResults(prev => ({
+          ...prev,
+          [proofFileParam.file.name]: cutContourInfo
+        }));
+
+        if (cutContourInfo.hasCutContour && cutContourInfo.dimensionsInches) {
+          const dims = cutContourInfo.dimensionsInches;
+          const bbox = cutContourInfo.boundingBox;
+          console.log(`📏 ADMIN: Cut contour dimensions: ${dims.width}" × ${dims.height}"`);
+          if (bbox) {
+            console.log(`📊 ADMIN: Cut contour bounding box (inches): x=${bbox.x}, y=${bbox.y}, w=${bbox.width}, h=${bbox.height}`);
           }
         } else {
-          console.log(`⚠️ ADMIN: No CutContour1 layer found in ${proofFileParam.file.name}`);
-          if (isAdmin) {
-            console.log(`📋 ADMIN: Available layers: ${cutContourInfo.layerInfo.layerNames.join(', ') || 'None'}`);
-          }
+          console.log(`⚠️ ADMIN: No CutContour layer found in ${proofFileParam.file.name}`);
         }
       } catch (error) {
-        console.warn('⚠️ Could not analyze PDF for cut contours:', error);
+        console.error('⚠️ Could not analyze PDF for cut contours:', error);
+        if (isAdmin) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+          alert(`❌ PDF ANALYSIS ERROR
+
+📄 File: ${proofFileParam.file.name}
+⚠️ Error: ${errorMessage}
+
+This might indicate:
+• Corrupted or invalid PDF file
+• PDF without proper layer structure  
+• Browser compatibility issue with PDF.js
+
+Please try re-uploading or contact support.`);
+        }
       }
     }
 
@@ -281,6 +332,10 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
             proofUrl,
             proofPublicId,
             proofTitle: proofFileParam.file.name,
+            // Store PDF dimensions for size display (not visible to customer)
+            adminNotes: cutContourInfo?.dimensionsInches ? 
+              `PDF_DIMENSIONS:${cutContourInfo.dimensionsInches.width}x${cutContourInfo.dimensionsInches.height}` : 
+              null
           }
         }
       });
@@ -349,6 +404,11 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
       
       // Successfully sent - update state to show View Proofs button
       setProofsSent(true);
+      
+      // Trigger parent component refresh to update proof statuses
+      if (onProofUploaded) {
+        onProofUploaded({ sent: true });
+      }
       
     } catch (error) {
       console.error('Error sending proofs:', error);
@@ -478,26 +538,136 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
     }
   };
 
+  // Helper function to extract size from order items
+  const getOrderSize = () => {
+    if (!orderItems || orderItems.length === 0) return null;
+    
+    const firstItem = orderItems[0];
+    if (!firstItem?.calculatorSelections?.size) return null;
+    
+    const sizeValue = firstItem.calculatorSelections.size.value || firstItem.calculatorSelections.size.displayValue;
+    
+    // Parse size strings like "Small (2\")", "Medium (3\")", "4\" x 6\"", etc.
+    const sizeMatch = sizeValue.match(/(\d+(?:\.\d+)?)\s*[\"x×]\s*(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)\s*\"/);
+    
+    if (sizeMatch) {
+      if (sizeMatch[1] && sizeMatch[2]) {
+        // Format like "4\" x 6\""
+        return {
+          width: parseFloat(sizeMatch[1]),
+          height: parseFloat(sizeMatch[2]),
+          display: `${sizeMatch[1]}" × ${sizeMatch[2]}"`
+        };
+      } else if (sizeMatch[3]) {
+        // Format like "3\"" (square)
+        const size = parseFloat(sizeMatch[3]);
+        return {
+          width: size,
+          height: size,
+          display: `${size}" × ${size}"`
+        };
+      }
+    }
+    
+    return {
+      width: null,
+      height: null,
+      display: sizeValue
+    };
+  };
+
+  // Admin notes handlers
+  const handleEditNote = (proofId: string, currentNote: string) => {
+    setEditingNote(proofId);
+    // Extract custom note if it exists, otherwise start blank
+    const adminNotes = currentNote || '';
+    if (adminNotes.startsWith('PDF_DIMENSIONS:')) {
+      setNoteText(''); // Start blank if only PDF dimensions
+    } else {
+      // Remove PDF dimensions from display to show only custom note
+      const noteWithoutDimensions = adminNotes.replace(/\nPDF_DIMENSIONS:[0-9.]+x[0-9.]+/, '').trim();
+      setNoteText(noteWithoutDimensions);
+    }
+  };
+
+  const handleSaveNote = async (proofId: string) => {
+    try {
+      // Find the existing proof to check for PDF dimensions
+      const existingProof = existingProofs.find(p => p.id === proofId);
+      const existingAdminNotes = existingProof?.adminNotes || '';
+      
+      // Preserve PDF dimensions if they exist
+      let finalNotes = noteText.trim() || null;
+      if (existingAdminNotes.includes('PDF_DIMENSIONS:')) {
+        const pdfDimensionMatch = existingAdminNotes.match(/PDF_DIMENSIONS:[0-9.]+x[0-9.]+/);
+        if (pdfDimensionMatch && finalNotes) {
+          // Append PDF dimensions to the custom note
+          finalNotes = `${finalNotes}\n${pdfDimensionMatch[0]}`;
+        } else if (pdfDimensionMatch && !finalNotes) {
+          // Keep only PDF dimensions if no custom note
+          finalNotes = pdfDimensionMatch[0];
+        }
+      }
+      
+      await addProofNotes({
+        variables: {
+          orderId,
+          proofId,
+          adminNotes: finalNotes,
+          customerNotes: null
+        }
+      });
+      setEditingNote(null);
+      setNoteText('');
+      
+      // Refresh the component by calling onProofUploaded if available
+      if (onProofUploaded) {
+        onProofUploaded({ id: proofId });
+      }
+    } catch (error) {
+      console.error('Error saving admin note:', error);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingNote(null);
+    setNoteText('');
+  };
+
   const canAddMore = proofFiles.length + (existingProofs?.length || 0) < 25;
   const hasUploadedProofs = proofFiles.some(p => p.uploaded);
   const hasExistingProofs = existingProofs && existingProofs.length > 0;
   const hasAnyProofs = hasUploadedProofs || hasExistingProofs;
+  
+  // Check if there are any proofs that haven't been sent yet (based on database state)
+  const hasUnsentProofs = existingProofs?.some(proof => proof.status !== 'sent') || hasUploadedProofs;
+  
+  // Determine if proofs have been sent (based on database state, not local state)
+  // Show "Send Proofs" button if there are any proofs that aren't 'sent' status
+  const shouldShowSendButton = hasUnsentProofs;
+  
+  // Show "View Proofs" button if all proofs are sent OR if order status is awaiting_approval
+  const shouldShowViewButton = (hasExistingProofs && !hasUnsentProofs && !hasUploadedProofs) || proofStatus === 'awaiting_approval';
+  
+  // Debug logging
+  console.log('ProofUpload button logic:', {
+    hasExistingProofs,
+    hasUploadedProofs,
+    hasUnsentProofs,
+    shouldShowSendButton,
+    shouldShowViewButton,
+    proofStatus,
+    existingProofStatuses: existingProofs?.map(p => ({ id: p.id, status: p.status, title: p.proofTitle }))
+  });
 
   return (
     <div className="space-y-6">
       {/* Cut Line Selection - Simplified */}
-      {isAdmin && (
+      {!hideCutLinesSection && isAdmin && (
         <div className="mb-6 p-4 rounded-lg" style={{
           backgroundColor: 'rgba(255, 255, 255, 0.05)',
           border: '1px solid rgba(255, 255, 255, 0.1)'
         }}>
-          <div className="flex items-center gap-2 mb-3">
-            <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <h3 className="text-sm font-medium text-white">Cut Line Options</h3>
-          </div>
-          
           <div className="flex items-center gap-4">
             <span className="text-gray-400 text-sm">Include cut lines in proofs:</span>
             <div className="flex gap-3">
@@ -507,12 +677,13 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
                     ? prev.filter(c => c !== 'green')
                     : [...prev, 'green']
                 )}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-all border ${
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all border flex items-center gap-2 ${
                   selectedCutLines.includes('green')
                     ? 'bg-green-500/20 text-green-300 border-green-400/50'
                     : 'bg-gray-500/20 text-gray-400 border-gray-500/50 hover:border-gray-400/50'
                 }`}
               >
+                <div className="w-4 h-0.5" style={{ backgroundColor: '#91c848' }}></div>
                 Green Cut Line
               </button>
               <button
@@ -521,33 +692,19 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
                     ? prev.filter(c => c !== 'grey')
                     : [...prev, 'grey']
                 )}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-all border ${
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all border flex items-center gap-2 ${
                   selectedCutLines.includes('grey')
                     ? 'bg-gray-500/20 text-gray-300 border-gray-400/50'
                     : 'bg-gray-600/20 text-gray-500 border-gray-600/50 hover:border-gray-500/50'
                 }`}
               >
+                <div className="w-4 h-0.5" style={{ backgroundColor: '#9ca3af' }}></div>
                 Grey Cut Line
               </button>
             </div>
           </div>
           
-          {selectedCutLines.length > 0 && (
-            <div className="mt-3 space-y-2">
-              {selectedCutLines.includes('green') && (
-                <div className="flex items-center gap-2 text-xs">
-                  <div className="w-4 h-4 border-2 border-green-500 rounded"></div>
-                  <span className="text-green-400">Green cut-line indicates where the sticker will be cut</span>
-                </div>
-              )}
-              {selectedCutLines.includes('grey') && (
-                <div className="flex items-center gap-2 text-xs">
-                  <div className="w-4 h-4 border-2 border-gray-400 rounded"></div>
-                  <span className="text-gray-400">Grey cut-line indicates where the sticker will be cut</span>
-                </div>
-              )}
-            </div>
-          )}
+
         </div>
       )}
 
@@ -646,13 +803,118 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
                       </span>
                     </div>
 
-                    {/* Notes display */}
-                    {proof.adminNotes && (
-                      <div className="mt-2 p-2 bg-blue-500 bg-opacity-10 border border-blue-500 border-opacity-20 rounded text-xs">
-                        <p className="text-blue-300 font-medium">Admin Notes:</p>
-                        <p className="text-gray-300 mt-1">{proof.adminNotes}</p>
-                      </div>
-                    )}
+                    {/* Admin Notes and PDF Analysis Side by Side */}
+                    {isAdmin && (() => {
+                      const adminNotes = proof.adminNotes;
+                      // Check if there's a custom note (not just PDF dimensions)
+                      const hasCustomNote = adminNotes && !adminNotes.startsWith('PDF_DIMENSIONS:') && adminNotes.replace(/\nPDF_DIMENSIONS:[0-9.]+x[0-9.]+/, '').trim();
+                      const customNoteText = hasCustomNote ? adminNotes.replace(/\nPDF_DIMENSIONS:[0-9.]+x[0-9.]+/, '').trim() : '';
+                      const isEditing = editingNote === proof.id;
+                      
+                      // Get PDF analysis for this specific file - either from state or from saved adminNotes
+                      const pdfAnalysis = pdfAnalysisResults[proof.proofTitle || 'Design Proof'];
+                      const orderSize = getOrderSize();
+                      
+                      // Check if we have PDF dimensions from saved adminNotes (for persistence)
+                      let pdfDims = pdfAnalysis?.dimensionsInches;
+                      if (!pdfDims && adminNotes && adminNotes.includes('PDF_DIMENSIONS:')) {
+                        const dimensionMatch = adminNotes.match(/PDF_DIMENSIONS:([0-9.]+)x([0-9.]+)/);
+                        if (dimensionMatch) {
+                          pdfDims = {
+                            width: parseFloat(dimensionMatch[1]),
+                            height: parseFloat(dimensionMatch[2])
+                          };
+                        }
+                      }
+                      
+                      // Check if dimensions align (within 0.1" tolerance)
+                      let dimensionsAlign = false;
+                      if (pdfDims && orderSize?.width && orderSize?.height) {
+                        const tolerance = 0.1;
+                        const widthMatch = Math.abs(pdfDims.width - orderSize.width) <= tolerance;
+                        const heightMatch = Math.abs(pdfDims.height - orderSize.height) <= tolerance;
+                        dimensionsAlign = widthMatch && heightMatch;
+                      }
+                      
+                      // Hide notes and PDF analysis if order is approved unless there's a custom note
+                      const isOrderApproved = proof.status === 'approved';
+                      if (isOrderApproved && !hasCustomNote) {
+                        return null;
+                      }
+                      
+                                              return (
+                          <div className="flex gap-4 mt-4">
+                              {/* Admin Notes - Left Side (Much Wider when no PDF analysis) */}
+                              <div className={`${isOrderApproved ? 'w-full' : 'w-2/3'} p-3 rounded-lg`} style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                                <p className="text-sm text-blue-300 font-medium mb-2">Note from our team:</p>
+                                {isEditing ? (
+                                  <div className="space-y-3">
+                                    <textarea
+                                      value={noteText}
+                                      onChange={(e) => setNoteText(e.target.value)}
+                                      placeholder="Add a note for the customer..."
+                                      className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 resize-none focus:outline-none focus:border-blue-400"
+                                      rows={3}
+                                      maxLength={500}
+                                      autoFocus
+                                    />
+                                    <div className="flex justify-between items-center">
+                                      <div className="flex gap-2">
+                                        <button
+                                          onClick={() => handleSaveNote(proof.id)}
+                                          className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors"
+                                        >
+                                          Save
+                                        </button>
+                                        <button
+                                          onClick={handleCancelEdit}
+                                          className="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                      <span className="text-xs text-gray-400">{noteText.length}/500</span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div 
+                                    className="text-sm text-gray-300 min-h-[40px] cursor-pointer hover:bg-white/5 rounded-lg px-3 py-2 transition-colors border border-transparent hover:border-white/10"
+                                    onClick={() => handleEditNote(proof.id, adminNotes || '')}
+                                  >
+                                    {hasCustomNote ? customNoteText : 'Click to add a note...'}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* PDF Analysis - Right Side (Hidden when approved) */}
+                              {!isOrderApproved && pdfDims && (
+                                <div className="w-1/3">
+                                  <div className="mb-2">
+                                    <p className="text-sm text-orange-300 font-medium">PDF Analysis:</p>
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-nowrap mt-3">
+                                    <span className="px-2.5 py-1 text-xs font-medium bg-orange-500/20 text-orange-300 border border-orange-500/30 rounded-full whitespace-nowrap">
+                                      Official: {pdfDims.width.toFixed(2)}" × {pdfDims.height.toFixed(2)}"
+                                    </span>
+                                    {orderSize && (
+                                      <span className="px-2.5 py-1 text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-full whitespace-nowrap">
+                                        Ordered: {orderSize.display}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-2">
+                                    <svg className="w-4 h-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.072 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                    </svg>
+                                    <span className="text-xs text-yellow-400 whitespace-nowrap">Please confirm sizes before sending proof</span>
+                                  </div>
+                                </div>
+                                                              )}
+                            </div>
+                          );
+                    })()}
+                    
+                    {/* Customer Notes - Read Only */}
                     {proof.customerNotes && (
                       <div className="mt-2 p-2 bg-purple-500 bg-opacity-10 border border-purple-500 border-opacity-20 rounded text-xs">
                         <p className="text-purple-300 font-medium">Customer Notes:</p>
@@ -862,7 +1124,7 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
       {/* Send Proofs Button or View Proofs Page Button */}
       {(hasAnyProofs || (existingProofs && existingProofs.length > 0)) && (
         <div className="flex justify-center pt-4 border-t border-gray-700 border-opacity-30">
-          {(proofsSent || proofStatus === 'awaiting_approval') ? (
+          {shouldShowViewButton ? (
             <button
               onClick={() => window.open(`/proofs?orderId=${orderId}`, '_blank')}
               className="inline-flex items-center px-6 py-3 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80 cursor-pointer"
@@ -883,8 +1145,8 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
               disabled={sendingProofs}
               className="inline-flex items-center px-6 py-3 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ 
-                backgroundColor: 'rgba(34, 197, 94, 0.2)',
-                border: '1px solid rgba(34, 197, 94, 0.4)'
+                backgroundColor: 'rgba(145, 200, 72, 0.2)',
+                border: '1px solid rgba(145, 200, 72, 0.4)'
               }}
             >
               {sendingProofs ? (

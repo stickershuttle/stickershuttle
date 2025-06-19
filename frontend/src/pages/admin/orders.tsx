@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import Layout from '@/components/Layout';
+import AdminLayout from '@/components/AdminLayout';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { getSupabase } from '../../lib/supabase';
 import ProofUpload from '@/components/ProofUpload';
+
 
 // GraphQL query to get all orders for admin
 const GET_ALL_ORDERS = gql`
@@ -195,8 +196,8 @@ export default function AdminOrders() {
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   const [columns, setColumns] = useState(defaultColumns);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
-  const [showMarketingDropdown, setShowMarketingDropdown] = useState(false);
   const [dateRange, setDateRange] = useState('all');
+
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [customDateRange, setCustomDateRange] = useState({ start: null as Date | null, end: null as Date | null });
   const [sortColumn, setSortColumn] = useState<string>('date');
@@ -204,9 +205,6 @@ export default function AdminOrders() {
   const [sendingProofs, setSendingProofs] = useState(false);
   const [proofsSent, setProofsSent] = useState<{ [key: string]: boolean }>({});
   const [newProofsCount, setNewProofsCount] = useState<{ [key: string]: number }>({});
-  const [hoveredOrderId, setHoveredOrderId] = useState<string | null>(null);
-  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
-  const [showProofNotesTooltip, setShowProofNotesTooltip] = useState(false);
 
   // Helper function to select an order and update URL
   const selectOrder = (order: Order) => {
@@ -519,13 +517,7 @@ export default function AdminOrders() {
     }
   };
 
-  // Open ShipStation for order
-  const openShipStation = (order: Order) => {
-    // You can customize this URL based on your ShipStation setup
-    // This is a generic example - replace with your actual ShipStation URL pattern
-    const shipStationUrl = `https://ship.shipstation.com/orders?search=${order.orderNumber || order.id}`;
-    window.open(shipStationUrl, '_blank');
-  };
+
 
   // Handle column sorting
   const handleColumnSort = (column: string) => {
@@ -686,400 +678,59 @@ export default function AdminOrders() {
     };
   };
 
-  // Get proof notes for tooltip
-  const getProofNotes = (order: Order) => {
-    if (!order.proofs || order.proofs.length === 0) return null;
-    
-    const notes = [];
-    for (const proof of order.proofs) {
-      if (proof.adminNotes) {
-        notes.push({ type: 'admin', text: proof.adminNotes, proofTitle: proof.proofTitle });
-      }
-      if (proof.customerNotes) {
-        notes.push({ type: 'customer', text: proof.customerNotes, proofTitle: proof.proofTitle });
-      }
-    }
-    
-    return notes.length > 0 ? notes : null;
-  };
 
-  // Handle mouse enter for proof status tooltip
-  const handleProofStatusMouseEnter = (e: React.MouseEvent, order: Order) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setTooltipPosition({
-      x: rect.left + rect.width / 2,
-      y: rect.top - 10
-    });
-    setHoveredOrderId(order.id);
-  };
-
-  // Handle mouse leave for proof status tooltip
-  const handleProofStatusMouseLeave = () => {
-    setHoveredOrderId(null);
-  };
 
   if (loading || !isAdmin) {
     return (
-      <Layout>
+      <AdminLayout>
         <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#030140' }}>
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-400"></div>
         </div>
-      </Layout>
+      </AdminLayout>
     );
   }
 
   return (
-    <Layout>
-      <div className="min-h-screen flex" style={{ backgroundColor: '#030140' }}>
-        {/* Sidebar */}
-        <div
-          className="w-56 fixed left-0 h-screen pt-8 pb-8 pr-4"
-          style={{
-            backgroundColor: 'transparent',
-            top: '64px',
-            height: 'calc(100vh - 64px)'
-          }}
-        >
-          <div
-            className="h-full rounded-r-2xl"
-            style={{
-              backgroundColor: 'rgba(0, 0, 0, 0.3)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderLeft: 'none'
-            }}
-          >
-            <nav className="px-3 py-6">
-              <div className="mb-2">
-                <h3 className="text-xs uppercase tracking-wider text-gray-500 font-semibold px-3 mb-3">Store Management</h3>
-              </div>
-
-              {/* Orders - Active */}
-              <a
-                href="#"
-                className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-white transition-all"
-                style={{
-                  backgroundColor: 'rgba(168, 85, 247, 0.15)',
-                  borderLeft: '3px solid #a855f7'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.25)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.15)';
-                }}
-              >
-                <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
-                Orders
-              </a>
-
-              {/* Customers */}
-              <a
-                href="#"
-                className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all"
-                style={{
-                  borderLeft: '3px solid transparent'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-                  e.currentTarget.style.color = '#93BBFC';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '';
-                }}
-              >
-                <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-                Customers
-              </a>
-
-              {/* Products */}
-              <a
-                href="#"
-                className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all"
-                style={{
-                  borderLeft: '3px solid transparent'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
-                  e.currentTarget.style.color = '#86EFAC';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '';
-                }}
-              >
-                <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-                Products
-              </a>
-
-              {/* Analytics */}
-              <a
-                href="#"
-                className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all"
-                style={{
-                  borderLeft: '3px solid transparent'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(249, 115, 22, 0.1)';
-                  e.currentTarget.style.color = '#FDBA74';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '';
-                }}
-              >
-                <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                Analytics
-              </a>
-
-              {/* Divider */}
-              <div className="my-4 border-t border-gray-700"></div>
-
-              {/* Marketing */}
-              <div className="relative">
-                <a
-                  href="#"
-                  className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all"
-                  style={{
-                    borderLeft: '3px solid transparent'
-                  }}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setShowMarketingDropdown(!showMarketingDropdown);
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(236, 72, 153, 0.1)';
-                    e.currentTarget.style.color = '#F9A8D4';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = '';
-                  }}
-                >
-                  <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-                  </svg>
-                  Marketing
-                  <svg className={`w-4 h-4 ml-auto transition-transform ${showMarketingDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </a>
-
-                {/* Dropdown Menu */}
-                {showMarketingDropdown && (
-                  <div className="ml-8 mt-1">
-                    <a
-                      href="#"
-                      className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all"
-                      style={{
-                        backgroundColor: 'transparent'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'rgba(236, 72, 153, 0.1)';
-                        e.currentTarget.style.color = '#F9A8D4';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                        e.currentTarget.style.color = '';
-                      }}
-                    >
-                      <img
-                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750291437/e2672593-d403-4b51-b028-d913fd20cde2.png"
-                        alt="Klaviyo"
-                        className="w-5 h-5 mr-3"
-                      />
-                      Klaviyo
-                    </a>
-                  </div>
-                )}
-              </div>
-
-              {/* Settings */}
-              <a
-                href="#"
-                className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all"
-                style={{
-                  borderLeft: '3px solid transparent'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(107, 114, 128, 0.1)';
-                  e.currentTarget.style.color = '#D1D5DB';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '';
-                }}
-              >
-                <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                Settings
-              </a>
-
-              {/* Second Divider */}
-              <div className="my-4 border-t border-gray-700"></div>
-
-              {/* Providers Section */}
-              <div className="mb-2">
-                <h3 className="text-xs uppercase tracking-wider text-gray-500 font-semibold px-3 mb-3">Quick Access</h3>
-              </div>
-
-              {/* Supabase */}
-              <a
-                href="https://app.supabase.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all"
-                style={{
-                  borderLeft: '3px solid transparent'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(52, 211, 153, 0.1)';
-                  e.currentTarget.style.color = '#6EE7B7';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '';
-                }}
-              >
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750290192/supabase-logo-icon_h0jcfk.png" alt="Supabase" className="w-5 h-5 mr-3 object-contain" />
-                Supabase
-              </a>
-
-              {/* Railway */}
-              <a
-                href="https://railway.app"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all"
-                style={{
-                  borderLeft: '3px solid transparent'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(139, 92, 246, 0.1)';
-                  e.currentTarget.style.color = '#A78BFA';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '';
-                }}
-              >
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750290230/Railway_Logo_bzh9nc.svg" alt="Railway" className="w-5 h-5 mr-3 brightness-0 invert object-contain" />
-                Railway
-              </a>
-
-              {/* Vercel */}
-              <a
-                href="https://vercel.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all"
-                style={{
-                  borderLeft: '3px solid transparent'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.3)';
-                  e.currentTarget.style.color = '#FFFFFF';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '';
-                }}
-              >
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750290249/Vercel_favicon_hbsrvj.svg" alt="Vercel" className="w-5 h-5 mr-3 brightness-0 invert object-contain" />
-                Vercel
-              </a>
-
-              {/* Stripe */}
-              <a
-                href="https://dashboard.stripe.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all"
-                style={{
-                  borderLeft: '3px solid transparent'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(99, 102, 241, 0.1)';
-                  e.currentTarget.style.color = '#818CF8';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '';
-                }}
-              >
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750290378/1685814539stripe-icon-png_utsajs.webp" alt="Stripe" className="w-5 h-5 mr-3 object-contain" />
-                Stripe
-              </a>
-
-              {/* Cloudinary */}
-              <a
-                href="https://cloudinary.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all"
-                style={{
-                  borderLeft: '3px solid transparent'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.1)';
-                  e.currentTarget.style.color = '#60A5FA';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '';
-                }}
-              >
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750290406/cloudinary-icon-512x335-z2n5aue3_r9svki.png" alt="Cloudinary" className="w-5 h-5 mr-3 object-contain" />
-                Cloudinary
-              </a>
-
-              {/* GitHub */}
-              <a
-                href="https://github.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all"
-                style={{
-                  borderLeft: '3px solid transparent'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(31, 41, 55, 0.3)';
-                  e.currentTarget.style.color = '#E5E7EB';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '';
-                }}
-              >
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750290446/Github-desktop-logo-symbol.svg_hb06pq.png" alt="GitHub" className="w-5 h-5 mr-3 object-contain" />
-                GitHub
-              </a>
-            </nav>
-          </div>
-        </div>
-
+    <AdminLayout>
+      <style jsx global>{`
+        .table-row-hover {
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .table-row-hover:hover {
+          background-color: rgba(255, 255, 255, 0.08) !important;
+        }
+        
+        .sort-indicator {
+          transition: all 0.2s ease;
+        }
+        
+        .filter-card {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(12px);
+          border-radius: 16px;
+        }
+        
+        .glass-container {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(12px);
+          border-radius: 16px;
+        }
+      `}</style>
+      <div className="min-h-screen" style={{ backgroundColor: '#030140' }}>
         {/* Main Content */}
-        <div className="flex-1 ml-56 pt-8 pb-8">
+        <div className="pt-8 pb-8">
           <div className="w-full px-6">
             {!selectedOrder ? (
               // Orders List View
               <>
                 {/* Analytics Cards */}
                 <div className="grid grid-cols-4 gap-4 mb-6">
-                  <div className="rounded-lg p-6" style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)'
-                  }}>
+                  <div className="rounded-2xl p-6 transition-all duration-200 hover:scale-[1.02] glass-container">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs text-gray-400 uppercase tracking-wider">Total Sales</span>
                       <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1088,7 +739,7 @@ export default function AdminOrders() {
                     </div>
                     <div className="flex items-end justify-between">
                       <div>
-                        <p className="text-2xl font-bold" style={{ color: '#86efac' }}>
+                        <p className="text-2xl font-bold transition-all duration-200 hover:scale-105" style={{ color: '#86efac' }}>
                           {formatCurrency(data?.getAllOrders?.reduce((sum: number, order: Order) => sum + order.totalPrice, 0) || 0)}
                         </p>
                         <p className="text-xs text-green-400 mt-1">↑ 23%</p>
@@ -1096,16 +747,13 @@ export default function AdminOrders() {
                     </div>
                   </div>
 
-                  <div className="rounded-lg p-6" style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)'
-                  }}>
+                  <div className="rounded-2xl p-6 transition-all duration-200 hover:scale-[1.02] glass-container">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs text-gray-400 uppercase tracking-wider">Avg Order Value</span>
                     </div>
                     <div className="flex items-end justify-between">
                       <div>
-                        <p className="text-2xl font-bold" style={{ color: '#86efac' }}>
+                        <p className="text-2xl font-bold transition-all duration-200 hover:scale-105" style={{ color: '#86efac' }}>
                           {formatCurrency(
                             data?.getAllOrders?.length
                               ? (data.getAllOrders.reduce((sum: number, order: Order) => sum + order.totalPrice, 0) / data.getAllOrders.length)
@@ -1117,38 +765,30 @@ export default function AdminOrders() {
                     </div>
                   </div>
 
-                  <div className="rounded-lg p-6" style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)'
-                  }}>
+                  <div className="rounded-2xl p-6 transition-all duration-200 hover:scale-[1.02] glass-container">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs text-gray-400 uppercase tracking-wider">Orders</span>
                     </div>
                     <div className="flex items-end justify-between">
                       <div>
-                        <p className="text-2xl font-bold text-white">{data?.getAllOrders?.length || 0}</p>
-                        <p className="text-xs text-gray-400 mt-1">—</p>
+                        <p className="text-2xl font-bold text-white transition-all duration-200 hover:scale-105">{data?.getAllOrders?.length || 0}</p>
+                        <p className="text-xs mt-1" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>—</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-lg p-6" style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)'
-                  }}>
+                  <div className="rounded-2xl p-6 transition-all duration-200 hover:scale-[1.02] glass-container">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs text-gray-400 uppercase tracking-wider">Conversion Rate</span>
                     </div>
                     <div className="flex items-end justify-between">
                       <div>
-                        <p className="text-2xl font-bold text-white">2.9%</p>
+                        <p className="text-2xl font-bold text-white transition-all duration-200 hover:scale-105">2.9%</p>
                         <p className="text-xs text-green-400 mt-1">↑ 31%</p>
                       </div>
                     </div>
                   </div>
                 </div>
-
-
 
                 {/* Compact Filters */}
                 <div className="flex justify-end items-center gap-3 mb-4">
@@ -1158,7 +798,7 @@ export default function AdminOrders() {
                       aria-label="Filter orders by status"
                       value={filterStatus}
                       onChange={(e) => setFilterStatus(e.target.value)}
-                      className="appearance-none bg-transparent border border-white/20 rounded-lg px-4 py-2 pl-10 text-white text-sm font-medium focus:outline-none focus:border-purple-400 transition-all cursor-pointer hover:scale-105"
+                      className="appearance-none bg-transparent border border-white/20 rounded-xl px-4 py-2 pl-10 text-white text-sm font-medium focus:outline-none focus:border-purple-400 transition-all cursor-pointer hover:scale-105"
                       style={{
                         backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
                         backgroundRepeat: 'no-repeat',
@@ -1188,7 +828,7 @@ export default function AdminOrders() {
                           setShowDatePicker(true);
                         }
                       }}
-                      className="appearance-none bg-transparent border border-white/20 rounded-lg px-4 py-2 pl-10 text-white text-sm font-medium focus:outline-none focus:border-purple-400 transition-all cursor-pointer hover:scale-105"
+                      className="appearance-none bg-transparent border border-white/20 rounded-xl px-4 py-2 pl-10 text-white text-sm font-medium focus:outline-none focus:border-purple-400 transition-all cursor-pointer hover:scale-105"
                       style={{
                         backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
                         backgroundRepeat: 'no-repeat',
@@ -1218,7 +858,7 @@ export default function AdminOrders() {
                       placeholder="Search orders..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="bg-transparent border border-white/20 rounded-lg px-4 py-2 pl-10 text-white text-sm placeholder-white/60 focus:outline-none focus:border-purple-400 transition-all"
+                      className="bg-transparent border border-white/20 rounded-xl px-4 py-2 pl-10 text-white text-sm placeholder-white/60 focus:outline-none focus:border-purple-400 transition-all"
                       style={{ minWidth: '200px' }}
                     />
                     <svg className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1228,14 +868,7 @@ export default function AdminOrders() {
                 </div>
 
                 {/* Orders Table */}
-                <div
-                  className="rounded-lg overflow-hidden"
-                  style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                    backdropFilter: 'blur(10px)'
-                  }}
-                >
+                <div className="rounded-2xl overflow-hidden glass-container">
                   <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 450px)', overflowY: 'auto' }}>
                     <table className="min-w-full">
                       <thead
@@ -1349,26 +982,16 @@ export default function AdminOrders() {
                           return (
                             <tr
                               key={order.id}
-                              className="cursor-pointer transition-all"
+                              className="cursor-pointer table-row-hover"
                               style={{
                                 borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
                                 backgroundColor: 'transparent'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.03)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'transparent';
                               }}
                               onClick={() => selectOrder(order)}
                             >
                               {/* Status */}
                               <td className="pl-6 pr-3 py-4">
-                                <div 
-                                  className="flex items-center gap-2.5 cursor-help"
-                                  onMouseEnter={(e) => handleProofStatusMouseEnter(e, order)}
-                                  onMouseLeave={handleProofStatusMouseLeave}
-                                >
+                                <div className="flex items-center gap-2.5">
                                   <div
                                     className={`rounded-full ${getProofStatusColor(getProofStatus(order))}`}
                                     style={{
@@ -1492,7 +1115,7 @@ export default function AdminOrders() {
                               <td className="px-2 py-4">
                                 {firstItemSelections.material?.displayValue ? (
                                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-green-300"
-                                    style={{ backgroundColor: 'rgba(34, 197, 94, 0.2)', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
+                                    style={{ backgroundColor: 'rgba(145, 200, 72, 0.2)', border: '1px solid rgba(145, 200, 72, 0.3)' }}>
                                     {firstItemSelections.material.displayValue}
                                   </span>
                                 ) : (
@@ -1555,10 +1178,10 @@ export default function AdminOrders() {
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      openShipStation(order);
+                                      router.push(`/admin/shipping-labels/${order.orderNumber || order.id.split('-')[0].toUpperCase()}`);
                                     }}
                                     className="p-1.5 rounded-lg text-green-400 hover:text-green-300 hover:bg-green-500 hover:bg-opacity-10 transition-all"
-                                    title="Ship Order"
+                                    title="Create Shipping Label"
                                   >
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -1591,129 +1214,96 @@ export default function AdminOrders() {
               // Order Details View - Shopify-style layout
               <div className="max-w-7xl mx-auto">
                 {/* Header */}
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex justify-between items-center mb-4">
                   <div className="flex items-center gap-4">
                     <button
                       onClick={goBackToOrders}
                       className="text-gray-400 hover:text-white transition-colors cursor-pointer"
                       aria-label="Back to orders"
                     >
-                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                       </svg>
                     </button>
                     <div>
-                      <h1 className="text-3xl font-bold text-white">
-                        Order #{selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}
+                      <h1 className="text-xl font-bold text-white">
+                        #{selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}
                       </h1>
-                      <p className="text-sm text-gray-400">{formatDate(selectedOrder.orderCreatedAt)}</p>
+                      <p className="text-xs text-gray-400">{formatDate(selectedOrder.orderCreatedAt)}</p>
                     </div>
                   </div>
 
                   {/* Status Badge and Action Buttons */}
                   <div className="flex items-center gap-3">
-                    <div 
-                      className="flex items-center gap-2.5 cursor-help"
-                      onMouseEnter={(e) => handleProofStatusMouseEnter(e, selectedOrder)}
-                      onMouseLeave={handleProofStatusMouseLeave}
-                    >
+                    <div className="flex items-center gap-2.5">
                       <div
                         className={`rounded-full ${getProofStatusColor(getProofStatus(selectedOrder))}`}
                         style={{
-                          width: '10px',
-                          height: '10px',
-                          minWidth: '10px',
-                          minHeight: '10px',
-                          boxShadow: '0 0 10px currentColor'
+                          width: '8px',
+                          height: '8px',
+                          minWidth: '8px',
+                          minHeight: '8px',
+                          boxShadow: '0 0 8px currentColor'
                         }}
                       ></div>
-                      <span className="text-sm font-medium text-gray-300">{getProofStatus(selectedOrder)}</span>
+                      <span className="text-xs font-medium text-gray-300">{getProofStatus(selectedOrder)}</span>
                     </div>
                     
                     {/* Action Buttons */}
                     <button
                       onClick={() => printOrderSlip(selectedOrder)}
-                      className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105"
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105"
                       style={{
                         backgroundColor: 'rgba(59, 130, 246, 0.2)',
                         border: '1px solid rgba(59, 130, 246, 0.4)'
                       }}
                     >
-                      <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                       </svg>
                       Print Order Slip
                     </button>
                     <button
-                      onClick={() => openShipStation(selectedOrder)}
-                      className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105"
+                      onClick={() => router.push(`/admin/shipping-labels/${selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}`)}
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-black transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105"
                       style={{
-                        backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                        border: '1px solid rgba(16, 185, 129, 0.4)'
+                        backgroundColor: '#EAB308',
+                        border: '1px solid #CA8A04'
                       }}
                     >
-                      <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                       </svg>
-                      Ship Order
+                      Create Shipping Label
                     </button>
                   </div>
                 </div>
-
-                {/* Proof Notes Section */}
-                {getProofNotes(selectedOrder) && (
-                  <div 
-                    className="rounded-lg p-4 mb-6"
-                    style={{
-                      backgroundColor: 'rgba(59, 130, 246, 0.08)',
-                      border: '1px solid rgba(59, 130, 246, 0.2)'
-                    }}
-                  >
-                    <h3 className="text-sm font-semibold text-blue-300 mb-3 flex items-center gap-2">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-1.586l-4 4z" />
-                      </svg>
-                      Proof Notes
-                    </h3>
-                    <div className="space-y-2">
-                      {getProofNotes(selectedOrder)!.map((note, index) => (
-                        <div key={index} className="text-sm">
-                          <div className="flex items-start gap-2">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                              note.type === 'admin' 
-                                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
-                                : 'bg-green-500/20 text-green-300 border border-green-500/30'
-                            }`}>
-                              {note.type === 'admin' ? 'Admin' : 'Customer'}
-                            </span>
-                            {note.proofTitle && (
-                              <span className="text-xs text-gray-400">({note.proofTitle})</span>
-                            )}
-                          </div>
-                          <p className="text-gray-300 mt-1 ml-0">{note.text}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Two-column layout */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Left Column - Order Details */}
                   <div className="lg:col-span-2 space-y-6">
                     {/* Order Summary */}
-                    <div
-                      className="rounded-lg p-6"
-                      style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)'
-                      }}
-                    >
+                    <div className="glass-container p-6">
                       <div className="flex justify-between items-start mb-6">
                         <h3 className="text-lg font-semibold text-white">Order Summary</h3>
                         <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.financialStatus)}`}>
                           {selectedOrder.financialStatus}
                         </span>
+                      </div>
+
+                      {/* Shipping Choice Section - Inside Order Summary */}
+                      <div className="mb-6 p-4 rounded-lg" style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)'
+                      }}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                          <span className="text-sm font-medium text-white">Shipping Choice</span>
+                        </div>
+                        <p className="text-sm text-gray-300 ml-6">UPS Ground (2-3 Days)</p>
                       </div>
 
                       {/* Order Items - Enhanced */}
@@ -1792,7 +1382,7 @@ export default function AdminOrders() {
                                       <div className="flex flex-col">
                                         <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Material</span>
                                         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-green-300"
-                                          style={{ backgroundColor: 'rgba(34, 197, 94, 0.2)', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
+                                          style={{ backgroundColor: 'rgba(145, 200, 72, 0.2)', border: '1px solid rgba(145, 200, 72, 0.3)' }}>
                                           {selections.material.displayValue}
                                         </span>
                                       </div>
@@ -1862,145 +1452,123 @@ export default function AdminOrders() {
                         })}
                       </div>
 
-                      {/* Order Totals - Enhanced */}
-                      <div className="pt-4 space-y-3">
-                        <div className="grid grid-cols-2 gap-4 pb-3 border-b border-gray-700 border-opacity-30">
-                          <div>
-                            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Items</p>
-                            <p className="text-sm text-white">{selectedOrder.items.length} items</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Total Quantity</p>
-                            <p className="text-sm text-white">{selectedOrder.items.reduce((sum: number, item: any) => sum + item.quantity, 0)} units</p>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-400">Subtotal</span>
-                            <span className="text-white">{formatCurrency(selectedOrder.subtotalPrice || selectedOrder.totalPrice)}</span>
-                          </div>
-                          {selectedOrder.totalTax && selectedOrder.totalTax > 0 && (
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-400">Tax</span>
-                              <span className="text-white">{formatCurrency(selectedOrder.totalTax)}</span>
-                            </div>
-                          )}
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-400">Shipping</span>
-                            <span className="text-white">Free</span>
-                          </div>
-                          <div className="flex justify-between text-lg font-semibold pt-3 border-t border-gray-700 border-opacity-30">
-                            <span className="text-white">Total</span>
-                            <span className="text-green-400">{formatCurrency(selectedOrder.totalPrice)}</span>
-                          </div>
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div className="flex gap-3 pt-4">
-                          {/* View/Send Proofs button - only show if there are proofs */}
-                          {((selectedOrder.proofs && selectedOrder.proofs.length > 0) || newProofsCount[selectedOrder.id] > 0) && (
-                            <button
-                              onClick={() => {
-                                // Check if there are NEW proofs that haven't been sent
-                                const hasNewProofs = newProofsCount[selectedOrder.id] > 0;
-                                
-                                if (hasNewProofs) {
-                                  // There are new proofs, send them
-                                  handleSendProofs(selectedOrder.id);
-                                } else if (selectedOrder.proof_status === 'awaiting_approval' || selectedOrder.proof_sent_at) {
-                                  // Already sent, just view proofs
-                                  window.open(`/proofs?orderId=${selectedOrder.id}`, '_blank');
-                                } else {
-                                  // Not sent yet, send proofs
-                                  handleSendProofs(selectedOrder.id);
-                                }
-                              }}
-                              disabled={sendingProofs}
-                              className="flex-1 inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer hover:scale-105"
-                              style={{
-                                backgroundColor: (newProofsCount[selectedOrder.id] > 0)
-                                  ? 'rgba(34, 197, 94, 0.2)' // Green for send proofs
-                                  : (selectedOrder.proof_status === 'awaiting_approval' || selectedOrder.proof_sent_at)
-                                    ? 'rgba(59, 130, 246, 0.2)' // Blue for view proofs
-                                    : 'rgba(34, 197, 94, 0.2)', // Green for send proofs
-                                border: (newProofsCount[selectedOrder.id] > 0)
-                                  ? '1px solid rgba(34, 197, 94, 0.4)' // Green for send proofs
-                                  : (selectedOrder.proof_status === 'awaiting_approval' || selectedOrder.proof_sent_at)
-                                    ? '1px solid rgba(59, 130, 246, 0.4)' // Blue for view proofs
-                                    : '1px solid rgba(34, 197, 94, 0.4)' // Green for send proofs
-                              }}
-                            >
-                              {sendingProofs ? (
-                                <>
-                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                  Sending...
-                                </>
-                              ) : (newProofsCount[selectedOrder.id] > 0) ? (
-                                <>
-                                  <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                                  </svg>
-                                  Send Proofs
-                                </>
-                              ) : (selectedOrder.proof_status === 'awaiting_approval' || selectedOrder.proof_sent_at) ? (
-                                <>
-                                  <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                  </svg>
-                                  View Proofs
-                                </>
-                              ) : (
-                                <>
-                                  <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                                  </svg>
-                                  Send Proofs
-                                </>
-                              )}
-                            </button>
-                          )}
-                          
+                      {/* Order Summary Actions */}
+                      <div className="grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-gray-700 border-opacity-30">
+                        {/* Show Send Proofs if proofs haven't been sent, otherwise show View Proofs */}
+                        {!selectedOrder.proof_sent_at && selectedOrder.proofs && selectedOrder.proofs.length > 0 ? (
                           <button
-                            onClick={() => openShipStation(selectedOrder)}
-                            className={`${(selectedOrder.proofs && selectedOrder.proofs.length > 0) || newProofsCount[selectedOrder.id] > 0 ? 'flex-1' : 'w-full'} inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105`}
+                            onClick={async () => {
+                              setSendingProofs(true);
+                              try {
+                                await handleSendProofs(selectedOrder.id);
+                                setProofsSent(prev => ({ ...prev, [selectedOrder.id]: true }));
+                                setNewProofsCount(prev => ({ ...prev, [selectedOrder.id]: 0 }));
+                              } catch (error) {
+                                console.error('Failed to send proofs:', error);
+                              } finally {
+                                setSendingProofs(false);
+                              }
+                            }}
+                            disabled={sendingProofs}
+                            className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                             style={{
-                              backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                              border: '1px solid rgba(16, 185, 129, 0.4)'
+                              backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                              border: '1px solid rgba(34, 197, 94, 0.4)'
+                            }}
+                          >
+                            {sendingProofs ? (
+                              <>
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Sending...
+                              </>
+                            ) : (
+                              <>
+                                <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                </svg>
+                                Send Proofs
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={async () => {
+                              if (selectedOrder.proofs && selectedOrder.proofs.length > 0) {
+                                // Open proof viewer/gallery
+                                window.open(selectedOrder.proofs[0].proofUrl, '_blank');
+                              }
+                            }}
+                            disabled={!selectedOrder.proofs || selectedOrder.proofs.length === 0}
+                            className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                            style={{
+                              backgroundColor: selectedOrder.proofs && selectedOrder.proofs.length > 0 ? 'rgba(59, 130, 246, 0.2)' : 'rgba(75, 85, 99, 0.2)',
+                              border: `1px solid ${selectedOrder.proofs && selectedOrder.proofs.length > 0 ? 'rgba(59, 130, 246, 0.4)' : 'rgba(75, 85, 99, 0.4)'}`
                             }}
                           >
                             <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
-                            Ship Order
+                            View Proofs
                           </button>
-                        </div>
+                        )}
+
+                        <button
+                          onClick={() => router.push(`/admin/shipping-labels/${selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}`)}
+                          className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-black transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105"
+                          style={{
+                            backgroundColor: '#EAB308',
+                            border: '1px solid #CA8A04'
+                          }}
+                        >
+                          <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                          Create Shipping Label
+                        </button>
                       </div>
                     </div>
 
                     {/* Proof Upload Section */}
-                    <div
-                      className="rounded-lg p-6"
-                      style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)'
-                      }}
-                    >
-                      <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                        <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                        Design Proofs
-                      </h3>
+                    <div className="glass-container p-6">
+                      <div className="flex justify-between items-start mb-4">
+                        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                          <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                          Design Proofs
+                        </h3>
+                        
+                        {/* Cut Lines Selection - Moved to top right */}
+                        <div className="flex items-center gap-3">
+                          <span className="text-gray-400 text-sm">Include cut lines in proofs:</span>
+                          <div className="flex gap-2">
+                            <button
+                              className="px-3 py-1 rounded-full text-xs font-medium transition-all border flex items-center gap-2 bg-green-500/20 text-green-300 border-green-400/50"
+                            >
+                              <div className="w-4 h-0.5" style={{ backgroundColor: '#91c848' }}></div>
+                              Green Cut Line
+                            </button>
+                            <button
+                              className="px-3 py-1 rounded-full text-xs font-medium transition-all border flex items-center gap-2 bg-gray-600/20 text-gray-500 border-gray-600/50"
+                            >
+                              <div className="w-4 h-0.5" style={{ backgroundColor: '#9ca3af' }}></div>
+                              Grey Cut Line
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      
                       <ProofUpload
                         orderId={selectedOrder.id}
                         proofStatus={selectedOrder.proof_status}
                         existingProofs={selectedOrder.proofs}
                         isAdmin={true}
+                        orderItems={selectedOrder.items}
+                        hideCutLinesSection={true}
                         onProofUploaded={(proof) => {
                           console.log('Proof uploaded:', proof);
                           // Refetch data to get updated proof information
@@ -2019,6 +1587,12 @@ export default function AdminOrders() {
                           } else if (proof.replaced) {
                             // Just refetch for replacements since proof ID stays the same
                             // The refetch above will handle the update
+                          } else if (proof.sent) {
+                            // Proofs were sent - refetch will handle the status updates
+                            // Reset new proofs count since they've been sent
+                            setNewProofsCount(prev => ({ ...prev, [selectedOrder.id]: 0 }));
+                            // Mark proofs as sent in local state
+                            setProofsSent(prev => ({ ...prev, [selectedOrder.id]: true }));
                           } else {
                             // Add new proof to local state
                             setSelectedOrder(prev => {
@@ -2042,13 +1616,7 @@ export default function AdminOrders() {
                   {/* Right Column - Customer Info */}
                   <div className="space-y-6">
                     {/* Customer Information */}
-                    <div
-                      className="rounded-lg p-6"
-                      style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)'
-                      }}
-                    >
+                    <div className="glass-container p-6">
                       <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                         <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -2114,13 +1682,7 @@ export default function AdminOrders() {
 
                     {/* Shipping Address */}
                     {selectedOrder.shippingAddress && (
-                      <div
-                        className="rounded-lg p-6"
-                        style={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                          border: '1px solid rgba(255, 255, 255, 0.08)'
-                        }}
-                      >
+                      <div className="glass-container p-6">
                         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                           <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -2129,57 +1691,49 @@ export default function AdminOrders() {
                           Shipping Address
                         </h3>
                         <div className="text-sm text-gray-300 space-y-1">
-                          <p className="font-medium text-white">{selectedOrder.shippingAddress.first_name} {selectedOrder.shippingAddress.last_name}</p>
-                          <p>{selectedOrder.shippingAddress.address1}</p>
-                          {selectedOrder.shippingAddress.address2 && <p>{selectedOrder.shippingAddress.address2}</p>}
-                          <p>{selectedOrder.shippingAddress.city}, {selectedOrder.shippingAddress.province} {selectedOrder.shippingAddress.zip}</p>
-                          <p>{selectedOrder.shippingAddress.country}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Billing Address */}
-                    {selectedOrder.billingAddress && (
-                      <div
-                        className="rounded-lg p-6"
-                        style={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                          border: '1px solid rgba(255, 255, 255, 0.08)'
-                        }}
-                      >
-                        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                          <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                          </svg>
-                          Billing Address
-                        </h3>
-                        <div className="text-sm text-gray-300 space-y-1">
-                          {typeof selectedOrder.billingAddress === 'object' ? (
-                            <>
-                              <p className="font-medium text-white">
-                                {selectedOrder.billingAddress.first_name} {selectedOrder.billingAddress.last_name}
-                              </p>
-                              <p>{selectedOrder.billingAddress.address1}</p>
-                              {selectedOrder.billingAddress.address2 && <p>{selectedOrder.billingAddress.address2}</p>}
-                              <p>{selectedOrder.billingAddress.city}, {selectedOrder.billingAddress.province} {selectedOrder.billingAddress.zip}</p>
-                              <p>{selectedOrder.billingAddress.country}</p>
-                            </>
-                          ) : (
-                            <p className="text-gray-400 italic">Same as shipping address</p>
+                          {(selectedOrder.shippingAddress.first_name || selectedOrder.shippingAddress.last_name) && (
+                            <p className="font-medium text-white">
+                              {selectedOrder.shippingAddress.first_name} {selectedOrder.shippingAddress.last_name}
+                            </p>
+                          )}
+                          {selectedOrder.shippingAddress.company && (
+                            <p className="text-gray-300">{selectedOrder.shippingAddress.company}</p>
+                          )}
+                          {(selectedOrder.shippingAddress.address1 || selectedOrder.shippingAddress.line1) && (
+                            <p>{selectedOrder.shippingAddress.address1 || selectedOrder.shippingAddress.line1}</p>
+                          )}
+                          {(selectedOrder.shippingAddress.address2 || selectedOrder.shippingAddress.line2) && (
+                            <p>{selectedOrder.shippingAddress.address2 || selectedOrder.shippingAddress.line2}</p>
+                          )}
+                          {(selectedOrder.shippingAddress.city || selectedOrder.shippingAddress.province || selectedOrder.shippingAddress.state || selectedOrder.shippingAddress.zip || selectedOrder.shippingAddress.postal_code) && (
+                            <p>
+                              {[
+                                selectedOrder.shippingAddress.city,
+                                selectedOrder.shippingAddress.province || selectedOrder.shippingAddress.state,
+                                selectedOrder.shippingAddress.zip || selectedOrder.shippingAddress.postal_code
+                              ].filter(Boolean).join(', ')}
+                            </p>
+                          )}
+                          {selectedOrder.shippingAddress.country && (
+                            <p>{selectedOrder.shippingAddress.country === 'US' ? 'United States' : selectedOrder.shippingAddress.country}</p>
+                          )}
+                          {selectedOrder.shippingAddress.phone && (
+                            <p className="text-sm text-gray-400 flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                              </svg>
+                              {selectedOrder.shippingAddress.phone}
+                            </p>
                           )}
                         </div>
                       </div>
                     )}
 
+
+
                     {/* Order Notes */}
                     {selectedOrder.orderNote && (
-                      <div
-                        className="rounded-lg p-6"
-                        style={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                          border: '1px solid rgba(255, 255, 255, 0.08)'
-                        }}
-                      >
+                      <div className="glass-container p-6">
                         <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                           <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
@@ -2191,13 +1745,7 @@ export default function AdminOrders() {
                     )}
 
                     {/* Order Timeline */}
-                    <div
-                      className="rounded-lg p-6"
-                      style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)'
-                      }}
-                    >
+                    <div className="glass-container p-6">
                       <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                         <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -2282,75 +1830,9 @@ export default function AdminOrders() {
           </div>
         </div>
 
-        {/* Proof Status Tooltip */}
-        {hoveredOrderId && (
-          <div
-            className="fixed z-50 pointer-events-none"
-            style={{
-              left: `${tooltipPosition.x}px`,
-              top: `${tooltipPosition.y}px`,
-              transform: 'translate(-50%, -100%)'
-            }}
-          >
-            <div
-              className="rounded-lg p-3 shadow-xl max-w-xs"
-              style={{
-                backgroundColor: 'rgba(3, 1, 64, 0.95)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                backdropFilter: 'blur(10px)'
-              }}
-            >
-              {(() => {
-                const order = filteredOrders.find(o => o.id === hoveredOrderId) || selectedOrder;
-                const notes = getProofNotes(order);
-                
-                if (!notes || notes.length === 0) {
-                  return (
-                    <div className="text-sm text-gray-300">
-                      No proof notes available
-                    </div>
-                  );
-                }
-                
-                return (
-                  <div className="space-y-2">
-                    <div className="text-xs font-semibold text-blue-300 mb-2">Proof Notes:</div>
-                    {notes.map((note, index) => (
-                      <div key={index} className="text-sm">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
-                            note.type === 'admin' 
-                              ? 'bg-purple-500/20 text-purple-300' 
-                              : 'bg-green-500/20 text-green-300'
-                          }`}>
-                            {note.type === 'admin' ? 'Admin' : 'Customer'}
-                          </span>
-                          {note.proofTitle && (
-                            <span className="text-xs text-gray-400">({note.proofTitle})</span>
-                          )}
-                        </div>
-                        <p className="text-gray-300 text-xs leading-relaxed">{note.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-              
-              {/* Tooltip Arrow */}
-              <div
-                className="absolute top-full left-1/2 transform -translate-x-1/2"
-                style={{
-                  width: 0,
-                  height: 0,
-                  borderLeft: '6px solid transparent',
-                  borderRight: '6px solid transparent',
-                  borderTop: '6px solid rgba(3, 1, 64, 0.95)'
-                }}
-              ></div>
-            </div>
-          </div>
-        )}
+
+
       </div>
-    </Layout>
+    </AdminLayout>
   );
 } 

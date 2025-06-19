@@ -2,13 +2,14 @@ require('dotenv').config({ path: '../.env.local' });
 require('dotenv').config({ path: './.env' });
 require('dotenv').config();
 
-const { ApolloServer, gql } = require('apollo-server-express');
+const { ApolloServer, gql, AuthenticationError } = require('apollo-server-express');
 const express = require('express');
 const cors = require('cors');
 const uploadRoutes = require('./upload-routes');
 const supabaseClient = require('./supabase-client');
 const stripeClient = require('./stripe-client');
 const stripeWebhookHandlers = require('./stripe-webhook-handlers');
+const easyPostClient = require('./easypost-client');
 
 // Initialize Express app
 const app = express();
@@ -82,8 +83,11 @@ const typeDefs = gql`
     # Customer order queries
     getUserOrders(userId: ID!): [CustomerOrder]
     getOrderById(id: ID!): CustomerOrder
+    getOrderByNumber(orderNumber: String!): CustomerOrder
     claimGuestOrders(userId: ID!, email: String!): ClaimResult
     getAllOrders: [CustomerOrder]
+    getAllCustomers: [Customer!]!
+    getAnalyticsData(timeRange: String): AnalyticsData
   }
 
   type Mutation {
@@ -99,7 +103,7 @@ const typeDefs = gql`
     updateProofFileByCustomer(orderId: ID!, proofId: ID!, newFileUrl: String!, originalFileName: String): CustomerOrder
     updateOrderFileByCustomer(orderId: ID!, newFileUrl: String!, originalFileName: String): CustomerOrder
     removeProof(orderId: ID!, proofId: ID!): CustomerOrder
-    addProofNotes(orderId: ID!, proofId: ID!, adminNotes: String!, customerNotes: String): CustomerOrder
+    addProofNotes(orderId: ID!, proofId: ID!, adminNotes: String, customerNotes: String): CustomerOrder
     approveProof(orderId: ID!, proofId: ID!, adminNotes: String): CustomerOrder
     requestProofChanges(orderId: ID!, proofId: ID!, adminNotes: String!): CustomerOrder
     sendProofs(orderId: ID!): CustomerOrder
@@ -107,14 +111,28 @@ const typeDefs = gql`
     # Stripe mutations
     createStripeCheckoutSession(input: StripeCheckoutInput!): StripeCheckoutResult
     processStripeCartOrder(input: CartOrderInput!): StripeOrderProcessResult
+    
+    # EasyPost shipping mutations
+    createEasyPostShipment(orderId: ID!, packageDimensions: PackageDimensionsInput): EasyPostShipmentResult
+    buyEasyPostLabel(shipmentId: String!, rateId: String!, insurance: String): EasyPostLabelResult
+    trackEasyPostShipment(trackingCode: String!): EasyPostTrackingResult
   }
 
   type Customer {
-    id: ID
-    email: String
-    first_name: String
-    last_name: String
-    phone: String
+    id: ID!
+    email: String!
+    firstName: String
+    lastName: String
+    city: String
+    state: String
+    country: String
+    totalOrders: Int!
+    totalSpent: Float!
+    averageOrderValue: Float!
+    marketingOptIn: Boolean!
+    lastOrderDate: String
+    firstOrderDate: String
+    orders: [CustomerOrder!]!
   }
 
   type Address {
@@ -306,6 +324,13 @@ const typeDefs = gql`
     trackingUrl: String
   }
 
+  input PackageDimensionsInput {
+    length: Float!
+    width: Float!
+    height: Float!
+    weight: Float!
+  }
+
   # Stripe types
   type StripeCheckoutResult {
     success: Boolean!
@@ -323,6 +348,89 @@ const typeDefs = gql`
     customerOrder: CustomerOrder
     message: String
     errors: [String]
+  }
+
+  # EasyPost Types
+  type EasyPostShipmentResult {
+    success: Boolean!
+    shipment: EasyPostShipment
+    error: String
+  }
+
+  type EasyPostShipment {
+    id: String!
+    rates: [EasyPostRate!]!
+    to_address: EasyPostAddress
+    from_address: EasyPostAddress
+    parcel: EasyPostParcel
+    reference: String
+  }
+
+  type EasyPostRate {
+    id: String!
+    carrier: String!
+    service: String!
+    rate: String!
+    currency: String!
+    delivery_days: Int
+    delivery_date: String
+    delivery_date_guaranteed: Boolean
+  }
+
+  type EasyPostAddress {
+    name: String
+    company: String
+    street1: String
+    street2: String
+    city: String
+    state: String
+    zip: String
+    country: String
+    phone: String
+    email: String
+  }
+
+  type EasyPostParcel {
+    length: Float
+    width: Float
+    height: Float
+    weight: Float
+  }
+
+  type EasyPostLabelResult {
+    success: Boolean!
+    shipment: EasyPostPurchasedShipment
+    error: String
+  }
+
+  type EasyPostPurchasedShipment {
+    id: String!
+    tracking_code: String
+    postage_label: EasyPostLabel
+    selected_rate: EasyPostRate
+    tracker: EasyPostTracker
+  }
+
+  type EasyPostLabel {
+    id: String!
+    label_url: String!
+    label_file_type: String
+    label_size: String
+  }
+
+  type EasyPostTracker {
+    id: String!
+    tracking_code: String!
+    carrier: String!
+    public_url: String
+    status: String
+    est_delivery_date: String
+  }
+
+  type EasyPostTrackingResult {
+    success: Boolean!
+    tracker: EasyPostTracker
+    error: String
   }
 
   input StripeCheckoutInput {
@@ -349,6 +457,50 @@ const typeDefs = gql`
     proofPublicId: String!
     proofTitle: String
     adminNotes: String
+  }
+
+  type AnalyticsData {
+    summary: SummaryMetrics
+    dailySales: [DailySalesData]
+    proofMetrics: ProofMetrics
+    productPerformance: ProductPerformance
+  }
+
+  type SummaryMetrics {
+    totalRevenue: Float
+    totalOrders: Int
+    averageOrderValue: Float
+    uniqueCustomers: Int
+    revenueGrowth: Float
+    conversionRate: Float
+  }
+
+  type DailySalesData {
+    date: String
+    revenue: Float
+    orders: Int
+    averageOrderValue: Float
+  }
+
+  type ProofMetrics {
+    avgProofSendTime: Float
+    avgProofAcceptTime: Float
+    proofApprovalRate: Float
+    proofChangesRate: Float
+    totalProofs: Int
+    proofsApproved: Int
+    proofsWithChanges: Int
+  }
+
+  type ProductPerformance {
+    topProductsByRevenue: [ProductStats]
+  }
+
+  type ProductStats {
+    name: String
+    revenue: Float
+    quantity: Int
+    orders: Int
   }
 `;
 
@@ -584,6 +736,99 @@ const resolvers = {
       }
     },
 
+    // Get order by number resolver
+    getOrderByNumber: async (_, { orderNumber }) => {
+      try {
+        console.log('🔍 getOrderByNumber called with orderNumber:', orderNumber);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Supabase client not ready');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        const { data: orders, error } = await client
+          .from('orders_main')
+          .select(`
+            *,
+            items:order_items_new(*)
+          `)
+          .eq('order_number', orderNumber)
+          .single();
+
+        if (error) {
+          console.error('❌ Error fetching order by number:', error);
+          throw new Error(`Failed to fetch order: ${error.message}`);
+        }
+
+        if (!orders) {
+          console.log('❌ No order found with orderNumber:', orderNumber);
+          return null;
+        }
+
+        console.log('✅ Order found:', orders);
+        
+        // Map the order to match GraphQL schema (same as getAllOrders)
+        return {
+          id: String(orders.id),
+          userId: orders.user_id ? String(orders.user_id) : null,
+          guestEmail: orders.guest_email,
+          stripePaymentIntentId: orders.stripe_payment_intent_id,
+          stripeCheckoutSessionId: orders.stripe_session_id,
+          orderNumber: orders.order_number,
+          orderStatus: orders.order_status || 'Processing',
+          fulfillmentStatus: orders.fulfillment_status || 'unfulfilled',
+          financialStatus: orders.financial_status || 'pending',
+          trackingNumber: orders.tracking_number,
+          trackingCompany: orders.tracking_company,
+          trackingUrl: orders.tracking_url,
+          subtotalPrice: Number(orders.subtotal_price) || 0,
+          totalTax: Number(orders.total_tax) || 0,
+          totalPrice: Number(orders.total_price) || 0,
+          currency: orders.currency || 'USD',
+          customerFirstName: orders.customer_first_name,
+          customerLastName: orders.customer_last_name,
+          customerEmail: orders.customer_email,
+          customerPhone: orders.customer_phone,
+          shippingAddress: orders.shipping_address,
+          billingAddress: orders.billing_address,
+          orderTags: orders.order_tags,
+          orderNote: orders.order_note,
+          orderCreatedAt: orders.order_created_at,
+          orderUpdatedAt: orders.order_updated_at,
+          createdAt: orders.created_at,
+          updatedAt: orders.updated_at,
+          proof_status: orders.proof_status,
+          proof_sent_at: orders.proof_sent_at,
+          proof_link: orders.proof_link,
+          proofs: orders.proofs || [],
+          // Map items
+          items: (orders.items || []).map(item => ({
+            id: String(item.id),
+            customerOrderId: String(orders.id),
+            stripeLineItemId: item.stripe_line_item_id,
+            productId: String(item.product_id || 'custom-product'),
+            productName: String(item.product_name || 'Custom Product'),
+            productCategory: item.product_category,
+            sku: item.sku,
+            quantity: Number(item.quantity) || 1,
+            unitPrice: Number(item.unit_price) || 0,
+            totalPrice: Number(item.total_price) || 0,
+            calculatorSelections: item.calculator_selections || {},
+            customFiles: Array.isArray(item.custom_files) ? item.custom_files : [],
+            customerNotes: item.customer_notes,
+            instagramHandle: item.instagram_handle,
+            instagramOptIn: item.instagram_opt_in,
+            fulfillmentStatus: item.fulfillment_status,
+            createdAt: item.created_at,
+            updatedAt: item.updated_at
+          }))
+        };
+      } catch (error) {
+        console.error('❌ getOrderByNumber error:', error);
+        throw error;
+      }
+    },
+
     getOrderById: async (_, { id }) => {
       try {
         console.log('🔍 getOrderById called with id:', id);
@@ -731,6 +976,291 @@ const resolvers = {
         throw new Error(error.message);
       }
     },
+
+    getAllCustomers: async (parent, args, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        // Get all orders from orders_main with items
+        const client = supabaseClient.getServiceClient();
+        const { data: orders, error } = await client
+          .from('orders_main')
+          .select(`
+            *,
+            order_items_new(*)
+          `)
+          .order('order_created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Group orders by customer email
+        const customerMap = new Map();
+
+        orders.forEach(order => {
+          const email = order.customer_email?.toLowerCase();
+          if (!email) return;
+
+          if (!customerMap.has(email)) {
+            customerMap.set(email, {
+              id: email, // Use email as ID for now
+              email: order.customer_email,
+              firstName: order.customer_first_name,
+              lastName: order.customer_last_name,
+              city: order.shipping_address?.city || '',
+              state: order.shipping_address?.province || order.shipping_address?.state || '',
+              country: order.shipping_address?.country || 'US',
+              totalOrders: 0,
+              totalSpent: 0,
+              marketingOptIn: false,
+              orders: [],
+              lastOrderDate: null,
+              firstOrderDate: null
+            });
+          }
+
+          const customer = customerMap.get(email);
+          customer.totalOrders += 1;
+          customer.totalSpent += Number(order.total_price) || 0;
+          
+          // Check marketing opt-in from any order item
+          if (order.order_items_new) {
+            order.order_items_new.forEach(item => {
+              if (item.instagram_opt_in) {
+                customer.marketingOptIn = true;
+              }
+            });
+          }
+
+          // Track order dates
+          const orderDate = order.order_created_at || order.created_at;
+          if (!customer.firstOrderDate || new Date(orderDate) < new Date(customer.firstOrderDate)) {
+            customer.firstOrderDate = orderDate;
+          }
+          if (!customer.lastOrderDate || new Date(orderDate) > new Date(customer.lastOrderDate)) {
+            customer.lastOrderDate = orderDate;
+          }
+
+          // Update location from most recent order
+          if (order.shipping_address) {
+            customer.city = order.shipping_address.city || customer.city;
+            customer.state = order.shipping_address.province || order.shipping_address.state || customer.state;
+            customer.country = order.shipping_address.country || customer.country;
+          }
+
+          customer.orders.push(order);
+        });
+
+        // Convert to array and calculate averages
+        const customers = Array.from(customerMap.values()).map(customer => ({
+          ...customer,
+          averageOrderValue: customer.totalOrders > 0 ? customer.totalSpent / customer.totalOrders : 0
+        }));
+
+        return customers;
+      } catch (error) {
+        console.error('Error fetching customers:', error);
+        throw new Error('Failed to fetch customers');
+      }
+    },
+
+    // Analytics query with time-series data
+    getAnalyticsData: async (_, { timeRange = '30d' }, context) => {
+      try {
+        const client = supabaseClient.getServiceClient();
+        const { data: allOrders, error } = await client
+          .from('orders_main')
+          .select(`
+            *,
+            order_items_new(*)
+          `)
+          .order('order_created_at', { ascending: true });
+
+        if (error) throw error;
+
+        const orders = allOrders || [];
+        
+        // Calculate date range
+        const now = new Date();
+        let startDate = new Date();
+        
+        
+        switch (timeRange) {
+          case '7d':
+            startDate.setDate(now.getDate() - 7);
+            break;
+          case '30d':
+            startDate.setDate(now.getDate() - 30);
+            break;
+          case '90d':
+            startDate.setDate(now.getDate() - 90);
+            break;
+          case '1y':
+            startDate.setFullYear(now.getFullYear() - 1);
+            break;
+          default:
+            startDate.setDate(now.getDate() - 30);
+        }
+
+        // Filter orders by date range
+        const filteredOrders = orders.filter(order => {
+          const orderDate = new Date(order.order_created_at || order.created_at);
+          return orderDate >= startDate;
+        });
+
+        // Calculate daily sales data
+        const dailySalesMap = new Map();
+        const dailyOrdersMap = new Map();
+        
+        filteredOrders.forEach(order => {
+          const date = new Date(order.order_created_at || order.created_at).toISOString().split('T')[0];
+          
+          // Daily sales
+          if (!dailySalesMap.has(date)) {
+            dailySalesMap.set(date, 0);
+            dailyOrdersMap.set(date, 0);
+          }
+          dailySalesMap.set(date, dailySalesMap.get(date) + (order.total_price || 0));
+          dailyOrdersMap.set(date, dailyOrdersMap.get(date) + 1);
+        });
+
+        // Prepare daily sales data for chart
+        const dailySales = Array.from(dailySalesMap.entries())
+          .map(([date, revenue]) => ({
+            date,
+            revenue,
+            orders: dailyOrdersMap.get(date),
+            averageOrderValue: revenue / dailyOrdersMap.get(date)
+          }))
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        // Calculate unique customers
+        const uniqueCustomers = new Set(filteredOrders.map(o => o.customer_email)).size;
+
+        // Calculate proof metrics
+        let totalProofSendTime = 0;
+        let proofSendCount = 0;
+        let totalProofAcceptTime = 0;
+        let proofAcceptCount = 0;
+        let proofsApproved = 0;
+        let proofsWithChanges = 0;
+        let totalProofs = 0;
+
+        filteredOrders.forEach(order => {
+          if (order.proofs && order.proofs.length > 0) {
+            // Time to send proof (order created to proof sent)
+            if (order.proof_sent_at) {
+              const orderDate = new Date(order.order_created_at || order.created_at);
+              const proofSentDate = new Date(order.proof_sent_at);
+              const hoursDiff = (proofSentDate.getTime() - orderDate.getTime()) / (1000 * 60 * 60);
+              if (hoursDiff > 0 && hoursDiff < 720) { // Exclude outliers over 30 days
+                totalProofSendTime += hoursDiff;
+                proofSendCount++;
+              }
+            }
+
+            // Analyze each proof
+            order.proofs.forEach(proof => {
+              totalProofs++;
+              
+              // Time to accept/respond to proof
+              if (proof.sentAt && (proof.approvedAt || proof.updatedAt)) {
+                const sentDate = new Date(proof.sentAt);
+                const responseDate = new Date(proof.approvedAt || proof.updatedAt);
+                const hoursDiff = (responseDate.getTime() - sentDate.getTime()) / (1000 * 60 * 60);
+                if (hoursDiff > 0 && hoursDiff < 720) { // Exclude outliers over 30 days
+                  totalProofAcceptTime += hoursDiff;
+                  proofAcceptCount++;
+                }
+              }
+
+              // Count approvals vs changes
+              if (proof.status === 'approved') {
+                proofsApproved++;
+              } else if (proof.status === 'changes_requested') {
+                proofsWithChanges++;
+              }
+            });
+          }
+        });
+
+        const avgProofSendTime = proofSendCount > 0 ? totalProofSendTime / proofSendCount : 0;
+        const avgProofAcceptTime = proofAcceptCount > 0 ? totalProofAcceptTime / proofAcceptCount : 0;
+        const proofApprovalRate = totalProofs > 0 ? (proofsApproved / totalProofs) * 100 : 0;
+        const proofChangesRate = totalProofs > 0 ? (proofsWithChanges / totalProofs) * 100 : 0;
+
+        // Product performance
+        const productStatsMap = new Map();
+        
+        filteredOrders.forEach(order => {
+          const items = order.order_items_new || [];
+          items.forEach(item => {
+            const productName = item.product_name || 'Unknown';
+            if (!productStatsMap.has(productName)) {
+              productStatsMap.set(productName, { revenue: 0, quantity: 0, orders: 0 });
+            }
+            const stats = productStatsMap.get(productName);
+            stats.revenue += item.total_price || 0;
+            stats.quantity += item.quantity || 0;
+            stats.orders += 1;
+          });
+        });
+
+        const topProductsByRevenue = Array.from(productStatsMap.entries())
+          .map(([name, stats]) => ({ name, ...stats }))
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 5);
+
+
+
+        // Summary metrics
+        const totalRevenue = filteredOrders.reduce((sum, order) => sum + (order.total_price || 0), 0);
+        const totalOrders = filteredOrders.length;
+        const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+        // Growth metrics (compare to previous period)
+        const previousPeriodStart = new Date(startDate);
+        const periodLength = now.getTime() - startDate.getTime();
+        previousPeriodStart.setTime(previousPeriodStart.getTime() - periodLength);
+
+        const previousPeriodOrders = orders.filter(order => {
+          const orderDate = new Date(order.order_created_at || order.created_at);
+          return orderDate >= previousPeriodStart && orderDate < startDate;
+        });
+
+        const previousRevenue = previousPeriodOrders.reduce((sum, order) => sum + (order.total_price || 0), 0);
+        const revenueGrowth = previousRevenue > 0 ? ((totalRevenue - previousRevenue) / previousRevenue) * 100 : 0;
+
+        return {
+          summary: {
+            totalRevenue,
+            totalOrders,
+            averageOrderValue,
+            uniqueCustomers,
+            revenueGrowth,
+            conversionRate: 2.9 // This would need actual visitor data
+          },
+          dailySales,
+          proofMetrics: {
+            avgProofSendTime, // in hours
+            avgProofAcceptTime, // in hours
+            proofApprovalRate,
+            proofChangesRate,
+            totalProofs,
+            proofsApproved,
+            proofsWithChanges
+          },
+          productPerformance: {
+            topProductsByRevenue
+          }
+        };
+      } catch (error) {
+        console.error('Error fetching analytics data:', error);
+        throw new Error('Failed to fetch analytics data');
+      }
+    }
   },
 
   Mutation: {
@@ -1581,6 +2111,165 @@ const resolvers = {
         console.error('Error removing proof:', error);
         throw new Error(error.message);
       }
+    },
+
+    // EasyPost Mutations
+    createEasyPostShipment: async (_, { orderId, packageDimensions }) => {
+      try {
+        if (!easyPostClient.isReady()) {
+          return {
+            success: false,
+            error: 'EasyPost service is not configured'
+          };
+        }
+
+        if (!supabaseClient.isReady()) {
+          return {
+            success: false,
+            error: 'Order service is currently unavailable'
+          };
+        }
+
+        // Get the order from Supabase
+        const client = supabaseClient.getServiceClient();
+        const { data: order, error: orderError } = await client
+          .from('orders_main')
+          .select(`
+            *,
+            order_items_new(*)
+          `)
+          .eq('id', orderId)
+          .single();
+
+        if (orderError || !order) {
+          return {
+            success: false,
+            error: `Order not found: ${orderError?.message || 'Unknown error'}`
+          };
+        }
+
+        // Use pre-verified EasyPost address ID for your business address
+        const fromAddressId = 'adr_31c828354d4a11f08f10ac1f6bc539aa';
+
+        // Format order for EasyPost
+        const shipmentData = easyPostClient.formatOrderForShipment(order, fromAddressId, packageDimensions);
+        
+        // Create shipment with EasyPost
+        const shipment = await easyPostClient.createShipment(shipmentData);
+
+        return {
+          success: true,
+          shipment: {
+            id: shipment.id,
+            rates: shipment.rates.map(rate => ({
+              id: rate.id,
+              carrier: rate.carrier,
+              service: rate.service,
+              rate: rate.rate,
+              currency: rate.currency,
+              delivery_days: rate.delivery_days,
+              delivery_date: rate.delivery_date,
+              delivery_date_guaranteed: rate.delivery_date_guaranteed
+            })),
+            to_address: shipment.to_address,
+            from_address: shipment.from_address,
+            parcel: shipment.parcel,
+            reference: shipment.reference
+          }
+        };
+      } catch (error) {
+        console.error('Error creating EasyPost shipment:', error);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+    },
+
+    buyEasyPostLabel: async (_, { shipmentId, rateId, insurance }) => {
+      try {
+        if (!easyPostClient.isReady()) {
+          return {
+            success: false,
+            error: 'EasyPost service is not configured'
+          };
+        }
+
+        // Find the rate object (in a real scenario, you might need to fetch the shipment first)
+        const rate = { id: rateId };
+        
+        // Buy the label
+        const boughtShipment = await easyPostClient.buyShipment(shipmentId, rate, insurance);
+
+        return {
+          success: true,
+          shipment: {
+            id: boughtShipment.id,
+            tracking_code: boughtShipment.tracking_code,
+            postage_label: {
+              id: boughtShipment.postage_label.id,
+              label_url: boughtShipment.postage_label.label_url,
+              label_file_type: boughtShipment.postage_label.label_file_type,
+              label_size: boughtShipment.postage_label.label_size
+            },
+            selected_rate: {
+              id: boughtShipment.selected_rate.id,
+              carrier: boughtShipment.selected_rate.carrier,
+              service: boughtShipment.selected_rate.service,
+              rate: boughtShipment.selected_rate.rate,
+              currency: boughtShipment.selected_rate.currency,
+              delivery_days: boughtShipment.selected_rate.delivery_days,
+              delivery_date: boughtShipment.selected_rate.delivery_date,
+              delivery_date_guaranteed: boughtShipment.selected_rate.delivery_date_guaranteed
+            },
+            tracker: {
+              id: boughtShipment.tracker.id,
+              tracking_code: boughtShipment.tracker.tracking_code,
+              carrier: boughtShipment.tracker.carrier,
+              public_url: boughtShipment.tracker.public_url,
+              status: boughtShipment.tracker.status,
+              est_delivery_date: boughtShipment.tracker.est_delivery_date
+            }
+          }
+        };
+      } catch (error) {
+        console.error('Error buying EasyPost label:', error);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+    },
+
+    trackEasyPostShipment: async (_, { trackingCode }) => {
+      try {
+        if (!easyPostClient.isReady()) {
+          return {
+            success: false,
+            error: 'EasyPost service is not configured'
+          };
+        }
+
+        const tracker = await easyPostClient.trackShipment(trackingCode);
+
+        return {
+          success: true,
+          tracker: {
+            id: tracker.id,
+            tracking_code: tracker.tracking_code,
+            carrier: tracker.carrier,
+            public_url: tracker.public_url,
+            status: tracker.status,
+            est_delivery_date: tracker.est_delivery_date
+          }
+        };
+      } catch (error) {
+        console.error('Error tracking EasyPost shipment:', error);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
     }
   }
 };
@@ -1692,11 +2381,32 @@ function formatOptionName(name) {
 const server = new ApolloServer({ 
   typeDefs, 
   resolvers,
-  context: ({ req }) => {
-    // You can add authentication context here later
+  context: async ({ req }) => {
+    // Extract auth token from header
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    let user = null;
+    if (token && supabaseClient.isReady()) {
+      try {
+        const client = supabaseClient.getServiceClient();
+        // Verify the JWT token with Supabase
+        const { data: { user: authUser }, error } = await client.auth.getUser(token);
+        
+        if (!error && authUser) {
+          user = authUser;
+          console.log('✅ Authenticated user:', authUser.email);
+        } else {
+          console.log('⚠️ Invalid auth token');
+        }
+      } catch (error) {
+        console.error('Auth verification error:', error);
+      }
+    }
+    
     return {
       supabase: supabaseClient,
-      stripe: stripeClient
+      stripe: stripeClient,
+      user
     };
   }
 });

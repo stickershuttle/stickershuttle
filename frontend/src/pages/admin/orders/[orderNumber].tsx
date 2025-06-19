@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import Layout from '@/components/Layout';
+import AdminLayout from '@/components/AdminLayout';
 import { getSupabase } from '../../../lib/supabase';
 
 // Admin check - add your admin email(s) here
@@ -53,11 +53,11 @@ export default function OrderDetail() {
 
   if (loading || !isAdmin) {
     return (
-      <Layout>
+      <AdminLayout>
         <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#030140' }}>
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-400"></div>
         </div>
-      </Layout>
+      </AdminLayout>
     );
   }
 

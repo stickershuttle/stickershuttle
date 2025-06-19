@@ -13,6 +13,8 @@ export default function UniversalHeader() {
   const [authError, setAuthError] = useState<boolean>(false);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [orderSearch, setOrderSearch] = useState<string>('');
+  const [profile, setProfile] = useState<any>(null);
+  const [showProfileDropdown, setShowProfileDropdown] = useState<boolean>(false);
   const router = useRouter();
 
   // Admin emails list - same as in admin dashboard
@@ -52,6 +54,23 @@ export default function UniversalHeader() {
               if (session?.user?.email && ADMIN_EMAILS.includes(session.user.email)) {
                 setIsAdmin(true);
               }
+              
+              // Fetch profile data if user exists
+              if (session?.user) {
+                try {
+                  const { data: profileData } = await supabase
+                    .from('user_profiles')
+                    .select('*')
+                    .eq('user_id', session.user.id)
+                    .single();
+                  
+                  if (profileData) {
+                    setProfile(profileData);
+                  }
+                } catch (profileError) {
+                  console.error('Error fetching profile:', profileError);
+                }
+              }
             }
           }
         } catch (error) {
@@ -82,10 +101,22 @@ export default function UniversalHeader() {
       const supabase = await getSupabase();
       await supabase.auth.signOut();
       setUser(null);
+      setProfile(null);
+      setShowProfileDropdown(false);
       router.push('/');
     } catch (error) {
       console.error('Error signing out:', error);
     }
+  };
+
+  const getUserDisplayName = () => {
+    if (user?.user_metadata?.first_name) {
+      return user.user_metadata.first_name;
+    }
+    if (user?.email) {
+      return user.email.split('@')[0];
+    }
+    return 'Astronaut';
   };
 
   const handleLinkClick = (href: string) => {
@@ -407,35 +438,165 @@ export default function UniversalHeader() {
             
             {/* Authentication Navigation - Show login/signup by default unless user verified */}
             {showAccountDashboard ? (
-              // Logged In and Verified - Show Account Dashboard
-              <>
-                <Link 
-                  href="/account/dashboard"
-                  className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 inline-block${router.pathname === '/account/dashboard' || router.asPath === '/account/dashboard' || router.pathname.startsWith('/account') ? ' active' : ''}`}
-                  style={(router.pathname === '/account/dashboard' || router.asPath === '/account/dashboard' || router.pathname.startsWith('/account')) ? {
-                    border: '0.5px solid #a855f7',
-                    background: 'rgba(168, 85, 247, 0.2)',
-                    boxShadow: '0 0 12px rgba(168, 85, 247, 0.48), 0 0 24px rgba(168, 85, 247, 0.32)',
-                    color: '#c084fc'
-                  } : {}}
+              // Logged In and Verified - Show Profile Dropdown
+              <div className="relative">
+                <button
+                  onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                  className="flex items-center gap-2 font-medium text-white transition-all duration-200 transform hover:scale-105"
+                  style={{ background: 'transparent', border: 'none' }}
+                  onBlur={() => setTimeout(() => setShowProfileDropdown(false), 200)}
                 >
-                  👨‍🚀 Account Dashboard
-                </Link>
-                {isAdmin && (
-                  <Link 
-                    href="/admin/orders"
-                    className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 inline-block${router.pathname === '/admin/orders' || router.asPath === '/admin/orders' || router.pathname.startsWith('/admin') ? ' active' : ''}`}
-                    style={(router.pathname === '/admin/orders' || router.asPath === '/admin/orders' || router.pathname.startsWith('/admin')) ? {
-                      border: '0.5px solid #f59e0b',
-                      background: 'rgba(245, 158, 11, 0.2)',
-                      boxShadow: '0 0 12px rgba(245, 158, 11, 0.48), 0 0 24px rgba(245, 158, 11, 0.32)',
-                      color: '#fbbf24'
-                    } : {}}
+                  {/* Profile Picture */}
+                  <div className="w-10 h-10 rounded-full overflow-hidden border border-white/15 transition-all duration-200 hover:border-white/40 hover:brightness-75">
+                    {profile?.profile_photo_url ? (
+                      <img 
+                        src={profile.profile_photo_url} 
+                        alt="Profile" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-base font-bold">
+                        {getUserDisplayName().charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Dropdown Arrow */}
+                  <svg 
+                    className={`w-4 h-4 transition-transform duration-200 ${showProfileDropdown ? 'rotate-180' : ''}`} 
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
                   >
-                    🛠️ Admin
-                  </Link>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Profile Dropdown */}
+                {showProfileDropdown && (
+                  <div 
+                    className="absolute top-full right-0 mt-2 w-64 rounded-xl shadow-2xl z-50"
+                    style={{
+                      backgroundColor: 'rgba(3, 1, 64, 0.95)',
+                      backdropFilter: 'blur(20px)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)'
+                    }}
+                  >
+                    <div className="p-4">
+                      {/* Profile Header */}
+                      <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/10">
+                        <div className="w-12 h-12 rounded-full overflow-hidden">
+                          {profile?.profile_photo_url ? (
+                            <img 
+                              src={profile.profile_photo_url} 
+                              alt="Profile" 
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-lg font-bold">
+                              {getUserDisplayName().charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="text-white font-semibold">{getUserDisplayName()}</h3>
+                          <p className="text-gray-300 text-sm">{user?.email}</p>
+                        </div>
+                      </div>
+
+                      {/* Menu Items */}
+                      <div className="space-y-2">
+                        <Link 
+                          href="/account/dashboard"
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                          onClick={() => setShowProfileDropdown(false)}
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                          </svg>
+                          <span>Dashboard</span>
+                        </Link>
+
+                        <Link 
+                          href="/account/dashboard?view=all-orders"
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                          onClick={() => setShowProfileDropdown(false)}
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span>My Orders</span>
+                        </Link>
+
+                        <Link 
+                          href="/account/dashboard?view=proofs"
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                          onClick={() => setShowProfileDropdown(false)}
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          <span>Proofs</span>
+                        </Link>
+
+                        <Link 
+                          href="/account/dashboard?view=design-vault"
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                          onClick={() => setShowProfileDropdown(false)}
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                          <span>Design Vault</span>
+                        </Link>
+
+                        <button
+                          onClick={() => {
+                            setShowProfileDropdown(false);
+                            // Add support functionality here
+                          }}
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white w-full text-left"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span>Get Support</span>
+                        </button>
+
+                        {isAdmin && (
+                          <Link 
+                            href="/admin/orders"
+                            className="flex items-center gap-3 p-3 rounded-lg hover:bg-amber-500/20 transition-colors duration-200 text-amber-300"
+                            onClick={() => setShowProfileDropdown(false)}
+                          >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <span>Admin Panel</span>
+                          </Link>
+                        )}
+
+                        <hr className="border-white/10 my-2" />
+
+                        <button
+                          onClick={() => {
+                            setShowProfileDropdown(false);
+                            handleSignOut();
+                          }}
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-red-500/20 transition-colors duration-200 text-red-300 w-full text-left"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                          </svg>
+                          <span>Sign Out</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 )}
-              </>
+              </div>
             ) : (
               // Default state - Show Login and Signup
               <>

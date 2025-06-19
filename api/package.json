@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@easypost/api": "^8.2.0",
     "@supabase/supabase-js": "^2.38.4",
     "apollo-server-express": "^3.13.0",
     "axios": "^1.10.0",

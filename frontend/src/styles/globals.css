@@ -83,3 +83,29 @@ h1 {
   animation: flip-in 0.6s ease-out forwards;
   transform-style: preserve-3d;
 }
+
+/* Banner gradient animation */
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  25% { background-position: 100% 50%; }
+  50% { background-position: 100% 100%; }
+  75% { background-position: 0% 100%; }
+}
+
+.banner-gradient:not([style*="url("]) {
+  animation: gradient-shift 8s ease-in-out infinite;
+}
+
+/* Progress tracker pulse animation */
+@keyframes subtlePulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+.subtle-pulse {
+  animation: subtlePulse 3s ease-in-out infinite;
+}

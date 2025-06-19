@@ -256,6 +256,26 @@ function Dashboard() {
     }
   }, [router]);
 
+  // Handle URL query parameters for view navigation
+  useEffect(() => {
+    if (router.query.view && router.query.view !== currentView) {
+      const requestedView = router.query.view as string;
+      const validViews: DashboardView[] = ['default', 'all-orders', 'financial', 'items-analysis', 'design-vault', 'proofs', 'order-details'];
+      
+      if (validViews.includes(requestedView as DashboardView)) {
+        setCurrentView(requestedView as DashboardView);
+      }
+    }
+  }, [router.query.view, currentView]);
+
+  // Helper function to update view and URL
+  const updateCurrentView = (view: DashboardView) => {
+    setCurrentView(view);
+    // Update URL to reflect the current view
+    const url = view === 'default' ? '/account/dashboard' : `/account/dashboard?view=${view}`;
+    router.push(url, undefined, { shallow: true });
+  };
+
   // Clear selected design image when navigating away from design vault
   useEffect(() => {
     if (currentView !== 'design-vault') {
@@ -310,16 +330,47 @@ function Dashboard() {
       return;
     }
     
-    // Skip profile fetch due to Supabase client version issues
-    // Profile data is optional for dashboard functionality
-    console.log('ℹ️ Skipping profile fetch due to Supabase compatibility issues');
-    
     try {
-      // Auto-fill contact form with user data (without profile data)
-      const displayName = (user as any)?.user_metadata?.first_name || 
-                         (user as any)?.email?.split('@')[0] || '';
+      console.log('👤 Fetching profile for user:', (user as any).id);
       
-      const userEmail = (user as any)?.email || '';
+      const supabase = await getSupabase();
+      
+      // Fetch from user_profiles table
+      const { data: profileData, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', (user as any).id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        console.error('❌ Error fetching profile:', error);
+      }
+
+      // Combine user metadata with profile data
+      const combinedProfile = {
+        id: (user as any).id,
+        email: (user as any).email,
+        first_name: (user as any).user_metadata?.first_name || '',
+        last_name: (user as any).user_metadata?.last_name || '',
+        phone: (user as any).user_metadata?.phone || '',
+        created_at: (user as any).created_at,
+        // Profile data from user_profiles table
+        profile_photo_url: profileData?.profile_photo_url || null,
+        banner_image_url: profileData?.banner_image_url || null,
+        profile_photo_public_id: profileData?.profile_photo_public_id || null,
+        banner_image_public_id: profileData?.banner_image_public_id || null,
+        display_name: profileData?.display_name || null,
+        bio: profileData?.bio || null
+      };
+      
+      console.log('✅ Profile data loaded:', combinedProfile);
+      setProfile(combinedProfile);
+
+      // Auto-fill contact form with user data
+      const displayName = combinedProfile.first_name || 
+                         combinedProfile.email?.split('@')[0] || '';
+      
+      const userEmail = combinedProfile.email || '';
 
       setContactFormData(prev => ({
         ...prev,
@@ -329,13 +380,400 @@ function Dashboard() {
       
       console.log('✅ Contact form pre-filled with user data');
     } catch (error) {
-      console.error('❌ Error setting up contact form:', error);
+      console.error('❌ Error fetching profile:', error);
+      setProfile(null);
     }
   };
 
+  const [uploadingProfilePhoto, setUploadingProfilePhoto] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [showBannerTemplates, setShowBannerTemplates] = useState(false);
+
   const handleProfilePictureClick = () => {
-    // TODO: Implement profile picture upload
-    alert('Profile picture upload coming soon! You\'ll need to add a profile_picture_url column to your Supabase profiles table and set up file storage.');
+    if (uploadingProfilePhoto) return;
+    
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        handleProfilePhotoUpload(file);
+      }
+    };
+    input.click();
+  };
+
+  const handleBannerClick = () => {
+    if (uploadingBanner) return;
+    
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        handleBannerUpload(file);
+      }
+    };
+    input.click();
+  };
+
+  const handleProfilePhotoUpload = async (file: File) => {
+    if (!user) return;
+    
+    try {
+      setUploadingProfilePhoto(true);
+      
+      // Validate file
+      const { validateFile } = await import('../../utils/cloudinary');
+      const validation = validateFile(file);
+      if (!validation.valid) {
+        alert(validation.error);
+        return;
+      }
+
+      // Upload to Cloudinary
+      const { uploadToCloudinary } = await import('../../utils/cloudinary');
+      const result = await uploadToCloudinary(file, undefined, undefined, 'profile-photos');
+
+      // Update Supabase profile
+      const supabase = await getSupabase();
+      const { error } = await supabase
+        .from('user_profiles')
+        .upsert({
+          user_id: (user as any).id,
+          profile_photo_url: result.secure_url,
+          profile_photo_public_id: result.public_id,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (error) {
+        console.error('Error updating profile:', error);
+        alert('Failed to update profile photo');
+        return;
+      }
+
+      // Update local profile state
+      setProfile((prev: any) => ({
+        ...prev,
+        profile_photo_url: result.secure_url,
+        profile_photo_public_id: result.public_id
+      }));
+
+      console.log('✅ Profile photo updated successfully');
+      
+    } catch (error) {
+      console.error('Error uploading profile photo:', error);
+      alert('Failed to upload profile photo');
+    } finally {
+      setUploadingProfilePhoto(false);
+    }
+  };
+
+  const handleBannerUpload = async (file: File) => {
+    if (!user) return;
+    
+    try {
+      setUploadingBanner(true);
+      
+      // Validate file
+      const { validateFile } = await import('../../utils/cloudinary');
+      const validation = validateFile(file);
+      if (!validation.valid) {
+        alert(validation.error);
+        return;
+      }
+
+      // Upload to Cloudinary
+      const { uploadToCloudinary } = await import('../../utils/cloudinary');
+      const result = await uploadToCloudinary(file, undefined, undefined, 'profile-banners');
+
+      // Update Supabase profile
+      const supabase = await getSupabase();
+      const { error } = await supabase
+        .from('user_profiles')
+        .upsert({
+          user_id: (user as any).id,
+          banner_image_url: result.secure_url,
+          banner_image_public_id: result.public_id,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (error) {
+        console.error('Error updating banner:', error);
+        alert('Failed to update banner image');
+        return;
+      }
+
+      // Update local profile state
+      setProfile((prev: any) => ({
+        ...prev,
+        banner_image_url: result.secure_url,
+        banner_image_public_id: result.public_id
+      }));
+
+      console.log('✅ Banner image updated successfully');
+      
+    } catch (error) {
+      console.error('Error uploading banner:', error);
+      alert('Failed to upload banner image');
+    } finally {
+      setUploadingBanner(false);
+    }
+  };
+
+  const handleRemoveBanner = async () => {
+    if (!user) return;
+    
+    // Check if there's actually a banner to remove
+    if (!profile?.banner_image_url && !profile?.banner_template) {
+      alert('No banner to remove');
+      return;
+    }
+    
+    setUploadingBanner(true);
+    
+    try {
+      // Update profile in Supabase to remove banner
+      const supabase = await getSupabase();
+      const { error } = await supabase
+        .from('user_profiles')
+        .upsert({
+          user_id: (user as any).id,
+          banner_image_url: null,
+          banner_image_public_id: null,
+          banner_template: null,
+          banner_template_id: null,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
+        });
+      
+      if (error) {
+        console.error('Error removing banner:', error);
+        alert(`Failed to remove banner: ${error.message}`);
+        return;
+      }
+      
+      // Update local profile state
+      setProfile((prev: any) => ({
+        ...prev,
+        banner_image_url: null,
+        banner_image_public_id: null,
+        banner_template: null,
+        banner_template_id: null
+      }));
+      
+      console.log('✅ Banner removed successfully');
+      
+    } catch (error) {
+      console.error('Banner removal failed:', error);
+      alert(`Failed to remove banner. Please try again. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setUploadingBanner(false);
+    }
+  };
+
+  const bannerTemplates = [
+    {
+      id: 1,
+      name: 'Ocean Waves',
+      style: {
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        backgroundSize: '400% 400%',
+        animation: 'gradient-shift 8s ease-in-out infinite'
+      }
+    },
+    {
+      id: 2,
+      name: 'Sunset Glow',
+      style: {
+        background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        backgroundSize: '400% 400%',
+        animation: 'gradient-shift 6s ease-in-out infinite'
+      }
+    },
+    {
+      id: 3,
+      name: 'Forest Mist',
+      style: {
+        background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+        backgroundSize: '400% 400%',
+        animation: 'gradient-shift 10s ease-in-out infinite'
+      }
+    },
+    {
+      id: 4,
+      name: 'Cosmic Purple',
+      style: {
+        background: 'radial-gradient(circle at 20% 80%, #120078 0%, #9d0191 50%, #fd5e53 100%)',
+        backgroundSize: '400% 400%',
+        animation: 'gradient-shift 12s ease-in-out infinite'
+      }
+    },
+    {
+      id: 5,
+      name: 'Golden Hour',
+      style: {
+        background: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+        backgroundSize: '400% 400%',
+        animation: 'gradient-shift 7s ease-in-out infinite'
+      }
+    },
+    {
+      id: 6,
+      name: 'Neon Cyber',
+      style: {
+        background: 'linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 100%)',
+        backgroundImage: `radial-gradient(circle at 25% 25%, #00ffff 0%, transparent 50%), 
+                         radial-gradient(circle at 75% 75%, #ff00ff 0%, transparent 50%)`,
+        backgroundSize: '400% 400%, 200% 200%',
+        animation: 'gradient-shift 9s ease-in-out infinite'
+      }
+    },
+    {
+      id: 7,
+      name: 'Aurora Borealis',
+      style: {
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #4facfe 100%)',
+        backgroundSize: '800% 800%',
+        animation: 'gradient-shift 15s ease-in-out infinite'
+      }
+    },
+    {
+      id: 8,
+      name: 'Mint Fresh',
+      style: {
+        background: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+        backgroundSize: '400% 400%',
+        animation: 'gradient-shift 8s ease-in-out infinite'
+      }
+    },
+    {
+      id: 9,
+      name: 'Fire Gradient',
+      style: {
+        background: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%)',
+        backgroundSize: '400% 400%',
+        animation: 'gradient-shift 6s ease-in-out infinite'
+      }
+    },
+    {
+      id: 10,
+      name: 'Deep Space',
+      style: {
+        background: 'radial-gradient(ellipse at center, #0f0f23 0%, #000000 70%)',
+        backgroundImage: `radial-gradient(circle at 20% 20%, rgba(255,255,255,0.1) 0%, transparent 20%),
+                         radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 0%, transparent 20%),
+                         radial-gradient(circle at 40% 40%, rgba(255,255,255,0.05) 0%, transparent 20%)`,
+        backgroundSize: '100% 100%, 200px 200px, 150px 150px, 100px 100px'
+      }
+    },
+    {
+      id: 11,
+      name: 'Electric Blue',
+      style: {
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)`,
+        backgroundSize: '400% 400%',
+        animation: 'gradient-shift 8s ease-in-out infinite'
+      }
+    },
+    {
+      id: 12,
+      name: 'Peachy Keen',
+      style: {
+        background: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+        backgroundImage: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2) 0%, transparent 50%)`,
+        backgroundSize: '400% 400%',
+        animation: 'gradient-shift 7s ease-in-out infinite'
+      }
+    },
+    {
+      id: 13,
+      name: 'Matrix Green',
+      style: {
+        background: 'linear-gradient(135deg, #134e5e 0%, #71b280 100%)',
+        backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(255,255,255,0.03) 10px, rgba(255,255,255,0.03) 20px)`,
+        backgroundSize: '400% 400%',
+        animation: 'gradient-shift 10s ease-in-out infinite'
+      }
+    },
+    {
+      id: 14,
+      name: 'Retro Wave',
+      style: {
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 20px, rgba(255,255,255,0.1) 20px, rgba(255,255,255,0.1) 40px)`,
+        backgroundSize: '400% 400%',
+        animation: 'gradient-shift 8s ease-in-out infinite'
+      }
+    },
+    {
+      id: 15,
+      name: 'Lavender Dreams',
+      style: {
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
+        backgroundImage: `radial-gradient(circle at 70% 70%, rgba(255,255,255,0.1) 0%, transparent 50%)`,
+        backgroundSize: '400% 400%',
+        animation: 'gradient-shift 12s ease-in-out infinite'
+      }
+    }
+  ];
+
+  const handleSelectBannerTemplate = async (template: any) => {
+    if (!user) return;
+    
+    setUploadingBanner(true);
+    setShowBannerTemplates(false);
+    
+    try {
+      // Create a CSS string for the template
+      const templateCSS = JSON.stringify(template.style);
+      
+      // Update profile in Supabase with template data
+      const supabase = await getSupabase();
+      const { error } = await supabase
+        .from('user_profiles')
+        .upsert({
+          user_id: (user as any).id,
+          banner_image_url: null, // Clear custom image
+          banner_image_public_id: null,
+          banner_template: templateCSS,
+          banner_template_id: template.id,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
+        });
+      
+      if (error) {
+        console.error('Error updating banner template:', error);
+        alert('Failed to apply template');
+        return;
+      }
+      
+      // Update local profile state
+      setProfile((prev: any) => ({
+        ...prev,
+        banner_image_url: null,
+        banner_image_public_id: null,
+        banner_template: templateCSS,
+        banner_template_id: template.id
+      }));
+      
+      console.log('✅ Banner template applied successfully');
+      
+    } catch (error) {
+      console.error('Banner template application failed:', error);
+      alert('Failed to apply template. Please try again.');
+    } finally {
+      setUploadingBanner(false);
+    }
   };
 
   const getUserDisplayName = () => {
@@ -1027,6 +1465,155 @@ function Dashboard() {
       URL.revokeObjectURL(stagedFile.preview);
       setStagedFile(null);
     }
+  };
+
+  // Order progress tracker function
+  const getOrderProgress = (status: string) => {
+    const steps = [
+      { 
+        id: 'building-proof', 
+        label: 'Building Proof', 
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+          </svg>
+        ),
+        statuses: ['Processing', 'Order Received', 'In Production']
+      },
+      { 
+        id: 'review-proof', 
+        label: 'Review Proof', 
+        icon: (
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+            <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+          </svg>
+        ),
+        statuses: ['Proof Review Needed', 'Reviewing Changes']
+      },
+      { 
+        id: 'printing', 
+        label: 'Printing', 
+        icon: (
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" />
+          </svg>
+        ),
+        statuses: ['Approved', 'Printing', 'In Production']
+      },
+      { 
+        id: 'shipped', 
+        label: 'Shipped', 
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          </svg>
+        ),
+        statuses: ['Shipped', 'In Transit']
+      },
+      { 
+        id: 'out-for-delivery', 
+        label: 'Out for Delivery', 
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0M15 17a2 2 0 104 0" />
+          </svg>
+        ),
+        statuses: ['Out for Delivery']
+      },
+      { 
+        id: 'delivered', 
+        label: 'Delivered', 
+        icon: (
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+        ),
+        statuses: ['Delivered']
+      }
+    ];
+
+    let currentStepIndex = 0;
+    
+    // Find current step based on status
+    steps.forEach((step, index) => {
+      if (step.statuses.includes(status)) {
+        currentStepIndex = index;
+      }
+    });
+
+    return { steps, currentStepIndex };
+  };
+
+  const renderOrderProgressTracker = (order: any) => {
+    const { steps, currentStepIndex } = getOrderProgress(order.status);
+    
+    return (
+      <div className="px-6 py-4 bg-white/5 border-t border-white/10">
+        <div className="relative flex items-start justify-between">
+          {/* Progress line background - perfectly centered through circle centers */}
+          <div 
+            className="absolute h-0.5 bg-gray-600 z-0" 
+            style={{ 
+              top: '16px', /* Center of 32px circles (16px from top) */
+              left: `calc(50% / ${steps.length})`, /* Start from center of first circle */
+              right: `calc(50% / ${steps.length})` /* End at center of last circle */
+            }}
+          ></div>
+          
+          {/* Active progress line with gradient - ends at center of current step */}
+          <div 
+            className="absolute h-0.5 transition-all duration-700 ease-in-out z-0"
+            style={{ 
+              top: '16px', /* Center of 32px circles (16px from top) */
+              left: `calc(50% / ${steps.length})`, /* Start from center of first circle */
+              width: currentStepIndex === 0 ? '0px' : 
+                `calc(${(currentStepIndex / (steps.length - 1)) * 100}% - ${(100 / steps.length)}% + ${(currentStepIndex / (steps.length - 1)) * (100 / steps.length * 2)}%)`,
+              background: 'linear-gradient(90deg, #f97316 0%, #fb923c 50%, #fdba74 100%)',
+              boxShadow: '0 0 8px rgba(249, 115, 22, 0.4), 0 0 16px rgba(249, 115, 22, 0.2)'
+            }}
+          ></div>
+          
+          {steps.map((step, index) => {
+            const isActive = index <= currentStepIndex;
+            const isCurrent = index === currentStepIndex;
+            
+            return (
+              <div key={step.id} className="flex flex-col items-center relative z-10 flex-1">
+                <div 
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+                    isCurrent 
+                      ? 'bg-orange-500 text-white border-2 border-orange-400 ring-2 ring-orange-400 ring-offset-2 ring-offset-transparent subtle-pulse' 
+                      : isActive 
+                        ? 'bg-orange-500 text-white border-2 border-orange-400' 
+                        : 'bg-gray-700 text-gray-400 border-2 border-gray-600'
+                  }`}
+                  title={step.label}
+                >
+                  {step.icon}
+                </div>
+                <span 
+                  className={`text-xs mt-2 text-center leading-tight w-16 ${
+                    isActive ? 'text-orange-300' : 'text-gray-500'
+                  }`}
+                  style={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    lineHeight: '1.2'
+                  }}
+                >
+                  {step.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   const renderMainContent = () => {
@@ -3393,8 +3980,9 @@ function Dashboard() {
               }, 0);
               
               return (
-                <div key={order.id} className="px-6 py-4 hover:bg-white/5 transition-colors duration-200">
-                  <div className="grid grid-cols-16 gap-6 items-center">
+                <div key={order.id}>
+                  <div className="px-6 py-4 hover:bg-white/5 transition-colors duration-200">
+                    <div className="grid grid-cols-16 gap-6 items-center">
                     
                     {/* Preview Column - Side by Side Images */}
                     <div className="col-span-2">
@@ -3579,7 +4167,11 @@ function Dashboard() {
                       </div>
                     </div>
                     
+                    </div>
                   </div>
+                  
+                  {/* Progress Tracker Subrow */}
+                  {renderOrderProgressTracker(order)}
                 </div>
               );
             })}
@@ -3898,35 +4490,154 @@ function Dashboard() {
             <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto max-w-sm sm:max-w-md md:max-w-full">
               {/* Header - Mission Control */}
               <div 
-                className="relative rounded-xl p-4 md:p-6 shadow-xl mb-6 overflow-hidden"
-                style={{
-                  backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591761/Banner-Homepage_s0zlpx.jpg)',
-                  backgroundSize: '120%',
-                  backgroundPosition: 'right 10%',
-                  backgroundRepeat: 'no-repeat',
-                  border: '1px solid rgba(255, 255, 255, 0.15)'
-                }}
+                className="relative rounded-xl p-4 md:p-6 shadow-xl mb-6 overflow-hidden cursor-pointer group banner-gradient"
+                style={
+                  profile?.banner_image_url 
+                    ? {
+                        backgroundImage: `url(${profile.banner_image_url})`,
+                        backgroundSize: '120%',
+                        backgroundPosition: 'right 10%',
+                        backgroundRepeat: 'no-repeat',
+                        border: '1px solid rgba(255, 255, 255, 0.15)'
+                      }
+                    : profile?.banner_template
+                      ? {
+                          ...JSON.parse(profile.banner_template),
+                          border: '1px solid rgba(255, 255, 255, 0.15)'
+                        }
+                      : {
+                          background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 25%, #ec4899 50%, #a855f7 75%, #ec4899 100%)',
+                          backgroundSize: '400% 400%',
+                          backgroundPosition: '0% 50%',
+                          backgroundRepeat: 'no-repeat',
+                          border: '1px solid rgba(255, 255, 255, 0.15)'
+                        }
+                }
+                onClick={handleBannerClick}
+                title="Click to change banner image"
               >
+                
+                {/* Grain texture overlay for default gradient */}
+                {!profile?.banner_image_url && (
+                  <div 
+                    className="absolute inset-0 opacity-30"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='7' cy='7' r='1'/%3E%3Ccircle cx='27' cy='7' r='1'/%3E%3Ccircle cx='47' cy='7' r='1'/%3E%3Ccircle cx='17' cy='17' r='1'/%3E%3Ccircle cx='37' cy='17' r='1'/%3E%3Ccircle cx='7' cy='27' r='1'/%3E%3Ccircle cx='27' cy='27' r='1'/%3E%3Ccircle cx='47' cy='27' r='1'/%3E%3Ccircle cx='17' cy='37' r='1'/%3E%3Ccircle cx='37' cy='37' r='1'/%3E%3Ccircle cx='7' cy='47' r='1'/%3E%3Ccircle cx='27' cy='47' r='1'/%3E%3Ccircle cx='47' cy='47' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+                      backgroundSize: '60px 60px'
+                    }}
+                  ></div>
+                )}
+                
                 {/* Dark overlay for text readability */}
-                <div className="absolute inset-0 bg-black/40"></div>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10">
+                <div className="absolute inset-0 bg-black/30 z-0"></div>
+                
+                {/* Upload indicator */}
+                {uploadingBanner && (
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-30">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-2 mx-auto"></div>
+                      <p className="text-white text-sm">Uploading banner...</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Hover overlay with action icons */}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center z-20 pointer-events-none">
+                  <div className="flex gap-4">
+                    {/* Upload/Change Banner Icon */}
+                    <div 
+                      className="p-3 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-200 cursor-pointer pointer-events-auto" 
+                      title="Change Banner"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBannerClick();
+                      }}
+                    >
+                      <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                    </div>
+                    
+                    {/* Template Icon */}
+                    <div 
+                      className="p-3 rounded-full bg-purple-500/20 backdrop-blur-sm border border-purple-400/30 hover:bg-purple-500/30 transition-all duration-200 cursor-pointer pointer-events-auto relative" 
+                      title="Choose Template"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowBannerTemplates(!showBannerTemplates);
+                      }}
+                    >
+                      <svg className="w-6 h-6 text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                      </svg>
+                    </div>
+                    
+                    {/* Replace Banner Icon */}
+                    <div 
+                      className="p-3 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-200 cursor-pointer pointer-events-auto" 
+                      title="Replace Banner"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBannerClick();
+                      }}
+                    >
+                      <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    
+                    {/* Remove Banner Icon (only show if custom banner exists) */}
+                    {(profile?.banner_image_url || profile?.banner_template) && (
+                      <div 
+                        className="p-3 rounded-full bg-red-500/20 backdrop-blur-sm border border-red-400/30 hover:bg-red-500/30 transition-all duration-200 cursor-pointer pointer-events-auto" 
+                        title="Remove Banner"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm('Are you sure you want to remove your banner?')) {
+                            handleRemoveBanner();
+                          }
+                        }}
+                      >
+                        <svg className="w-6 h-6 text-red-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10 pointer-events-none">
                   <div className="flex items-center gap-4">
                     {/* Profile Picture Circle */}
                     <div 
-                      className="w-16 h-16 rounded-full cursor-pointer transition-all duration-200 transform hover:scale-105 flex items-center justify-center"
+                      className="w-16 h-16 rounded-full cursor-pointer transition-all duration-200 transform hover:scale-105 flex items-center justify-center relative pointer-events-auto"
                       style={{
                         backgroundColor: 'rgba(255, 255, 255, 0.1)',
                         backdropFilter: 'blur(10px)',
                         border: '2px solid rgba(255, 255, 255, 0.2)'
                       }}
                       onClick={handleProfilePictureClick}
+                      title="Click to change profile photo"
                     >
-                      {profile?.profile_picture_url ? (
-                        <img 
-                          src={profile.profile_picture_url} 
-                          alt="Profile" 
-                          className="w-full h-full rounded-full object-cover"
-                        />
+                      {uploadingProfilePhoto ? (
+                        <div className="flex flex-col items-center">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mb-1"></div>
+                          <span className="text-xs text-white">Uploading...</span>
+                        </div>
+                      ) : profile?.profile_photo_url ? (
+                        <>
+                          <img 
+                            src={profile.profile_photo_url} 
+                            alt="Profile" 
+                            className="w-full h-full rounded-full object-cover"
+                          />
+                          {/* Hover overlay for profile photo */}
+                          <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                          </div>
+                        </>
                       ) : (
                         <div className="text-white text-xl font-bold">
                           {getUserDisplayName().charAt(0).toUpperCase()}
@@ -3944,20 +4655,7 @@ function Dashboard() {
                       </p>
                     </div>
                   </div>
-                  
-                  {/* Settings Gear - Top Right */}
-                  <Link 
-                    href="/account/settings"
-                    className="absolute top-0 right-0 p-2 rounded-lg transition-all duration-200 transform hover:scale-110 text-white"
-                    style={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                      backdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(255, 255, 255, 0.2)'
-                    }}
-                    title="Settings"
-                  >
-                    ⚙️
-                  </Link>
+
                 </div>
               </div>
 
@@ -4024,7 +4722,7 @@ function Dashboard() {
 
                   {/* Dashboard Button */}
                                       <button 
-                      onClick={() => setCurrentView('default')}
+                      onClick={() => updateCurrentView('default')}
                       className={`block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden ${
                         currentView === 'default' ? 'rounded-2xl' : 'container-style'
                       }`}
@@ -4055,7 +4753,7 @@ function Dashboard() {
                   {/* Stats - Grid Layout for Mobile, Vertical for Desktop */}
                   <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
                     <button 
-                      onClick={() => setCurrentView('all-orders')}
+                      onClick={() => updateCurrentView('all-orders')}
                       className={`block p-3 lg:p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden ${
                         currentView === 'all-orders' ? 'rounded-2xl' : 'container-style'
                       }`}
@@ -4085,7 +4783,7 @@ function Dashboard() {
 
 
                     <button 
-                      onClick={() => setCurrentView('financial')}
+                      onClick={() => updateCurrentView('financial')}
                       className={`block p-3 lg:p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden ${
                         currentView === 'financial' ? 'rounded-2xl' : 'container-style'
                       }`}
@@ -4113,7 +4811,7 @@ function Dashboard() {
                     </button>
 
                     <button 
-                      onClick={() => setCurrentView('design-vault')}
+                      onClick={() => updateCurrentView('design-vault')}
                       className="block rounded-2xl p-3 lg:p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden"
                       style={{
                         background: currentView === 'design-vault' 
@@ -4147,7 +4845,7 @@ function Dashboard() {
 
                     {/* Mobile Proof Review Button */}
                     <button 
-                      onClick={() => setCurrentView('proofs')}
+                      onClick={() => updateCurrentView('proofs')}
                       className={`lg:hidden block p-3 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden ${currentView === 'proofs' ? 'rounded-2xl' : 'container-style'}`}
                       style={currentView === 'proofs' ? {
                         background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.4) 0%, rgba(249, 115, 22, 0.25) 50%, rgba(249, 115, 22, 0.1) 100%)',
@@ -4185,7 +4883,7 @@ function Dashboard() {
 
 
                     <button 
-                      onClick={() => setCurrentView('proofs')}
+                      onClick={() => updateCurrentView('proofs')}
                       className={`block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden ${currentView === 'proofs' ? 'rounded-2xl' : 'container-style'}`}
                       style={currentView === 'proofs' ? {
                         background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.4) 0%, rgba(249, 115, 22, 0.25) 50%, rgba(249, 115, 22, 0.1) 100%)',
@@ -4215,26 +4913,51 @@ function Dashboard() {
                       )}
                     </button>
 
-                    <button 
-                      onClick={handleGetSupport}
-                      className="container-style block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg"
-                             style={{
-                               background: 'linear-gradient(135deg, #ef4444, #f87171)',
-                               boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
-                             }}>
-                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
+                    {/* Two-column layout for Get Support and Settings */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <button 
+                        onClick={handleGetSupport}
+                        className="container-style block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg"
+                               style={{
+                                 background: 'linear-gradient(135deg, #ef4444, #f87171)',
+                                 boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
+                               }}>
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-white text-sm">Get Support</h4>
+                            <p className="text-xs text-gray-300">Contact ground crew</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-semibold text-white text-sm">Get Support</h4>
-                          <p className="text-xs text-gray-300">Contact ground crew</p>
+                      </button>
+
+                      <Link 
+                        href="/account/settings"
+                        className="container-style block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg"
+                               style={{
+                                 background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                                 boxShadow: '0 4px 12px rgba(99, 102, 241, 0.15)'
+                               }}>
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-white text-sm">Settings</h4>
+                            <p className="text-xs text-gray-300">Account preferences</p>
+                          </div>
                         </div>
-                      </div>
-                    </button>
+                      </Link>
+                    </div>
 
 
 
@@ -4904,6 +5627,75 @@ function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Banner Templates Popup */}
+      {showBannerTemplates && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div 
+            className="max-w-4xl w-full max-h-[80vh] overflow-y-auto rounded-2xl shadow-2xl"
+            style={{
+              backgroundColor: 'rgba(3, 1, 64, 0.95)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255, 255, 255, 0.15)'
+            }}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-white">Choose Banner Template</h3>
+                <button
+                  onClick={() => setShowBannerTemplates(false)}
+                  className="p-2 rounded-full hover:bg-white/10 transition-colors duration-200"
+                  title="Close"
+                >
+                  <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {bannerTemplates.map((template) => (
+                  <div
+                    key={template.id}
+                    className="relative cursor-pointer group"
+                    onClick={() => handleSelectBannerTemplate(template)}
+                  >
+                    {/* Template Preview */}
+                    <div 
+                      className="w-full h-24 rounded-lg border-2 border-white/20 hover:border-white/40 transition-all duration-200 transform hover:scale-105 relative overflow-hidden"
+                      style={template.style}
+                    >
+                      {/* Overlay */}
+                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                        <div className="bg-white/20 backdrop-blur-sm rounded-full p-2">
+                          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Template Name */}
+                    <div className="mt-2 text-center">
+                      <p className="text-white text-sm font-medium">{template.name}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 text-center">
+                <button
+                  onClick={() => setShowBannerTemplates(false)}
+                  className="px-6 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
             </ErrorBoundary>
     </Layout>
 
