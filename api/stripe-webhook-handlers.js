@@ -169,10 +169,51 @@ async function handleCheckoutSessionCompleted(session) {
         for (const lineItem of fullSession.line_items.data) {
           const itemMetadata = lineItem.price.product.metadata || {};
           
-          // Update order items with timestamp
+          // Parse calculator selections from simplified metadata or orderNote
+          let calculatorSelections = {};
+          
+          // First, try to rebuild from simplified metadata fields
+          if (itemMetadata.size || itemMetadata.material || itemMetadata.cut) {
+            console.log('📝 Rebuilding calculator selections from simplified metadata...');
+            if (itemMetadata.size) {
+              calculatorSelections.size = {
+                type: 'size-preset',
+                value: itemMetadata.size,
+                displayValue: itemMetadata.size,
+                priceImpact: 0
+              };
+            }
+            if (itemMetadata.material) {
+              calculatorSelections.material = {
+                type: 'finish',
+                value: itemMetadata.material,
+                displayValue: itemMetadata.material,
+                priceImpact: 0
+              };
+            }
+            if (itemMetadata.cut) {
+              calculatorSelections.cut = {
+                type: 'shape',
+                value: itemMetadata.cut,
+                displayValue: itemMetadata.cut,
+                priceImpact: 0
+              };
+            }
+          }
+          
+          // If still incomplete, parse from orderNote for additional fields
+          if (metadata.orderNote) {
+            console.log('📝 Parsing additional selections from orderNote...');
+            const orderNoteSelections = parseCalculatorSelectionsFromOrderNote(metadata.orderNote);
+            // Merge with existing selections, orderNote takes precedence for completeness
+            calculatorSelections = { ...calculatorSelections, ...orderNoteSelections };
+          }
+          
+          // Update order items with calculator selections
           await client
             .from('order_items_new')
             .update({
+              calculator_selections: calculatorSelections,
               updated_at: new Date().toISOString()
             })
             .eq('order_id', existingOrderId)
@@ -226,6 +267,46 @@ async function handleCheckoutSessionCompleted(session) {
         const orderItems = fullSession.line_items.data.map(lineItem => {
           const itemMetadata = lineItem.price.product.metadata || {};
           
+          // Parse calculator selections from simplified metadata or orderNote
+          let calculatorSelections = {};
+          
+          // First, try to rebuild from simplified metadata fields
+          if (itemMetadata.size || itemMetadata.material || itemMetadata.cut) {
+            console.log('📝 Rebuilding calculator selections from simplified metadata...');
+            if (itemMetadata.size) {
+              calculatorSelections.size = {
+                type: 'size-preset',
+                value: itemMetadata.size,
+                displayValue: itemMetadata.size,
+                priceImpact: 0
+              };
+            }
+            if (itemMetadata.material) {
+              calculatorSelections.material = {
+                type: 'finish',
+                value: itemMetadata.material,
+                displayValue: itemMetadata.material,
+                priceImpact: 0
+              };
+            }
+            if (itemMetadata.cut) {
+              calculatorSelections.cut = {
+                type: 'shape',
+                value: itemMetadata.cut,
+                displayValue: itemMetadata.cut,
+                priceImpact: 0
+              };
+            }
+          }
+          
+          // If still incomplete, parse from orderNote for additional fields
+          if (metadata.orderNote) {
+            console.log('📝 Parsing additional selections from orderNote...');
+            const orderNoteSelections = parseCalculatorSelectionsFromOrderNote(metadata.orderNote);
+            // Merge with existing selections, orderNote takes precedence for completeness
+            calculatorSelections = { ...calculatorSelections, ...orderNoteSelections };
+          }
+          
           return {
             order_id: order.id,
             product_id: itemMetadata.productId || 'custom-product',
@@ -235,7 +316,7 @@ async function handleCheckoutSessionCompleted(session) {
             quantity: lineItem.quantity,
             unit_price: (lineItem.price.unit_amount / 100).toFixed(2),
             total_price: (lineItem.amount_total / 100).toFixed(2),
-            calculator_selections: itemMetadata.calculatorSelections || {},
+            calculator_selections: calculatorSelections,
             custom_files: cartMetadata?.customFiles || [],
             customer_notes: cartMetadata?.customerNotes || '',
             instagram_handle: cartMetadata?.instagramHandle || '',
@@ -304,31 +385,129 @@ async function handleChargeRefunded(charge) {
 // Helper function to generate order numbers
 async function generateOrderNumber(supabaseClient) {
   try {
-    // Get the current year
-    const year = new Date().getFullYear();
-    
-    // Get the count of orders this year
-    const { count, error } = await supabaseClient
+    // Get the highest existing order number
+    const { data: existingOrders, error } = await supabaseClient
       .from('orders_main')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', `${year}-01-01`)
-      .lt('created_at', `${year + 1}-01-01`);
+      .select('order_number')
+      .not('order_number', 'is', null)
+      .like('order_number', 'SS-%')  // Only consider our format
+      .order('order_number', { ascending: false })
+      .limit(1);
     
     if (error) {
-      console.error('Error getting order count:', error);
+      console.error('Error getting highest order number:', error);
       // Fallback to timestamp-based order number
-      return `SS-${year}-${Date.now().toString().slice(-6)}`;
+      return `SS-${Date.now().toString().slice(-6)}`;
     }
     
-    // Generate order number: SS-YYYY-NNNNNN
-    const orderNumber = `SS-${year}-${String((count || 0) + 1).padStart(6, '0')}`;
+    let nextNumber = 1;
+    
+    if (existingOrders && existingOrders.length > 0) {
+      const lastOrderNumber = existingOrders[0].order_number;
+      console.log('📊 Last order number found:', lastOrderNumber);
+      
+      // Extract the number from SS-00001 format
+      const match = lastOrderNumber.match(/SS-(\d+)/);
+      if (match) {
+        nextNumber = parseInt(match[1]) + 1;
+      }
+    }
+    
+    // Generate order number: SS-00001 (5 digit number)
+    const orderNumber = `SS-${String(nextNumber).padStart(5, '0')}`;
+    console.log('📝 Generated new order number:', orderNumber);
+    
     return orderNumber;
   } catch (error) {
     console.error('Error generating order number:', error);
     // Fallback to timestamp-based order number
-    const year = new Date().getFullYear();
-    return `SS-${year}-${Date.now().toString().slice(-6)}`;
+    return `SS-${Date.now().toString().slice(-6)}`;
   }
+}
+
+// Helper function to parse calculator selections from orderNote
+function parseCalculatorSelectionsFromOrderNote(orderNote) {
+  const selections = {};
+  
+  if (!orderNote || typeof orderNote !== 'string') {
+    return selections;
+  }
+  
+  // Parse cut option (✂️)
+  const cutMatch = orderNote.match(/✂️ Cut: (.+?)(?:\n|$)/);
+  if (cutMatch) {
+    selections.cut = {
+      type: 'shape',
+      value: cutMatch[1].trim(),
+      displayValue: cutMatch[1].trim(),
+      priceImpact: 0
+    };
+  }
+  
+  // Parse material option (✨)
+  const materialMatch = orderNote.match(/✨ Material: (.+?)(?:\n|$)/);
+  if (materialMatch) {
+    selections.material = {
+      type: 'finish',
+      value: materialMatch[1].trim(),
+      displayValue: materialMatch[1].trim(),
+      priceImpact: 0
+    };
+  }
+  
+  // Parse size option (📏)
+  const sizeMatch = orderNote.match(/📏 Size: (.+?)(?:\n|$)/);
+  if (sizeMatch) {
+    selections.size = {
+      type: 'size-preset',
+      value: sizeMatch[1].trim(),
+      displayValue: sizeMatch[1].trim(),
+      priceImpact: 0
+    };
+  }
+  
+  // Parse rush option (✨ Rush:)
+  const rushMatch = orderNote.match(/✨ Rush: (.+?)(?:\n|$)/);
+  if (rushMatch && rushMatch[1].trim() === 'Rush Order') {
+    selections.rush = {
+      type: 'finish',
+      value: true,
+      displayValue: 'Rush Order',
+      priceImpact: 0 // This should be calculated based on total price
+    };
+  }
+  
+  // Parse white option if present (for clear/chrome/glitter stickers)
+  const whiteMatch = orderNote.match(/✨ White Option: (.+?)(?:\n|$)/);
+  if (whiteMatch) {
+    selections.whiteOption = {
+      type: 'white-base',
+      value: whiteMatch[1].trim(),
+      displayValue: whiteMatch[1].trim(),
+      priceImpact: 0
+    };
+  }
+  
+  // Parse kiss cut option if present (for sticker sheets)
+  const kissCutMatch = orderNote.match(/✨ Kiss Cut: (.+?)(?:\n|$)/);
+  if (kissCutMatch) {
+    selections.kissCut = {
+      type: 'finish',
+      value: kissCutMatch[1].trim(),
+      displayValue: kissCutMatch[1].trim(),
+      priceImpact: 0
+    };
+  }
+  
+  // Default proof option (not usually in orderNote unless "No Proof")
+  selections.proof = {
+    type: 'finish',
+    value: true,
+    displayValue: 'Send Proof',
+    priceImpact: 0
+  };
+  
+  return selections;
 }
 
 module.exports = router; 

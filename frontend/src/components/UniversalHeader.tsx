@@ -11,7 +11,23 @@ export default function UniversalHeader() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState<boolean>(false);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [orderSearch, setOrderSearch] = useState<string>('');
   const router = useRouter();
+
+  // Admin emails list - same as in admin dashboard
+  const ADMIN_EMAILS = ['justin@stickershuttle.com'];
+  
+  // Check if we're on an admin page
+  const isAdminPage = router.pathname.startsWith('/admin');
+  
+  // Handle order search
+  const handleOrderSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (orderSearch.trim()) {
+      router.push(`/admin/orders?search=${encodeURIComponent(orderSearch.trim())}`);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -30,7 +46,13 @@ export default function UniversalHeader() {
               setAuthError(true);
             }
           } else {
-            if (isMounted) setUser(session?.user || null);
+            if (isMounted) {
+              setUser(session?.user || null);
+              // Check if user is admin
+              if (session?.user?.email && ADMIN_EMAILS.includes(session.user.email)) {
+                setIsAdmin(true);
+              }
+            }
           }
         } catch (error) {
           console.error('Error checking user:', error);
@@ -85,8 +107,8 @@ export default function UniversalHeader() {
 
   return (
     <>
-    <header className="w-full relative z-50" style={{ backgroundColor: '#030140' }}>
-      <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto py-4 px-4">
+    <header className="w-full fixed top-0 z-50" style={{ backgroundColor: '#030140' }}>
+      <div className={isAdminPage ? "w-full py-4 px-8" : "w-[95%] md:w-[90%] lg:w-[70%] mx-auto py-4 px-4"}>
         <div className="flex items-center justify-between relative" style={{ paddingTop: '2px' }}>
           {/* Mobile/Tablet Left Side - Hamburger */}
           <div className="lg:hidden flex items-center">
@@ -105,7 +127,7 @@ export default function UniversalHeader() {
 
           {/* Desktop Left Side - Logo */}
           <div className="hidden lg:flex items-center">
-            <div className="lg:mr-6">
+            <div className={isAdminPage ? "" : "lg:mr-6"}>
               <Link href="/">
                 <img 
                   src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
@@ -131,40 +153,73 @@ export default function UniversalHeader() {
 
           {/* Mobile/Tablet Right Side - Cart */}
           <div className="lg:hidden flex items-center">
-            <CartIndicator />
+            {!isAdminPage && <CartIndicator />}
           </div>
 
           {/* Desktop Search Bar */}
-          <div className="hidden lg:flex flex-1 items-center relative search-dropdown-container mx-4">
-            <input 
-              type="text"
-              placeholder="Go on.. create your universe 🧑‍🚀"
-              className="headerButton flex-1 px-4 py-2 pr-12 rounded-lg font-medium text-white transition-all duration-200 transform focus:scale-101 focus:outline-none placeholder-gray-400"
-              onFocus={() => setIsSearchDropdownOpen(true)}
-              onBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 300)}
-            />
-            <button 
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white transition-all duration-200 hover:scale-110"
-              aria-label="Search"
-            >
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                strokeWidth={2} 
-                stroke="currentColor" 
-                className="w-5 h-5"
+          {isAdminPage ? (
+            <form onSubmit={handleOrderSearch} className={`hidden lg:flex flex-1 items-center relative search-dropdown-container ml-8`}>
+              <input 
+                type="text"
+                placeholder="Search by order #, email, or name..."
+                className="headerButton flex-1 px-4 py-2 pr-12 rounded-lg font-medium text-white transition-all duration-200 transform focus:scale-101 focus:outline-none placeholder-gray-400"
+                value={orderSearch}
+                onChange={(e) => setOrderSearch(e.target.value)}
+              />
+              <button 
+                type="submit"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white transition-all duration-200 hover:scale-110"
+                aria-label="Search"
               >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 15.803a7.5 7.5 0 0 0 10.607 0Z" 
-                />
-              </svg>
-            </button>
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  strokeWidth={2} 
+                  stroke="currentColor" 
+                  className="w-5 h-5"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 15.803a7.5 7.5 0 0 0 10.607 0Z" 
+                  />
+                </svg>
+              </button>
+            </form>
+          ) : (
+            <div className={`hidden lg:flex flex-1 items-center relative search-dropdown-container mx-4`}>
+              <input 
+                type="text"
+                placeholder="Go on.. create your universe 🧑‍🚀"
+                className="headerButton flex-1 px-4 py-2 pr-12 rounded-lg font-medium text-white transition-all duration-200 transform focus:scale-101 focus:outline-none placeholder-gray-400"
+                onFocus={() => setIsSearchDropdownOpen(true)}
+                onBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 300)}
+              />
+              <button 
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white transition-all duration-200 hover:scale-110"
+                aria-label="Search"
+              >
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  strokeWidth={2} 
+                  stroke="currentColor" 
+                  className="w-5 h-5"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 15.803a7.5 7.5 0 0 0 10.607 0Z" 
+                  />
+                </svg>
+              </button>
+            </div>
+          )}
             
-            {/* Search Dropdown */}
-            {isSearchDropdownOpen && (
+            {/* Search Dropdown - Only show on non-admin pages */}
+            {!isAdminPage && isSearchDropdownOpen && (
               <div 
                 className="absolute top-full left-0 right-8 mt-2 rounded-lg z-50 shadow-lg"
                 style={{ 
@@ -332,38 +387,55 @@ export default function UniversalHeader() {
                 </div>
               </div>
             )}
-          </div>
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center gap-4" style={{ letterSpacing: '-0.5px' }}>
-            <Link 
-              href="/deals"
-              className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105${router.pathname === '/deals' || router.asPath === '/deals' ? ' active' : ''}`}
-              style={router.pathname === '/deals' || router.asPath === '/deals' ? {
-                border: '0.5px solid #a855f7',
-                background: 'rgba(168, 85, 247, 0.2)',
-                boxShadow: '0 0 12px rgba(168, 85, 247, 0.48), 0 0 24px rgba(168, 85, 247, 0.32)',
-                color: '#c084fc'
-              } : {}}
-            >
-              ⚡ Deals
-            </Link>
-            
-            {/* Authentication Navigation - Show login/signup by default unless user verified */}
-            {showAccountDashboard ? (
-              // Logged In and Verified - Show Account Dashboard
+            {!isAdminPage && (
               <Link 
-                href="/account/dashboard"
-                className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 inline-block${router.pathname === '/account/dashboard' || router.asPath === '/account/dashboard' || router.pathname.startsWith('/account') ? ' active' : ''}`}
-                style={(router.pathname === '/account/dashboard' || router.asPath === '/account/dashboard' || router.pathname.startsWith('/account')) ? {
+                href="/deals"
+                className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105${router.pathname === '/deals' || router.asPath === '/deals' ? ' active' : ''}`}
+                style={router.pathname === '/deals' || router.asPath === '/deals' ? {
                   border: '0.5px solid #a855f7',
                   background: 'rgba(168, 85, 247, 0.2)',
                   boxShadow: '0 0 12px rgba(168, 85, 247, 0.48), 0 0 24px rgba(168, 85, 247, 0.32)',
                   color: '#c084fc'
                 } : {}}
               >
-                👨‍🚀 Account Dashboard
+                ⚡ Deals
               </Link>
+            )}
+            
+            {/* Authentication Navigation - Show login/signup by default unless user verified */}
+            {showAccountDashboard ? (
+              // Logged In and Verified - Show Account Dashboard
+              <>
+                <Link 
+                  href="/account/dashboard"
+                  className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 inline-block${router.pathname === '/account/dashboard' || router.asPath === '/account/dashboard' || router.pathname.startsWith('/account') ? ' active' : ''}`}
+                  style={(router.pathname === '/account/dashboard' || router.asPath === '/account/dashboard' || router.pathname.startsWith('/account')) ? {
+                    border: '0.5px solid #a855f7',
+                    background: 'rgba(168, 85, 247, 0.2)',
+                    boxShadow: '0 0 12px rgba(168, 85, 247, 0.48), 0 0 24px rgba(168, 85, 247, 0.32)',
+                    color: '#c084fc'
+                  } : {}}
+                >
+                  👨‍🚀 Account Dashboard
+                </Link>
+                {isAdmin && (
+                  <Link 
+                    href="/admin/orders"
+                    className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 inline-block${router.pathname === '/admin/orders' || router.asPath === '/admin/orders' || router.pathname.startsWith('/admin') ? ' active' : ''}`}
+                    style={(router.pathname === '/admin/orders' || router.asPath === '/admin/orders' || router.pathname.startsWith('/admin')) ? {
+                      border: '0.5px solid #f59e0b',
+                      background: 'rgba(245, 158, 11, 0.2)',
+                      boxShadow: '0 0 12px rgba(245, 158, 11, 0.48), 0 0 24px rgba(245, 158, 11, 0.32)',
+                      color: '#fbbf24'
+                    } : {}}
+                  >
+                    🛠️ Admin
+                  </Link>
+                )}
+              </>
             ) : (
               // Default state - Show Login and Signup
               <>
@@ -383,7 +455,7 @@ export default function UniversalHeader() {
             )}
             
             {/* Cart Icon */}
-            <CartIndicator />
+            {!isAdminPage && <CartIndicator />}
           </nav>
         </div>
       </div>
@@ -532,14 +604,16 @@ export default function UniversalHeader() {
 
           {/* Navigation Items */}
           <nav className="space-y-2">
-            <Link 
-              href="/deals" 
-              className={`w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center${router.pathname === '/deals' || router.asPath === '/deals' ? ' bg-purple-500 bg-opacity-20 border-l-4 border-purple-400' : ''}`} 
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              <span className="mr-3">⚡</span>
-              Deals
-            </Link>
+            {!isAdminPage && (
+              <Link 
+                href="/deals" 
+                className={`w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center${router.pathname === '/deals' || router.asPath === '/deals' ? ' bg-purple-500 bg-opacity-20 border-l-4 border-purple-400' : ''}`} 
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <span className="mr-3">⚡</span>
+                Deals
+              </Link>
+            )}
             
             {/* Mobile Authentication Navigation - Show login/signup by default unless user verified */}
             {showAccountDashboard ? (
@@ -553,6 +627,16 @@ export default function UniversalHeader() {
                   <span className="mr-3">👨‍🚀</span>
                   Account Dashboard
                 </Link>
+                {isAdmin && (
+                  <Link 
+                    href="/admin/orders" 
+                    className={`w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center${router.pathname === '/admin/orders' || router.asPath === '/admin/orders' || router.pathname.startsWith('/admin') ? ' bg-amber-500 bg-opacity-20 border-l-4 border-amber-400' : ''}`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <span className="mr-3">🛠️</span>
+                    Admin Dashboard
+                  </Link>
+                )}
                 <button 
                   onClick={() => {
                     handleSignOut();

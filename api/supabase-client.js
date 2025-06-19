@@ -270,7 +270,7 @@ class SupabaseClient {
             const { data, error } = await client
                 .rpc('claim_guest_orders', { 
                     user_uuid: userId, 
-                    user_email: userEmail 
+                    guest_email_param: userEmail 
                 });
 
             if (error) {

@@ -290,65 +290,54 @@ function Dashboard() {
 
   const getOrderDisplayNumber = (order: any) => {
     console.log(`🎯 Getting display number for order ${order.id}:`, {
-      shopifyOrderNumber: order.shopifyOrderNumber,
-      shopify_order_number: order.shopify_order_number,
-      shopifyOrderId: order.shopifyOrderId,
-      shopify_order_id: order.shopify_order_id,
-      fullOrderShopifyOrderNumber: order._fullOrderData?.shopifyOrderNumber,
-      fullOrderShopify_order_number: order._fullOrderData?.shopify_order_number,
+      orderNumber: order.orderNumber,
+      order_number: order.order_number,
+      fullOrderOrderNumber: order._fullOrderData?.orderNumber,
+      fullOrder_order_number: order._fullOrderData?.order_number,
       fullOrder: order._fullOrderData
     });
     
-    // Debug logging for order display number resolution
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`🎯 Getting display number for order ${order.id}`, {
-        shopifyOrderNumber: order.shopifyOrderNumber,
-        shopifyOrderId: order.shopifyOrderId
-      });
+    // Priority 1: Check for order_number (the SS-00001 format from Stripe webhook)
+    if (order.orderNumber) {
+      console.log(`✅ Using orderNumber: ${order.orderNumber}`);
+      return order.orderNumber;
     }
-
-    // Priority 1: Try to get Shopify order number from transformed order (camelCase from GraphQL)
+    
+    if (order.order_number) {
+      console.log(`✅ Using order_number: ${order.order_number}`);
+      return order.order_number;
+    }
+    
+    // Priority 2: Check _fullOrderData for order_number
+    if (order._fullOrderData?.orderNumber) {
+      console.log(`✅ Using _fullOrderData.orderNumber: ${order._fullOrderData.orderNumber}`);
+      return order._fullOrderData.orderNumber;
+    }
+    
+    if (order._fullOrderData?.order_number) {
+      console.log(`✅ Using _fullOrderData.order_number: ${order._fullOrderData.order_number}`);
+      return order._fullOrderData.order_number;
+    }
+    
+    // Priority 3: Legacy - Try Shopify order numbers
     if (order.shopifyOrderNumber) {
-      console.log(`✅ Using shopifyOrderNumber: ${order.shopifyOrderNumber}`);
+      console.log(`⚠️ Using legacy shopifyOrderNumber: ${order.shopifyOrderNumber}`);
       return order.shopifyOrderNumber;
     }
     
-    // Priority 2: Try to get Shopify order number from _fullOrderData (both camelCase and snake_case)
     if (order._fullOrderData?.shopifyOrderNumber) {
-      console.log(`✅ Using _fullOrderData.shopifyOrderNumber: ${order._fullOrderData.shopifyOrderNumber}`);
+      console.log(`⚠️ Using legacy _fullOrderData.shopifyOrderNumber: ${order._fullOrderData.shopifyOrderNumber}`);
       return order._fullOrderData.shopifyOrderNumber;
     }
     
     if (order._fullOrderData?.shopify_order_number) {
-      console.log(`✅ Using _fullOrderData.shopify_order_number: ${order._fullOrderData.shopify_order_number}`);
+      console.log(`⚠️ Using legacy _fullOrderData.shopify_order_number: ${order._fullOrderData.shopify_order_number}`);
       return order._fullOrderData.shopify_order_number;
     }
     
-    // Priority 3: Check snake_case properties on main order (from database)
     if (order.shopify_order_number) {
-      console.log(`✅ Using snake_case shopify_order_number: ${order.shopify_order_number}`);
+      console.log(`⚠️ Using legacy snake_case shopify_order_number: ${order.shopify_order_number}`);
       return order.shopify_order_number;
-    }
-    
-    // Priority 4: Use Shopify order ID as fallback (add # prefix)
-    if (order.shopifyOrderId) {
-      console.log(`⚠️ Using shopifyOrderId: #${order.shopifyOrderId}`);
-      return `#${order.shopifyOrderId}`;
-    }
-    
-    if (order._fullOrderData?.shopifyOrderId) {
-      console.log(`⚠️ Using _fullOrderData.shopifyOrderId: #${order._fullOrderData.shopifyOrderId}`);
-      return `#${order._fullOrderData.shopifyOrderId}`;
-    }
-    
-    if (order.shopify_order_id) {
-      console.log(`⚠️ Using shopify_order_id: #${order.shopify_order_id}`);
-      return `#${order.shopify_order_id}`;
-    }
-    
-    if (order._fullOrderData?.shopify_order_id) {
-      console.log(`⚠️ Using _fullOrderData.shopify_order_id: #${order._fullOrderData.shopify_order_id}`);
-      return `#${order._fullOrderData.shopify_order_id}`;
     }
     
     // Last resort: Use internal ID but make it shorter and cleaner

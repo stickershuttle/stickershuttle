@@ -45,15 +45,13 @@ class StripeClient {
               metadata: {
                 productId: item.productId,
                 sku: item.sku,
-                // Convert calculator selections to string metadata
-                ...(item.calculatorSelections ? Object.entries(item.calculatorSelections).reduce((acc, [key, value]) => {
-                  if (value && typeof value === 'object' && value.displayValue) {
-                    acc[key] = String(value.displayValue);
-                  } else if (value !== null && value !== undefined) {
-                    acc[key] = String(value);
-                  }
-                  return acc;
-                }, {}) : {})
+                // Store only essential selections in product metadata (500 char limit)
+                // Full selections will be in orderNote in session metadata
+                size: item.calculatorSelections?.size?.displayValue || '',
+                material: item.calculatorSelections?.material?.displayValue || '',
+                cut: item.calculatorSelections?.cut?.displayValue || '',
+                // Add essential product info
+                category: item.category || 'custom-stickers'
               }
             },
             unit_amount: Math.round(item.unitPrice * 100), // Convert to cents
@@ -138,7 +136,7 @@ class StripeClient {
 
     try {
       const session = await this.stripe.checkout.sessions.retrieve(sessionId, {
-        expand: ['line_items', 'customer', 'payment_intent']
+        expand: ['line_items.data.price.product', 'customer', 'payment_intent']
       });
       return session;
     } catch (error) {

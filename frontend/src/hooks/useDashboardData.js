@@ -181,7 +181,8 @@ export const useDashboardData = () => {
           
           const transformedOrder = {
             id: order.id, // Keep original order ID
-            orderNumber: order.orderNumber, // Preserve order number
+            orderNumber: order.orderNumber, // Preserve order number (SS-00001 format)
+            order_number: order.order_number || order.orderNumber, // Support both formats
             stripePaymentIntentId: order.stripePaymentIntentId, // Preserve Stripe payment intent
             date: order.orderCreatedAt || order.createdAt || new Date().toISOString(),
             status: mapOrderStatus(order.orderStatus, order.fulfillmentStatus),

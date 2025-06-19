@@ -83,6 +83,7 @@ const typeDefs = gql`
     getUserOrders(userId: ID!): [CustomerOrder]
     getOrderById(id: ID!): CustomerOrder
     claimGuestOrders(userId: ID!, email: String!): ClaimResult
+    getAllOrders: [CustomerOrder]
   }
 
   type Mutation {
@@ -90,6 +91,11 @@ const typeDefs = gql`
     createCustomerOrder(input: CustomerOrderInput!): CustomerOrder
     updateOrderStatus(orderId: String!, statusUpdate: OrderStatusInput!): CustomerOrder
     claimGuestOrders(userId: ID!, email: String!): ClaimResult
+    
+    # Proof mutations
+    addOrderProof(orderId: ID!, proofData: OrderProofInput!): CustomerOrder
+    updateProofStatus(orderId: ID!, proofId: ID!, status: String!, customerNotes: String): CustomerOrder
+    sendProofs(orderId: ID!): CustomerOrder
     
     # Stripe mutations
     createStripeCheckoutSession(input: StripeCheckoutInput!): StripeCheckoutResult
@@ -153,6 +159,20 @@ const typeDefs = gql`
     createdAt: String
     updatedAt: String
     items: [OrderItem]
+    proofs: [OrderProof]
+  }
+
+  type OrderProof {
+    id: ID!
+    orderId: ID!
+    proofUrl: String!
+    proofPublicId: String!
+    proofTitle: String
+    uploadedAt: String
+    uploadedBy: String
+    status: String
+    customerNotes: String
+    adminNotes: String
   }
 
   type OrderItem {
@@ -307,6 +327,13 @@ const typeDefs = gql`
     sku: String
     calculatorSelections: JSON
   }
+
+  input OrderProofInput {
+    proofUrl: String!
+    proofPublicId: String!
+    proofTitle: String
+    adminNotes: String
+  }
 `;
 
 // 2. Resolvers
@@ -338,7 +365,8 @@ const resolvers = {
     orderCreatedAt: (parent) => parent.order_created_at || parent.orderCreatedAt,
     orderUpdatedAt: (parent) => parent.order_updated_at || parent.orderUpdatedAt,
     createdAt: (parent) => parent.created_at || parent.createdAt,
-    updatedAt: (parent) => parent.updated_at || parent.updatedAt
+    updatedAt: (parent) => parent.updated_at || parent.updatedAt,
+    proofs: (parent) => parent.proofs || []
   },
 
   OrderItem: {
@@ -357,6 +385,17 @@ const resolvers = {
     fulfillmentStatus: (parent) => parent.fulfillment_status || parent.fulfillmentStatus,
     createdAt: (parent) => parent.created_at || parent.createdAt,
     updatedAt: (parent) => parent.updated_at || parent.updatedAt
+  },
+
+  OrderProof: {
+    orderId: (parent) => parent.orderId || parent.order_id,
+    proofUrl: (parent) => parent.proofUrl || parent.proof_url,
+    proofPublicId: (parent) => parent.proofPublicId || parent.proof_public_id,
+    proofTitle: (parent) => parent.proofTitle || parent.proof_title,
+    uploadedAt: (parent) => parent.uploadedAt || parent.uploaded_at,
+    uploadedBy: (parent) => parent.uploadedBy || parent.uploaded_by,
+    customerNotes: (parent) => parent.customerNotes || parent.customer_notes,
+    adminNotes: (parent) => parent.adminNotes || parent.admin_notes
   },
 
   Query: {
@@ -522,6 +561,91 @@ const resolvers = {
         throw new Error(error.message);
       }
     },
+
+    getAllOrders: async () => {
+      try {
+        console.log('🔍 getAllOrders called - Admin fetching all orders');
+        
+        if (!supabaseClient.isReady()) {
+          console.error('❌ Supabase client not ready');
+          throw new Error('Order service is currently unavailable');
+        }
+        
+        const client = supabaseClient.getServiceClient();
+        
+        // Fetch all orders with their items
+        const { data: orders, error } = await client
+          .from('orders_main')
+          .select(`
+            *,
+            items:order_items_new(*)
+          `)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('❌ Error fetching all orders:', error);
+          throw new Error('Failed to fetch orders');
+        }
+
+        console.log(`📊 Found ${orders?.length || 0} total orders`);
+
+        // Map the orders to match GraphQL schema
+        return (orders || []).map(order => ({
+          id: String(order.id),
+          userId: order.user_id ? String(order.user_id) : null,
+          guestEmail: order.guest_email,
+          stripePaymentIntentId: order.stripe_payment_intent_id,
+          stripeCheckoutSessionId: order.stripe_session_id,
+          orderNumber: order.order_number,
+          orderStatus: order.order_status || 'Processing',
+          fulfillmentStatus: order.fulfillment_status || 'unfulfilled',
+          financialStatus: order.financial_status || 'pending',
+          trackingNumber: order.tracking_number,
+          trackingCompany: order.tracking_company,
+          trackingUrl: order.tracking_url,
+          subtotalPrice: Number(order.subtotal_price) || 0,
+          totalTax: Number(order.total_tax) || 0,
+          totalPrice: Number(order.total_price) || 0,
+          currency: order.currency || 'USD',
+          customerFirstName: order.customer_first_name,
+          customerLastName: order.customer_last_name,
+          customerEmail: order.customer_email,
+          customerPhone: order.customer_phone,
+          shippingAddress: order.shipping_address,
+          billingAddress: order.billing_address,
+          orderTags: order.order_tags,
+          orderNote: order.order_note,
+          orderCreatedAt: order.order_created_at,
+          orderUpdatedAt: order.order_updated_at,
+          createdAt: order.created_at,
+          updatedAt: order.updated_at,
+          // Map items
+          items: (order.items || []).map(item => ({
+            id: String(item.id),
+            customerOrderId: String(order.id),
+            stripeLineItemId: item.stripe_line_item_id,
+            productId: String(item.product_id || 'custom-product'),
+            productName: String(item.product_name || 'Custom Product'),
+            productCategory: item.product_category,
+            sku: item.sku,
+            quantity: Number(item.quantity) || 1,
+            unitPrice: Number(item.unit_price) || 0,
+            totalPrice: Number(item.total_price) || 0,
+            calculatorSelections: item.calculator_selections || {},
+            customFiles: Array.isArray(item.custom_files) ? item.custom_files : [],
+            customerNotes: item.customer_notes,
+            instagramHandle: item.instagram_handle,
+            instagramOptIn: item.instagram_opt_in,
+            fulfillmentStatus: item.fulfillment_status,
+            createdAt: item.created_at,
+            updatedAt: item.updated_at
+          }))
+        }));
+      } catch (error) {
+        console.error('❌ Error in getAllOrders:', error);
+        throw new Error(error.message);
+      }
+    },
   },
 
   Mutation: {
@@ -567,6 +691,175 @@ const resolvers = {
         throw new Error(error.message);
       }
     },
+
+    addOrderProof: async (_, { orderId, proofData }) => {
+      try {
+        if (!supabaseClient.isReady()) {
+          throw new Error('Order service is currently unavailable');
+        }
+        
+        // Add proof to database
+        const client = supabaseClient.getServiceClient();
+        
+        // First, get the current proofs
+        const { data: currentOrder, error: fetchError } = await client
+          .from('orders_main')
+          .select('proofs')
+          .eq('id', orderId)
+          .single();
+          
+        if (fetchError) {
+          throw new Error(`Failed to fetch order: ${fetchError.message}`);
+        }
+        
+        // Create new proof entry
+        const newProof = {
+          id: `proof_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          orderId: orderId,
+          proofUrl: proofData.proofUrl,
+          proofPublicId: proofData.proofPublicId,
+          proofTitle: proofData.proofTitle || 'Proof',
+          uploadedAt: new Date().toISOString(),
+          uploadedBy: 'admin', // In future, get from auth context
+          status: 'pending',
+          adminNotes: proofData.adminNotes || null,
+          customerNotes: null
+        };
+        
+        // Update proofs array
+        const currentProofs = currentOrder.proofs || [];
+        const updatedProofs = [...currentProofs, newProof];
+        
+        // Update order with new proof
+        const { data: updatedOrder, error: updateError } = await client
+          .from('orders_main')
+          .update({ proofs: updatedProofs })
+          .eq('id', orderId)
+          .select(`
+            *,
+            order_items_new(*)
+          `)
+          .single();
+          
+        if (updateError) {
+          throw new Error(`Failed to update order with proof: ${updateError.message}`);
+        }
+        
+               return updatedOrder;
+     } catch (error) {
+       console.error('Error adding order proof:', error);
+       throw new Error(error.message);
+     }
+   },
+
+   updateProofStatus: async (_, { orderId, proofId, status, customerNotes }) => {
+     try {
+       if (!supabaseClient.isReady()) {
+         throw new Error('Order service is currently unavailable');
+       }
+       
+       const client = supabaseClient.getServiceClient();
+       
+       // Get current order
+       const { data: currentOrder, error: fetchError } = await client
+         .from('orders_main')
+         .select('proofs')
+         .eq('id', orderId)
+         .single();
+         
+       if (fetchError) {
+         throw new Error(`Failed to fetch order: ${fetchError.message}`);
+       }
+       
+       // Update the specific proof
+       const updatedProofs = (currentOrder.proofs || []).map(proof => {
+         if (proof.id === proofId) {
+           return {
+             ...proof,
+             status,
+             customerNotes: customerNotes || proof.customerNotes,
+             updatedAt: new Date().toISOString()
+           };
+         }
+         return proof;
+       });
+       
+       // Update order with modified proofs
+       const { data: updatedOrder, error: updateError } = await client
+         .from('orders_main')
+         .update({ proofs: updatedProofs })
+         .eq('id', orderId)
+         .select(`
+           *,
+           order_items_new(*)
+         `)
+         .single();
+         
+       if (updateError) {
+         throw new Error(`Failed to update proof status: ${updateError.message}`);
+       }
+       
+       return updatedOrder;
+     } catch (error) {
+       console.error('Error updating proof status:', error);
+       throw new Error(error.message);
+     }
+   },
+
+   sendProofs: async (_, { orderId }) => {
+     try {
+       if (!supabaseClient.isReady()) {
+         throw new Error('Order service is currently unavailable');
+       }
+       
+       const client = supabaseClient.getServiceClient();
+       
+       // Get current order
+       const { data: currentOrder, error: fetchError } = await client
+         .from('orders_main')
+         .select('proofs, customer_email, customer_first_name, order_number')
+         .eq('id', orderId)
+         .single();
+         
+       if (fetchError) {
+         throw new Error(`Failed to fetch order: ${fetchError.message}`);
+       }
+       
+       // Update all proofs to 'sent' status
+       const updatedProofs = (currentOrder.proofs || []).map(proof => ({
+         ...proof,
+         status: 'sent',
+         sentAt: new Date().toISOString()
+       }));
+       
+       // Update order with sent proofs and status
+       const { data: updatedOrder, error: updateError } = await client
+         .from('orders_main')
+         .update({ 
+           proofs: updatedProofs,
+           proof_status: 'awaiting_approval',
+           proof_sent_at: new Date().toISOString()
+         })
+         .eq('id', orderId)
+         .select(`
+           *,
+           order_items_new(*)
+         `)
+         .single();
+         
+       if (updateError) {
+         throw new Error(`Failed to send proofs: ${updateError.message}`);
+       }
+       
+       // Log successful proof sending (here you would trigger email notification)
+       console.log(`✅ Proofs sent for order ${currentOrder.order_number} to ${currentOrder.customer_email}`);
+       
+       return updatedOrder;
+     } catch (error) {
+       console.error('Error sending proofs:', error);
+       throw new Error(error.message);
+     }
+   },
 
     // Stripe mutations
     createStripeCheckoutSession: async (_, { input }) => {

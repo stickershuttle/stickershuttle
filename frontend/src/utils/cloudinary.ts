@@ -40,13 +40,19 @@ const CLOUDINARY_UPLOAD_PRESET = 'sticker-uploads';
 export const uploadToCloudinary = async (
   file: File,
   metadata?: CalculatorMetadata,
-  onProgress?: (progress: UploadProgress) => void
+  onProgress?: (progress: UploadProgress) => void,
+  folder?: string
 ): Promise<CloudinaryUploadResult> => {
   console.log('🚀 Starting Cloudinary upload...');
   
   const formData = new FormData();
   formData.append('file', file);
   formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+  
+  // Add folder if specified
+  if (folder) {
+    formData.append('folder', folder);
+  }
   
   // Add metadata as context or tags
   if (metadata) {

@@ -32,7 +32,7 @@ export default function Layout({ children, title = "Sticker Shuttle - Custom Sti
       
       <div className="min-h-screen text-white relative" style={{ backgroundColor: '#030140', fontFamily: 'Inter, sans-serif' }}>
         <UniversalHeader />
-        <main>
+        <main className="pt-16">
           {children}
         </main>
         <UniversalFooter />
