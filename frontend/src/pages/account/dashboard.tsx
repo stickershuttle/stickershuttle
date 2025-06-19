@@ -2159,7 +2159,7 @@ function Dashboard() {
               {/* Left - Proof Image */}
               <div className="lg:col-span-1">
                 <div 
-                  className="rounded-lg overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform duration-200"
+                  className="rounded-lg overflow-hidden cursor-pointer hover:scale-[1.02] transition-all duration-200 hover:bg-white hover:shadow-lg"
                   style={{
                     backgroundColor: 'rgba(255, 255, 255, 0.03)',
                     border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -2170,7 +2170,7 @@ function Dashboard() {
                   <img
                     src={proof.proofUrl}
                     alt={proof.proofTitle}
-                    className="w-full h-full object-contain p-2"
+                    className="w-full h-full object-contain p-2 transition-all duration-200"
                   />
                 </div>
                 <div className="mt-3 text-center">
@@ -2205,17 +2205,14 @@ function Dashboard() {
                       <div className="mb-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
                         <div className="flex items-center gap-3">
                           <div 
-                            className="w-4 h-4 rounded border-2 flex-shrink-0" 
+                            className="w-5 h-5 rounded border-2 flex-shrink-0" 
                             style={{ 
                               borderColor: isGreenCut ? '#91c848' : '#6b7280', 
                               backgroundColor: 'transparent' 
                             }}
                           ></div>
-                          <span 
-                            className="text-sm font-medium" 
-                            style={{ color: isGreenCut ? '#91c848' : '#6b7280' }}
-                          >
-                            {isGreenCut ? 'Green' : 'Grey'} cut-line indicates where the sticker will be cut - {defaultCutSelection.displayValue}
+                          <span className="text-sm font-medium text-white">
+                            This is the cut line, it will not show up on the print.
                           </span>
                         </div>
                       </div>
