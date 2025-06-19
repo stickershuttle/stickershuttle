@@ -121,6 +121,7 @@ function Dashboard() {
     cloudinaryUrl?: string;
     orderId: string;
     proofId: string;
+    cutContourInfo?: any;
   } | null>(null);
   const [replacementSent, setReplacementSent] = useState<{[key: string]: boolean}>({});
   
@@ -147,7 +148,7 @@ function Dashboard() {
   const [highlightComments, setHighlightComments] = useState(false);
   const [actionNotification, setActionNotification] = useState<{
     message: string;
-    type: 'success' | 'error' | 'info';
+    type: 'success' | 'error' | 'info' | 'warning';
   } | null>(null);
   const [recordingMode, setRecordingMode] = useState(false);
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState<any>(null);
@@ -879,6 +880,18 @@ function Dashboard() {
         return;
       }
 
+      // Check for CutContour1 layers in PDF files
+      let cutContourInfo = null;
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        try {
+          const { analyzePDFForCutLines } = await import('../../utils/pdf-layer-detection');
+          cutContourInfo = await analyzePDFForCutLines(file);
+          console.log('📄 PDF layer analysis:', cutContourInfo);
+        } catch (error) {
+          console.warn('⚠️ Could not analyze PDF layers:', error);
+        }
+      }
+
       // Create preview URL
       const preview = URL.createObjectURL(file);
       
@@ -887,10 +900,27 @@ function Dashboard() {
         file,
         preview,
         orderId,
-        proofId
+        proofId,
+        cutContourInfo // Add cut contour analysis to staged file
       });
 
       console.log('📁 File staged for replacement:', file.name);
+      
+      // Show cut contour feedback if available
+      if (cutContourInfo) {
+        if (cutContourInfo.hasCutLines) {
+          setActionNotification({ 
+            message: '✅ CutContour1 layer detected! Your cut lines look good.', 
+            type: 'success' 
+          });
+        } else if (cutContourInfo.recommendations.length > 0) {
+          setActionNotification({ 
+            message: `⚠️ ${cutContourInfo.recommendations[0]}`, 
+            type: 'warning' 
+          });
+        }
+        setTimeout(() => setActionNotification(null), 6000);
+      }
       
       // Clear the file input to allow selecting the same file again
       const input = document.getElementById(`proof-file-input-${proofId}`) as HTMLInputElement;
@@ -2144,6 +2174,38 @@ function Dashboard() {
                   />
                 </div>
                 <div className="mt-3 text-center">
+                  {/* Cut Line Message Above Status Pill */}
+                  {(() => {
+                    const firstItem = order.items[0];
+                    const cutSelection = firstItem?._fullOrderData?.calculatorSelections?.cut;
+                    
+                    if (!cutSelection?.displayValue) return null;
+                    
+                    const isGreenCut = cutSelection.displayValue.toLowerCase().includes('kiss') || 
+                                      cutSelection.displayValue.toLowerCase().includes('cut through backing') ||
+                                      !cutSelection.displayValue.toLowerCase().includes('through');
+                    
+                    return (
+                      <div className="mb-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
+                        <div className="flex items-center gap-3">
+                          <div 
+                            className="w-4 h-4 rounded border-2 flex-shrink-0" 
+                            style={{ 
+                              borderColor: isGreenCut ? '#91c848' : '#6b7280', 
+                              backgroundColor: 'transparent' 
+                            }}
+                          ></div>
+                          <span 
+                            className="text-sm font-medium" 
+                            style={{ color: isGreenCut ? '#91c848' : '#6b7280' }}
+                          >
+                            {isGreenCut ? 'Green' : 'Grey'} cut-line indicates where the sticker will be cut - {cutSelection.displayValue}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  
                   <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(proof.status)}`}>
                     {getStatusText(proof.status)}
                   </span>

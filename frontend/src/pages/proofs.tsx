@@ -468,12 +468,7 @@ export default function ProofsPage() {
                         
                         return (
                           <div className="mt-4 p-4 rounded-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
-                            <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
-                              <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v8a2 2 0 002 2h2m9-10a2 2 0 012 2v8a2 2 0 01-2 2h-2M9 5a2 2 0 002 2v6a2 2 0 01-2 2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 5v10a2 2 0 002 2" />
-                              </svg>
-                              Cut Line Option
-                            </h4>
+
                             
                             <div className="flex items-center gap-3">
                               <div 
