@@ -37,6 +37,9 @@ const GET_ALL_ORDERS = gql`
       orderUpdatedAt
       createdAt
       updatedAt
+      proof_status
+      proof_sent_at
+      proof_link
       items {
         id
         customerOrderId
@@ -56,6 +59,9 @@ const GET_ALL_ORDERS = gql`
         fulfillmentStatus
         createdAt
         updatedAt
+        customerReplacementFile
+        customerReplacementFileName
+        customerReplacementAt
       }
       proofs {
         id
@@ -87,6 +93,21 @@ const UPDATE_ORDER_STATUS = gql`
   }
 `;
 
+// Mutation to send proofs
+const SEND_PROOFS = gql`
+  mutation SendProofs($orderId: ID!) {
+    sendProofs(orderId: $orderId) {
+      id
+      proof_status
+      proof_sent_at
+      proofs {
+        id
+        status
+      }
+    }
+  }
+`;
+
 // Admin check - add your admin email(s) here
 const ADMIN_EMAILS = ['justin@stickershuttle.com']; // Add all admin emails here
 
@@ -113,6 +134,9 @@ interface Order {
   orderCreatedAt?: string;
   createdAt?: string;
   orderNote?: string;
+  proof_status?: string;
+  proof_sent_at?: string;
+  proof_link?: string;
   items: Array<{
     id: string;
     productName: string;
@@ -126,6 +150,9 @@ interface Order {
     customerNotes?: string;
     instagramHandle?: string;
     instagramOptIn?: boolean;
+    customerReplacementFile?: string;
+    customerReplacementFileName?: string;
+    customerReplacementAt?: string;
   }>;
   proofs?: Array<{
     id: string;
@@ -175,6 +202,21 @@ export default function AdminOrders() {
   const [sortColumn, setSortColumn] = useState<string>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [sendingProofs, setSendingProofs] = useState(false);
+  const [proofsSent, setProofsSent] = useState<{ [key: string]: boolean }>({});
+  const [newProofsCount, setNewProofsCount] = useState<{ [key: string]: number }>({});
+
+  // Helper function to select an order and update URL
+  const selectOrder = (order: Order) => {
+    setSelectedOrder(order);
+    const orderNumber = order.orderNumber || order.id.split('-')[0].toUpperCase();
+    router.push(`/admin/orders/${orderNumber}`, undefined, { shallow: true });
+  };
+
+  // Helper function to go back to orders list
+  const goBackToOrders = () => {
+    setSelectedOrder(null);
+    router.push('/admin/orders', undefined, { shallow: true });
+  };
 
   // Get search term from URL params (set by header search)
   useEffect(() => {
@@ -186,7 +228,43 @@ export default function AdminOrders() {
   }, []);
 
   const { data, loading: ordersLoading, error, refetch } = useQuery(GET_ALL_ORDERS);
+
+  // Handle selectedOrder parameter after data is loaded
+  useEffect(() => {
+    if (data?.getAllOrders) {
+      const searchParams = new URLSearchParams(window.location.search);
+      const selectedOrderParam = searchParams.get('selectedOrder');
+      if (selectedOrderParam) {
+        const order = data.getAllOrders.find((o: Order) => 
+          (o.orderNumber && o.orderNumber === selectedOrderParam) || 
+          o.id.split('-')[0].toUpperCase() === selectedOrderParam
+        );
+        if (order) {
+          setSelectedOrder(order);
+        }
+      }
+    }
+  }, [data]);
+
+  // Handle URL-based order selection when data loads
+  useEffect(() => {
+    if (data?.getAllOrders && !selectedOrder) {
+      const pathSegments = router.asPath.split('/');
+      const ordersIndex = pathSegments.indexOf('orders');
+      if (ordersIndex !== -1 && pathSegments[ordersIndex + 1]) {
+        const orderNumber = pathSegments[ordersIndex + 1];
+        const order = data.getAllOrders.find((o: Order) => 
+          (o.orderNumber && o.orderNumber === orderNumber) || 
+          o.id.split('-')[0].toUpperCase() === orderNumber
+        );
+        if (order) {
+          setSelectedOrder(order);
+        }
+      }
+    }
+  }, [data, router.asPath, selectedOrder]);
   const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
+  const [sendProofs] = useMutation(SEND_PROOFS);
 
   // Calculate customer statistics
   const getCustomerStats = (customerEmail: string | undefined) => {
@@ -224,34 +302,7 @@ export default function AdminOrders() {
     return position || 1;
   };
 
-  // Generate proof URL and save to Supabase
-  const sendAllProofs = async (order: Order) => {
-    setSendingProofs(true);
-    try {
-      // Generate a unique proof viewing URL
-      const proofViewUrl = `${window.location.origin}/proofs?order=${order.id}`;
-      
-      // Here you would typically save this URL to Supabase
-      // For now, we'll just copy it to clipboard and show an alert
-      await navigator.clipboard.writeText(proofViewUrl);
-      
-      alert(`Proof URL copied to clipboard!\n\nURL: ${proofViewUrl}\n\nThis URL can be sent to the customer for proof approval.`);
-      
-      // TODO: Save proof URL to Supabase
-      // const supabase = await getSupabase();
-      // await supabase.from('proof_links').insert({
-      //   order_id: order.id,
-      //   proof_url: proofViewUrl,
-      //   sent_at: new Date().toISOString()
-      // });
-      
-    } catch (error) {
-      console.error('Error sending proofs:', error);
-      alert('Failed to generate proof URL');
-    } finally {
-      setSendingProofs(false);
-    }
-  };
+
 
   // Check if user is admin
   useEffect(() => {
@@ -294,14 +345,11 @@ export default function AdminOrders() {
       orders = orders.filter(order => {
         switch (filterStatus) {
           case 'building':
-            // For now all orders are "Building Proof"
-            return true;
+            return !order.proof_status || order.proof_status === 'building' || order.proof_status === 'pending';
           case 'awaiting':
-            // Coming soon - no orders yet
-            return false;
+            return order.proof_status === 'awaiting_approval';
           case 'approved':
-            // Coming soon - no orders yet
-            return false;
+            return order.proof_status === 'approved';
           default:
             return true;
         }
@@ -443,7 +491,14 @@ export default function AdminOrders() {
 
   // Get proof status (for now all are Building Proof)
   const getProofStatus = (order: Order) => {
-    // This will be dynamic later based on order data
+    // Check the actual proof_status from the database
+    if (order.proof_status === 'awaiting_approval') {
+      return 'Awaiting Approval';
+    }
+    if (order.proof_status === 'approved') {
+      return 'Proof Approved';
+    }
+    // Default to Building Proof if no proofs sent yet
     return 'Building Proof';
   };
 
@@ -453,7 +508,7 @@ export default function AdminOrders() {
       case 'Building Proof':
         return 'bg-yellow-400';
       case 'Awaiting Approval':
-        return 'bg-orange-400';
+        return 'bg-cyan-400'; // Changed from orange to neon blue
       case 'Proof Approved':
         return 'bg-green-400';
       default:
@@ -476,6 +531,31 @@ export default function AdminOrders() {
     } else {
       setSortColumn(column);
       setSortDirection('desc');
+    }
+  };
+
+  // Handle send proofs
+  const handleSendProofs = async (orderId: string) => {
+    setSendingProofs(true);
+    try {
+      await sendProofs({
+        variables: { orderId }
+      });
+      
+      // Update state to show proofs were sent
+      setProofsSent(prev => ({ ...prev, [orderId]: true }));
+      
+      // Reset new proofs count since they've been sent
+      setNewProofsCount(prev => ({ ...prev, [orderId]: 0 }));
+      
+      // Refetch to update proof status
+      refetch();
+      
+    } catch (error) {
+      console.error('Error sending proofs:', error);
+      alert('Failed to send proofs. Please try again.');
+    } finally {
+      setSendingProofs(false);
     }
   };
 
@@ -1033,152 +1113,82 @@ export default function AdminOrders() {
                   </div>
                 </div>
 
-                {/* Comprehensive Filter Section */}
-                <div className="rounded-xl mb-6 p-5" style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(12px)'
-                }}>
-                  <div className="flex items-center gap-2 mb-4">
-                    <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+
+
+                {/* Compact Filters */}
+                <div className="flex justify-end items-center gap-3 mb-4">
+                  {/* Filter Dropdown */}
+                  <div className="relative">
+                    <select
+                      aria-label="Filter orders by status"
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className="appearance-none bg-transparent border border-white/20 rounded-lg px-4 py-2 pl-10 text-white text-sm font-medium focus:outline-none focus:border-purple-400 transition-all cursor-pointer hover:scale-105"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 8px center',
+                        backgroundSize: '16px',
+                        paddingRight: '32px'
+                      }}
+                    >
+                      <option value="all" style={{ backgroundColor: '#030140' }}>All Orders</option>
+                      <option value="building" style={{ backgroundColor: '#030140' }}>Building Proof</option>
+                      <option value="awaiting" style={{ backgroundColor: '#030140' }}>Awaiting Approval</option>
+                      <option value="approved" style={{ backgroundColor: '#030140' }}>Proof Approved</option>
+                    </select>
+                    <svg className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                     </svg>
-                    <h3 className="text-sm font-medium text-white">Filter by Proof Status</h3>
                   </div>
 
-                  {/* Status Filters */}
-                  <div className="grid grid-cols-4 gap-3">
-                    <button
-                      onClick={() => setFilterStatus('all')}
-                      className={`relative w-full text-left px-4 py-3 rounded-xl flex items-center justify-between transition-all border backdrop-blur-md
-                        ${filterStatus === 'all'
-                          ? "bg-purple-500/20 text-purple-200 font-medium border-purple-400/50 shadow-[0_0_15px_rgba(168,85,247,0.4),0_0_25px_rgba(168,85,247,0.2)]"
-                          : "hover:bg-white/10 border-white/20 text-white/80"
-                        }`}
+                  {/* Date Range Dropdown */}
+                  <div className="relative">
+                    <select
+                      aria-label="Filter orders by date range"
+                      value={dateRange}
+                      onChange={(e) => {
+                        setDateRange(e.target.value);
+                        if (e.target.value === 'custom') {
+                          setShowDatePicker(true);
+                        }
+                      }}
+                      className="appearance-none bg-transparent border border-white/20 rounded-lg px-4 py-2 pl-10 text-white text-sm font-medium focus:outline-none focus:border-purple-400 transition-all cursor-pointer hover:scale-105"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 8px center',
+                        backgroundSize: '16px',
+                        paddingRight: '32px'
+                      }}
                     >
-                      <div className="flex items-center gap-3">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                        </svg>
-                        <span className="font-medium">All Orders</span>
-                      </div>
-                      <span className="text-lg font-bold">{data?.getAllOrders?.length || 0}</span>
-                    </button>
-
-                    <button
-                      onClick={() => setFilterStatus('building')}
-                      className={`relative w-full text-left px-4 py-3 rounded-xl flex items-center justify-between transition-all border backdrop-blur-md
-                        ${filterStatus === 'building'
-                          ? "bg-yellow-500/20 text-yellow-200 font-medium border-yellow-400/50 shadow-[0_0_15px_rgba(234,179,8,0.4),0_0_25px_rgba(234,179,8,0.2)]"
-                          : "hover:bg-white/10 border-white/20 text-white/80"
-                        }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <svg className="w-5 h-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
-                        </svg>
-                        <span className="font-medium">Building Proof</span>
-                      </div>
-                      <span className="text-lg font-bold">{data?.getAllOrders?.length || 0}</span>
-                    </button>
-
-                    <button
-                      onClick={() => setFilterStatus('awaiting')}
-                      className={`relative w-full text-left px-4 py-3 rounded-xl flex items-center justify-between transition-all border backdrop-blur-md opacity-50 cursor-not-allowed
-                        ${filterStatus === 'awaiting'
-                          ? "bg-orange-500/20 text-orange-200 font-medium border-orange-400/50 shadow-[0_0_15px_rgba(249,115,22,0.4),0_0_25px_rgba(249,115,22,0.2)]"
-                          : "hover:bg-white/10 border-white/20 text-white/80"
-                        }`}
-                      disabled
-                    >
-                      <div className="flex items-center gap-3">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="font-medium text-sm">Awaiting Approval</span>
-                      </div>
-                      <span className="text-lg font-bold">0</span>
-                    </button>
-
-                    <button
-                      onClick={() => setFilterStatus('approved')}
-                      className={`relative w-full text-left px-4 py-3 rounded-xl flex items-center justify-between transition-all border backdrop-blur-md opacity-50 cursor-not-allowed
-                        ${filterStatus === 'approved'
-                          ? "bg-green-500/20 text-green-200 font-medium border-green-400/50 shadow-[0_0_15px_rgba(34,197,94,0.4),0_0_25px_rgba(34,197,94,0.2)]"
-                          : "hover:bg-white/10 border-white/20 text-white/80"
-                        }`}
-                      disabled
-                    >
-                      <div className="flex items-center gap-3">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="font-medium text-sm">Proof Approved</span>
-                      </div>
-                      <span className="text-lg font-bold">0</span>
-                    </button>
+                      <option value="all" style={{ backgroundColor: '#030140' }}>All Time</option>
+                      <option value="today" style={{ backgroundColor: '#030140' }}>Today</option>
+                      <option value="week" style={{ backgroundColor: '#030140' }}>This Week</option>
+                      <option value="month" style={{ backgroundColor: '#030140' }}>This Month</option>
+                      <option value="quarter" style={{ backgroundColor: '#030140' }}>This Quarter</option>
+                      <option value="year" style={{ backgroundColor: '#030140' }}>Year to Date</option>
+                      <option value="last90" style={{ backgroundColor: '#030140' }}>Last 90 Days</option>
+                      <option value="custom" style={{ backgroundColor: '#030140' }}>Custom Range...</option>
+                    </select>
+                    <svg className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
                   </div>
 
-                  {/* Additional Filters Row */}
-                  <div className="grid grid-cols-2 gap-4 pt-5 mt-5 border-t border-gray-700 border-opacity-30">
-                    {/* Date Range */}
-                    <div>
-                      <label className="block text-xs text-gray-300 font-medium mb-2 flex items-center gap-2">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        Date Range
-                      </label>
-                      <select
-                        aria-label="Filter by date range"
-                        value={dateRange}
-                        onChange={(e) => {
-                          setDateRange(e.target.value);
-                          if (e.target.value === 'custom') {
-                            setShowDatePicker(true);
-                          }
-                        }}
-                        className="w-full px-4 py-2.5 rounded-lg text-white font-medium focus:outline-none focus:border-purple-400 transition-all backdrop-blur-md appearance-none cursor-pointer"
-                        style={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.10)',
-                          border: '1px solid rgba(255, 255, 255, 0.2)',
-                          backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                          backgroundRepeat: 'no-repeat',
-                          backgroundPosition: 'right 1rem center',
-                          backgroundSize: '1em',
-                          paddingRight: '3rem'
-                        }}
-                      >
-                        <option value="all" style={{ backgroundColor: '#030140' }}>All Time</option>
-                        <option value="today" style={{ backgroundColor: '#030140' }}>Today</option>
-                        <option value="week" style={{ backgroundColor: '#030140' }}>This Week</option>
-                        <option value="month" style={{ backgroundColor: '#030140' }}>This Month</option>
-                        <option value="quarter" style={{ backgroundColor: '#030140' }}>This Quarter</option>
-                        <option value="custom" style={{ backgroundColor: '#030140' }}>Custom Range...</option>
-                      </select>
-                    </div>
-
-                    {/* Search */}
-                    <div>
-                      <label className="block text-xs text-gray-300 font-medium mb-2 flex items-center gap-2">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                        Search Orders
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Order #, email, or name..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-lg text-white placeholder-white/60 font-medium focus:outline-none focus:border-purple-400 transition-all backdrop-blur-md"
-                        style={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.10)',
-                          border: '1px solid rgba(255, 255, 255, 0.2)'
-                        }}
-                      />
-                    </div>
+                  {/* Search Input */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search orders..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="bg-transparent border border-white/20 rounded-lg px-4 py-2 pl-10 text-white text-sm placeholder-white/60 focus:outline-none focus:border-purple-400 transition-all"
+                      style={{ minWidth: '200px' }}
+                    />
+                    <svg className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
                   </div>
                 </div>
 
@@ -1315,7 +1325,7 @@ export default function AdminOrders() {
                               onMouseLeave={(e) => {
                                 e.currentTarget.style.backgroundColor = 'transparent';
                               }}
-                              onClick={() => setSelectedOrder(order)}
+                              onClick={() => selectOrder(order)}
                             >
                               {/* Status */}
                               <td className="pl-6 pr-3 py-4">
@@ -1348,7 +1358,7 @@ export default function AdminOrders() {
                                     <img
                                       src={firstItemImage}
                                       alt="Design preview"
-                                      className="w-full h-full object-contain"
+                                      className="w-full h-full object-contain p-4"
                                     />
                                   ) : (
                                     <div className="w-full h-full flex items-center justify-center">
@@ -1481,7 +1491,7 @@ export default function AdminOrders() {
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setSelectedOrder(order);
+                                      selectOrder(order);
                                     }}
                                     className="p-1.5 rounded-lg text-purple-400 hover:text-purple-300 hover:bg-purple-500 hover:bg-opacity-10 transition-all"
                                     title="View Order Details"
@@ -1512,7 +1522,7 @@ export default function AdminOrders() {
                                     title="Ship Order"
                                   >
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                                     </svg>
                                   </button>
                                 </div>
@@ -1545,7 +1555,7 @@ export default function AdminOrders() {
                 <div className="flex justify-between items-center mb-6">
                   <div className="flex items-center gap-4">
                     <button
-                      onClick={() => setSelectedOrder(null)}
+                      onClick={goBackToOrders}
                       className="text-gray-400 hover:text-white transition-colors cursor-pointer"
                       aria-label="Back to orders"
                     >
@@ -1580,7 +1590,7 @@ export default function AdminOrders() {
                     {/* Action Buttons */}
                     <button
                       onClick={() => printOrderSlip(selectedOrder)}
-                      className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80"
+                      className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105"
                       style={{
                         backgroundColor: 'rgba(59, 130, 246, 0.2)',
                         border: '1px solid rgba(59, 130, 246, 0.4)'
@@ -1593,14 +1603,14 @@ export default function AdminOrders() {
                     </button>
                     <button
                       onClick={() => openShipStation(selectedOrder)}
-                      className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80"
+                      className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105"
                       style={{
                         backgroundColor: 'rgba(16, 185, 129, 0.2)',
                         border: '1px solid rgba(16, 185, 129, 0.4)'
                       }}
                     >
                       <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                       </svg>
                       Ship Order
                     </button>
@@ -1637,25 +1647,38 @@ export default function AdminOrders() {
                             <div key={idx} className="py-4 border-b border-gray-700 border-opacity-30 last:border-b-0">
                               <div className="flex gap-4">
                                 {/* Product Image */}
-                                <div
-                                  className="rounded-lg overflow-hidden flex-shrink-0"
-                                  style={{
-                                    width: '80px',
-                                    height: '80px',
-                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)'
-                                  }}
-                                >
-                                  {itemImage ? (
-                                    <img
-                                      src={itemImage}
-                                      alt={`${item.productName} design`}
-                                      className="w-full h-full object-contain"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                      <svg className="w-8 h-8 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                <div className="relative">
+                                  <div
+                                    className={`rounded-lg overflow-hidden flex-shrink-0 ${item.customerReplacementFile ? 'ring-2 ring-orange-400 ring-opacity-60' : ''}`}
+                                    style={{
+                                      width: '80px',
+                                      height: '80px',
+                                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                      border: item.customerReplacementFile 
+                                        ? '1px solid rgba(251, 146, 60, 0.6)' 
+                                        : '1px solid rgba(255, 255, 255, 0.1)'
+                                    }}
+                                  >
+                                    {itemImage ? (
+                                      <img
+                                        src={itemImage}
+                                        alt={`${item.productName} design`}
+                                        className="w-full h-full object-contain p-4"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center">
+                                        <svg className="w-8 h-8 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Customer Replacement Indicator */}
+                                  {item.customerReplacementFile && (
+                                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
+                                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                       </svg>
                                     </div>
                                   )}
@@ -1706,7 +1729,7 @@ export default function AdminOrders() {
                                   </div>
 
                                   {/* Additional Details */}
-                                  {(item.customerNotes || item.instagramHandle) && (
+                                  {(item.customerNotes || item.instagramHandle || item.customerReplacementFile) && (
                                     <div className="mt-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
                                       {item.customerNotes && (
                                         <div className="text-sm">
@@ -1721,6 +1744,33 @@ export default function AdminOrders() {
                                           {item.instagramOptIn && (
                                             <span className="ml-2 text-xs text-green-400">(Opted in for marketing)</span>
                                           )}
+                                        </div>
+                                      )}
+                                      {item.customerReplacementFile && (
+                                        <div className="text-sm mt-1 p-2 rounded-lg bg-orange-500/10 border border-orange-500/30">
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                            </svg>
+                                            <span className="text-orange-400 font-medium">Customer Replacement File</span>
+                                          </div>
+                                          <div className="ml-6 space-y-1">
+                                            <div className="text-xs text-gray-300">
+                                              <span className="text-gray-500">File:</span>
+                                              <button
+                                                onClick={() => handleDownloadFile(item.customerReplacementFile!, item.customerReplacementFileName)}
+                                                className="ml-2 text-orange-400 hover:text-orange-300 underline"
+                                              >
+                                                {item.customerReplacementFileName || 'Download'}
+                                              </button>
+                                            </div>
+                                            {item.customerReplacementAt && (
+                                              <div className="text-xs text-gray-400">
+                                                <span className="text-gray-500">Uploaded:</span>
+                                                <span className="ml-2">{formatDate(item.customerReplacementAt)}</span>
+                                              </div>
+                                            )}
+                                          </div>
                                         </div>
                                       )}
                                     </div>
@@ -1768,30 +1818,83 @@ export default function AdminOrders() {
 
                         {/* Action Buttons */}
                         <div className="flex gap-3 pt-4">
-                          <button
-                            onClick={() => sendAllProofs(selectedOrder)}
-                            disabled={sendingProofs}
-                            className="flex-1 inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
-                            style={{
-                              backgroundColor: 'rgba(168, 85, 247, 0.2)',
-                              border: '1px solid rgba(168, 85, 247, 0.4)'
-                            }}
-                          >
-                            <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                            </svg>
-                            {sendingProofs ? 'Generating...' : 'Send All Proofs'}
-                          </button>
+                          {/* View/Send Proofs button - only show if there are proofs */}
+                          {((selectedOrder.proofs && selectedOrder.proofs.length > 0) || newProofsCount[selectedOrder.id] > 0) && (
+                            <button
+                              onClick={() => {
+                                // Check if there are NEW proofs that haven't been sent
+                                const hasNewProofs = newProofsCount[selectedOrder.id] > 0;
+                                
+                                if (hasNewProofs) {
+                                  // There are new proofs, send them
+                                  handleSendProofs(selectedOrder.id);
+                                } else if (selectedOrder.proof_status === 'awaiting_approval' || selectedOrder.proof_sent_at) {
+                                  // Already sent, just view proofs
+                                  window.open(`/proofs?orderId=${selectedOrder.id}`, '_blank');
+                                } else {
+                                  // Not sent yet, send proofs
+                                  handleSendProofs(selectedOrder.id);
+                                }
+                              }}
+                              disabled={sendingProofs}
+                              className="flex-1 inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer hover:scale-105"
+                              style={{
+                                backgroundColor: (newProofsCount[selectedOrder.id] > 0)
+                                  ? 'rgba(34, 197, 94, 0.2)' // Green for send proofs
+                                  : (selectedOrder.proof_status === 'awaiting_approval' || selectedOrder.proof_sent_at)
+                                    ? 'rgba(59, 130, 246, 0.2)' // Blue for view proofs
+                                    : 'rgba(34, 197, 94, 0.2)', // Green for send proofs
+                                border: (newProofsCount[selectedOrder.id] > 0)
+                                  ? '1px solid rgba(34, 197, 94, 0.4)' // Green for send proofs
+                                  : (selectedOrder.proof_status === 'awaiting_approval' || selectedOrder.proof_sent_at)
+                                    ? '1px solid rgba(59, 130, 246, 0.4)' // Blue for view proofs
+                                    : '1px solid rgba(34, 197, 94, 0.4)' // Green for send proofs
+                              }}
+                            >
+                              {sendingProofs ? (
+                                <>
+                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Sending...
+                                </>
+                              ) : (newProofsCount[selectedOrder.id] > 0) ? (
+                                <>
+                                  <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                  </svg>
+                                  Send Proofs
+                                </>
+                              ) : (selectedOrder.proof_status === 'awaiting_approval' || selectedOrder.proof_sent_at) ? (
+                                <>
+                                  <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </svg>
+                                  View Proofs
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                  </svg>
+                                  Send Proofs
+                                </>
+                              )}
+                            </button>
+                          )}
+                          
                           <button
                             onClick={() => openShipStation(selectedOrder)}
-                            className="flex-1 inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80"
+                            className={`${(selectedOrder.proofs && selectedOrder.proofs.length > 0) || newProofsCount[selectedOrder.id] > 0 ? 'flex-1' : 'w-full'} inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105`}
                             style={{
                               backgroundColor: 'rgba(16, 185, 129, 0.2)',
                               border: '1px solid rgba(16, 185, 129, 0.4)'
                             }}
                           >
                             <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                             </svg>
                             Ship Order
                           </button>
@@ -1815,9 +1918,42 @@ export default function AdminOrders() {
                       </h3>
                       <ProofUpload
                         orderId={selectedOrder.id}
+                        proofStatus={selectedOrder.proof_status}
+                        existingProofs={selectedOrder.proofs}
+                        isAdmin={true}
                         onProofUploaded={(proof) => {
                           console.log('Proof uploaded:', proof);
+                          // Refetch data to get updated proof information
                           refetch();
+                          
+                          // Handle different proof actions
+                          if (proof.removed) {
+                            // Remove proof from local state
+                            setSelectedOrder(prev => {
+                              if (!prev) return prev;
+                              return {
+                                ...prev,
+                                proofs: (prev.proofs || []).filter(p => p.id !== proof.proofId)
+                              };
+                            });
+                          } else if (proof.replaced) {
+                            // Just refetch for replacements since proof ID stays the same
+                            // The refetch above will handle the update
+                          } else {
+                            // Add new proof to local state
+                            setSelectedOrder(prev => {
+                              if (!prev) return prev;
+                              return {
+                                ...prev,
+                                proofs: [...(prev.proofs || []), proof]
+                              };
+                            });
+                            // Track that we have a new proof for this order
+                            setNewProofsCount(prev => ({
+                              ...prev,
+                              [selectedOrder.id]: (prev[selectedOrder.id] || 0) + 1
+                            }));
+                          }
                         }}
                       />
                     </div>
@@ -2005,13 +2141,58 @@ export default function AdminOrders() {
                             </div>
                           </div>
                         )}
-                        <div className="flex items-start gap-3">
-                          <div className="w-2 h-2 rounded-full bg-yellow-400 mt-1.5 animate-pulse"></div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-white">Building proof</p>
-                            <p className="text-xs text-gray-400">In progress</p>
+                        
+                        {/* Proof Activities */}
+                        {selectedOrder.proofs && selectedOrder.proofs.length > 0 && (
+                          <>
+                            <div className="flex items-start gap-3">
+                              <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5"></div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-white">Design proofs uploaded</p>
+                                <p className="text-xs text-gray-400">{formatDate(selectedOrder.proofs[0].uploadedAt)}</p>
+                              </div>
+                            </div>
+                            
+                            {selectedOrder.proof_sent_at && (
+                              <div className="flex items-start gap-3">
+                                <div className="w-2 h-2 rounded-full bg-purple-400 mt-1.5"></div>
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-white">Proofs sent to customer</p>
+                                  <p className="text-xs text-gray-400">{formatDate(selectedOrder.proof_sent_at)}</p>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {selectedOrder.proof_status === 'approved' && (
+                              <div className="flex items-start gap-3">
+                                <div className="w-2 h-2 rounded-full bg-green-400 mt-1.5"></div>
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-white">Proofs approved by customer</p>
+                                  <p className="text-xs text-gray-400">Ready for production</p>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                        
+                        {/* Current Status */}
+                        {selectedOrder.proof_status === 'awaiting_approval' ? (
+                          <div className="flex items-start gap-3">
+                            <div className="w-2 h-2 rounded-full bg-cyan-400 mt-1.5 animate-pulse"></div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-white">Awaiting customer approval</p>
+                              <p className="text-xs text-gray-400">Customer is reviewing proofs</p>
+                            </div>
                           </div>
-                        </div>
+                        ) : !selectedOrder.proof_sent_at && (
+                          <div className="flex items-start gap-3">
+                            <div className="w-2 h-2 rounded-full bg-yellow-400 mt-1.5 animate-pulse"></div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-white">Building proof</p>
+                              <p className="text-xs text-gray-400">In progress</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

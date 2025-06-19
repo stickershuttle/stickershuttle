@@ -32,6 +32,9 @@ export const GET_USER_ORDERS = gql`
       orderUpdatedAt
       createdAt
       updatedAt
+      proof_status
+      proof_sent_at
+      proof_link
       items {
         id
         customerOrderId
@@ -51,6 +54,17 @@ export const GET_USER_ORDERS = gql`
         fulfillmentStatus
         createdAt
         updatedAt
+      }
+      proofs {
+        id
+        proofUrl
+        proofPublicId
+        proofTitle
+        uploadedAt
+        uploadedBy
+        status
+        customerNotes
+        adminNotes
       }
     }
   }
@@ -88,6 +102,9 @@ export const GET_ORDER_BY_ID = gql`
       orderUpdatedAt
       createdAt
       updatedAt
+      proof_status
+      proof_sent_at
+      proof_link
       items {
         id
         customerOrderId
@@ -107,6 +124,17 @@ export const GET_ORDER_BY_ID = gql`
         fulfillmentStatus
         createdAt
         updatedAt
+      }
+      proofs {
+        id
+        proofUrl
+        proofPublicId
+        proofTitle
+        uploadedAt
+        uploadedBy
+        status
+        customerNotes
+        adminNotes
       }
     }
   }

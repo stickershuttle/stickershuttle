@@ -179,16 +179,44 @@ export const useDashboardData = () => {
           const missionId = getMissionNumber(order);
           console.log(`🎯 FINAL MISSION ID: ${missionId} for order ${order.id}`);
           
+          // Handle proofs data
+          console.log(`🔍 PROOF DEBUG for order ${order.id}:`, {
+            proofs: order.proofs,
+            proofsLength: order.proofs?.length || 0,
+            proof_status: order.proof_status,
+            proof_sent_at: order.proof_sent_at
+          });
+          
+          const hasProofs = order.proofs && order.proofs.length > 0;
+          const firstProofUrl = hasProofs ? order.proofs[0].proofUrl : null;
+          
+          // Determine proof status for dashboard
+          let proofStatus = 'Building Proof'; // Default status
+          if (order.proof_status === 'awaiting_approval') {
+            proofStatus = 'Proof Review Needed';
+          } else if (order.proof_status === 'approved') {
+            proofStatus = 'In Production';
+          } else if (hasProofs && order.proof_sent_at) {
+            proofStatus = 'Proof Review Needed';
+          } else if (hasProofs) {
+            proofStatus = 'Proof Ready';
+          }
+
           const transformedOrder = {
             id: order.id, // Keep original order ID
             orderNumber: order.orderNumber, // Preserve order number (SS-00001 format)
             order_number: order.order_number || order.orderNumber, // Support both formats
             stripePaymentIntentId: order.stripePaymentIntentId, // Preserve Stripe payment intent
             date: order.orderCreatedAt || order.createdAt || new Date().toISOString(),
-            status: mapOrderStatus(order.orderStatus, order.fulfillmentStatus),
+            status: hasProofs && order.proof_status ? proofStatus : mapOrderStatus(order.orderStatus, order.fulfillmentStatus),
             total: orderTotal, // Use the calculated total
             trackingNumber: order.trackingNumber || null,
-            proofUrl: null, // TODO: Add proof URL logic
+            proofUrl: firstProofUrl, // Use first proof URL if available
+            
+            // Add proof-related fields for dashboard
+            proofs: order.proofs || [],
+            proof_status: order.proof_status,
+            proof_sent_at: order.proof_sent_at,
             
             // Keep full order data for invoice
             _fullOrderData: order,
@@ -320,10 +348,13 @@ export const useDashboardData = () => {
   const refreshOrders = async () => {
     if (!user) return;
     
-    console.log('🔄 Phase 2: Refreshing real order data...');
+    console.log('🔄 Phase 2: Refreshing real order data (forcing network fetch)...');
     try {
-      await refetchOrders();
-      console.log('✅ Phase 2: Real order data refreshed');
+      // Force a network-only refetch to bypass cache
+      await refetchOrders({
+        fetchPolicy: 'network-only'
+      });
+      console.log('✅ Phase 2: Real order data refreshed from network');
     } catch (error) {
       console.error('Error refreshing orders:', error);
       setOrdersError('Failed to refresh orders');

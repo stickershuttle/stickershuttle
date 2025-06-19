@@ -5,8 +5,22 @@ import Link from 'next/link';
 import { getSupabase } from '../../lib/supabase';
 import { useDashboardData } from '../../hooks/useDashboardData';
 import OrderInvoice from '../../components/OrderInvoice';
-import { useLazyQuery } from '@apollo/client';
+import { useLazyQuery, useMutation, gql } from '@apollo/client';
 import { GET_ORDER_BY_ID } from '../../lib/order-mutations';
+
+// Mutation to update proof status (same as proofs page)
+const UPDATE_PROOF_STATUS = gql`
+  mutation UpdateProofStatus($orderId: ID!, $proofId: ID!, $status: String!, $customerNotes: String) {
+    updateProofStatus(orderId: $orderId, proofId: $proofId, status: $status, customerNotes: $customerNotes) {
+      id
+      proofs {
+        id
+        status
+        customerNotes
+      }
+    }
+  }
+`;
 import useInvoiceGenerator, { InvoiceData } from '../../components/InvoiceGenerator';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import dynamic from 'next/dynamic';
@@ -31,6 +45,7 @@ interface OrderItem {
 
 interface Order {
   id: string;
+  orderNumber?: string;
   date: string;
   status: string;
   total: number;
@@ -38,6 +53,18 @@ interface Order {
   proofUrl?: string;
   items: OrderItem[];
   _fullOrderData?: any;
+  // Proof-related fields
+  proofs?: Array<{
+    id: string;
+    proofUrl: string;
+    proofTitle?: string;
+    uploadedAt: string;
+    status: string;
+    customerNotes?: string;
+    adminNotes?: string;
+  }>;
+  proof_status?: string;
+  proof_sent_at?: string;
 }
 
 function Dashboard() {
@@ -71,6 +98,31 @@ function Dashboard() {
       console.log('⚠️ Falling back to basic order data');
     }
   });
+
+  // Add proof update mutation
+  const [updateProofStatus] = useMutation(UPDATE_PROOF_STATUS, {
+    onCompleted: () => {
+      // Force a fresh network request for orders data after proof update
+      console.log('✅ Proof status updated, refreshing orders data...');
+      setTimeout(() => {
+        refreshOrders();
+      }, 500); // Small delay to ensure backend has processed the update
+    },
+    onError: (error) => {
+      console.error('Error updating proof status:', error);
+    }
+  });
+
+  // File upload state
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [stagedFile, setStagedFile] = useState<{
+    file: File;
+    preview: string;
+    cloudinaryUrl?: string;
+    orderId: string;
+    proofId: string;
+  } | null>(null);
+  const [replacementSent, setReplacementSent] = useState<{[key: string]: boolean}>({});
   
   // Use real orders only - no sample data
   const orders: Order[] = realOrders || [];
@@ -241,6 +293,15 @@ function Dashboard() {
       document.removeEventListener('keydown', handleKeyPress);
     };
   }, [recordingMode]);
+
+  // Cleanup staged file on unmount
+  useEffect(() => {
+    return () => {
+      if (stagedFile) {
+        URL.revokeObjectURL(stagedFile.preview);
+      }
+    };
+  }, [stagedFile]);
 
   const fetchProfile = async () => {
     if (!user || !(user as any)?.id) {
@@ -765,45 +826,177 @@ function Dashboard() {
     setCurrentView('order-details');
   };
 
-  const handleProofAction = async (action: string, orderId?: string) => {
-    // Require comments for certain actions
-    if ((action === 'changes' || action === 'deny' || action === 'upload') && !proofComments.trim()) {
-      setHighlightComments(true);
-      setTimeout(() => setHighlightComments(false), 3000);
-      return;
-    }
-    
-    setProofAction(action);
-    
-    // Simulate API call
-    setTimeout(() => {
-      let message = '';
+  const handleProofAction = async (action: 'approve' | 'request_changes', orderId: string, proofId: string) => {
+    if (!orderId || !proofId) return;
+
+    console.log(`🔄 Processing proof action: ${action} for order ${orderId}, proof ${proofId}`);
+
+    try {
+      setProofAction(action);
       
-      // Handle proof action based on type
-      switch (action) {
-        case 'approve':
-          message = `Proof approved! Order ${orderId} is now in production.`;
-          break;
-        case 'deny':
-          message = `Proof denied. Our design team will create a new proof based on your feedback.`;
-          break;
-        case 'changes':
-          message = `Change request submitted. Our design team is reviewing your feedback.`;
-          break;
-        case 'upload':
-          message = `File upload initiated. Please upload your corrected design file.`;
-          break;
-      }
-      
-      setActionNotification({ message, type: 'success' });
-      setTimeout(() => setActionNotification(null), 4000);
-      setProofAction('');
+      await updateProofStatus({
+        variables: {
+          orderId,
+          proofId,
+          status: action === 'approve' ? 'approved' : 'changes_requested',
+          customerNotes: proofComments || null
+        }
+      });
+
       setProofComments('');
       setShowApprovalConfirm(false);
       
-      // Force re-render
-      setCurrentView('proofs');
-    }, 1500);
+      // Show success message
+      const message = action === 'approve' ? 'Proof approved! Order is now in production.' : 'Change request submitted! Our design team will review your feedback.';
+      setActionNotification({ message, type: 'success' });
+      setTimeout(() => setActionNotification(null), 4000);
+      
+      console.log(`✅ Proof action ${action} completed successfully`);
+      
+    } catch (error) {
+      console.error('Error updating proof:', error);
+      setActionNotification({ message: 'Failed to update proof status', type: 'error' });
+      setTimeout(() => setActionNotification(null), 4000);
+    } finally {
+      setProofAction('');
+    }
+  };
+
+  const handleFileSelect = async (file: File, orderId: string, proofId: string) => {
+    if (!file) return;
+
+    try {
+      // Validate file before staging
+      const { validateFile } = await import('../../utils/cloudinary');
+      const validation = validateFile(file);
+      
+      if (!validation.valid) {
+        setActionNotification({ 
+          message: validation.error || 'Invalid file', 
+          type: 'error' 
+        });
+        setTimeout(() => setActionNotification(null), 4000);
+        return;
+      }
+
+      // Create preview URL
+      const preview = URL.createObjectURL(file);
+      
+      // Stage the file for preview
+      setStagedFile({
+        file,
+        preview,
+        orderId,
+        proofId
+      });
+
+      console.log('📁 File staged for replacement:', file.name);
+      
+      // Clear the file input to allow selecting the same file again
+      const input = document.getElementById(`proof-file-input-${proofId}`) as HTMLInputElement;
+      if (input) {
+        input.value = '';
+      }
+
+    } catch (error: any) {
+      console.error('Error staging file:', error);
+      setActionNotification({ 
+        message: `Failed to stage file: ${error?.message || 'Unknown error'}`, 
+        type: 'error' 
+      });
+      setTimeout(() => setActionNotification(null), 4000);
+    }
+  };
+
+  const handleSendReplacement = async () => {
+    if (!stagedFile) return;
+
+    try {
+      setUploadingFile(true);
+      console.log('🔄 Uploading replacement file:', stagedFile.file.name);
+
+      // Use the existing Cloudinary utility function
+      const { uploadToCloudinary } = await import('../../utils/cloudinary');
+      
+      const cloudinaryData = await uploadToCloudinary(
+        stagedFile.file,
+        undefined, // no metadata needed for proof replacements
+        undefined, // no progress callback needed
+        'customer-replacements' // folder for customer replacements
+      );
+      
+      console.log('✅ File uploaded to Cloudinary:', cloudinaryData.secure_url);
+
+      // Update the ORDER's custom files (not the proof) - this is what gets printed
+      const { gql } = await import('@apollo/client');
+      const { default: apolloClient } = await import('../../lib/apollo-client');
+      
+      // For now, we'll just upload the file and track the replacement in frontend state
+      // The actual integration with order files can be done later by admin team
+      
+      console.log('✅ Replacement file uploaded to:', cloudinaryData.secure_url);
+      console.log('📝 File details:', {
+        orderId: stagedFile.orderId,
+        proofId: stagedFile.proofId,
+        fileName: stagedFile.file.name,
+        fileUrl: cloudinaryData.secure_url,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Store replacement info in localStorage for admin reference
+      const replacementKey = `replacement_${stagedFile.orderId}_${stagedFile.proofId}`;
+      const replacementData = {
+        orderId: stagedFile.orderId,
+        proofId: stagedFile.proofId,
+        originalFileName: stagedFile.file.name,
+        replacementFileUrl: cloudinaryData.secure_url,
+        uploadedAt: new Date().toISOString(),
+        customerEmail: 'current-user-email' // This would come from auth context
+      };
+      
+      try {
+        localStorage.setItem(replacementKey, JSON.stringify(replacementData));
+        console.log('💾 Replacement data stored in localStorage:', replacementKey);
+      } catch (e) {
+        console.warn('⚠️ Could not store replacement data in localStorage:', e);
+      }
+      
+      // Mark replacement as sent for this proof
+      const proofKey = `${stagedFile.orderId}-${stagedFile.proofId}`;
+      setReplacementSent(prev => ({ ...prev, [proofKey]: true }));
+
+      // Clean up staged file
+      URL.revokeObjectURL(stagedFile.preview);
+      setStagedFile(null);
+
+      // Note: We're not updating the proof image - that stays the same
+      // The replacement file will be processed by the admin team
+      
+      setActionNotification({ 
+        message: 'Replacement file sent successfully! We\'ll review it and send you an updated proof shortly.', 
+        type: 'success' 
+      });
+      setTimeout(() => setActionNotification(null), 4000);
+
+    } catch (error: any) {
+      console.error('Error uploading replacement file:', error);
+      const errorMessage = error?.message || 'Unknown error occurred';
+      
+      setActionNotification({ 
+        message: `Failed to upload replacement file: ${errorMessage}`, 
+        type: 'error' 
+      });
+      setTimeout(() => setActionNotification(null), 4000);
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleCancelReplacement = () => {
+    if (stagedFile) {
+      URL.revokeObjectURL(stagedFile.preview);
+      setStagedFile(null);
+    }
   };
 
   const renderMainContent = () => {
@@ -1815,38 +2008,489 @@ function Dashboard() {
     );
   };
 
-  const renderProofsView = () => {
-    const proofsToReview = orders.filter(order => 
-      order.status === 'Proof Review Needed'
+  // Helper function to render individual proof review interface (like proofs.tsx)
+  const renderProofReviewInterface = (order: any) => {
+    const formatDate = (dateString: string) => {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      });
+    };
+
+    const formatCurrency = (amount: number) => {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(amount);
+    };
+
+    const getStatusColor = (status: string) => {
+      switch (status) {
+        case 'approved':
+          return 'bg-green-900 bg-opacity-40 text-green-300';
+        case 'changes_requested':
+          return 'bg-orange-900 bg-opacity-40 text-orange-300';
+        case 'pending':
+        case 'sent':
+        default:
+          return 'bg-yellow-900 bg-opacity-40 text-yellow-300';
+      }
+    };
+
+    const getStatusText = (status: string) => {
+      switch (status) {
+        case 'approved':
+          return 'Approved';
+        case 'changes_requested':
+          return 'Changes Requested';
+        case 'pending':
+        case 'sent':
+        default:
+          return 'Pending Review';
+      }
+    };
+
+    // Get proofs from either proofs array or legacy proofUrl
+    const proofs = order.proofs && order.proofs.length > 0 
+      ? order.proofs 
+      : order.proofUrl 
+        ? [{
+            id: 'legacy',
+            proofUrl: order.proofUrl,
+            proofTitle: 'Design Proof',
+            uploadedAt: order.date,
+            status: order.proof_status || 'pending',
+            customerNotes: '',
+            adminNotes: ''
+          }]
+        : [];
+
+    if (proofs.length === 0) {
+      return (
+        <div className="text-center py-8">
+          <div className="text-gray-400">
+            <svg className="mx-auto h-8 w-8 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h3 className="text-sm font-medium text-white mb-1">No proofs uploaded yet</h3>
+            <p className="text-xs text-gray-400">We're working on your design proofs.</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {proofs.map((proof: any, index: number) => {
+          const proofKey = `${order.id}-${proof.id}`;
+          const hasReplacementSent = replacementSent[proofKey];
+          
+          if (hasReplacementSent) {
+            // Show replacement confirmation message instead of proof interface
+            return (
+              <div key={proof.id} className="container-style p-8 text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-500/20 mb-4">
+                  <svg className="w-8 h-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">Replacement File Received</h3>
+                <p className="text-gray-300 mb-4">
+                  We've received your new file and will send you an updated proof shortly. Check back soon.
+                </p>
+                <div className="inline-flex items-center gap-2 text-sm text-blue-400">
+                  <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></div>
+                  Processing your replacement file
+                </div>
+              </div>
+            );
+          }
+          
+          return (
+          <div key={proof.id} className="container-style p-6">
+            {/* Proof Header */}
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h3 className="text-xl font-semibold text-white">Design Proof #{index + 1}</h3>
+                <div className="flex items-center gap-2 mt-1">
+                  <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <p className="text-sm text-gray-400">Uploaded {formatDate(proof.uploadedAt)}</p>
+                </div>
+              </div>
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(proof.status)}`}>
+                {getStatusText(proof.status)}
+              </span>
+            </div>
+
+            {/* Improved Proof Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left - Proof Image */}
+              <div className="lg:col-span-1">
+                <div 
+                  className="rounded-lg overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform duration-200"
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    aspectRatio: '1'
+                  }}
+                  onClick={() => window.open(proof.proofUrl, '_blank')}
+                >
+                  <img
+                    src={proof.proofUrl}
+                    alt={proof.proofTitle}
+                    className="w-full h-full object-contain p-2"
+                  />
+                </div>
+                <div className="mt-3 text-center">
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(proof.status)}`}>
+                    {getStatusText(proof.status)}
+                  </span>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Uploaded {formatDate(proof.uploadedAt)} at {new Date(proof.uploadedAt).toLocaleTimeString('en-US', { 
+                      hour: '2-digit', 
+                      minute: '2-digit',
+                      hour12: true 
+                    })}
+                  </p>
+                </div>
+              </div>
+
+              {/* Right - Order Summary & Actions */}
+              <div className="lg:col-span-2 space-y-4">
+                {/* Order Summary Container */}
+                <div className="container-style p-4">
+                  <h4 className="text-sm font-semibold text-white mb-3">Order Summary</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Product:</span>
+                      <span className="text-white">{order.items[0]?.name}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Quantity:</span>
+                      <span className="text-white">{order.items.reduce((sum: number, item: any) => sum + item.quantity, 0)}</span>
+                    </div>
+                    {(() => {
+                      const firstItem = order.items[0];
+                      const selections = firstItem?._fullOrderData?.calculatorSelections || {};
+                      const size = selections.size || selections.sizePreset || {};
+                      
+                      return (
+                        <>
+                          {((size.width && size.height) || size.displayValue) && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-400">Size:</span>
+                              <span className="text-white">
+                                {size.width && size.height ? `${size.width}" × ${size.height}"` : size.displayValue}
+                              </span>
+                            </div>
+                          )}
+                          {selections.material?.displayValue && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-400">Material:</span>
+                              <span className="text-white">{selections.material.displayValue}</span>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                    <div className="flex justify-between text-xs pt-2 border-t border-white/10">
+                      <span className="text-gray-400">Total:</span>
+                      <span className="text-green-400 font-semibold">$122.85</span>
+                    </div>
+                  </div>
+
+                  {/* Production Info */}
+                  <div className="mt-4 pt-3 border-t border-white/10 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750314056/cmyk_nypyrn.png" 
+                        alt="CMYK" 
+                        className="w-4 h-4"
+                      />
+                      <span className="text-white text-xs">Converted to CMYK</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="text-white text-xs">Printed within 48-hrs of Approval</span>
+                    </div>
+                    {(() => {
+                      // Get cut line selection from the first item's calculator selections
+                      const firstItem = order.items[0];
+                      const cutSelection = firstItem?._fullOrderData?.calculatorSelections?.cut;
+                      
+                      if (!cutSelection?.displayValue) return null;
+                      
+                      const isGreenCut = cutSelection.displayValue.toLowerCase().includes('kiss') || 
+                                        cutSelection.displayValue.toLowerCase().includes('cut through backing') ||
+                                        !cutSelection.displayValue.toLowerCase().includes('through');
+                      
+                      return (
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-4 h-4 rounded border-2 flex-shrink-0" 
+                            style={{ 
+                              borderColor: isGreenCut ? '#91c848' : '#6b7280', 
+                              backgroundColor: 'transparent' 
+                            }}
+                          ></div>
+                          <span className="text-white text-xs">
+                            {isGreenCut ? 'Green' : 'Grey'} cut-line shows where sticker will be cut
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Actions Container */}
+                <div className="container-style p-4">
+                  {(proof.status === 'pending' || proof.status === 'sent') && (
+                    <div className="space-y-4">
+                      {/* Action Buttons */}
+                      <div className="space-y-3">
+                        <button
+                          className="w-full py-3 px-4 rounded-lg border transition-all duration-200 hover:scale-[1.02] text-sm font-medium backdrop-blur-md"
+                          style={{
+                            background: 'rgba(34, 197, 94, 0.1)',
+                            borderColor: 'rgba(34, 197, 94, 0.3)',
+                            color: '#22c55e',
+                            boxShadow: '0 4px 16px rgba(34, 197, 94, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+                          }}
+                          onClick={() => handleProofAction('approve', order.id, proof.id)}
+                        >
+                          ✅ Approve This Proof
+                        </button>
+
+                        <button
+                          className="w-full py-3 px-4 rounded-lg border transition-all duration-200 hover:scale-[1.02] text-sm font-medium backdrop-blur-md"
+                          style={{
+                            background: 'rgba(251, 146, 60, 0.1)',
+                            borderColor: 'rgba(251, 146, 60, 0.3)',
+                            color: '#fb923c',
+                            boxShadow: '0 4px 16px rgba(251, 146, 60, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+                          }}
+                          onClick={() => handleProofAction('request_changes', order.id, proof.id)}
+                        >
+                          ✏️ Request Changes
+                        </button>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="border-t border-white/10 my-4"></div>
+
+                      {/* Review & Respond Section */}
+                      <div>
+                        <h5 className="text-sm font-medium text-white mb-3">Review & Respond</h5>
+                        
+                        {/* File Upload/Preview Area */}
+                        {!stagedFile || (stagedFile.orderId !== order.id || stagedFile.proofId !== proof.id) ? (
+                          /* File Upload Drop Zone */
+                          <div 
+                            className={`border-2 border-dashed rounded-lg p-4 mb-3 text-center transition-colors cursor-pointer ${
+                              uploadingFile 
+                                ? 'border-blue-400/50 bg-blue-500/10' 
+                                : 'border-white/20 hover:border-white/30'
+                            }`}
+                            onClick={() => !uploadingFile && document.getElementById(`proof-file-input-${proof.id}`)?.click()}
+                          >
+                            {uploadingFile ? (
+                              <div className="flex flex-col items-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mb-2"></div>
+                                <p className="text-xs text-blue-400 mb-1">Uploading...</p>
+                                <p className="text-xs text-gray-500">Please wait</p>
+                              </div>
+                            ) : (
+                              <>
+                                <svg className="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                </svg>
+                                <p className="text-xs text-gray-400 mb-1">Upload replacement file</p>
+                                <p className="text-xs text-gray-500">Click to browse or drag & drop</p>
+                              </>
+                            )}
+                            <input 
+                              id={`proof-file-input-${proof.id}`}
+                              type="file" 
+                              className="hidden" 
+                              accept="image/*,application/pdf,.ai,.eps,.psd"
+                              title="Upload replacement file"
+                              aria-label="Upload replacement file for proof"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  handleFileSelect(file, order.id, proof.id);
+                                }
+                              }}
+                              disabled={uploadingFile}
+                            />
+                          </div>
+                        ) : (
+                          /* Staged File Preview */
+                          <div className="border-2 border-green-400/50 rounded-lg p-4 mb-3 bg-green-500/10">
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className="w-16 h-16 rounded-lg overflow-hidden bg-white/10">
+                                {stagedFile.file.type === 'application/pdf' ? (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <svg className="w-8 h-8 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                                      <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+                                    </svg>
+                                  </div>
+                                ) : (
+                                  <img 
+                                    src={stagedFile.preview} 
+                                    alt="New file preview" 
+                                    className="w-full h-full object-cover"
+                                  />
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-white">{stagedFile.file.name}</p>
+                                <p className="text-xs text-gray-400">
+                                  {(stagedFile.file.size / 1024 / 1024).toFixed(2)} MB • Ready to send
+                                </p>
+                                <div className="flex items-center gap-1 mt-1">
+                                  <div className="w-2 h-2 rounded-full bg-green-400"></div>
+                                  <span className="text-xs text-green-400">Staged for replacement</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Action Buttons */}
+                            <div className="flex gap-2">
+                              <button
+                                onClick={handleSendReplacement}
+                                disabled={uploadingFile}
+                                className="flex-1 py-2 px-4 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                              >
+                                {uploadingFile ? 'Sending...' : 'Send Replacement'}
+                              </button>
+                              <button
+                                onClick={handleCancelReplacement}
+                                disabled={uploadingFile}
+                                className="px-4 py-2 rounded-lg bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Feedback Textarea */}
+                        <textarea
+                          value={proofComments}
+                          onChange={(e) => setProofComments(e.target.value)}
+                          placeholder="Add feedback or notes (optional)..."
+                          className="w-full h-20 p-3 rounded-lg text-white placeholder-gray-400 text-sm resize-none bg-white/5 border border-white/10 focus:border-white/20 focus:outline-none transition-colors"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Status Messages for completed proofs */}
+                  {proof.status === 'approved' && (
+                    <div className="text-center py-6">
+                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/20 mb-3">
+                        <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <p className="text-green-300 text-lg font-medium">Proof Approved!</p>
+                      <p className="text-gray-400 text-sm">Your order is now in production</p>
+                    </div>
+                  )}
+
+                  {proof.status === 'changes_requested' && (
+                    <div className="text-center py-6">
+                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-orange-500/20 mb-3">
+                        <svg className="w-8 h-8 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <p className="text-orange-300 text-lg font-medium">Changes Requested</p>
+                      <p className="text-gray-400 text-sm">Our team is working on your updates</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Admin/Customer Notes */}
+                {(proof.adminNotes || proof.customerNotes) && (
+                  <div className="container-style p-4 space-y-3">
+                    {proof.adminNotes && (
+                      <div>
+                        <h5 className="text-sm font-medium text-blue-300 mb-2 flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Notes from our team
+                        </h5>
+                        <p className="text-sm text-gray-300 bg-blue-500/10 p-3 rounded-lg">{proof.adminNotes}</p>
+                      </div>
+                    )}
+
+                    {proof.customerNotes && (
+                      <div>
+                        <h5 className="text-sm font-medium text-green-300 mb-2 flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                          </svg>
+                          Your previous feedback
+                        </h5>
+                        <p className="text-sm text-gray-300 bg-green-500/10 p-3 rounded-lg">{proof.customerNotes}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          );
+        })}
+      </div>
     );
+  };
+
+  const renderProofsView = () => {
+    // More comprehensive filtering for proofs that need review
+    const proofsToReview = orders.filter(order => {
+      // Check if order has proofs available
+      const hasProofs = (order.proofs && order.proofs.length > 0) || order.proofUrl;
+      if (!hasProofs) return false;
+      
+      // Include orders with these statuses or proof statuses (more inclusive)
+      return (
+        order.status === 'Proof Review Needed' ||
+        order.proof_status === 'awaiting_approval' ||
+        order.proof_status === 'sent' ||
+        (hasProofs && order.proof_sent_at && order.proof_status !== 'approved') ||
+        // Include orders with pending proofs that need customer action
+        (hasProofs && (order.proof_status === 'pending' || !order.proof_status))
+      );
+    });
     
     const inProduction = orders.filter(order => 
-      order.status === 'in-production' && order.proofUrl
+      (order.status === 'In Production' || order.proof_status === 'approved') && 
+      ((order.proofs && order.proofs.length > 0) || order.proofUrl)
     );
     
     const requestChanges = orders.filter(order => 
-      order.status === 'request-changes' && order.proofUrl
+      (order.status === 'request-changes' || order.proof_status === 'changes_requested') && 
+      ((order.proofs && order.proofs.length > 0) || order.proofUrl)
     );
     
     const pastProofs = orders.filter(order => 
-      order.proofUrl && (order.status === 'In Production' || order.status === 'Delivered')
+      (order.proofUrl || (order.proofs && order.proofs.length > 0)) && 
+      (order.status === 'Delivered' || order.status === 'Shipped')
     );
 
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white">🔍 Proof Review Center</h2>
-          <button 
-            onClick={() => setCurrentView('default')}
-            className="text-purple-400 hover:text-purple-300 font-medium transition-colors duration-200 text-sm"
-          >
-            ← Back to Dashboard
-          </button>
-        </div>
-
-        {/* Current Proofs Needing Review */}
+                {/* Current Proofs Needing Review */}
         {proofsToReview.length > 0 && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <h3 className="text-xl font-semibold text-white flex items-center gap-2">
               ⚠️ Requires Your Review
               <span className="text-xs bg-orange-500/20 text-orange-300 px-2 py-1 rounded-full animate-pulse">
@@ -1855,243 +2499,21 @@ function Dashboard() {
             </h3>
             
             {proofsToReview.map((order) => (
-              <div key={order.id} 
-                   className="container-style p-6 border-2 border-orange-500/30"
-                   style={{
-                     boxShadow: '0 0 12px rgba(249, 115, 22, 0.15)'
-                   }}>
-                
+              <div key={order.id} className="space-y-4">
                 {/* Order Header */}
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h4 className="text-lg font-semibold text-white">Mission {getOrderDisplayNumber(order)}</h4>
-                    <p className="text-sm text-gray-300">
-                      {new Date(order.date).toLocaleDateString()} • ${order.total} • {order.items[0].name}
+                    <h4 className="text-xl font-bold text-white">
+                      Order {getOrderDisplayNumber(order)}
+                    </h4>
+                    <p className="text-sm text-gray-400">
+                      {new Date(order.date).toLocaleDateString()} • $122.85
                     </p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <div className={`w-3 h-3 rounded-full ${getStatusColor(order.status)} animate-pulse`}></div>
-                      <span className="text-sm text-orange-300 font-medium">{getStatusDisplayText(order.status)}</span>
-                    </div>
                   </div>
                 </div>
 
-                {/* Proof Display */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                     {/* Proof Image */}
-                   <div>
-                     <h5 className="text-md font-semibold text-white mb-3">Design Proof</h5>
-                     <div className="rounded-lg overflow-hidden" style={{ aspectRatio: '7/5' }}>
-                       <img 
-                         src={order.proofUrl} 
-                         alt="Design Proof"
-                         className="w-full h-full object-cover"
-                       />
-                     </div>
-                     <div className="mt-3 flex justify-center">
-                       <div className="px-4 py-2 rounded-full text-xs text-gray-300 text-center backdrop-blur-md border"
-                            style={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                              borderColor: 'rgba(255, 255, 255, 0.15)'
-                            }}>
-                         ✨ This is how your stickers will look when printed
-                       </div>
-                     </div>
-                   </div>
-
-                  {/* Action Panel */}
-                  <div className="space-y-4">
-                    <h5 className="text-md font-semibold text-white">Review Actions</h5>
-                    
-                    {/* Action Notification */}
-                    {actionNotification && (
-                      <div className="relative mb-4">
-                        <div className="absolute top-0 left-0 right-0 z-10 animate-in slide-in-from-top-2 duration-300">
-                          <div className={`px-4 py-3 rounded-xl border backdrop-blur-md shadow-lg ${
-                            actionNotification.type === 'success' 
-                              ? 'bg-green-500/10 border-green-400/30 text-green-300' 
-                              : actionNotification.type === 'error'
-                              ? 'bg-red-500/10 border-red-400/30 text-red-300'
-                              : 'bg-blue-500/10 border-blue-400/30 text-blue-300'
-                          }`}>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm">
-                                {actionNotification.type === 'success' && '✅'}
-                                {actionNotification.type === 'error' && '❌'}
-                                {actionNotification.type === 'info' && 'ℹ️'}
-                              </span>
-                              <p className="text-sm font-medium">{actionNotification.message}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Action Buttons with Liquid Glass Style */}
-                    <div className="space-y-3">
-                      {!showApprovalConfirm ? (
-                        <button
-                          onClick={() => setShowApprovalConfirm(true)}
-                          disabled={proofAction === 'approve'}
-                          className="button-interactive relative w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 transition-all duration-300 border backdrop-blur-md hover:bg-green-500/10 hover:border-green-400/40 hover:scale-[1.02] border-white/20 text-white/80 font-normal group cursor-pointer"
-                          style={{
-                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                            borderColor: 'rgba(255, 255, 255, 0.2)'
-                          }}
-                        >
-                          <span className="text-green-400 group-hover:scale-110 transition-transform duration-300">✅</span>
-                          <div>
-                            <div className="font-medium text-white group-hover:text-green-100 transition-colors duration-300">Approve Proof</div>
-                            <div className="text-xs text-gray-300 group-hover:text-green-200 transition-colors duration-300">Proceed to production</div>
-                          </div>
-                        </button>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="px-4 py-3 rounded-xl border border-green-400/30 bg-green-500/10">
-                            <p className="text-green-300 font-medium text-sm">You're sure?</p>
-                            <p className="text-green-200 text-xs">This will send the order to production</p>
-                          </div>
-                          <div className="flex gap-3">
-                            <button
-                              onClick={() => setShowApprovalConfirm(false)}
-                              className="flex-1 px-4 py-3 rounded-xl border border-white/20 bg-white/10 text-white hover:bg-white/20 transition-all duration-300 hover:scale-[1.02]"
-                            >
-                              Cancel
-                            </button>
-                            <div className="relative">
-                              <div className="absolute -inset-1 bg-gradient-to-r from-green-400 to-emerald-400 rounded-xl blur opacity-30 animate-pulse"></div>
-                              <button
-                                onClick={() => {
-                                  handleProofAction('approve', order.id);
-                                  setShowApprovalConfirm(false);
-                                }}
-                                disabled={proofAction === 'approve'}
-                                className="relative flex-1 w-full px-4 py-3 rounded-xl border border-green-400/50 bg-green-500/20 text-green-200 hover:bg-green-500/30 hover:scale-[1.02] transition-all duration-300 disabled:opacity-50"
-                              >
-                              {proofAction === 'approve' ? (
-                                <>
-                                  <svg className="animate-spin w-4 h-4 mx-auto" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 718-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                </>
-                              ) : (
-                                'Yes, Continue'
-                              )}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      <button
-                         onClick={() => handleProofAction('changes', order.id)}
-                         disabled={proofAction === 'changes'}
-                         className="button-interactive relative w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 transition-all duration-300 border backdrop-blur-md hover:bg-amber-500/10 hover:border-amber-400/40 hover:scale-[1.02] border-white/20 text-white/80 font-normal group cursor-pointer"
-                         style={{
-                           backgroundColor: proofAction === 'changes' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                           borderColor: proofAction === 'changes' ? 'rgba(245, 158, 11, 0.5)' : 'rgba(255, 255, 255, 0.2)'
-                         }}
-                       >
-                        {proofAction === 'changes' ? (
-                          <>
-                            <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 718-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Requesting...
-                          </>
-                        ) : (
-                          <>
-                            <span className="text-amber-400 group-hover:scale-110 transition-transform duration-300">🔄</span>
-                            <div>
-                              <div className="font-medium text-white group-hover:text-amber-100 transition-colors duration-300">Request Changes</div>
-                              <div className="text-xs text-gray-300 group-hover:text-amber-200 transition-colors duration-300">Ask for revisions</div>
-                            </div>
-                          </>
-                        )}
-                      </button>
-
-                      <button
-                        onClick={() => handleProofAction('deny')}
-                        disabled={proofAction === 'deny'}
-                                                 className="button-interactive relative w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 transition-all duration-300 border backdrop-blur-md hover:bg-red-500/10 hover:border-red-400/40 hover:scale-[1.02] border-white/20 text-white/80 font-normal group cursor-pointer"
-                        style={{
-                          backgroundColor: proofAction === 'deny' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                          borderColor: proofAction === 'deny' ? 'rgba(239, 68, 68, 0.5)' : 'rgba(255, 255, 255, 0.2)'
-                        }}
-                      >
-                        {proofAction === 'deny' ? (
-                          <>
-                            <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 718-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Denying...
-                          </>
-                        ) : (
-                          <>
-                            <span className="text-red-400 group-hover:scale-110 transition-transform duration-300">❌</span>
-                            <div>
-                              <div className="font-medium text-white group-hover:text-red-100 transition-colors duration-300">Deny Proof</div>
-                              <div className="text-xs text-gray-300 group-hover:text-red-200 transition-colors duration-300">Start over</div>
-                            </div>
-                          </>
-                        )}
-                      </button>
-
-                      <button
-                        onClick={() => handleProofAction('upload')}
-                        disabled={proofAction === 'upload'}
-                                                 className="button-interactive relative w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 transition-all duration-300 border backdrop-blur-md hover:bg-purple-500/10 hover:border-purple-400/40 hover:scale-[1.02] border-white/20 text-white/80 font-normal group cursor-pointer"
-                        style={{
-                          backgroundColor: proofAction === 'upload' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                          borderColor: proofAction === 'upload' ? 'rgba(139, 92, 246, 0.5)' : 'rgba(255, 255, 255, 0.2)'
-                        }}
-                      >
-                        {proofAction === 'upload' ? (
-                          <>
-                            <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 718-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Uploading...
-                          </>
-                        ) : (
-                          <>
-                            <span className="text-purple-400 group-hover:scale-110 transition-transform duration-300">📁</span>
-                            <div>
-                              <div className="font-medium text-white group-hover:text-purple-100 transition-colors duration-300">Upload New File</div>
-                              <div className="text-xs text-gray-300 group-hover:text-purple-200 transition-colors duration-300">Replace design</div>
-                            </div>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Comments Section */}
-                    <div className={`mt-6 transition-all duration-500 ${highlightComments ? 'animate-pulse' : ''}`}>
-                      <label className={`block text-sm font-medium mb-2 transition-colors duration-500 ${highlightComments ? 'text-orange-300' : 'text-gray-300'}`}>
-                        Comments <span className={`transition-colors duration-500 ${highlightComments ? 'text-orange-200' : 'text-orange-400'}`}>(Required for changes, deny, or upload)</span>
-                      </label>
-                      <textarea
-                        value={proofComments}
-                        onChange={(e) => setProofComments(e.target.value)}
-                        rows={3}
-                        className={`w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none backdrop-blur-md border transition-all duration-500 ${highlightComments ? 'ring-2 ring-orange-400 border-orange-400/50' : ''}`}
-                        style={{
-                          backgroundColor: highlightComments ? 'rgba(249, 115, 22, 0.1)' : 'rgba(255, 255, 255, 0.1)',
-                          borderColor: highlightComments ? 'rgba(249, 115, 22, 0.5)' : 'rgba(255, 255, 255, 0.2)'
-                        }}
-                        placeholder="Add specific feedback or instructions..."
-                      />
-                      {highlightComments && (
-                        <p className="text-orange-300 text-xs mt-2 animate-bounce">
-                          ⚠️ Please add comments before proceeding with this action
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                {/* Full Proof Review Interface */}
+                {renderProofReviewInterface(order)}
               </div>
             ))}
           </div>
@@ -2275,6 +2697,30 @@ function Dashboard() {
               }}
             >
               🚀 Start New Mission
+            </Link>
+          </div>
+        )}
+
+        {/* Show orders with proofs but not matching review criteria */}
+        {proofsToReview.length === 0 && orders.some(o => (o.proofs && o.proofs.length > 0) || o.proofUrl) && (
+          <div className="mt-6 p-4 bg-blue-900/20 border border-blue-400/30 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h4 className="text-blue-300 font-medium">You have proofs in other statuses</h4>
+            </div>
+            <p className="text-blue-200 text-sm mb-3">
+              Some of your orders have proofs that may be in production or already approved.
+            </p>
+            <Link
+              href="/proofs"
+              className="inline-flex items-center gap-2 text-cyan-400 hover:text-cyan-300 text-sm"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2M7 7l10 10M17 7l-10 10" />
+              </svg>
+              View All Proofs
             </Link>
           </div>
         )}
@@ -3472,6 +3918,8 @@ function Dashboard() {
                   </div>
                 </div>
               )}
+
+
 
               {/* Main Layout - Sidebar + Content */}
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

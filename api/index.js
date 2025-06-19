@@ -95,6 +95,13 @@ const typeDefs = gql`
     # Proof mutations
     addOrderProof(orderId: ID!, proofData: OrderProofInput!): CustomerOrder
     updateProofStatus(orderId: ID!, proofId: ID!, status: String!, customerNotes: String): CustomerOrder
+    replaceProofFile(orderId: ID!, proofId: ID!, newProofData: OrderProofInput!): CustomerOrder
+    updateProofFileByCustomer(orderId: ID!, proofId: ID!, newFileUrl: String!, originalFileName: String): CustomerOrder
+    updateOrderFileByCustomer(orderId: ID!, newFileUrl: String!, originalFileName: String): CustomerOrder
+    removeProof(orderId: ID!, proofId: ID!): CustomerOrder
+    addProofNotes(orderId: ID!, proofId: ID!, adminNotes: String!, customerNotes: String): CustomerOrder
+    approveProof(orderId: ID!, proofId: ID!, adminNotes: String): CustomerOrder
+    requestProofChanges(orderId: ID!, proofId: ID!, adminNotes: String!): CustomerOrder
     sendProofs(orderId: ID!): CustomerOrder
     
     # Stripe mutations
@@ -160,6 +167,9 @@ const typeDefs = gql`
     updatedAt: String
     items: [OrderItem]
     proofs: [OrderProof]
+    proof_status: String
+    proof_sent_at: String
+    proof_link: String
   }
 
   type OrderProof {
@@ -173,6 +183,9 @@ const typeDefs = gql`
     status: String
     customerNotes: String
     adminNotes: String
+    replaced: Boolean
+    replacedAt: String
+    originalFileName: String
   }
 
   type OrderItem {
@@ -194,6 +207,9 @@ const typeDefs = gql`
     fulfillmentStatus: String
     createdAt: String
     updatedAt: String
+    customerReplacementFile: String
+    customerReplacementFileName: String
+    customerReplacementAt: String
   }
 
   type ClaimResult {
@@ -366,11 +382,17 @@ const resolvers = {
     orderUpdatedAt: (parent) => parent.order_updated_at || parent.orderUpdatedAt,
     createdAt: (parent) => parent.created_at || parent.createdAt,
     updatedAt: (parent) => parent.updated_at || parent.updatedAt,
-    proofs: (parent) => parent.proofs || []
+    proofs: (parent) => parent.proofs || [],
+    proof_status: (parent) => parent.proof_status || parent.proofStatus,
+    proof_sent_at: (parent) => parent.proof_sent_at || parent.proofSentAt,
+    proof_link: (parent) => parent.proof_link || parent.proofLink
   },
 
   OrderItem: {
     customerOrderId: (parent) => parent.order_id || parent.customerOrderId,
+    customerReplacementFile: (parent) => parent.customer_replacement_file || parent.customerReplacementFile,
+    customerReplacementFileName: (parent) => parent.customer_replacement_file_name || parent.customerReplacementFileName,
+    customerReplacementAt: (parent) => parent.customer_replacement_at || parent.customerReplacementAt,
     stripeLineItemId: (parent) => parent.stripe_line_item_id || parent.stripeLineItemId,
     productId: (parent) => parent.product_id || parent.productId || 'custom-product',
     productName: (parent) => parent.product_name || parent.productName || 'Custom Product',
@@ -418,6 +440,34 @@ const resolvers = {
         const paidOrders = rpcData.filter(order => order.financial_status === 'paid');
         console.log('💰 Filtered to paid orders:', paidOrders.length, 'of', rpcData.length, 'total');
         
+        // Fetch proof data for all orders since RPC doesn't include it
+        const client = supabaseClient.getServiceClient();
+        const orderIds = paidOrders.map(order => order.order_id);
+        
+        let proofsData = {};
+        if (orderIds.length > 0) {
+          const { data: ordersWithProofs, error: proofsError } = await client
+            .from('orders_main')
+            .select('id, proofs, proof_status, proof_sent_at, proof_link')
+            .in('id', orderIds);
+            
+          if (proofsError) {
+            console.error('❌ Error fetching proof data:', proofsError);
+          } else {
+            // Create lookup map for proof data
+            proofsData = ordersWithProofs.reduce((acc, order) => {
+              acc[order.id] = {
+                proofs: order.proofs || [],
+                proof_status: order.proof_status,
+                proof_sent_at: order.proof_sent_at,
+                proof_link: order.proof_link
+              };
+              return acc;
+            }, {});
+            console.log('🔍 Proof data fetched for', Object.keys(proofsData).length, 'orders');
+          }
+        }
+        
         // Debug: Log the first order's items to see the actual structure
         if (paidOrders.length > 0 && paidOrders[0].items) {
           console.log('🔍 First paid order items structure:', JSON.stringify(paidOrders[0].items, null, 2));
@@ -425,6 +475,13 @@ const resolvers = {
         
         // Map RPC function results to match GraphQL schema expectations (camelCase field names)
         return paidOrders.map(order => {
+          // Get proof data for this order
+          const orderProofData = proofsData[order.order_id] || {
+            proofs: [],
+            proof_status: null,
+            proof_sent_at: null,
+            proof_link: null
+          };
           // Calculate order total from items since RPC doesn't provide order-level total
           const calculatedTotal = (order.items || []).reduce((sum, item) => {
             const itemTotal = Number(item.total_price) || 0;
@@ -432,6 +489,12 @@ const resolvers = {
           }, 0);
           
           console.log(`🔍 Order ${order.order_id} calculated total: ${calculatedTotal} from ${order.items?.length || 0} items`);
+          console.log(`🔍 Order ${order.order_id} proof data:`, {
+            hasProofs: orderProofData.proofs.length > 0,
+            proofsCount: orderProofData.proofs.length,
+            proof_status: orderProofData.proof_status,
+            proof_sent_at: orderProofData.proof_sent_at
+          });
           console.log(`🎯 Order ${order.order_id} Shopify data:`, {
             shopify_order_id: order.shopify_order_id,
             shopify_order_number: order.shopify_order_number,
@@ -485,6 +548,11 @@ const resolvers = {
             orderUpdatedAt: null, // RPC doesn't return this
             createdAt: order.order_created_at || new Date().toISOString(), // Use order_created_at as fallback
             updatedAt: order.order_created_at || new Date().toISOString(), // Use order_created_at as fallback
+            // Add proof-related fields
+            proofs: orderProofData.proofs || [], // Include proofs array from fetched data
+            proof_status: orderProofData.proof_status || null, // Include proof status
+            proof_sent_at: orderProofData.proof_sent_at || null, // Include proof sent timestamp
+            proof_link: orderProofData.proof_link || null, // Include proof link
             // Map items from JSONB to expected structure (camelCase field names)
             items: (order.items || []).map(item => ({
               id: String(item.id || `item-${Date.now()}-${Math.random()}`), // Ensure string ID
@@ -518,9 +586,12 @@ const resolvers = {
 
     getOrderById: async (_, { id }) => {
       try {
+        console.log('🔍 getOrderById called with id:', id);
+        
         if (!supabaseClient.isReady()) {
           throw new Error('Order service is currently unavailable');
         }
+        
         const client = supabaseClient.getServiceClient();
         const { data, error } = await client
           .from('orders_main')
@@ -536,7 +607,17 @@ const resolvers = {
           throw new Error('Order not found');
         }
 
-        return data;
+        console.log('📦 Order fetched:', {
+          id: data.id,
+          proofs: data.proofs || [],
+          proof_status: data.proof_status
+        });
+
+        // Return the order with proofs array (it's a JSONB column in the orders_main table)
+        return {
+          ...data,
+          proofs: data.proofs || []
+        };
       } catch (error) {
         console.error('Error fetching order by ID:', error);
         throw new Error(error.message);
@@ -619,6 +700,10 @@ const resolvers = {
           orderUpdatedAt: order.order_updated_at,
           createdAt: order.created_at,
           updatedAt: order.updated_at,
+          proof_status: order.proof_status,
+          proof_sent_at: order.proof_sent_at,
+          proof_link: order.proof_link,
+          proofs: order.proofs || [],
           // Map items
           items: (order.items || []).map(item => ({
             id: String(item.id),
@@ -778,16 +863,31 @@ const resolvers = {
              ...proof,
              status,
              customerNotes: customerNotes || proof.customerNotes,
-             updatedAt: new Date().toISOString()
+             updatedAt: new Date().toISOString(),
+             ...(status === 'approved' && { approvedAt: new Date().toISOString() })
            };
          }
          return proof;
        });
        
-       // Update order with modified proofs
+       // Check if all proofs are approved
+       const allApproved = updatedProofs.every(proof => proof.status === 'approved');
+       
+       // Update order with modified proofs and potentially the order-level proof status
+       const updateData = { 
+         proofs: updatedProofs 
+       };
+       
+       // If all proofs are approved, update the order-level proof status
+       if (allApproved) {
+         updateData.proof_status = 'approved';
+       } else if (status === 'changes_requested') {
+         updateData.proof_status = 'changes_requested';
+       }
+       
        const { data: updatedOrder, error: updateError } = await client
          .from('orders_main')
-         .update({ proofs: updatedProofs })
+         .update(updateData)
          .eq('id', orderId)
          .select(`
            *,
@@ -832,13 +932,18 @@ const resolvers = {
          sentAt: new Date().toISOString()
        }));
        
+       // Generate proof approval link
+       const baseUrl = process.env.FRONTEND_URL || 'https://stickershuttle.com';
+       const proofLink = `${baseUrl}/proofs?orderId=${orderId}`;
+       
        // Update order with sent proofs and status
        const { data: updatedOrder, error: updateError } = await client
          .from('orders_main')
          .update({ 
            proofs: updatedProofs,
            proof_status: 'awaiting_approval',
-           proof_sent_at: new Date().toISOString()
+           proof_sent_at: new Date().toISOString(),
+           proof_link: proofLink
          })
          .eq('id', orderId)
          .select(`
@@ -853,10 +958,376 @@ const resolvers = {
        
        // Log successful proof sending (here you would trigger email notification)
        console.log(`✅ Proofs sent for order ${currentOrder.order_number} to ${currentOrder.customer_email}`);
+       console.log(`📧 Proof approval link: ${proofLink}`);
        
        return updatedOrder;
      } catch (error) {
        console.error('Error sending proofs:', error);
+       throw new Error(error.message);
+     }
+   },
+
+   replaceProofFile: async (_, { orderId, proofId, newProofData }) => {
+     try {
+       if (!supabaseClient.isReady()) {
+         throw new Error('Order service is currently unavailable');
+       }
+       
+       const client = supabaseClient.getServiceClient();
+       
+       // Get current order
+       const { data: currentOrder, error: fetchError } = await client
+         .from('orders_main')
+         .select('proofs')
+         .eq('id', orderId)
+         .single();
+         
+       if (fetchError) {
+         throw new Error(`Failed to fetch order: ${fetchError.message}`);
+       }
+       
+       // Replace the specific proof file (keep same ID and timestamps)
+       const updatedProofs = (currentOrder.proofs || []).map(proof => {
+         if (proof.id === proofId) {
+           return {
+             ...proof,
+             proofUrl: newProofData.proofUrl,
+             proofPublicId: newProofData.proofPublicId,
+             proofTitle: newProofData.proofTitle || proof.proofTitle,
+             replacedAt: new Date().toISOString(),
+             adminNotes: newProofData.adminNotes || proof.adminNotes,
+             status: 'pending' // Reset status when file is replaced
+           };
+         }
+         return proof;
+       });
+       
+       // Update order with modified proofs
+       const { data: updatedOrder, error: updateError } = await client
+         .from('orders_main')
+         .update({ proofs: updatedProofs })
+         .eq('id', orderId)
+         .select(`
+           *,
+           order_items_new(*)
+         `)
+         .single();
+         
+       if (updateError) {
+         throw new Error(`Failed to replace proof file: ${updateError.message}`);
+       }
+       
+       return updatedOrder;
+     } catch (error) {
+       console.error('Error replacing proof file:', error);
+       throw new Error(error.message);
+     }
+   },
+
+   updateProofFileByCustomer: async (_, { orderId, proofId, newFileUrl, originalFileName }) => {
+     try {
+       if (!supabaseClient.isReady()) {
+         throw new Error('Order service is currently unavailable');
+       }
+       
+       const client = supabaseClient.getServiceClient();
+       
+       // Get current order
+       const { data: currentOrder, error: fetchError } = await client
+         .from('orders_main')
+         .select('proofs')
+         .eq('id', orderId)
+         .single();
+         
+       if (fetchError) {
+         throw new Error(`Failed to fetch order: ${fetchError.message}`);
+       }
+       
+       // Update the specific proof with new file and mark as replaced
+       const updatedProofs = (currentOrder.proofs || []).map(proof => {
+         if (proof.id === proofId) {
+           return {
+             ...proof,
+             proofUrl: newFileUrl,
+             replaced: true,
+             replacedAt: new Date().toISOString(),
+             originalFileName: originalFileName,
+             updatedAt: new Date().toISOString(),
+             status: 'pending' // Reset status when customer replaces file
+           };
+         }
+         return proof;
+       });
+       
+       // Update order with modified proofs
+       const { data: updatedOrder, error: updateError } = await client
+         .from('orders_main')
+         .update({ 
+           proofs: updatedProofs,
+           proof_status: 'pending' // Reset order proof status when file is replaced
+         })
+         .eq('id', orderId)
+         .select(`
+           *,
+           order_items_new(*)
+         `)
+         .single();
+         
+       if (updateError) {
+         throw new Error(`Failed to update proof file: ${updateError.message}`);
+       }
+       
+       console.log(`✅ Customer replaced proof file for order ${orderId}, proof ${proofId}`);
+       return updatedOrder;
+     } catch (error) {
+       console.error('Error updating proof file by customer:', error);
+       throw new Error(error.message);
+     }
+   },
+
+   updateOrderFileByCustomer: async (_, { orderId, newFileUrl, originalFileName }) => {
+     try {
+       if (!supabaseClient.isReady()) {
+         throw new Error('Order service is currently unavailable');
+       }
+       
+       const client = supabaseClient.getServiceClient();
+       
+       // Get current order and its items
+       const { data: currentOrder, error: fetchError } = await client
+         .from('orders_main')
+         .select(`
+           *,
+           order_items_new(*)
+         `)
+         .eq('id', orderId)
+         .single();
+         
+       if (fetchError) {
+         throw new Error(`Failed to fetch order: ${fetchError.message}`);
+       }
+       
+       // Update the first item's custom files with the new file
+       const updatedItems = (currentOrder.order_items_new || []).map((item, index) => {
+         if (index === 0) { // Update the first item
+           return {
+             ...item,
+             customFiles: [newFileUrl], // Replace with new file
+             customerReplacementFile: newFileUrl,
+             customerReplacementFileName: originalFileName,
+             customerReplacementAt: new Date().toISOString()
+           };
+         }
+         return item;
+       });
+       
+       // Update each item in the database
+       for (const item of updatedItems) {
+         await client
+           .from('order_items_new')
+           .update({
+             customFiles: item.customFiles,
+             customerReplacementFile: item.customerReplacementFile,
+             customerReplacementFileName: item.customerReplacementFileName,
+             customerReplacementAt: item.customerReplacementAt
+           })
+           .eq('id', item.id);
+       }
+       
+       // Get the updated order
+       const { data: updatedOrder, error: updateError } = await client
+         .from('orders_main')
+         .select(`
+           *,
+           order_items_new(*)
+         `)
+         .eq('id', orderId)
+         .single();
+         
+       if (updateError) {
+         throw new Error(`Failed to fetch updated order: ${updateError.message}`);
+       }
+       
+       console.log(`✅ Customer replaced order file for order ${orderId}`);
+       return updatedOrder;
+     } catch (error) {
+       console.error('Error updating order file by customer:', error);
+       throw new Error(error.message);
+     }
+   },
+
+   addProofNotes: async (_, { orderId, proofId, adminNotes, customerNotes }) => {
+     try {
+       if (!supabaseClient.isReady()) {
+         throw new Error('Order service is currently unavailable');
+       }
+       
+       const client = supabaseClient.getServiceClient();
+       
+       // Get current order
+       const { data: currentOrder, error: fetchError } = await client
+         .from('orders_main')
+         .select('proofs')
+         .eq('id', orderId)
+         .single();
+         
+       if (fetchError) {
+         throw new Error(`Failed to fetch order: ${fetchError.message}`);
+       }
+       
+       // Add notes to the specific proof
+       const updatedProofs = (currentOrder.proofs || []).map(proof => {
+         if (proof.id === proofId) {
+           return {
+             ...proof,
+             adminNotes: adminNotes || proof.adminNotes,
+             customerNotes: customerNotes || proof.customerNotes,
+             notesUpdatedAt: new Date().toISOString()
+           };
+         }
+         return proof;
+       });
+       
+       // Update order with modified proofs
+       const { data: updatedOrder, error: updateError } = await client
+         .from('orders_main')
+         .update({ proofs: updatedProofs })
+         .eq('id', orderId)
+         .select(`
+           *,
+           order_items_new(*)
+         `)
+         .single();
+         
+       if (updateError) {
+         throw new Error(`Failed to add proof notes: ${updateError.message}`);
+       }
+       
+       return updatedOrder;
+     } catch (error) {
+       console.error('Error adding proof notes:', error);
+       throw new Error(error.message);
+     }
+   },
+
+   approveProof: async (_, { orderId, proofId, adminNotes }) => {
+     try {
+       if (!supabaseClient.isReady()) {
+         throw new Error('Order service is currently unavailable');
+       }
+       
+       const client = supabaseClient.getServiceClient();
+       
+       // Get current order
+       const { data: currentOrder, error: fetchError } = await client
+         .from('orders_main')
+         .select('proofs')
+         .eq('id', orderId)
+         .single();
+         
+       if (fetchError) {
+         throw new Error(`Failed to fetch order: ${fetchError.message}`);
+       }
+       
+       // Approve the specific proof
+       const updatedProofs = (currentOrder.proofs || []).map(proof => {
+         if (proof.id === proofId) {
+           return {
+             ...proof,
+             status: 'approved',
+             adminNotes: adminNotes || proof.adminNotes,
+             approvedAt: new Date().toISOString(),
+             approvedBy: 'admin' // In future, get from auth context
+           };
+         }
+         return proof;
+       });
+       
+       // Check if all proofs are approved
+       const allApproved = updatedProofs.every(proof => proof.status === 'approved');
+       
+       // Update order with approved proof
+       const { data: updatedOrder, error: updateError } = await client
+         .from('orders_main')
+         .update({ 
+           proofs: updatedProofs,
+           ...(allApproved && { 
+             proof_status: 'approved',
+             order_status: 'Ready for Production'
+           })
+         })
+         .eq('id', orderId)
+         .select(`
+           *,
+           order_items_new(*)
+         `)
+         .single();
+         
+       if (updateError) {
+         throw new Error(`Failed to approve proof: ${updateError.message}`);
+       }
+       
+       return updatedOrder;
+     } catch (error) {
+       console.error('Error approving proof:', error);
+       throw new Error(error.message);
+     }
+   },
+
+   requestProofChanges: async (_, { orderId, proofId, adminNotes }) => {
+     try {
+       if (!supabaseClient.isReady()) {
+         throw new Error('Order service is currently unavailable');
+       }
+       
+       const client = supabaseClient.getServiceClient();
+       
+       // Get current order
+       const { data: currentOrder, error: fetchError } = await client
+         .from('orders_main')
+         .select('proofs')
+         .eq('id', orderId)
+         .single();
+         
+       if (fetchError) {
+         throw new Error(`Failed to fetch order: ${fetchError.message}`);
+       }
+       
+       // Request changes for the specific proof
+       const updatedProofs = (currentOrder.proofs || []).map(proof => {
+         if (proof.id === proofId) {
+           return {
+             ...proof,
+             status: 'changes_requested',
+             adminNotes: adminNotes,
+             changesRequestedAt: new Date().toISOString(),
+             requestedBy: 'admin' // In future, get from auth context
+           };
+         }
+         return proof;
+       });
+       
+       // Update order with changes requested
+       const { data: updatedOrder, error: updateError } = await client
+         .from('orders_main')
+         .update({ 
+           proofs: updatedProofs,
+           proof_status: 'changes_requested'
+         })
+         .eq('id', orderId)
+         .select(`
+           *,
+           order_items_new(*)
+         `)
+         .single();
+         
+       if (updateError) {
+         throw new Error(`Failed to request proof changes: ${updateError.message}`);
+       }
+       
+       return updatedOrder;
+     } catch (error) {
+       console.error('Error requesting proof changes:', error);
        throw new Error(error.message);
      }
    },
@@ -1065,6 +1536,50 @@ const resolvers = {
           message: `Critical error: ${error.message}`,
           errors: [error.message]
         };
+      }
+    },
+
+    removeProof: async (_, { orderId, proofId }) => {
+      try {
+        if (!supabaseClient.isReady()) {
+          throw new Error('Order service is currently unavailable');
+        }
+        
+        const client = supabaseClient.getServiceClient();
+        
+        // Get current order
+        const { data: currentOrder, error: fetchError } = await client
+          .from('orders_main')
+          .select('proofs')
+          .eq('id', orderId)
+          .single();
+          
+        if (fetchError) {
+          throw new Error(`Failed to fetch order: ${fetchError.message}`);
+        }
+        
+        // Remove the specific proof
+        const updatedProofs = (currentOrder.proofs || []).filter(proof => proof.id !== proofId);
+        
+        // Update order with modified proofs
+        const { data: updatedOrder, error: updateError } = await client
+          .from('orders_main')
+          .update({ proofs: updatedProofs })
+          .eq('id', orderId)
+          .select(`
+            *,
+            order_items_new(*)
+          `)
+          .single();
+          
+        if (updateError) {
+          throw new Error(`Failed to remove proof: ${updateError.message}`);
+        }
+        
+        return updatedOrder;
+      } catch (error) {
+        console.error('Error removing proof:', error);
+        throw new Error(error.message);
       }
     }
   }

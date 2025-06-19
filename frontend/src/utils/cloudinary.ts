@@ -31,6 +31,7 @@ export interface CalculatorMetadata {
   costPerSticker?: string;
   calculatedArea?: number;
   timestamp?: string;
+  cutLines?: string;
 }
 
 // Cloudinary configuration
@@ -146,28 +147,42 @@ export const uploadToCloudinary = async (
 };
 
 export const validateFile = (file: File): { valid: boolean; error?: string } => {
+  // Check file size (10MB limit)
   const maxSize = 10 * 1024 * 1024; // 10MB
-  const allowedTypes = [
-    'image/jpeg',
-    'image/jpg', 
-    'image/png',
-    'image/svg+xml',
-    'application/postscript', // .ai, .eps
-    'image/vnd.adobe.photoshop', // .psd
-  ];
-
   if (file.size > maxSize) {
     return { valid: false, error: 'File size must be less than 10MB' };
   }
 
-  // Check file extension for formats that might not have proper MIME types
+  // Get file extension from filename
   const fileName = file.name.toLowerCase();
-  const hasValidExtension = ['.ai', '.svg', '.eps', '.png', '.jpg', '.jpeg', '.psd'].some(ext => 
-    fileName.endsWith(ext)
-  );
-
-  if (!allowedTypes.includes(file.type) && !hasValidExtension) {
-    return { valid: false, error: 'File type not supported. Please use .ai, .svg, .eps, .png, .jpg, or .psd files' };
+  const fileExtension = fileName.split('.').pop();
+  
+  // Check file type - allow design files and images
+  const allowedTypes = [
+    // Standard images
+    'image/jpeg',
+    'image/jpg', 
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/svg+xml',
+    // Design files
+    'application/postscript', // .ai, .eps files
+    'application/illustrator', // .ai files
+    'image/vnd.adobe.photoshop', // .psd files
+    'application/octet-stream', // generic binary (often used for .psd, .ai)
+    // PDF
+    'application/pdf'
+  ];
+  
+  // Also check by file extension as a fallback since MIME types can be unreliable for design files
+  const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ai', 'eps', 'psd', 'pdf'];
+  
+  const typeAllowed = allowedTypes.includes(file.type);
+  const extensionAllowed = fileExtension && allowedExtensions.includes(fileExtension);
+  
+  if (!typeAllowed && !extensionAllowed) {
+    return { valid: false, error: 'File must be a design file (.ai, .eps, .psd, .svg) or image (.jpg, .png, .gif, .webp) or PDF' };
   }
 
   return { valid: true };
