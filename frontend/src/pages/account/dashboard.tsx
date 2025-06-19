@@ -2177,13 +2177,29 @@ function Dashboard() {
                   {/* Cut Line Message Above Status Pill */}
                   {(() => {
                     const firstItem = order.items[0];
-                    const cutSelection = firstItem?._fullOrderData?.calculatorSelections?.cut;
+                    console.log('🔍 Debug - First item:', firstItem);
+                    console.log('🔍 Debug - Full order data:', firstItem?._fullOrderData);
                     
-                    if (!cutSelection?.displayValue) return null;
+                    // Try multiple possible data paths
+                    let cutSelection = firstItem?._fullOrderData?.calculatorSelections?.cut;
                     
-                    const isGreenCut = cutSelection.displayValue.toLowerCase().includes('kiss') || 
-                                      cutSelection.displayValue.toLowerCase().includes('cut through backing') ||
-                                      !cutSelection.displayValue.toLowerCase().includes('through');
+                    // Fallback paths
+                    if (!cutSelection) {
+                      cutSelection = firstItem?.calculatorSelections?.cut;
+                    }
+                    if (!cutSelection) {
+                      cutSelection = order._fullOrderData?.calculatorSelections?.cut;
+                    }
+                    
+                    console.log('🔍 Debug - Cut selection:', cutSelection);
+                    
+                    // For now, always show a cut line message for testing
+                    // This will help us see if the styling works
+                    const defaultCutSelection = cutSelection || { displayValue: 'Custom Shape' };
+                    
+                    const isGreenCut = defaultCutSelection.displayValue.toLowerCase().includes('kiss') || 
+                                      defaultCutSelection.displayValue.toLowerCase().includes('cut through backing') ||
+                                      !defaultCutSelection.displayValue.toLowerCase().includes('through');
                     
                     return (
                       <div className="mb-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
@@ -2199,7 +2215,7 @@ function Dashboard() {
                             className="text-sm font-medium" 
                             style={{ color: isGreenCut ? '#91c848' : '#6b7280' }}
                           >
-                            {isGreenCut ? 'Green' : 'Grey'} cut-line indicates where the sticker will be cut - {cutSelection.displayValue}
+                            {isGreenCut ? 'Green' : 'Grey'} cut-line indicates where the sticker will be cut - {defaultCutSelection.displayValue}
                           </span>
                         </div>
                       </div>
