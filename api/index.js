@@ -2285,11 +2285,32 @@ const resolvers = {
           };
         }
 
-        // Use pre-verified EasyPost address ID for your business address
-        const fromAddressId = 'adr_31c828354d4a11f08f10ac1f6bc539aa';
+        // Handle from address based on test/production mode
+        let fromAddress;
+        
+        if (easyPostClient.isTestMode()) {
+          console.log('📍 Test mode detected - creating from address on the fly');
+          // In test mode, create address object
+          fromAddress = {
+            name: 'Sticker Shuttle',
+            company: 'Sticker Shuttle',
+            street1: '2981 S Harrison St',
+            street2: null,
+            city: 'Denver',
+            state: 'CO',
+            zip: '80210',
+            country: 'US',
+            phone: '720-555-0000', // Test phone number
+            email: 'justin@stickershuttle.com'
+          };
+        } else {
+          console.log('📍 Production mode - using pre-verified address ID');
+          // In production, use pre-verified address ID
+          fromAddress = 'adr_31c828354d4a11f08f10ac1f6bc539aa';
+        }
 
         // Format order for EasyPost
-        const shipmentData = easyPostClient.formatOrderForShipment(order, fromAddressId, packageDimensions);
+        const shipmentData = easyPostClient.formatOrderForShipment(order, fromAddress, packageDimensions);
         
         // Create shipment with EasyPost
         const shipment = await easyPostClient.createShipment(shipmentData);
@@ -2316,9 +2337,19 @@ const resolvers = {
         };
       } catch (error) {
         console.error('Error creating EasyPost shipment:', error);
+        
+        // Log more details about the error
+        if (error.message && error.message.includes('resource could not be found')) {
+          console.error('❌ Resource not found error - this usually means:');
+          console.error('  1. Using production address ID in test mode');
+          console.error('  2. Invalid address ID');
+          console.error('  3. Address was deleted');
+          console.error('Current mode:', easyPostClient.isTestMode() ? 'TEST' : 'PRODUCTION');
+        }
+        
         return {
           success: false,
-          error: error.message
+          error: error.message || 'Failed to create shipment'
         };
       }
     },
