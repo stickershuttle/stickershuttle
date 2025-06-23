@@ -237,26 +237,40 @@ async function sendDiscordNotification(payload: NotificationPayload): Promise<{ 
   try {
     // Create different messages based on order status
     const isNewOrder = payload.orderStatus === 'Awaiting Proof Approval' || payload.orderStatus === 'Creating Proofs'
-    const statusEmoji = getStatusEmoji(payload.orderStatus)
     
     // Process order items to get detailed product information
     const orderItemsInfo = formatOrderItemsForDiscord(payload.orderItems)
     
+    // Check if it's a rush order
+    const isRushOrder = payload.orderItems.some(item => 
+      item.calculatorSelections?.rush?.value === true || 
+      item.calculator_selections?.rush?.value === true
+    )
+    
+    // Create description with price above order items
+    let description = ''
+    if (isNewOrder) {
+      description = isRushOrder ? 
+        'You have a rush order that needs attention!' : 
+        'You have a new order that needs attention!'
+    } else {
+      description = `Order status changed to: **${payload.orderStatus}**`
+    }
+    
+    description += `\n\n**Total: $${payload.orderTotal.toFixed(2)}**\n\n**Order Items:**\n${orderItemsInfo.summary}`
+    
     const discordMessage = {
-      content: isNewOrder ? `🚨 **NEW ORDER ALERT** 🚨` : `📋 **ORDER UPDATE** 📋`,
+      content: isNewOrder ? `**NEW ORDER ALERT**` : `**ORDER UPDATE**`,
       embeds: [{
-        title: isNewOrder ? "🎉 New Sticker Shuttle Order!" : `${statusEmoji} Order Status Update`,
-        description: isNewOrder ? 
-          `You have a new order that needs attention!\n\n**Order Items:**\n${orderItemsInfo.summary}` : 
-          `Order status changed to: **${payload.orderStatus}**\n\n**Order Items:**\n${orderItemsInfo.summary}`,
+        title: isNewOrder ? "New Sticker Shuttle Order!" : `Order Status Update`,
+        description: description,
         color: isNewOrder ? 0x00ff00 : getStatusColor(payload.orderStatus),
         fields: [
-          { name: "📋 Order Number", value: payload.orderNumber, inline: true },
-          { name: "👤 Customer", value: payload.customerName || "N/A", inline: true },
-          { name: "💰 Total", value: `$${payload.orderTotal.toFixed(2)}`, inline: true },
-          { name: "📧 Email", value: payload.customerEmail, inline: true },
-          { name: "📊 Status", value: payload.orderStatus, inline: true },
-          { name: "🕐 Time", value: new Date().toLocaleString(), inline: true },
+          { name: "Order Number", value: payload.orderNumber, inline: true },
+          { name: "Customer", value: payload.customerName || "N/A", inline: true },
+          { name: "Email", value: payload.customerEmail, inline: true },
+          { name: "Status", value: payload.orderStatus, inline: true },
+          { name: "Time", value: new Date().toLocaleString(), inline: true },
           ...orderItemsInfo.detailFields
         ],
         footer: {
@@ -268,7 +282,7 @@ async function sendDiscordNotification(payload: NotificationPayload): Promise<{ 
         components: [{
           type: 2, // Button
           style: 5, // Link style
-          label: "📋 View Order in Admin",
+          label: "View Order in Admin",
           url: `https://stickershuttle.vercel.app/admin/orders/${payload.orderNumber}`
         }]
       }]
@@ -334,7 +348,7 @@ function formatOrderItemsForDiscord(orderItems: any[]) {
                 (selections.size?.width && selections.size?.height ? 
                  `${selections.size.width}" × ${selections.size.height}"` : 'Standard')
     
-    return `• **${quantity}x** ${stickerType} (${size}) - ${material}`
+    return `• ${quantity}x ${stickerType} (${size}) - ${material}`
   }).join('\n')
 
   // Create detail fields for first item (most important for quick view)
@@ -346,7 +360,7 @@ function formatOrderItemsForDiscord(orderItems: any[]) {
   // Add quantity field
   const totalQuantity = orderItems.reduce((sum, item) => sum + (item.quantity || 1), 0)
   detailFields.push({
-    name: "📦 Total Quantity", 
+    name: "Total Quantity", 
     value: `${totalQuantity} pieces`, 
     inline: true
   })
@@ -358,7 +372,7 @@ function formatOrderItemsForDiscord(orderItems: any[]) {
                       `${firstSelections.size.width}" × ${firstSelections.size.height}"` : null)
     if (sizeValue) {
       detailFields.push({
-        name: "📏 Size", 
+        name: "Size", 
         value: sizeValue, 
         inline: true
       })
@@ -368,7 +382,7 @@ function formatOrderItemsForDiscord(orderItems: any[]) {
   // Add material field if available
   if (firstSelections.material) {
     detailFields.push({
-      name: "🎨 Material", 
+      name: "Material", 
       value: firstSelections.material.displayValue || firstSelections.material.value, 
       inline: true
     })
@@ -377,20 +391,13 @@ function formatOrderItemsForDiscord(orderItems: any[]) {
   // Add cut/shape if available
   if (firstSelections.cut) {
     detailFields.push({
-      name: "✂️ Cut", 
+      name: "Cut", 
       value: firstSelections.cut.displayValue || firstSelections.cut.value, 
       inline: true
     })
   }
   
-  // Add rush order if applicable
-  if (firstSelections.rush?.value === true) {
-    detailFields.push({
-      name: "⚡ Rush Order", 
-      value: "Yes - 24hr turnaround", 
-      inline: true
-    })
-  }
+  // Don't add rush order field here since it's now in the main description
 
   return {
     summary: summary.length > 0 ? summary : "Custom order items",
