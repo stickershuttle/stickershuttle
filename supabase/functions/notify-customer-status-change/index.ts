@@ -247,36 +247,38 @@ async function sendDiscordNotification(payload: NotificationPayload): Promise<{ 
       item.calculator_selections?.rush?.value === true
     )
     
-    // Create description with price above order items
+    // Create description in your exact format
     let description = ''
     if (isNewOrder) {
       description = isRushOrder ? 
-        'You have a rush order that needs attention!' : 
-        'You have a new order that needs attention!'
+        '💸 Rush Order!\n\n' : 
+        '💸 New Order!\n\n'
     } else {
-      description = `Order status changed to: **${payload.orderStatus}**`
+      description = `💸 Order Update!\n\nStatus: ${payload.orderStatus}\n\n`
     }
     
-    description += `\n\n**Total: $${payload.orderTotal.toFixed(2)}**\n\n**Order Items:**\n${orderItemsInfo.summary}`
+    // Add total
+    description += `Total: $${payload.orderTotal.toFixed(2)}\n\n`
+    
+    // Add order items
+    description += `Order Items:\n${orderItemsInfo.summary}\n\n`
+    
+    // Add product details
+    if (orderItemsInfo.detailFields.length > 0) {
+      orderItemsInfo.detailFields.forEach(field => {
+        description += `${field.name}\n${field.value}\n`
+      })
+      description += '\n'
+    }
+    
+    // Add order info
+    description += `Order Number\n${payload.orderNumber}\n`
+    description += `Customer\n${payload.customerName || "N/A"}\n`
+    description += `Email\n${payload.customerEmail}\n`
+    description += `Time\n${new Date().toLocaleString()}`
     
     const discordMessage = {
-      content: isNewOrder ? `**NEW ORDER ALERT**` : `**ORDER UPDATE**`,
-      embeds: [{
-        title: isNewOrder ? "New Sticker Shuttle Order!" : `Order Status Update`,
-        description: description,
-        color: isNewOrder ? 0x00ff00 : getStatusColor(payload.orderStatus),
-        fields: [
-          { name: "Order Number", value: payload.orderNumber, inline: true },
-          { name: "Customer", value: payload.customerName || "N/A", inline: true },
-          { name: "Email", value: payload.customerEmail, inline: true },
-          { name: "Status", value: payload.orderStatus, inline: true },
-          { name: "Time", value: new Date().toLocaleString(), inline: true },
-          ...orderItemsInfo.detailFields
-        ],
-        footer: {
-          text: "Sticker Shuttle Order System"
-        }
-      }],
+      content: description,
       components: [{
         type: 1, // Action Row
         components: [{
@@ -288,13 +290,9 @@ async function sendDiscordNotification(payload: NotificationPayload): Promise<{ 
       }]
     }
 
-    // Add tracking info if available
+    // Add tracking info if available (append to content)
     if (payload.trackingNumber) {
-      discordMessage.embeds[0].fields.push({
-        name: "📦 Tracking", 
-        value: payload.trackingNumber, 
-        inline: true
-      })
+      discordMessage.content += `\nTracking\n${payload.trackingNumber}`
     }
 
     const response = await fetch(discordWebhookUrl, {
