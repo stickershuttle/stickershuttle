@@ -325,8 +325,6 @@ function formatOrderItemsForDiscord(orderItems: any[]) {
   }
 
   const summary = orderItems.map((item, index) => {
-    // Extract product information
-    const quantity = item.quantity || 1
     const productName = item.productName || item.name || 'Custom Stickers'
     
     // Get sticker type from product category or name
@@ -341,31 +339,24 @@ function formatOrderItemsForDiscord(orderItems: any[]) {
       else if (category.includes('sheet')) stickerType = 'Sticker Sheets'
     }
     
-    // Extract selections (try different possible structures)
-    const selections = item.calculatorSelections || item.calculator_selections || {}
-    const material = selections.material?.displayValue || selections.material?.value || 'Premium Vinyl'
-    const size = selections.size?.displayValue || selections.size?.value || 
-                (selections.size?.width && selections.size?.height ? 
-                 `${selections.size.width}" × ${selections.size.height}"` : 'Standard')
-    
-    return `• ${quantity}x ${stickerType} (${size}) - ${material}`
+    return `• ${stickerType}`
   }).join('\n')
 
-  // Create detail fields for first item (most important for quick view)
+  // Create detail fields for first item in the order you specified
   const firstItem = orderItems[0]
   const firstSelections = firstItem.calculatorSelections || firstItem.calculator_selections || {}
   
   const detailFields: any[] = []
   
-  // Add quantity field
+  // 1. Quantity (under order items)
   const totalQuantity = orderItems.reduce((sum, item) => sum + (item.quantity || 1), 0)
   detailFields.push({
-    name: "Total Quantity", 
+    name: "Quantity", 
     value: `${totalQuantity} pieces`, 
     inline: true
   })
   
-  // Add size field if available
+  // 2. Size (under quantity)
   if (firstSelections.size) {
     const sizeValue = firstSelections.size.displayValue || firstSelections.size.value ||
                      (firstSelections.size.width && firstSelections.size.height ? 
@@ -379,16 +370,7 @@ function formatOrderItemsForDiscord(orderItems: any[]) {
     }
   }
   
-  // Add material field if available
-  if (firstSelections.material) {
-    detailFields.push({
-      name: "Material", 
-      value: firstSelections.material.displayValue || firstSelections.material.value, 
-      inline: true
-    })
-  }
-  
-  // Add cut/shape if available
+  // 3. Cut (under size)
   if (firstSelections.cut) {
     detailFields.push({
       name: "Cut", 
@@ -397,7 +379,14 @@ function formatOrderItemsForDiscord(orderItems: any[]) {
     })
   }
   
-  // Don't add rush order field here since it's now in the main description
+  // 4. Material (then the rest)
+  if (firstSelections.material) {
+    detailFields.push({
+      name: "Material", 
+      value: firstSelections.material.displayValue || firstSelections.material.value, 
+      inline: true
+    })
+  }
 
   return {
     summary: summary.length > 0 ? summary : "Custom order items",
