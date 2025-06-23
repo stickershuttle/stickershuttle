@@ -4,24 +4,97 @@ class EasyPostService {
     constructor() {
         this.client = null;
         this.isConfigured = false;
+        this.testMode = false;
         this.init();
     }
 
     init() {
-        const apiKey = process.env.EASYPOST_API_KEY;
+        // Debug: Log all EasyPost-related environment variables
+        console.log('🔍 DEBUG: Environment variables check:');
+        console.log('NODE_ENV:', process.env.NODE_ENV);
+        console.log('EASYPOST_TEST_MODE:', process.env.EASYPOST_TEST_MODE);
+        console.log('EASYPOST_API_KEY:', process.env.EASYPOST_API_KEY ? 'SET' : 'NOT SET');
+        console.log('EASYPOST_TEST_API_KEY:', process.env.EASYPOST_TEST_API_KEY ? 'SET' : 'NOT SET');
+        console.log('EASYPOST_PROD_API_KEY:', process.env.EASYPOST_PROD_API_KEY ? 'SET' : 'NOT SET');
+        
+        // Show first few characters of keys for debugging
+        if (process.env.EASYPOST_TEST_API_KEY) {
+            console.log('EASYPOST_TEST_API_KEY value:', process.env.EASYPOST_TEST_API_KEY.substring(0, 8) + '...');
+        }
+        if (process.env.EASYPOST_PROD_API_KEY) {
+            console.log('EASYPOST_PROD_API_KEY value:', process.env.EASYPOST_PROD_API_KEY.substring(0, 8) + '...');
+        }
+        
+        // Determine if we're in test/development mode
+        const isTestModeEnv = process.env.EASYPOST_TEST_MODE === 'true';
+        const isDevEnvironment = process.env.NODE_ENV !== 'production';
+        console.log('🎯 EASYPOST_TEST_MODE:', isTestModeEnv);
+        console.log('🎯 NODE_ENV !== production:', isDevEnvironment);
+        
+        // Use test mode if explicitly set OR if in development environment
+        const isTestMode = isTestModeEnv || isDevEnvironment;
+        console.log('🎯 Final calculated test mode:', isTestMode);
+        
+        // Use test or production API key based on mode
+        let apiKey;
+        if (isTestMode) {
+            // For test mode, use test key
+            apiKey = process.env.EASYPOST_TEST_API_KEY;
+            console.log('🔑 Test mode - using EASYPOST_TEST_API_KEY');
+        } else {
+            // For production mode, use prod key
+            apiKey = process.env.EASYPOST_PROD_API_KEY;
+            console.log('🔑 Production mode - using EASYPOST_PROD_API_KEY');
+        }
+        
+        // Fallback to generic EASYPOST_API_KEY if no specific key found
         if (!apiKey) {
-            console.warn('⚠️ EasyPost API key not found in environment variables');
+            apiKey = process.env.EASYPOST_API_KEY;
+            console.log('🔑 Fallback - using EASYPOST_API_KEY');
+        }
+        
+        console.log('🎯 Final API key found:', apiKey ? `${apiKey.substring(0, 8)}...` : 'NONE');
+            
+        if (!apiKey) {
+            console.error(`❌ No EasyPost API key found in environment variables`);
+            console.error('Available environment variables:', Object.keys(process.env).filter(key => key.includes('EASYPOST')));
+            console.error('Need: EASYPOST_TEST_API_KEY, EASYPOST_PROD_API_KEY, or EASYPOST_API_KEY');
             return;
         }
 
         try {
             this.client = new EasyPostClient(apiKey);
             this.isConfigured = true;
-            console.log('✅ EasyPost client initialized successfully');
+            this.testMode = isTestMode;
+            
+            // Detect key type from the key itself
+            const keyType = this.detectKeyType(apiKey);
+            const actualMode = keyType === 'test' ? 'TEST' : 'PRODUCTION';
+            
+            console.log(`✅ EasyPost client initialized successfully`);
+            console.log(`🔑 Using API key: ${apiKey.substring(0, 8)}...`);
+            console.log(`📍 Detected mode: ${actualMode}`);
+            
+            if (keyType === 'test') {
+                console.log('💰 TEST MODE: No real charges will be made!');
+            } else {
+                console.log('💸 PRODUCTION MODE: Real charges will be made!');
+                if (isTestMode) {
+                    console.warn('⚠️ WARNING: You wanted test mode but your key appears to be production!');
+                    console.warn('⚠️ To use test mode, add EASYPOST_TEST_API_KEY with a test key');
+                }
+            }
         } catch (error) {
             console.error('❌ Failed to initialize EasyPost client:', error);
             this.isConfigured = false;
         }
+    }
+
+    detectKeyType(apiKey) {
+        if (apiKey && (apiKey.includes('_test_') || apiKey.startsWith('EZSK_test_'))) {
+            return 'test';
+        }
+        return 'production';
     }
 
     isReady() {
@@ -69,17 +142,36 @@ class EasyPostService {
         }
 
         try {
-            console.log('💳 Buying EasyPost shipment label...');
-            const buyOptions = { rate };
-            if (insurance) {
-                buyOptions.insurance = insurance;
+            const mode = this.isTestMode() ? 'TEST' : 'PRODUCTION';
+            console.log(`💳 Buying EasyPost shipment label in ${mode} mode...`);
+            
+            if (this.isTestMode()) {
+                console.log('💰 TEST MODE: This is a test purchase - no real money will be charged!');
+            } else {
+                console.log('💸 PRODUCTION MODE: This will charge real money!');
             }
             
-            const boughtShipment = await this.client.Shipment.buy(shipmentId, buyOptions);
-            console.log('✅ EasyPost label purchased:', boughtShipment.id);
+            console.log('📊 Rate object:', JSON.stringify(rate, null, 2));
+            
+            // For Node.js EasyPost library, pass the rate object directly
+            // If insurance is provided, pass it as a second parameter  
+            let boughtShipment;
+            if (insurance) {
+                boughtShipment = await this.client.Shipment.buy(shipmentId, rate, insurance);
+            } else {
+                boughtShipment = await this.client.Shipment.buy(shipmentId, rate);
+            }
+            
+            console.log(`✅ EasyPost label purchased in ${mode} mode:`, boughtShipment.id);
+            
+            if (this.isTestMode()) {
+                console.log('🎉 TEST MODE: No real money was charged - this was a test!');
+            }
+            
             return boughtShipment;
         } catch (error) {
             console.error('❌ Failed to buy EasyPost shipment:', error);
+            console.error('❌ Error details:', error.message);
             throw error;
         }
     }
@@ -323,6 +415,13 @@ class EasyPostService {
         }
 
         return { length, width, height };
+    }
+
+    isTestMode() {
+        if (!this.isConfigured || !this.client) return false;
+        // Get the actual API key being used and check if it's a test key
+        const apiKey = process.env.EASYPOST_TEST_API_KEY || process.env.EASYPOST_PROD_API_KEY || process.env.EASYPOST_API_KEY;
+        return this.detectKeyType(apiKey) === 'test';
     }
 }
 
