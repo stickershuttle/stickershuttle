@@ -169,6 +169,11 @@ async function handleCheckoutSessionCompleted(session) {
         for (const lineItem of fullSession.line_items.data) {
           const itemMetadata = lineItem.price.product.metadata || {};
           
+          // Extract actual quantity from metadata (since Stripe quantity is always 1 now)
+          const actualQuantity = parseInt(itemMetadata.actualQuantity) || 1;
+          const totalPrice = lineItem.amount_total / 100; // Total price from Stripe
+          const unitPrice = totalPrice / actualQuantity; // Calculate unit price
+          
           // Parse calculator selections from simplified metadata or orderNote
           let calculatorSelections = {};
           
@@ -267,6 +272,11 @@ async function handleCheckoutSessionCompleted(session) {
         const orderItems = fullSession.line_items.data.map(lineItem => {
           const itemMetadata = lineItem.price.product.metadata || {};
           
+          // Extract actual quantity from metadata (since Stripe quantity is always 1 now)
+          const actualQuantity = parseInt(itemMetadata.actualQuantity) || 1;
+          const totalPrice = lineItem.amount_total / 100; // Total price from Stripe
+          const unitPrice = totalPrice / actualQuantity; // Calculate unit price
+          
           // Parse calculator selections from simplified metadata or orderNote
           let calculatorSelections = {};
           
@@ -313,9 +323,9 @@ async function handleCheckoutSessionCompleted(session) {
             product_name: lineItem.description || lineItem.price.product.name,
             product_category: itemMetadata.category || 'Custom Stickers',
             sku: itemMetadata.sku || 'CUSTOM',
-            quantity: lineItem.quantity,
-            unit_price: (lineItem.price.unit_amount / 100).toFixed(2),
-            total_price: (lineItem.amount_total / 100).toFixed(2),
+            quantity: actualQuantity, // Use actual quantity from metadata
+            unit_price: unitPrice.toFixed(2), // Calculated unit price
+            total_price: totalPrice.toFixed(2), // Total price from Stripe
             calculator_selections: calculatorSelections,
             custom_files: cartMetadata?.customFiles || [],
             customer_notes: cartMetadata?.customerNotes || '',

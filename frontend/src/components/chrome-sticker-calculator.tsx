@@ -149,6 +149,114 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
     updatePricing()
   }, [updatePricing])
 
+  // Load reorder data from localStorage if available
+  useEffect(() => {
+    const loadReorderData = () => {
+      try {
+        const reorderDataString = localStorage.getItem('reorderData');
+        if (reorderDataString) {
+          console.log('🔄 Loading reorder data for chrome stickers...');
+          const reorderData = JSON.parse(reorderDataString);
+          
+          if (reorderData.items && reorderData.items.length > 0) {
+            const item = reorderData.items[0]; // Use first item
+            const fullItemData = reorderData.items[0]; // In this case, items already contain full data
+            
+            console.log('📋 Reorder item data:', fullItemData);
+            
+            // Load calculator selections from the original order
+            if (fullItemData._fullItemData?.calculatorSelections || fullItemData.calculatorSelections) {
+              const selections = fullItemData._fullItemData?.calculatorSelections || fullItemData.calculatorSelections;
+              
+              // Set form fields based on original order
+              if (selections.cut?.displayValue) {
+                setSelectedCut(selections.cut.displayValue);
+              }
+              if (selections.material?.displayValue) {
+                setSelectedMaterial(selections.material.displayValue);
+              }
+              if (selections.size?.displayValue) {
+                setSelectedSize(selections.size.displayValue);
+                
+                // Handle custom size
+                if (selections.size.displayValue === 'Custom size' || selections.size.value?.includes('x')) {
+                  const customSize = selections.size.value || selections.size.displayValue;
+                  if (customSize.includes('x')) {
+                    const [width, height] = customSize.split('x').map((s: string) => s.replace(/['"]/g, '').trim());
+                    setCustomWidth(width);
+                    setCustomHeight(height);
+                  }
+                }
+              }
+              if (selections.whiteOption?.displayValue) {
+                setSelectedWhiteOption(selections.whiteOption.displayValue);
+              }
+              if (selections.rush?.value === true) {
+                setRushOrder(true);
+              }
+              if (selections.proof?.value === false) {
+                setSendProof(false);
+              }
+            }
+            
+            // Set quantity
+            if (fullItemData.quantity) {
+              const qty = fullItemData.quantity.toString();
+              if (['50', '100', '200', '300', '500', '750', '1000', '2500'].includes(qty)) {
+                setSelectedQuantity(qty);
+              } else {
+                setSelectedQuantity('Custom');
+                setCustomQuantity(qty);
+              }
+            }
+            
+            // Load uploaded file from original order
+            const originalFiles = fullItemData._fullItemData?.customFiles || 
+                                 fullItemData._fullItemData?.custom_files || 
+                                 fullItemData.customFiles || 
+                                 fullItemData.custom_files || 
+                                 [fullItemData.image];
+                                 
+            if (originalFiles && originalFiles.length > 0 && originalFiles[0]) {
+              console.log('🖼️ Preloading original image:', originalFiles[0]);
+              
+              // Create a mock CloudinaryUploadResult to display the original image
+              const mockUploadResult: CloudinaryUploadResult = {
+                secure_url: originalFiles[0],
+                public_id: `reorder-${Date.now()}`,
+                original_filename: 'reorder-image',
+                width: 800, // Default values
+                height: 600,
+                format: 'png',
+                bytes: 0
+              };
+              
+              setUploadedFile(mockUploadResult);
+              setUploadLater(false);
+            }
+            
+            // Load notes
+            if (fullItemData._fullItemData?.customerNotes || fullItemData._fullItemData?.customer_notes || fullItemData.notes) {
+              setAdditionalNotes(fullItemData._fullItemData?.customerNotes || fullItemData._fullItemData?.customer_notes || fullItemData.notes || '');
+            }
+            
+            console.log('✅ Reorder data loaded successfully');
+          }
+          
+          // Clear the localStorage data after loading
+          localStorage.removeItem('reorderData');
+        }
+      } catch (error) {
+        console.error('❌ Error loading reorder data:', error);
+        // Clear corrupted data
+        localStorage.removeItem('reorderData');
+      }
+    };
+
+    // Load reorder data on component mount
+    loadReorderData();
+  }, []); // Empty dependency array - only run once on mount
+
   // Calculate area based on size
   const calculateArea = (size: string, customW = "", customH = "") => {
     // Defensive check for SSR

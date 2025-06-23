@@ -148,6 +148,111 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     updatePricing()
   }, [updatePricing])
 
+  // Load reorder data from localStorage if available
+  useEffect(() => {
+    const loadReorderData = () => {
+      try {
+        const reorderDataString = localStorage.getItem('reorderData');
+        if (reorderDataString) {
+          console.log('🔄 Loading reorder data for vinyl stickers...');
+          const reorderData = JSON.parse(reorderDataString);
+          
+          if (reorderData.items && reorderData.items.length > 0) {
+            const item = reorderData.items[0]; // Use first item
+            const fullItemData = reorderData.items[0]; // In this case, items already contain full data
+            
+            console.log('📋 Reorder item data:', fullItemData);
+            
+            // Load calculator selections from the original order
+            if (fullItemData._fullItemData?.calculatorSelections || fullItemData.calculatorSelections) {
+              const selections = fullItemData._fullItemData?.calculatorSelections || fullItemData.calculatorSelections;
+              
+              // Set form fields based on original order
+              if (selections.cut?.displayValue) {
+                setSelectedCut(selections.cut.displayValue);
+              }
+              if (selections.material?.displayValue) {
+                setSelectedMaterial(selections.material.displayValue);
+              }
+              if (selections.size?.displayValue) {
+                setSelectedSize(selections.size.displayValue);
+                
+                // Handle custom size
+                if (selections.size.displayValue === 'Custom size' || selections.size.value?.includes('x')) {
+                  const customSize = selections.size.value || selections.size.displayValue;
+                  if (customSize.includes('x')) {
+                    const [width, height] = customSize.split('x').map((s: string) => s.replace(/['"]/g, '').trim());
+                    setCustomWidth(width);
+                    setCustomHeight(height);
+                  }
+                }
+              }
+              if (selections.rush?.value === true) {
+                setRushOrder(true);
+              }
+              if (selections.proof?.value === false) {
+                setSendProof(false);
+              }
+            }
+            
+            // Set quantity
+            if (fullItemData.quantity) {
+              const qty = fullItemData.quantity.toString();
+              if (['50', '100', '200', '300', '500', '750', '1000', '2500'].includes(qty)) {
+                setSelectedQuantity(qty);
+              } else {
+                setSelectedQuantity('Custom');
+                setCustomQuantity(qty);
+              }
+            }
+            
+            // Load uploaded file from original order
+            const originalFiles = fullItemData._fullItemData?.customFiles || 
+                                 fullItemData._fullItemData?.custom_files || 
+                                 fullItemData.customFiles || 
+                                 fullItemData.custom_files || 
+                                 [fullItemData.image];
+                                 
+            if (originalFiles && originalFiles.length > 0 && originalFiles[0]) {
+              console.log('🖼️ Preloading original image:', originalFiles[0]);
+              
+              // Create a mock CloudinaryUploadResult to display the original image
+              const mockUploadResult: CloudinaryUploadResult = {
+                secure_url: originalFiles[0],
+                public_id: `reorder-${Date.now()}`,
+                original_filename: 'reorder-image',
+                width: 800, // Default values
+                height: 600,
+                format: 'png',
+                bytes: 0
+              };
+              
+              setUploadedFile(mockUploadResult);
+              setUploadLater(false);
+            }
+            
+            // Load notes
+            if (fullItemData._fullItemData?.customerNotes || fullItemData._fullItemData?.customer_notes || fullItemData.notes) {
+              setAdditionalNotes(fullItemData._fullItemData?.customerNotes || fullItemData._fullItemData?.customer_notes || fullItemData.notes || '');
+            }
+            
+            console.log('✅ Reorder data loaded successfully');
+          }
+          
+          // Clear the localStorage data after loading
+          localStorage.removeItem('reorderData');
+        }
+      } catch (error) {
+        console.error('❌ Error loading reorder data:', error);
+        // Clear corrupted data
+        localStorage.removeItem('reorderData');
+      }
+    };
+
+    // Load reorder data on component mount
+    loadReorderData();
+  }, []); // Empty dependency array - only run once on mount
+
   // Calculate area based on size
   const calculateArea = (size: string, customW = "", customH = "") => {
     // Defensive check for SSR
@@ -518,9 +623,9 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
           {/* Main Container */}
         <div className="rounded-3xl">
           {/* Top Section */}
-          <div className="grid grid-cols-1 md:grid-cols-18 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-12 lg:grid-cols-18 gap-4 lg:gap-6 mb-4 lg:mb-6">
             {/* Cut Selection */}
-            <div className="md:col-span-4 container-style p-6 transition-colors duration-200">
+            <div className="md:col-span-3 lg:col-span-4 container-style p-4 lg:p-6 transition-colors duration-200">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
                 <span className="text-purple-400">✂️</span>
                 Select a Cut
@@ -547,7 +652,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
             </div>
 
             {/* Material Selection */}
-            <div className="md:col-span-4 container-style p-6 transition-colors duration-200">
+            <div className="md:col-span-3 lg:col-span-4 container-style p-4 lg:p-6 transition-colors duration-200">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
                 <span role="img" aria-label="material" className="text-green-400">
                   🧻
@@ -578,7 +683,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
             </div>
 
             {/* Size Selection */}
-            <div className="md:col-span-4 container-style p-6 transition-colors duration-200">
+            <div className="md:col-span-3 lg:col-span-4 container-style p-4 lg:p-6 transition-colors duration-200">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
                 <span role="img" aria-label="ruler" className="text-purple-400">
                   📏
@@ -627,7 +732,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
             </div>
 
             {/* Quantity Selection */}
-            <div className="md:col-span-6 container-style p-6 transition-colors duration-200">
+            <div className="md:col-span-3 lg:col-span-6 container-style p-4 lg:p-6 transition-colors duration-200">
               <h2 className="text-lg font-semibold mb-4 flex items-center justify-between text-white">
                 <span className="flex items-center gap-2">
                   <span className="text-green-400">#️⃣</span>
@@ -897,9 +1002,9 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
           </div>
 
           {/* Bottom Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 mb-4 lg:mb-6">
             {/* Artwork Upload */}
-            <div className="container-style p-6 transition-colors duration-200">
+            <div className="container-style p-4 lg:p-6 transition-colors duration-200">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">📁 Artwork Upload *</h2>
               
               {/* Hidden file input - always present */}
@@ -1027,7 +1132,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
             </div>
 
             {/* Proof Options */}
-            <div className="container-style p-6 transition-colors duration-200">
+            <div className="container-style p-4 lg:p-6 transition-colors duration-200">
               <div className="space-y-3">
                 <button
                   onClick={() => setSendProof(true)}
@@ -1088,7 +1193,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
             </div>
 
             {/* Additional Instructions */}
-            <div className="container-style p-6 transition-colors duration-200">
+            <div className="container-style p-4 lg:p-6 transition-colors duration-200">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
                 <span role="img" aria-label="pencil">
                   ✏️

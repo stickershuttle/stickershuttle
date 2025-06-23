@@ -51,12 +51,21 @@ export default function HolographicStickers() {
   ];
 
   return (
-    <Layout title="Holographic Stickers - Iridescent & Eye-Catching | Sticker Shuttle">
+    <Layout title="Holographic Stickers - Rainbow Iridescent | Sticker Shuttle">
+      <style jsx>{`
+        .container-style {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(12px);
+          border-radius: 16px;
+        }
+      `}</style>
       {/* Hero Section with Banner Background */}
-      <section className="py-2 md:py-4">
-        <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
+      <section className="pt-[20px] pb-2 md:pb-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
           <div 
-            className="bg-white bg-opacity-5 backdrop-blur-sm rounded-2xl pt-12 pb-8 px-4 md:p-12 relative overflow-hidden"
+            className="bg-white bg-opacity-5 backdrop-blur-sm rounded-2xl pt-12 pb-8 px-8 md:px-12 md:p-12 relative overflow-hidden"
             style={{
               backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749652826/StickerShuttle_Banner_CustomStickers_g73u56.jpg)',
               backgroundSize: 'cover',
@@ -71,7 +80,7 @@ export default function HolographicStickers() {
                 background: 'linear-gradient(135deg, #4c1d95 0%, #6b21a8 25%, #7c3aed 50%, #8b5cf6 75%, #a855f7 100%)'
               }}
             ></div>
-            <div className="text-left md:text-left text-center relative z-10">
+            <div className="text-left md:text-left text-center relative z-10 md:pl-8">
               {/* Desktop Stars - Above Title */}
               <div className="hidden md:flex items-center gap-2 mb-4">
                 <div className="flex gap-1">
@@ -244,8 +253,8 @@ export default function HolographicStickers() {
       </section>
 
       {/* Calculator Section */}
-      <section className="py-2 md:py-4">
-        <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
+      <section className="pt-7 pb-2 md:py-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
           {pricingError && (
             <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg text-yellow-200 text-sm">
               ⚠️ {pricingError} - Using fallback pricing data
@@ -266,19 +275,12 @@ export default function HolographicStickers() {
       </section>
 
       {/* Three-Column Benefits Section */}
-      <section className="py-8">
-        <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
-          <div className="flex flex-col space-y-4 md:grid md:grid-cols-3 md:gap-4 md:space-y-0">
+      <section className="pt-7 pb-8">
+        <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
             
             {/* Holographic Effect */}
-            <div 
-              className="rounded-xl p-6"
-              style={{ 
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-              }}
-            >
+            <div className="container-style p-4 lg:p-6 transition-colors duration-200">
               <div className="flex items-center">
                 <div 
                   className="text-4xl mr-4"
@@ -296,14 +298,7 @@ export default function HolographicStickers() {
             </div>
 
             {/* Premium Iridescent Material */}
-            <div 
-              className="rounded-xl p-6"
-              style={{ 
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-              }}
-            >
+            <div className="container-style p-4 lg:p-6 transition-colors duration-200">
               <div className="flex items-center">
                 <div 
                   className="text-4xl mr-4"
@@ -321,14 +316,7 @@ export default function HolographicStickers() {
             </div>
 
             {/* Custom Sizes */}
-            <div 
-              className="rounded-xl p-6"
-              style={{ 
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-              }}
-            >
+            <div className="container-style p-4 lg:p-6 transition-colors duration-200">
               <div className="flex items-center">
                 <div 
                   className="text-4xl mr-4"
@@ -349,8 +337,80 @@ export default function HolographicStickers() {
         </div>
       </section>
 
+      {/* Four-Column Use Cases Section */}
+      <section className="py-8">
+        <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+            
+            {/* Helmet - Small (2") */}
+            <div className="container-style p-4 lg:p-6 transition-colors duration-200">
+              <div className="text-center">
+                <div className="w-32 h-32 mx-auto mb-4 rounded-lg overflow-hidden">
+                  <img
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750628948/StickerShuttle_Helmet_atrvi7.webp"
+                    alt="Helmet with custom stickers"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <h3 className="font-semibold text-white mb-2 text-lg">Small (2")</h3>
+                <p className="text-gray-300 text-sm">Best for phone cases, helmets, or tight spots.</p>
+              </div>
+            </div>
+
+            {/* Bottle - Medium (3") */}
+            <div className="container-style p-4 lg:p-6 transition-colors duration-200">
+              <div className="text-center">
+                <div className="w-32 h-32 mx-auto mb-4 rounded-lg overflow-hidden">
+                  <img
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750628951/StickerShuttle_Bottle_m6rxb5.webp"
+                    alt="Water bottle with custom stickers"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <h3 className="font-semibold text-white mb-2 text-lg">Medium (3")</h3>
+                <p className="text-gray-300 text-sm">Great for water bottles, laptops, or notebooks.</p>
+              </div>
+            </div>
+
+            {/* Skateboard - Large (4") */}
+            <div className="container-style p-4 lg:p-6 transition-colors duration-200">
+              <div className="text-center">
+                <div className="w-32 h-32 mx-auto mb-4 rounded-lg overflow-hidden">
+                  <img
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750628956/StickerShuttle_Board_150b2de5-5194-4773-b983-0a4f746602a4_cox6gj.webp"
+                    alt="Skateboard with custom stickers"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <h3 className="font-semibold text-white mb-2 text-lg">Large (4")</h3>
+                <p className="text-gray-300 text-sm">Commonly used for skateboards, tumblers, or tablets.</p>
+              </div>
+            </div>
+
+            {/* Cooler - X-Large (5") */}
+            <div className="container-style p-4 lg:p-6 transition-colors duration-200">
+              <div className="text-center">
+                <div className="w-32 h-32 mx-auto mb-4 rounded-lg overflow-hidden">
+                  <img
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750628960/StickerShuttle_VisitMars_jhm6al.webp"
+                    alt="Cooler with custom stickers"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <h3 className="font-semibold text-white mb-2 text-lg">X-Large (5")</h3>
+                <p className="text-gray-300 text-sm">Most seen on cars, coolers, fridges, or toolboxes.</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
       {/* Floating Chat Widget */}
       <FloatingChatWidget />
     </Layout>
   );
 } 
+
+
+

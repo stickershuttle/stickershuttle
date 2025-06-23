@@ -224,7 +224,7 @@ export default function SignUp() {
         ></div>
       </div>
       
-      <div className="min-h-screen py-4 px-4 relative z-10" style={{ backgroundColor: 'transparent' }}>
+      <div className="min-h-screen py-4 px-6 md:px-4 relative z-10" style={{ backgroundColor: 'transparent' }}>
         {/* Mobile Layout */}
         <div className="lg:hidden max-w-md mx-auto">
           {/* Header */}
@@ -254,7 +254,7 @@ export default function SignUp() {
                     type="button"
                     onClick={() => handleOAuthSignup(provider.name)}
                     disabled={loading}
-                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-white/20 bg-white/5 hover:bg-white/10 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center justify-center gap-2 px-6 md:px-4 py-3 rounded-lg border border-white/20 bg-white/5 hover:bg-white/10 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <img 
                       src={provider.icon} 
@@ -283,7 +283,7 @@ export default function SignUp() {
               <button
                 type="button"
                 onClick={() => setSignupMethod('email')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
+                className={`flex-1 py-2 px-6 md:px-4 rounded-md text-sm font-medium transition-all duration-200 ${
                   signupMethod === 'email'
                     ? 'bg-purple-600 text-white shadow-md'
                     : 'text-gray-300 hover:text-white'
@@ -294,7 +294,7 @@ export default function SignUp() {
               <button
                 type="button"
                 onClick={() => setSignupMethod('phone')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
+                className={`flex-1 py-2 px-6 md:px-4 rounded-md text-sm font-medium transition-all duration-200 ${
                   signupMethod === 'phone'
                     ? 'bg-purple-600 text-white shadow-md'
                     : 'text-gray-300 hover:text-white'
@@ -318,7 +318,7 @@ export default function SignUp() {
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                     placeholder="John"
                     required
                   />
@@ -333,7 +333,7 @@ export default function SignUp() {
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                     placeholder="Doe"
                     required
                   />
@@ -352,7 +352,7 @@ export default function SignUp() {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                     placeholder="john@example.com"
                     required
                   />
@@ -368,7 +368,7 @@ export default function SignUp() {
                     name="phone"
                     value={formData.phone}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                     placeholder="+1 (555) 123-4567"
                     required
                   />
@@ -387,7 +387,7 @@ export default function SignUp() {
                     name="password"
                     value={formData.password}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                     placeholder="Create a strong password"
                     required
                   />
@@ -402,7 +402,7 @@ export default function SignUp() {
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                     placeholder="Confirm your password"
                     required
                   />
@@ -444,7 +444,7 @@ export default function SignUp() {
                 type="submit"
                 disabled={loading}
                 onClick={() => console.log('🔴 Button clicked!')}
-                className="w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 px-6 md:px-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: loading ? '#666' : 'linear-gradient(135deg, #ffd713, #ffed4e)',
                   color: '#030140',
@@ -513,7 +513,7 @@ export default function SignUp() {
                         type="button"
                         onClick={() => handleOAuthSignup(provider.name)}
                         disabled={loading}
-                        className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-white/20 bg-white/5 hover:bg-white/10 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center justify-center gap-2 px-6 md:px-4 py-3 rounded-lg border border-white/20 bg-white/5 hover:bg-white/10 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <img 
                           src={provider.icon} 
@@ -563,7 +563,7 @@ export default function SignUp() {
                     <button
                       type="button"
                       onClick={() => setSignupMethod('email')}
-                      className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
+                      className={`flex-1 py-2 px-6 md:px-4 rounded-md text-sm font-medium transition-all duration-200 ${
                         signupMethod === 'email'
                           ? 'bg-purple-600 text-white shadow-md'
                           : 'text-gray-300 hover:text-white'
@@ -574,7 +574,7 @@ export default function SignUp() {
                     <button
                       type="button"
                       onClick={() => setSignupMethod('phone')}
-                      className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
+                      className={`flex-1 py-2 px-6 md:px-4 rounded-md text-sm font-medium transition-all duration-200 ${
                         signupMethod === 'phone'
                           ? 'bg-purple-600 text-white shadow-md'
                           : 'text-gray-300 hover:text-white'
@@ -598,7 +598,7 @@ export default function SignUp() {
                           name="firstName"
                           value={formData.firstName}
                           onChange={handleInputChange}
-                          className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                          className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                           placeholder="John"
                           required
                         />
@@ -613,7 +613,7 @@ export default function SignUp() {
                           name="lastName"
                           value={formData.lastName}
                           onChange={handleInputChange}
-                          className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                          className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                           placeholder="Doe"
                           required
                         />
@@ -632,7 +632,7 @@ export default function SignUp() {
                           name="email"
                           value={formData.email}
                           onChange={handleInputChange}
-                          className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                          className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                           placeholder="john@example.com"
                           required
                         />
@@ -648,7 +648,7 @@ export default function SignUp() {
                           name="phone"
                           value={formData.phone}
                           onChange={handleInputChange}
-                          className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                          className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                           placeholder="+1 (555) 123-4567"
                           required
                         />
@@ -667,7 +667,7 @@ export default function SignUp() {
                           name="password"
                           value={formData.password}
                           onChange={handleInputChange}
-                          className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                          className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                           placeholder="Create a strong password"
                           required
                         />
@@ -682,7 +682,7 @@ export default function SignUp() {
                           name="confirmPassword"
                           value={formData.confirmPassword}
                           onChange={handleInputChange}
-                          className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                          className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                           placeholder="Confirm your password"
                           required
                         />
@@ -724,7 +724,7 @@ export default function SignUp() {
                       type="submit"
                       disabled={loading}
                       onClick={() => console.log('🔴 Desktop Button clicked!')}
-                      className="w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full py-3 px-6 md:px-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{
                         background: loading ? '#666' : 'linear-gradient(135deg, #ffd713, #ffed4e)',
                         color: '#030140',
@@ -755,3 +755,4 @@ export default function SignUp() {
     </Layout>
   );
 } 
+

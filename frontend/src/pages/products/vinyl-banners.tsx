@@ -7,10 +7,10 @@ export default function VinylBanners() {
   return (
     <Layout title="Vinyl Banners - Professional Signage | Sticker Shuttle">
       {/* Hero Section with Banner Background */}
-      <section className="py-2 md:py-4">
-        <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
+      <section className="pt-7 pb-2 md:py-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
           <div 
-            className="bg-white bg-opacity-5 backdrop-blur-sm rounded-2xl pt-12 pb-8 px-4 md:p-12 relative overflow-hidden"
+            className="bg-white bg-opacity-5 backdrop-blur-sm rounded-2xl pt-12 pb-8 px-6 md:px-4 md:p-12 relative overflow-hidden"
             style={{
               backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749652827/StickerShuttle_VinylBanner_VinylBanner_chvbfs.png)',
               backgroundSize: 'cover',
@@ -198,15 +198,15 @@ export default function VinylBanners() {
       </section>
 
       {/* Calculator Section */}
-      <section className="py-2 md:py-4">
-        <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
+      <section className="pt-7 pb-2 md:py-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
           <VinylBannerCalculator />
         </div>
       </section>
 
       {/* Three-Column Benefits Section */}
-      <section className="py-8">
-        <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
+      <section className="pt-7 pb-8">
+        <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
           <div className="flex flex-col space-y-4 md:grid md:grid-cols-3 md:gap-4 md:space-y-0">
             
             {/* Heavy Duty Material */}
@@ -293,3 +293,6 @@ export default function VinylBanners() {
     </Layout>
   );
 } 
+
+
+

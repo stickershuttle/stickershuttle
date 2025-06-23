@@ -11,6 +11,12 @@ const stripeClient = require('./stripe-client');
 const stripeWebhookHandlers = require('./stripe-webhook-handlers');
 const easyPostClient = require('./easypost-client');
 
+// Log initial status of all services
+console.log('🚀 Initial service status:');
+console.log('  - Supabase:', supabaseClient.isReady() ? '✅ Ready' : '❌ Not configured');
+console.log('  - Stripe:', stripeClient.isReady() ? '✅ Ready' : '❌ Not configured');
+console.log('  - EasyPost:', easyPostClient.isReady() ? '✅ Ready' : '❌ Not configured');
+
 // Initialize Express app
 const app = express();
 
@@ -126,7 +132,7 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     service: 'Sticker Shuttle API',
     environment: process.env.NODE_ENV || 'development',
-    easypostConfigured: require('./easypost-client').isReady() // Added EasyPost status check
+    easypostConfigured: easyPostClient.isReady() // Added EasyPost status check
   });
 });
 
@@ -164,6 +170,29 @@ app.get('/webhooks/test', async (req, res) => {
     } catch (error) {
       diagnostics.pending_orders_error = error.message;
     }
+  }
+
+  res.json(diagnostics);
+});
+
+// Add EasyPost diagnostic endpoint
+app.get('/easypost/status', (req, res) => {
+  const diagnostics = {
+    easypost_configured: easyPostClient.isReady(),
+    easypost_test_mode: easyPostClient.isTestMode(),
+    easypost_api_key_set: !!process.env.EASYPOST_API_KEY,
+    easypost_api_key_prefix: process.env.EASYPOST_API_KEY ? process.env.EASYPOST_API_KEY.substring(0, 8) + '...' : 'NOT SET',
+    easypost_test_mode_env: process.env.EASYPOST_TEST_MODE,
+    node_env: process.env.NODE_ENV,
+    timestamp: new Date().toISOString()
+  };
+
+  // Try to check if we can reinitialize
+  if (!easyPostClient.isReady() && process.env.EASYPOST_API_KEY) {
+    console.log('🔄 EasyPost not ready, attempting reinit from status endpoint...');
+    easyPostClient.init();
+    diagnostics.reinit_attempted = true;
+    diagnostics.reinit_result = easyPostClient.isReady();
   }
 
   res.json(diagnostics);
@@ -2216,23 +2245,17 @@ const resolvers = {
       try {
         console.log('🔍 DEBUG: EasyPost client status check...');
         console.log('easyPostClient exists:', !!easyPostClient);
-        console.log('easyPostClient.isReady():', easyPostClient.isReady());
-        console.log('easyPostClient.isConfigured:', easyPostClient.isConfigured);
-        console.log('easyPostClient.client exists:', !!easyPostClient.client);
         
-        // Try to reinitialize if not ready
-        if (!easyPostClient.isReady()) {
-          console.log('❌ EasyPost client not ready - attempting to reinitialize...');
-          easyPostClient.init();
-          console.log('🔄 After reinit - isReady():', easyPostClient.isReady());
-          
-          if (!easyPostClient.isReady()) {
-            console.log('❌ EasyPost client still not ready after reinit - returning error');
-            return {
-              success: false,
-              error: 'EasyPost service is not configured'
-            };
-          }
+        // The isReady() method now handles re-initialization automatically
+        const isReady = easyPostClient.isReady();
+        console.log('easyPostClient.isReady():', isReady);
+        
+        if (!isReady) {
+          console.log('❌ EasyPost client not ready - check logs above for details');
+          return {
+            success: false,
+            error: 'EasyPost service is not configured. Please check server logs for details.'
+          };
         }
         
         console.log('✅ EasyPost client is ready - proceeding with shipment creation');

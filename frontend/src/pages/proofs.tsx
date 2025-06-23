@@ -329,7 +329,7 @@ export default function ProofsPage() {
       return (
         <Layout title="Order Proofs - Sticker Shuttle">
           <div className="min-h-screen" style={{ backgroundColor: '#030140' }}>
-            <div className="container mx-auto px-4 py-8">
+            <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4 py-8">
               <div className="mb-6">
                 <h1 className="text-3xl font-bold text-white mb-2">
                   Order {selectedOrder.orderNumber || `#${selectedOrder.id.split('-')[0].toUpperCase()}`}
@@ -391,7 +391,7 @@ export default function ProofsPage() {
             }
           `}</style>
           
-          <div className="container mx-auto px-4 py-8">
+          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4 py-8">
             {/* Header */}
             <div className="mb-6">
               {!orderId && (
@@ -665,7 +665,7 @@ export default function ProofsPage() {
                             <textarea
                               value={customerNotes}
                               onChange={(e) => setCustomerNotes(e.target.value)}
-                              className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all backdrop-blur-md"
+                              className="w-full px-6 md:px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all backdrop-blur-md"
                               style={{ 
                                 backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                 border: '1px solid rgba(255, 255, 255, 0.1)'
@@ -799,7 +799,7 @@ export default function ProofsPage() {
                       setShowFileUpload(false);
                       setCurrentProofId(null);
                     }}
-                    className="flex-1 px-4 py-2 rounded-lg text-gray-300 hover:text-white transition-colors button-interactive"
+                    className="flex-1 px-6 md:px-4 py-2 rounded-lg text-gray-300 hover:text-white transition-colors button-interactive"
                     style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
                     disabled={uploadingFile}
                   >
@@ -817,7 +817,7 @@ export default function ProofsPage() {
   return (
     <Layout title="Your Proofs - Sticker Shuttle">
       <div className="min-h-screen" style={{ backgroundColor: '#030140' }}>
-        <div className="container mx-auto px-4 py-8">
+        <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4 py-8">
           {/* Orders List */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">Your Proofs</h1>
@@ -893,3 +893,6 @@ export default function ProofsPage() {
     </Layout>
   );
 } 
+
+
+

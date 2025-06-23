@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { getSupabase } from '@/lib/supabase';
 import { useStripeCheckout } from '@/hooks/useStripeCheckout';
 import { useOrderCompletion } from '@/hooks/useOrderCompletion';
+import { useCart } from '@/components/CartContext';
 
 interface CartCheckoutButtonProps {
   cartItems: any[];
@@ -25,6 +26,7 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
   const [user, setUser] = useState<any>(null);
   const { processCheckout, loading, error } = useStripeCheckout();
   const { startMonitoring, stopMonitoring, isMonitoring } = useOrderCompletion();
+  const { clearCart } = useCart();
 
   // Helper function to capitalize first name
   const capitalizeFirstName = (firstName: string): string => {
@@ -53,7 +55,11 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
     const handleOrderCompletion = (event: CustomEvent) => {
       console.log('🎉 Order completion detected!', event.detail);
       
-      // Clear cart and redirect to dashboard
+      // Clear cart immediately - don't wait for onCheckoutSuccess
+      console.log('🛒 Clearing cart due to order completion event');
+      clearCart();
+      
+      // Call the callback (for additional UI updates)
       onCheckoutSuccess?.();
       
       // Show success message and redirect
@@ -68,7 +74,30 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
       window.removeEventListener('newOrderCompleted', handleOrderCompletion as EventListener);
       stopMonitoring(); // Clean up monitoring on unmount
     };
-  }, [router, onCheckoutSuccess, stopMonitoring]);
+  }, [router, onCheckoutSuccess, stopMonitoring, clearCart]);
+
+  // Fallback: Check for successful return from Stripe checkout
+  useEffect(() => {
+    const checkStripeReturn = () => {
+      // Check if we're returning from Stripe checkout with success
+      const urlParams = new URLSearchParams(window.location.search);
+      const fromStripe = sessionStorage.getItem('stripe_checkout_initiated');
+      
+      if (fromStripe && urlParams.get('session_id')) {
+        console.log('🔄 Detected return from Stripe with session_id - clearing cart as fallback');
+        clearCart();
+        sessionStorage.removeItem('stripe_checkout_initiated');
+      }
+    };
+
+    // Check immediately and also on focus (in case user returns to tab)
+    checkStripeReturn();
+    window.addEventListener('focus', checkStripeReturn);
+    
+    return () => {
+      window.removeEventListener('focus', checkStripeReturn);
+    };
+  }, [clearCart]);
 
   const handleDirectCheckout = async () => {
     onCheckoutStart?.();
@@ -81,6 +110,9 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
       
       console.log('🚀 Phase 2: Direct enhanced checkout...');
       console.log('👤 User context:', user ? `Logged in as ${capitalizeFirstName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User')}` : 'Guest user');
+      
+      // Set flag to detect return from Stripe
+      sessionStorage.setItem('stripe_checkout_initiated', 'true');
       
       // Create minimal customer info - Shopify will collect the rest
       const customerInfo = {
@@ -121,12 +153,14 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
         // Don't call onCheckoutSuccess here - wait for order completion
         // Redirect will be handled by processEnhancedCheckout to Shopify, then by monitoring
       } else {
+        sessionStorage.removeItem('stripe_checkout_initiated'); // Clean up on failure
         stopMonitoring(); // Stop monitoring if checkout failed
         throw new Error(result.error || 'Checkout failed');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Checkout failed';
       console.error('❌ Phase 2: Direct checkout error:', errorMessage);
+      sessionStorage.removeItem('stripe_checkout_initiated'); // Clean up on error
       stopMonitoring(); // Stop monitoring on error
       onCheckoutError?.(errorMessage);
     }

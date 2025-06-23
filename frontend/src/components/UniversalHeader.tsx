@@ -132,14 +132,27 @@ export default function UniversalHeader() {
     console.log('Current router.asPath:', router.asPath);
   }, [router.pathname, router.asPath]);
 
+  // Add body class for admin/non-admin pages
+  useEffect(() => {
+    if (isAdminPage) {
+      document.body.classList.add('admin-page');
+    } else {
+      document.body.classList.remove('admin-page');
+    }
+    
+    return () => {
+      document.body.classList.remove('admin-page');
+    };
+  }, [isAdminPage]);
+
   // Determine visibility for authentication UI elements
   const showAccountDashboard = user && !authError && !loading;
   const showLoginSignupButtons = !showAccountDashboard;
 
   return (
     <>
-    <header className="w-full fixed top-0 z-50" style={{ backgroundColor: '#030140' }}>
-      <div className={isAdminPage ? "w-full py-4 px-8" : "w-[95%] md:w-[90%] lg:w-[70%] mx-auto py-4 px-4"}>
+    <header className={`w-full fixed top-0 z-50 ${!isAdminPage ? 'pb-[5px]' : ''}`} style={{ backgroundColor: '#030140' }}>
+      <div className={isAdminPage ? "w-full py-4 px-8" : "w-[95%] md:w-[90%] xl:w-[70%] mx-auto py-4 px-4"}>
         <div className="flex items-center justify-between relative" style={{ paddingTop: '2px' }}>
           {/* Mobile/Tablet Left Side - Hamburger */}
           <div className="lg:hidden flex items-center">
@@ -189,7 +202,7 @@ export default function UniversalHeader() {
 
           {/* Desktop Search Bar */}
           {isAdminPage ? (
-            <form onSubmit={handleOrderSearch} className={`hidden lg:flex flex-1 items-center relative search-dropdown-container ml-8`}>
+            <form onSubmit={handleOrderSearch} className={`hidden lg:flex flex-1 items-center relative search-dropdown-container ml-8 mr-4`}>
               <input 
                 type="text"
                 placeholder="Search by order #, email, or name..."
@@ -246,22 +259,18 @@ export default function UniversalHeader() {
                   />
                 </svg>
               </button>
-            </div>
-          )}
-            
-            {/* Search Dropdown - Only show on non-admin pages */}
-            {!isAdminPage && isSearchDropdownOpen && (
-              <div 
-                className="absolute top-full left-0 right-8 mt-2 rounded-lg z-50 shadow-lg"
-                style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(10px)',
-                  position: 'absolute',
-                  width: 'calc(100% - 2rem)'
-                }}
-                onMouseLeave={() => setIsSearchDropdownOpen(false)}
-              >
+              
+              {/* Search Dropdown - Only show on non-admin pages */}
+              {!isAdminPage && isSearchDropdownOpen && (
+                <div 
+                  className="absolute top-full mt-2 rounded-lg z-50 shadow-lg w-full"
+                  style={{ 
+                    backgroundColor: 'rgba(26, 20, 74, 0.4)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    backdropFilter: 'blur(12px)'
+                  }}
+                  onMouseLeave={() => setIsSearchDropdownOpen(false)}
+                >
                 <div className="p-2">
                   <h3 className="text-sm font-semibold text-white mb-2 px-2">Sticker Types:</h3>
                   <div className="space-y-1">
@@ -418,19 +427,21 @@ export default function UniversalHeader() {
                 </div>
               </div>
             )}
+            </div>
+          )}
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center gap-4" style={{ letterSpacing: '-0.5px' }}>
             {!isAdminPage && (
               <Link 
                 href="/deals"
-                className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105${router.pathname === '/deals' || router.asPath === '/deals' ? ' active' : ''}`}
-                style={router.pathname === '/deals' || router.asPath === '/deals' ? {
-                  border: '0.5px solid #a855f7',
-                  background: 'rgba(168, 85, 247, 0.2)',
-                  boxShadow: '0 0 12px rgba(168, 85, 247, 0.48), 0 0 24px rgba(168, 85, 247, 0.32)',
-                  color: '#c084fc'
-                } : {}}
+                className={`px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105${router.pathname === '/deals' || router.asPath === '/deals' ? ' active' : ''}`}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
+                }}
               >
                 ⚡ Deals
               </Link>
@@ -551,28 +562,25 @@ export default function UniversalHeader() {
                           <span>Design Vault</span>
                         </Link>
 
-                        <button
-                          onClick={() => {
-                            setShowProfileDropdown(false);
-                            // Add support functionality here
-                          }}
-                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white w-full text-left"
+                        <Link 
+                          href="/account/support"
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-red-500/20 transition-colors duration-200 text-white w-full text-left"
+                          onClick={() => setShowProfileDropdown(false)}
                         >
                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                           <span>Get Support</span>
-                        </button>
+                        </Link>
 
                         {isAdmin && (
                           <Link 
                             href="/admin/orders"
-                            className="flex items-center gap-3 p-3 rounded-lg hover:bg-amber-500/20 transition-colors duration-200 text-amber-300"
+                            className="flex items-center gap-3 p-3 rounded-lg hover:bg-purple-500/20 transition-colors duration-200 text-purple-300"
                             onClick={() => setShowProfileDropdown(false)}
                           >
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                             </svg>
                             <span>Admin Panel</span>
                           </Link>
@@ -602,7 +610,13 @@ export default function UniversalHeader() {
               <>
                 <Link 
                   href="/login"
-                  className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 inline-block"
+                  className="px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 inline-block"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)'
+                  }}
                 >
                   Log in
                 </Link>
@@ -644,7 +658,7 @@ export default function UniversalHeader() {
       >
         <div className="p-6">
           {/* Menu Header */}
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-6">
             <img 
               src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
               alt="Sticker Shuttle Logo" 
@@ -659,106 +673,195 @@ export default function UniversalHeader() {
             </button>
           </div>
 
-          {/* Search Bar for Mobile */}
-          <div className="mb-6">
-            <input 
-              type="text"
-              placeholder="Search sticker types..."
-              className="w-full px-4 py-3 rounded-lg font-medium text-white transition-all duration-200 focus:outline-none placeholder-gray-400"
-              style={{ 
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.2)'
-              }}
-            />
-          </div>
+          {/* Profile Section for Logged In Users */}
+          {user && (
+            <div className="mb-6 pb-6 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-white/20">
+                  {profile?.profile_photo_url ? (
+                    <img 
+                      src={profile.profile_photo_url} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-lg font-bold">
+                      {getUserDisplayName().charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold text-lg">{getUserDisplayName()}</h3>
+                  <p className="text-gray-300 text-sm">{user?.email}</p>
+                </div>
+              </div>
+              
+              {/* Quick Menu Items */}
+              <div className="mt-4 grid grid-cols-4 gap-2">
+                <Link 
+                  href="/account/dashboard"
+                  className="flex flex-col items-center p-2 rounded-lg hover:bg-white/10 transition-colors duration-200"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <svg className="w-5 h-5 text-white mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                  </svg>
+                  <span className="text-xs text-gray-300">Dashboard</span>
+                </Link>
+                
+                <Link 
+                  href="/account/dashboard?view=all-orders"
+                  className="flex flex-col items-center p-2 rounded-lg hover:bg-white/10 transition-colors duration-200"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <svg className="w-5 h-5 text-white mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span className="text-xs text-gray-300">Orders</span>
+                </Link>
+                
+                <Link 
+                  href="/account/dashboard?view=proofs"
+                  className="flex flex-col items-center p-2 rounded-lg hover:bg-white/10 transition-colors duration-200"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <svg className="w-5 h-5 text-white mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  <span className="text-xs text-gray-300">Proofs</span>
+                </Link>
+                
+                <Link 
+                  href="/account/dashboard?view=design-vault"
+                  className="flex flex-col items-center p-2 rounded-lg hover:bg-white/10 transition-colors duration-200"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <svg className="w-5 h-5 text-white mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                  </svg>
+                  <span className="text-xs text-gray-300">Designs</span>
+                </Link>
+              </div>
+            </div>
+          )}
 
-          {/* Sticker Types Quick Access */}
+          {/* Sticker Types Quick Access - 2 Column Grid */}
           <div className="mb-8">
-            <h3 className="text-sm font-semibold text-white mb-4 px-4">Sticker Types:</h3>
-            <div className="space-y-2">
-              <Link href="/products/vinyl-stickers" className="flex items-center px-4 py-3 rounded-lg hover:bg-white hover:bg-opacity-90 cursor-pointer transition-all duration-200 group" onClick={() => setIsMobileMenuOpen(false)}>
-                <div className="w-8 h-8 mr-3 flex items-center justify-center">
+            <h3 className="text-sm font-semibold text-white mb-4">Quick Access:</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <Link 
+                href="/products/vinyl-stickers" 
+                className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <div className="w-12 h-12 mb-2 flex items-center justify-center">
                   <img 
                     src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
                     alt="Vinyl" 
                     className="max-w-full max-h-full object-contain"
                     style={{
-                      filter: 'drop-shadow(0 0 6px rgba(168, 242, 106, 0.4))'
+                      filter: 'drop-shadow(0 0 8px rgba(168, 242, 106, 0.5))'
                     }}
                   />
                 </div>
-                <div>
-                  <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Vinyl Stickers</p>
-                  <p className="text-xs transition-colors duration-200 group-hover:text-gray-600" style={{ color: 'rgb(168, 242, 106)' }}>Most Popular</p>
-                </div>
+                <p className="text-white text-xs font-medium text-center">Vinyl</p>
+                <p className="text-white text-xs text-center mt-0.5">Stickers</p>
               </Link>
               
-              <Link href="/products/holographic-stickers" className="flex items-center px-4 py-3 rounded-lg hover:bg-white hover:bg-opacity-90 cursor-pointer transition-all duration-200 group" onClick={() => setIsMobileMenuOpen(false)}>
-                <div className="w-8 h-8 mr-3 flex items-center justify-center">
+              <Link 
+                href="/products/holographic-stickers" 
+                className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <div className="w-12 h-12 mb-2 flex items-center justify-center">
                   <img 
                     src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
                     alt="Holographic" 
                     className="max-w-full max-h-full object-contain"
                     style={{
-                      filter: 'drop-shadow(0 0 6px rgba(168, 85, 247, 0.4))'
+                      filter: 'drop-shadow(0 0 8px rgba(168, 85, 247, 0.5))'
                     }}
                   />
                 </div>
-                <div>
-                  <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Holographic</p>
-                  <p className="text-xs transition-colors duration-200 group-hover:text-gray-600" style={{ color: 'rgb(168, 85, 247)' }}>Premium</p>
-                </div>
+                <p className="text-white text-xs font-medium text-center">Holographic</p>
+                <p className="text-white text-xs text-center mt-0.5">Stickers</p>
               </Link>
               
-              <Link href="/products/chrome-stickers" className="flex items-center px-4 py-3 rounded-lg hover:bg-white hover:bg-opacity-90 cursor-pointer transition-all duration-200 group" onClick={() => setIsMobileMenuOpen(false)}>
-                <div className="w-8 h-8 mr-3 flex items-center justify-center">
+              <Link 
+                href="/products/chrome-stickers" 
+                className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <div className="w-12 h-12 mb-2 flex items-center justify-center">
                   <img 
                     src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
                     alt="Chrome" 
                     className="max-w-full max-h-full object-contain"
                     style={{
-                      filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.4))'
+                      filter: 'drop-shadow(0 0 8px rgba(220, 220, 220, 0.5))'
                     }}
                   />
                 </div>
-                <div>
-                  <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Chrome</p>
-                  <p className="text-xs transition-colors duration-200 group-hover:text-gray-600" style={{ color: 'rgb(220, 220, 220)' }}>Mirror Finish</p>
-                </div>
+                <p className="text-white text-xs font-medium text-center">Chrome</p>
+                <p className="text-white text-xs text-center mt-0.5">Stickers</p>
               </Link>
               
-              <Link href="/products/glitter-stickers" className="flex items-center px-4 py-3 rounded-lg hover:bg-white hover:bg-opacity-90 cursor-pointer transition-all duration-200 group" onClick={() => setIsMobileMenuOpen(false)}>
-                <div className="w-8 h-8 mr-3 flex items-center justify-center">
+              <Link 
+                href="/products/glitter-stickers" 
+                className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <div className="w-12 h-12 mb-2 flex items-center justify-center">
                   <img 
                     src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
                     alt="Glitter" 
                     className="max-w-full max-h-full object-contain"
                     style={{
-                      filter: 'drop-shadow(0 0 6px rgba(59, 130, 246, 0.4))'
+                      filter: 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.5))'
                     }}
                   />
                 </div>
-                <div>
-                  <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Glitter</p>
-                  <p className="text-xs transition-colors duration-200 group-hover:text-gray-600" style={{ color: 'rgb(59, 130, 246)' }}>Sparkly</p>
-                </div>
+                <p className="text-white text-xs font-medium text-center">Glitter</p>
+                <p className="text-white text-xs text-center mt-0.5">Stickers</p>
               </Link>
               
-              <Link href="/products/vinyl-banners" className="flex items-center px-4 py-3 rounded-lg hover:bg-white hover:bg-opacity-90 cursor-pointer transition-all duration-200 group" onClick={() => setIsMobileMenuOpen(false)}>
-                <div className="w-8 h-8 mr-3 flex items-center justify-center">
+              <Link 
+                href="/products/vinyl-banners" 
+                className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <div className="w-12 h-12 mb-2 flex items-center justify-center">
                   <img 
                     src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593724/Vinyl-Banner_c84nis.png" 
                     alt="Vinyl Banners" 
                     className="max-w-full max-h-full object-contain"
                     style={{
-                      filter: 'drop-shadow(0 0 6px rgba(196, 181, 253, 0.4))'
+                      filter: 'drop-shadow(0 0 8px rgba(196, 181, 253, 0.5))'
                     }}
                   />
                 </div>
-                <div>
-                  <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Vinyl Banners</p>
-                  <p className="text-xs transition-colors duration-200 group-hover:text-gray-600" style={{ color: 'rgb(196, 181, 253)' }}>Heavy Duty</p>
+                <p className="text-white text-xs font-medium text-center">Vinyl</p>
+                <p className="text-white text-xs text-center mt-0.5">Banners</p>
+              </Link>
+              
+              <Link 
+                href="/products/sticker-sheets" 
+                className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <div className="w-12 h-12 mb-2 flex items-center justify-center">
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749847809/StickerShuttle_StickerSheetsIcon_2_g61dty.svg" 
+                    alt="Sticker Sheets" 
+                    className="max-w-full max-h-full object-contain"
+                    style={{
+                      filter: 'drop-shadow(0 0 8px rgba(196, 181, 253, 0.5))'
+                    }}
+                  />
                 </div>
+                <p className="text-white text-xs font-medium text-center">Sticker</p>
+                <p className="text-white text-xs text-center mt-0.5">Sheets</p>
               </Link>
             </div>
           </div>
@@ -778,16 +881,8 @@ export default function UniversalHeader() {
             
             {/* Mobile Authentication Navigation - Show login/signup by default unless user verified */}
             {showAccountDashboard ? (
-              /* Logged In and Verified - Show Account Dashboard and Sign Out */
+              /* Logged In and Verified - Show Sign Out only */
               <>
-                <Link 
-                  href="/account/dashboard" 
-                  className={`w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center${router.pathname === '/account/dashboard' || router.asPath === '/account/dashboard' || router.pathname.startsWith('/account') ? ' bg-purple-500 bg-opacity-20 border-l-4 border-purple-400' : ''}`}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <span className="mr-3">👨‍🚀</span>
-                  Account Dashboard
-                </Link>
                 {isAdmin && (
                   <Link 
                     href="/admin/orders" 
@@ -861,28 +956,29 @@ export default function UniversalHeader() {
 
       /* Header Button Styles */
       .headerButton {
-        background: rgba(255, 255, 255, 0.1) !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        backdrop-filter: blur(10px) !important;
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+        backdrop-filter: blur(12px) !important;
       }
 
       .headerButton:hover {
-        background: rgba(255, 255, 255, 0.2) !important;
-        border-color: rgba(255, 255, 255, 0.3) !important;
+        background: rgba(255, 255, 255, 0.1) !important;
+        border-color: rgba(255, 255, 255, 0.2) !important;
       }
       
       /* Active page button styling */
       .headerButton.active {
-        border: 0.5px solid #a855f7 !important;
+        border: 1px solid rgba(168, 85, 247, 0.5) !important;
         background: rgba(168, 85, 247, 0.2) !important;
-        box-shadow: 0 0 12px rgba(168, 85, 247, 0.48), 0 0 24px rgba(168, 85, 247, 0.32) !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 15px rgba(168, 85, 247, 0.4), 0 0 25px rgba(168, 85, 247, 0.2) !important;
         color: #c084fc !important;
       }
       
       .headerButton.active:hover {
         background: rgba(168, 85, 247, 0.3) !important;
-        border-color: #c084fc !important;
-        box-shadow: 0 0 16px rgba(168, 85, 247, 0.64), 0 0 32px rgba(168, 85, 247, 0.4) !important;
+        border-color: rgba(168, 85, 247, 0.6) !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 20px rgba(168, 85, 247, 0.5), 0 0 30px rgba(168, 85, 247, 0.3) !important;
         color: #e0c3fc !important;
       }
       

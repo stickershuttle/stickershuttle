@@ -24,10 +24,18 @@ const UPDATE_PROOF_STATUS = gql`
 import useInvoiceGenerator, { InvoiceData } from '../../components/InvoiceGenerator';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import dynamic from 'next/dynamic';
+import { useCart } from '../../components/CartContext';
+import { generateCartItemId } from '../../types/product';
+import { 
+  calculateRealPrice, 
+  loadRealPricingData, 
+  BasePriceRow, 
+  QuantityDiscountRow 
+} from '../../utils/real-pricing';
 
 // Using real order data only - no more sample/demo data
 
-type DashboardView = 'default' | 'all-orders' | 'financial' | 'items-analysis' | 'design-vault' | 'proofs' | 'order-details';
+type DashboardView = 'default' | 'all-orders' | 'financial' | 'items-analysis' | 'design-vault' | 'proofs' | 'order-details' | 'settings' | 'support';
 
 // Order type interface
 interface OrderItem {
@@ -69,6 +77,7 @@ interface Order {
 
 function Dashboard() {
   const router = useRouter();
+  const { addToCart } = useCart();
   const [profile, setProfile] = useState<any>(null);
 
   
@@ -159,6 +168,9 @@ function Dashboard() {
   const [reorderOrderData, setReorderOrderData] = useState<any>(null);
   const [removedRushItems, setRemovedRushItems] = useState<Set<number>>(new Set());
   const [removedItems, setRemovedItems] = useState<Set<number>>(new Set());
+  const [updatedQuantities, setUpdatedQuantities] = useState<{ [index: number]: number }>({});
+  const [updatedPrices, setUpdatedPrices] = useState<{ [index: number]: { total: number; perSticker: number } }>({});
+  const [pricingData, setPricingData] = useState<any>(null);
 
   // Add custom styles for animations
   useEffect(() => {
@@ -167,29 +179,84 @@ function Dashboard() {
       @keyframes liquid-flow {
         0% {
           background-position: 0% 50%;
-          transform: scale(1) rotate(0deg);
         }
         25% {
           background-position: 100% 50%;
-          transform: scale(1.05) rotate(1deg);
         }
         50% {
           background-position: 100% 100%;
-          transform: scale(1) rotate(0deg);
         }
         75% {
           background-position: 0% 100%;
-          transform: scale(1.05) rotate(-1deg);
         }
         100% {
           background-position: 0% 50%;
-          transform: scale(1) rotate(0deg);
+        }
+      }
+      
+      @keyframes stellar-drift {
+        0% {
+          background-position: 0% 0%, 20% 20%, 40% 60%, 60% 40%, 80% 80%, 10% 30%;
+        }
+        20% {
+          background-position: 30% 40%, 50% 10%, 70% 60%, 90% 80%, 20% 100%, 40% 50%;
+        }
+        40% {
+          background-position: 60% 70%, 80% 50%, 90% 30%, 20% 90%, 40% 20%, 70% 10%;
+        }
+        60% {
+          background-position: 80% 100%, 100% 80%, 30% 40%, 50% 60%, 70% 50%, 90% 70%;
+        }
+        80% {
+          background-position: 100% 50%, 30% 70%, 50% 100%, 70% 30%, 90% 90%, 60% 60%;
+        }
+        100% {
+          background-position: 0% 0%, 20% 20%, 40% 60%, 60% 40%, 80% 80%, 10% 30%;
+        }
+      }
+      
+      @keyframes nebula-pulse {
+        0%, 100% {
+          opacity: 0.3;
+        }
+        50% {
+          opacity: 0.6;
+        }
+      }
+      
+      @keyframes star-twinkle {
+        0%, 100% {
+          opacity: 0.1;
+        }
+        50% {
+          opacity: 0.3;
         }
       }
       
       .animate-liquid-flow {
         background-size: 400% 400%;
         animation: liquid-flow 8s ease-in-out infinite;
+      }
+      
+      .stellar-void-animation {
+        position: relative;
+        overflow: hidden;
+      }
+      
+      .stellar-void-animation::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse at 25% 30%, rgba(139, 92, 246, 0.4) 0%, transparent 60%);
+        animation: nebula-pulse 4s ease-in-out infinite;
+      }
+      
+      .stellar-void-animation::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse at 75% 70%, rgba(124, 58, 237, 0.3) 0%, transparent 50%);
+        animation: nebula-pulse 4s ease-in-out infinite 2s;
       }
       
       .bg-noise {
@@ -240,7 +307,12 @@ function Dashboard() {
     if (user && !profile) {
       fetchProfile();
     }
-  }, [user, userLoading, profile, router]);
+
+    // Load pricing data
+    if (!pricingData) {
+      loadPricing();
+    }
+  }, [user, userLoading, profile, router, pricingData]);
 
   // Check for order completion flag from URL
   useEffect(() => {
@@ -258,22 +330,60 @@ function Dashboard() {
 
   // Handle URL query parameters for view navigation
   useEffect(() => {
-    if (router.query.view && router.query.view !== currentView) {
-      const requestedView = router.query.view as string;
-      const validViews: DashboardView[] = ['default', 'all-orders', 'financial', 'items-analysis', 'design-vault', 'proofs', 'order-details'];
+    // Get the requested view from URL
+    const requestedView = router.query.view as string;
+    
+    // If no view in URL, set to default
+    if (!requestedView && currentView !== 'default') {
+      setCurrentView('default');
+      return;
+    }
+    
+    // If view in URL is different from current, update
+    if (requestedView && requestedView !== currentView) {
+      const validViews: DashboardView[] = ['default', 'all-orders', 'financial', 'items-analysis', 'design-vault', 'proofs', 'order-details', 'settings', 'support'];
       
       if (validViews.includes(requestedView as DashboardView)) {
         setCurrentView(requestedView as DashboardView);
       }
     }
-  }, [router.query.view, currentView]);
+  }, [router.query.view]);
 
   // Helper function to update view and URL
   const updateCurrentView = (view: DashboardView) => {
+    // If already on the same view, do nothing
+    if (currentView === view) return;
+    
+    // Use a transition state to prevent flashing
+    const prevView = currentView;
+    
+    // Update state immediately
     setCurrentView(view);
+    
     // Update URL to reflect the current view
     const url = view === 'default' ? '/account/dashboard' : `/account/dashboard?view=${view}`;
     router.push(url, undefined, { shallow: true });
+    
+    // Force re-render if moving to/from default view
+    if (view === 'default' || prevView === 'default') {
+      // Small timeout to ensure smooth transition
+      setTimeout(() => {
+        setCurrentView(view);
+      }, 10);
+    }
+    
+    // Load saved support form draft when switching to support view
+    if (view === 'support') {
+      const savedDraft = localStorage.getItem('supportFormDraft');
+      if (savedDraft) {
+        try {
+          const draft = JSON.parse(savedDraft);
+          setContactFormData(prev => ({ ...prev, ...draft }));
+        } catch (e) {
+          console.error('Error loading draft:', e);
+        }
+      }
+    }
   };
 
   // Clear selected design image when navigating away from design vault
@@ -324,6 +434,15 @@ function Dashboard() {
     };
   }, [stagedFile]);
 
+  const loadPricing = async () => {
+    try {
+      const pricingData = await loadRealPricingData();
+      setPricingData(pricingData);
+    } catch (error) {
+      console.warn('Failed to load pricing data, using fallback pricing:', error);
+    }
+  };
+
   const fetchProfile = async () => {
     if (!user || !(user as any)?.id) {
       console.log('⚠️ No user or user ID available for profile fetch');
@@ -360,10 +479,17 @@ function Dashboard() {
         profile_photo_public_id: profileData?.profile_photo_public_id || null,
         banner_image_public_id: profileData?.banner_image_public_id || null,
         display_name: profileData?.display_name || null,
-        bio: profileData?.bio || null
+        bio: profileData?.bio || null,
+        // Banner template data
+        banner_template: profileData?.banner_template || null,
+        banner_template_id: profileData?.banner_template_id || null
       };
       
       console.log('✅ Profile data loaded:', combinedProfile);
+      console.log('🎨 Banner template data:', {
+        banner_template: combinedProfile.banner_template,
+        banner_template_id: combinedProfile.banner_template_id
+      });
       setProfile(combinedProfile);
 
       // Auto-fill contact form with user data
@@ -388,6 +514,7 @@ function Dashboard() {
   const [uploadingProfilePhoto, setUploadingProfilePhoto] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [showBannerTemplates, setShowBannerTemplates] = useState(false);
+
 
   const handleProfilePictureClick = () => {
     if (uploadingProfilePhoto) return;
@@ -580,151 +707,280 @@ function Dashboard() {
   };
 
   const bannerTemplates = [
+    // New Perfect Default Template
     {
       id: 1,
-      name: 'Ocean Waves',
+      name: 'Stellar Void (Default)',
+      category: 'cosmic',
+      isDefault: true,
       style: {
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        backgroundSize: '400% 400%',
-        animation: 'gradient-shift 8s ease-in-out infinite'
+        background: 'linear-gradient(135deg, #0a0a2e 0%, #1a1a4a 25%, #2d1b6b 50%, #4c1d95 75%, #7c3aed 100%)',
+        backgroundImage: `
+          radial-gradient(ellipse at 25% 30%, rgba(139, 92, 246, 0.5) 0%, transparent 60%),
+          radial-gradient(ellipse at 75% 70%, rgba(124, 58, 237, 0.4) 0%, transparent 50%),
+          radial-gradient(ellipse at 50% 20%, rgba(147, 51, 234, 0.3) 0%, transparent 40%),
+          radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15) 1px, transparent 1px),
+          radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+          radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.18) 1px, transparent 1px)
+        `,
+        backgroundSize: '200% 200%, 200% 200%, 200% 200%, 100px 100px, 150px 150px, 80px 80px',
+        animation: 'stellar-drift 8s ease-in-out infinite',
+        backgroundPosition: '0% 0%, 20% 20%, 40% 60%, 60% 40%, 80% 80%, 10% 30%'
       }
     },
+
+    // Business Themed Templates with Emojis
     {
       id: 2,
-      name: 'Sunset Glow',
+      name: 'Bakery Vibes',
+      category: 'business',
       style: {
-        background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-        backgroundSize: '400% 400%',
-        animation: 'gradient-shift 6s ease-in-out infinite'
-      }
+        background: 'linear-gradient(135deg, #fef3c7 0%, #fed7aa 50%, #fecaca 100%)'
+      },
+      emojis: ['🧁', '🍰', '🥖', '🥐', '🍪', '🎂']
     },
     {
       id: 3,
-      name: 'Forest Mist',
+      name: 'Barber Shop',
+      category: 'business',
       style: {
-        background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-        backgroundSize: '400% 400%',
-        animation: 'gradient-shift 10s ease-in-out infinite'
-      }
+        background: 'linear-gradient(135deg, #1f2937 0%, #374151 50%, #4b5563 100%)'
+      },
+      emojis: ['✂️', '💈', '🪒', '👨‍🦲', '💇‍♂️', '🧔']
     },
     {
       id: 4,
-      name: 'Cosmic Purple',
+      name: 'Fashion Store',
+      category: 'business',
       style: {
-        background: 'radial-gradient(circle at 20% 80%, #120078 0%, #9d0191 50%, #fd5e53 100%)',
-        backgroundSize: '400% 400%',
-        animation: 'gradient-shift 12s ease-in-out infinite'
-      }
+        background: 'linear-gradient(135deg, #ec4899 0%, #be185d 50%, #9d174d 100%)'
+      },
+      emojis: ['👗', '👔', '👠', '👜', '💄', '👑']
     },
     {
       id: 5,
-      name: 'Golden Hour',
+      name: 'Candle Shop',
+      category: 'business',
       style: {
-        background: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
-        backgroundSize: '400% 400%',
-        animation: 'gradient-shift 7s ease-in-out infinite'
-      }
+        background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)'
+      },
+      emojis: ['🕯️', '🔥', '✨', '🌙', '💫', '🌟']
     },
     {
       id: 6,
-      name: 'Neon Cyber',
+      name: 'Flower Shop',
+      category: 'business',
       style: {
-        background: 'linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #16213e 50%, #0f3460 100%)',
-        backgroundImage: `radial-gradient(circle at 25% 25%, #00ffff 0%, transparent 50%), 
-                         radial-gradient(circle at 75% 75%, #ff00ff 0%, transparent 50%)`,
-        backgroundSize: '400% 400%, 200% 200%',
-        animation: 'gradient-shift 9s ease-in-out infinite'
-      }
+        background: 'linear-gradient(135deg, #fda4af 0%, #fb7185 50%, #f43f5e 100%)'
+      },
+      emojis: ['🌸', '🌺', '🌻', '🌹', '🌷', '💐']
     },
     {
       id: 7,
-      name: 'Aurora Borealis',
+      name: 'Coffee Shop',
+      category: 'business',
       style: {
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #4facfe 100%)',
-        backgroundSize: '800% 800%',
-        animation: 'gradient-shift 15s ease-in-out infinite'
-      }
+        background: 'linear-gradient(135deg, #a78bfa 0%, #8b5cf6 50%, #7c3aed 100%)'
+      },
+      emojis: ['☕', '🧁', '🥐', '📚', '💻', '🎵']
     },
     {
       id: 8,
-      name: 'Mint Fresh',
+      name: 'Gym & Fitness',
+      category: 'business',
       style: {
-        background: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
-        backgroundSize: '400% 400%',
-        animation: 'gradient-shift 8s ease-in-out infinite'
-      }
+        background: 'linear-gradient(135deg, #f97316 0%, #ea580c 50%, #dc2626 100%)'
+      },
+      emojis: ['💪', '🏋️‍♀️', '🏃‍♂️', '⚡', '🔥', '🏆']
     },
     {
       id: 9,
-      name: 'Fire Gradient',
+      name: 'Pet Care',
+      category: 'business',
       style: {
-        background: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%)',
-        backgroundSize: '400% 400%',
-        animation: 'gradient-shift 6s ease-in-out infinite'
-      }
+        background: 'linear-gradient(135deg, #34d399 0%, #10b981 50%, #059669 100%)'
+      },
+      emojis: ['🐕', '🐈', '🐾', '❤️', '🦴', '🎾']
     },
     {
       id: 10,
-      name: 'Deep Space',
+      name: 'Tech Startup',
+      category: 'business',
       style: {
-        background: 'radial-gradient(ellipse at center, #0f0f23 0%, #000000 70%)',
-        backgroundImage: `radial-gradient(circle at 20% 20%, rgba(255,255,255,0.1) 0%, transparent 20%),
-                         radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 0%, transparent 20%),
-                         radial-gradient(circle at 40% 40%, rgba(255,255,255,0.05) 0%, transparent 20%)`,
-        backgroundSize: '100% 100%, 200px 200px, 150px 150px, 100px 100px'
-      }
+        background: 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 50%, #2563eb 100%)'
+      },
+      emojis: ['💻', '📱', '⚡', '🚀', '💡', '🔧']
     },
+
+
+
+    // Additional Business Templates  
     {
       id: 11,
-      name: 'Electric Blue',
+      name: 'Music Studio',
+      category: 'business',
       style: {
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)`,
-        backgroundSize: '400% 400%',
-        animation: 'gradient-shift 8s ease-in-out infinite'
-      }
+        background: 'linear-gradient(135deg, #4c1d95 0%, #7c3aed 50%, #a855f7 100%)'
+      },
+      emojis: ['🎵', '🎤', '🎸', '🥁', '🎹', '🎧']
     },
     {
       id: 12,
-      name: 'Peachy Keen',
+      name: 'Restaurant',
+      category: 'business',
       style: {
-        background: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
-        backgroundImage: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2) 0%, transparent 50%)`,
-        backgroundSize: '400% 400%',
-        animation: 'gradient-shift 7s ease-in-out infinite'
-      }
+        background: 'linear-gradient(135deg, #b91c1c 0%, #dc2626 50%, #ef4444 100%)'
+      },
+      emojis: ['🍕', '🍔', '🍜', '🥗', '🍷', '👨‍🍳']
     },
     {
       id: 13,
-      name: 'Matrix Green',
+      name: 'Spa & Wellness',
+      category: 'business',
       style: {
-        background: 'linear-gradient(135deg, #134e5e 0%, #71b280 100%)',
-        backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(255,255,255,0.03) 10px, rgba(255,255,255,0.03) 20px)`,
-        backgroundSize: '400% 400%',
-        animation: 'gradient-shift 10s ease-in-out infinite'
-      }
+        background: 'linear-gradient(135deg, #065f46 0%, #059669 50%, #10b981 100%)'
+      },
+      emojis: ['🧘‍♀️', '💆‍♀️', '🌿', '🕯️', '🛁', '✨']
     },
     {
       id: 14,
-      name: 'Retro Wave',
+      name: 'Auto Repair',
+      category: 'business',
       style: {
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 20px, rgba(255,255,255,0.1) 20px, rgba(255,255,255,0.1) 40px)`,
-        backgroundSize: '400% 400%',
-        animation: 'gradient-shift 8s ease-in-out infinite'
-      }
+        background: 'linear-gradient(135deg, #374151 0%, #4b5563 50%, #6b7280 100%)'
+      },
+      emojis: ['🔧', '🚗', '⚙️', '🛠️', '🔩', '🚙']
     },
     {
       id: 15,
-      name: 'Lavender Dreams',
+      name: 'Photography',
+      category: 'business',
       style: {
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
-        backgroundImage: `radial-gradient(circle at 70% 70%, rgba(255,255,255,0.1) 0%, transparent 50%)`,
-        backgroundSize: '400% 400%',
-        animation: 'gradient-shift 12s ease-in-out infinite'
+        background: 'linear-gradient(135deg, #581c87 0%, #7c2d12 50%, #a21caf 100%)'
+      },
+      emojis: ['📸', '📷', '🌅', '💡', '🎭', '✨']
+    },
+    {
+      id: 16,
+      name: 'Real Estate',
+      category: 'business',
+      style: {
+        background: 'linear-gradient(135deg, #0c4a6e 0%, #0369a1 50%, #0284c7 100%)'
+      },
+      emojis: ['🏠', '🏢', '🔑', '📋', '💼', '🏘️']
+    },
+    {
+      id: 17,
+      name: 'Education',
+      category: 'business',
+      style: {
+        background: 'linear-gradient(135deg, #14532d 0%, #166534 50%, #15803d 100%)'
+      },
+      emojis: ['📚', '🎓', '✏️', '📝', '🍎', '🧑‍🏫']
+    },
+    {
+      id: 18,
+      name: 'Travel Agency',
+      category: 'business',
+      style: {
+        background: 'linear-gradient(135deg, #0f766e 0%, #0d9488 50%, #14b8a6 100%)'
+      },
+      emojis: ['✈️', '🌍', '🗺️', '🏖️', '🎒', '📍']
+    },
+    {
+      id: 19,
+      name: 'Legal Services',
+      category: 'business',
+      style: {
+        background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #3730a3 100%)'
+      },
+      emojis: ['⚖️', '📋', '🏛️', '📜', '✍️', '💼']
+    },
+
+    // Neon Cyber Effects
+    {
+      id: 20,
+      name: 'Neon Grid',
+      category: 'cyber',
+      style: {
+        background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%)',
+        backgroundImage: `
+          linear-gradient(rgba(0, 255, 255, 0.1) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 255, 255, 0.1) 1px, transparent 1px)
+        `,
+        backgroundSize: '20px 20px',
+        boxShadow: 'inset 0 0 50px rgba(0, 255, 255, 0.1)'
       }
-    }
+    },
+    {
+      id: 21,
+      name: 'Deep Space',
+      category: 'cyber',
+      style: {
+        background: 'linear-gradient(135deg, #000000 0%, #050514 25%, #0a0a1f 50%, #0f0f2a 75%, #141435 100%)',
+        backgroundImage: `
+          radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.3) 1px, transparent 1px),
+          radial-gradient(circle at 60% 20%, rgba(255, 255, 255, 0.2) 1px, transparent 1px),
+          radial-gradient(circle at 80% 60%, rgba(255, 255, 255, 0.4) 1px, transparent 1px),
+          radial-gradient(circle at 30% 80%, rgba(255, 255, 255, 0.3) 1px, transparent 1px),
+          radial-gradient(circle at 90% 40%, rgba(255, 255, 255, 0.2) 1px, transparent 1px)
+        `,
+        backgroundSize: '200px 200px, 300px 300px, 250px 250px, 180px 180px, 320px 320px',
+        animation: 'twinkling-stars 12s ease-in-out infinite'
+      }
+    },
+    {
+      id: 22,
+      name: 'Nebula Cloud',
+      category: 'cyber',
+      style: {
+        background: 'linear-gradient(135deg, #1a0d2e 0%, #2d1b4e 25%, #4a2c6b 50%, #6b3d88 75%, #8b4ea5 100%)',
+        backgroundImage: `
+          radial-gradient(ellipse at 20% 70%, rgba(138, 43, 226, 0.4) 0%, transparent 60%),
+          radial-gradient(ellipse at 80% 30%, rgba(75, 0, 130, 0.3) 0%, transparent 50%),
+          radial-gradient(ellipse at 40% 40%, rgba(199, 21, 133, 0.3) 0%, transparent 40%),
+          radial-gradient(ellipse at 60% 80%, rgba(138, 43, 226, 0.2) 0%, transparent 50%)
+        `,
+        animation: 'nebula-drift 15s ease-in-out infinite'
+      }
+    },
+
+    {
+      id: 24,
+      name: 'Galactic Dust',
+      category: 'cyber',
+      style: {
+        background: 'linear-gradient(135deg, #050210 0%, #0a0515 25%, #150a25 50%, #200f35 75%, #2a1445 100%)',
+        backgroundImage: `
+          radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+          radial-gradient(circle at 30% 40%, rgba(138, 43, 226, 0.2) 2px, transparent 2px),
+          radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+          radial-gradient(circle at 50% 70%, rgba(75, 0, 130, 0.15) 1px, transparent 1px),
+          radial-gradient(circle at 85% 80%, rgba(255, 255, 255, 0.12) 1px, transparent 1px)
+        `,
+        backgroundSize: '100px 100px, 150px 150px, 80px 80px, 120px 120px, 90px 90px',
+        animation: 'cosmic-dust 18s ease-in-out infinite'
+      }
+    },
+    {
+      id: 25,
+      name: 'Cosmic Galaxy',
+      category: 'cyber',
+      style: {
+        background: 'radial-gradient(circle at 20% 80%, #120078 0%, #9d0191 30%, #1a0033 70%, #000 100%)',
+        backgroundImage: `
+          radial-gradient(circle at 70% 70%, rgba(138, 43, 226, 0.4) 0%, transparent 50%),
+          radial-gradient(circle at 20% 80%, rgba(75, 0, 130, 0.3) 0%, transparent 40%),
+          radial-gradient(circle at 40% 20%, rgba(255,255,255,0.1) 0%, transparent 20%)
+        `,
+        backgroundSize: '100% 100%, 300px 300px, 200px 200px, 150px 150px',
+        animation: 'gradient-shift 15s ease-in-out infinite'
+      }
+    },
+
   ];
+
+
 
   const handleSelectBannerTemplate = async (template: any) => {
     if (!user) return;
@@ -800,49 +1056,49 @@ function Dashboard() {
     // Priority 1: Check for order_number (the SS-00001 format from Stripe webhook)
     if (order.orderNumber) {
       console.log(`✅ Using orderNumber: ${order.orderNumber}`);
-      return order.orderNumber;
+      return order.orderNumber.startsWith('SS-') ? order.orderNumber : `SS-${order.orderNumber}`;
     }
     
     if (order.order_number) {
       console.log(`✅ Using order_number: ${order.order_number}`);
-      return order.order_number;
+      return order.order_number.startsWith('SS-') ? order.order_number : `SS-${order.order_number}`;
     }
     
     // Priority 2: Check _fullOrderData for order_number
     if (order._fullOrderData?.orderNumber) {
       console.log(`✅ Using _fullOrderData.orderNumber: ${order._fullOrderData.orderNumber}`);
-      return order._fullOrderData.orderNumber;
+      return order._fullOrderData.orderNumber.startsWith('SS-') ? order._fullOrderData.orderNumber : `SS-${order._fullOrderData.orderNumber}`;
     }
     
     if (order._fullOrderData?.order_number) {
       console.log(`✅ Using _fullOrderData.order_number: ${order._fullOrderData.order_number}`);
-      return order._fullOrderData.order_number;
+      return order._fullOrderData.order_number.startsWith('SS-') ? order._fullOrderData.order_number : `SS-${order._fullOrderData.order_number}`;
     }
     
     // Priority 3: Legacy - Try Shopify order numbers
     if (order.shopifyOrderNumber) {
       console.log(`⚠️ Using legacy shopifyOrderNumber: ${order.shopifyOrderNumber}`);
-      return order.shopifyOrderNumber;
+      return order.shopifyOrderNumber.startsWith('SS-') ? order.shopifyOrderNumber : `SS-${order.shopifyOrderNumber}`;
     }
     
     if (order._fullOrderData?.shopifyOrderNumber) {
       console.log(`⚠️ Using legacy _fullOrderData.shopifyOrderNumber: ${order._fullOrderData.shopifyOrderNumber}`);
-      return order._fullOrderData.shopifyOrderNumber;
+      return order._fullOrderData.shopifyOrderNumber.startsWith('SS-') ? order._fullOrderData.shopifyOrderNumber : `SS-${order._fullOrderData.shopifyOrderNumber}`;
     }
     
     if (order._fullOrderData?.shopify_order_number) {
       console.log(`⚠️ Using legacy _fullOrderData.shopify_order_number: ${order._fullOrderData.shopify_order_number}`);
-      return order._fullOrderData.shopify_order_number;
+      return order._fullOrderData.shopify_order_number.startsWith('SS-') ? order._fullOrderData.shopify_order_number : `SS-${order._fullOrderData.shopify_order_number}`;
     }
     
     if (order.shopify_order_number) {
       console.log(`⚠️ Using legacy snake_case shopify_order_number: ${order.shopify_order_number}`);
-      return order.shopify_order_number;
+      return order.shopify_order_number.startsWith('SS-') ? order.shopify_order_number : `SS-${order.shopify_order_number}`;
     }
     
     // Last resort: Use internal ID but make it shorter and cleaner
-    console.log(`🔄 Fallback to internal ID: #${order.id.split('-')[0].toUpperCase()}`);
-    return `#${order.id.split('-')[0].toUpperCase()}`;
+    console.log(`🔄 Fallback to internal ID: SS-${order.id.split('-')[0].toUpperCase()}`);
+    return `SS-${order.id.split('-')[0].toUpperCase()}`;
   };
 
   const handleReorder = async (orderId: string) => {
@@ -908,82 +1164,111 @@ function Dashboard() {
         router.push(productPath);
       }
     } else {
-      // Direct reorder - go straight to Shopify checkout
+      // Add items to cart and redirect to checkout
       try {
-        // Get current user context
-        let currentUser = null;
-        try {
-          const supabase = await getSupabase();
-          const { data: { session } } = await supabase.auth.getSession();
-          currentUser = session?.user || null;
-        } catch (userError) {
-          console.warn('Could not get user context, proceeding as guest:', userError);
-        }
-
-        // Prepare items for direct checkout (filter out removed items)
-        const checkoutItems = reorderOrderData.items
-          .map((item: any, itemIndex: number) => ({ item, itemIndex }))
-          .filter(({ itemIndex }: { itemIndex: number }) => !removedItems.has(itemIndex))
-          .map(({ item, itemIndex }: { item: any, itemIndex: number }) => {
-            const itemData = reorderOrderData._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+        // Add each item to cart
+        reorderOrderData.items.forEach((item: any, index: number) => {
+          // Skip removed items
+          if (removedItems.has(index)) return;
           
-            return {
-              product: {
-                id: itemData.productId || itemData.product_id || `reorder-${Date.now()}`,
-                name: itemData.productName || item.name || 'Custom Stickers',
-                category: itemData.productCategory || itemData.product_category || 'vinyl-stickers',
-                sku: `REORDER-${reorderOrderData.id}-${itemData.id || itemIndex}`
-              },
-              quantity: itemData.quantity || item.quantity || 1,
-              unitPrice: itemData.unitPrice || item.unitPrice || 0,
-              totalPrice: itemData.totalPrice || item.totalPrice || 0,
-              customization: {
-                selections: itemData.calculatorSelections || {
-                  size: { displayValue: item.size || 'Custom' },
-                  material: { displayValue: item.material || 'Premium Vinyl' },
-                  cut: { displayValue: 'Custom Shape' },
-                  quantity: { displayValue: (itemData.quantity || item.quantity || 1).toString() }
+          const itemData = reorderOrderData._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+          const selections = itemData.calculatorSelections || {};
+          const currentQty = updatedQuantities[index] ?? (itemData.quantity || item.quantity || 1);
+          const currentPrice = updatedPrices[index] || { total: item.totalPrice || 0, perSticker: item.unitPrice || 0 };
+          
+                     // Create cart item
+           const cartItem = {
+             id: generateCartItemId(),
+             product: {
+               id: itemData.productCategory || 'vinyl-stickers',
+               sku: `REORDER-${reorderOrderData.id}-${index}`,
+               name: itemData.productName || item.name || 'Custom Stickers',
+               description: `Reordered ${itemData.productName || item.name || 'Custom Stickers'}`,
+               shortDescription: 'Reordered item',
+               category: (itemData.productCategory || 'vinyl-stickers') as any,
+               basePrice: currentPrice.perSticker,
+               images: itemData.customFiles || [item.image] || ['https://res.cloudinary.com/dxcnvqk6b/image/upload/v1747860831/samples/sticker-default.png'],
+               defaultImage: itemData.customFiles?.[0] || item.image || 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1747860831/samples/sticker-default.png',
+               features: ['Custom Design', 'High Quality'],
+               customizable: true,
+               isActive: true,
+               createdAt: new Date().toISOString(),
+               updatedAt: new Date().toISOString()
+             },
+            customization: {
+              productId: itemData.productCategory || 'vinyl-stickers',
+              selections: {
+                size: {
+                  type: 'size-preset' as const,
+                  value: selections.size?.value || selections.sizePreset?.value || item.size || 'Medium (3")',
+                  displayValue: selections.size?.displayValue || selections.sizePreset?.displayValue || item.size || 'Medium (3")',
+                  priceImpact: 0
                 },
-                customFiles: itemData.customFiles || itemData.custom_files || (item.image ? [item.image] : []),
-                notes: itemData.customerNotes || itemData.customer_notes || `Reorder of original order ${reorderOrderData.id}`,
-                instagramHandle: '',
-                instagramOptIn: false
-              }
-            };
-          });
-
-        // Create customer info from current user or defaults
-        const customerInfo = {
-          firstName: currentUser?.user_metadata?.first_name || '',
-          lastName: currentUser?.user_metadata?.last_name || '',
-          email: currentUser?.email || '',
-          phone: currentUser?.user_metadata?.phone || ''
-        };
-
-        // Create minimal shipping address - Shopify will collect the full address
-        const shippingAddress = {
-          first_name: customerInfo.firstName,
-          last_name: customerInfo.lastName,
-          address1: '', // Let Shopify collect this
-          address2: '',
-          city: '',
-          province: '',
-          country: 'United States',
-          zip: '',
-          phone: customerInfo.phone
-        };
-
-        console.log('🚀 Direct reorder checkout with items:', checkoutItems.length);
-
-        // TODO: Implement reorder with Stripe checkout
-        alert('Reorder functionality is coming soon! We\'re updating our checkout system.');
+                material: {
+                  type: 'finish' as const,
+                  value: selections.material?.value || item.material || 'Matte',
+                  displayValue: selections.material?.displayValue || item.material || 'Matte',
+                  priceImpact: 0
+                },
+                cut: {
+                  type: 'shape' as const,
+                  value: selections.cut?.value || selections.shape?.value || 'Custom Shape',
+                  displayValue: selections.cut?.displayValue || selections.shape?.displayValue || 'Custom Shape',
+                  priceImpact: 0
+                },
+                proof: {
+                  type: 'finish' as const,
+                  value: true,
+                  displayValue: 'Send Proof',
+                  priceImpact: 0
+                },
+                rush: {
+                  type: 'finish' as const,
+                  value: selections.rush?.value || false,
+                  displayValue: selections.rush?.value ? 'Rush Order' : 'Standard',
+                  priceImpact: 0
+                },
+                ...(selections.whiteOption && {
+                  whiteOption: {
+                    type: 'white-base' as const,
+                    value: selections.whiteOption.value,
+                    displayValue: selections.whiteOption.displayValue,
+                    priceImpact: 0
+                  }
+                }),
+                ...(selections.kissCut && {
+                  kissCut: {
+                    type: 'finish' as const,
+                    value: selections.kissCut.value,
+                    displayValue: selections.kissCut.displayValue,
+                    priceImpact: 0
+                  }
+                })
+              },
+              totalPrice: currentPrice.total,
+              customFiles: itemData.customFiles || item.customFiles || [],
+              notes: itemData.customerNotes || item.notes || '',
+              isReorder: true
+            },
+            quantity: currentQty,
+            unitPrice: currentPrice.perSticker,
+            totalPrice: currentPrice.total,
+            addedAt: new Date().toISOString()
+          };
+          
+          addToCart(cartItem);
+        });
         
-        // For now, redirect to products page so they can manually reorder
-        router.push('/products');
+        // Reset reorder state
+        setReorderingId(null);
+        
+        // Redirect to cart for checkout
+        router.push('/cart');
         
       } catch (error) {
-        console.error('Error processing direct reorder checkout:', error);
-        alert('Error starting checkout. Please try again.');
+        console.error('Error adding reorder to cart:', error);
+        setReorderingId(null);
+        alert('Error adding items to cart. Please try again.');
       }
     }
     
@@ -1050,6 +1335,128 @@ function Dashboard() {
         setReorderOrderData(updatedOrderData);
       }
     }
+  };
+
+  // Helper function to calculate area from size
+  const calculateAreaFromSize = (sizeDisplay: string, customWidth?: string, customHeight?: string) => {
+    if (customWidth && customHeight) {
+      return parseFloat(customWidth) * parseFloat(customHeight);
+    }
+    
+    // Parse common size formats
+    if (sizeDisplay.includes('x')) {
+      const [width, height] = sizeDisplay.split('x').map(s => parseFloat(s.replace(/[^0-9.]/g, '')));
+      return width * height;
+    }
+    
+    // For circular sizes like "3 inch" or "Medium (3\")"
+    const match = sizeDisplay.match(/(\d+(?:\.\d+)?)/);
+    if (match) {
+      const diameter = parseFloat(match[1]);
+      return diameter * diameter; // For simplicity, using square area
+    }
+    
+    return 9; // Default to 3x3 inches
+  };
+
+  // Helper function to calculate pricing based on product type and selections
+  const calculateItemPricing = (item: any, quantity: number) => {
+    const itemData = reorderOrderData._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+    const selections = itemData.calculatorSelections || {};
+    
+    // Calculate area
+    const area = calculateAreaFromSize(
+      selections.size?.displayValue || selections.sizePreset?.displayValue || item.size || "Medium (3\")",
+      selections.customWidth?.value,
+      selections.customHeight?.value
+    );
+    
+    // Check for rush order
+    const rushOrder = selections.rush?.value === true;
+    
+    // Get white option modifier (for holographic, chrome, clear, glitter)
+    const whiteOptionModifiers = {
+      'color-only': 1.0,
+      'partial-white': 1.05,
+      'full-white': 1.1
+    };
+    const whiteOptionValue = selections.whiteOption?.value || 'color-only';
+    const whiteOptionMultiplier = whiteOptionModifiers[whiteOptionValue as keyof typeof whiteOptionModifiers] || 1.0;
+
+    // Use real pricing data if available, otherwise fallback
+    if (pricingData && pricingData.basePricing && pricingData.quantityDiscounts) {
+      const realResult = calculateRealPrice(
+        pricingData.basePricing,
+        pricingData.quantityDiscounts,
+        area,
+        quantity,
+        rushOrder
+      );
+      
+      // Apply white option modifier
+      const adjustedTotal = realResult.totalPrice * whiteOptionMultiplier;
+      const adjustedPerSticker = realResult.finalPricePerSticker * whiteOptionMultiplier;
+      
+      return {
+        total: adjustedTotal,
+        perSticker: adjustedPerSticker
+      };
+    }
+
+    // Fallback pricing calculation (same as cart fallback)
+    const basePrice = 1.36;
+    const baseArea = 9;
+    const scaledBasePrice = basePrice * (area / baseArea);
+    
+    const discountMap: { [key: number]: number } = {
+      50: 1.0,
+      100: 0.647,
+      200: 0.463,
+      300: 0.39,
+      500: 0.324,
+      750: 0.324,
+      1000: 0.257,
+      2500: 0.213,
+    };
+    
+    // Find closest quantity tier
+    const quantities = Object.keys(discountMap).map(Number).sort((a, b) => a - b);
+    let applicableQuantity = quantities[0];
+    for (const qty of quantities) {
+      if (quantity >= qty) {
+        applicableQuantity = qty;
+      } else {
+        break;
+      }
+    }
+    
+    const discountMultiplier = discountMap[applicableQuantity] || 1.0;
+    let pricePerSticker = scaledBasePrice * discountMultiplier * whiteOptionMultiplier;
+    let totalPrice = pricePerSticker * quantity;
+    
+    if (rushOrder) {
+      totalPrice *= 1.4;
+      pricePerSticker *= 1.4;
+    }
+    
+    return {
+      total: totalPrice,
+      perSticker: pricePerSticker
+    };
+  };
+
+  // Handle quantity updates
+  const handleQuantityUpdate = (itemIndex: number, newQuantity: number) => {
+    const minQuantity = 50;
+    const finalQuantity = Math.max(minQuantity, newQuantity);
+    
+    // Update quantity
+    setUpdatedQuantities(prev => ({ ...prev, [itemIndex]: finalQuantity }));
+    
+    // Recalculate pricing
+    const item = reorderOrderData.items[itemIndex];
+    const newPricing = calculateItemPricing(item, finalQuantity);
+    setUpdatedPrices(prev => ({ ...prev, [itemIndex]: newPricing }));
   };
 
   const handleRemoveItem = (itemIndex: number) => {
@@ -1159,7 +1566,7 @@ function Dashboard() {
   };
 
   const handleGetSupport = () => {
-    setShowContactForm(true);
+    updateCurrentView('support');
   };
 
   const handleRaiseConcern = () => {
@@ -1261,8 +1668,11 @@ function Dashboard() {
       setSelectedOrderForInvoice(transformedOrder);
     }
     
-    // Switch to order details view instead of opening modal
-    setCurrentView('order-details');
+    // Switch to order details view instead of opening modal  
+    // Small delay to prevent flashing
+    setTimeout(() => {
+      setCurrentView('order-details');
+    }, 50);
   };
 
   const handleProofAction = async (action: 'approve' | 'request_changes', orderId: string, proofId: string) => {
@@ -1550,26 +1960,31 @@ function Dashboard() {
     const { steps, currentStepIndex } = getOrderProgress(order.status);
     
     return (
-      <div className="px-6 py-4 bg-white/5 border-t border-white/10">
-        <div className="relative flex items-start justify-between">
-          {/* Progress line background - perfectly centered through circle centers */}
+      <div className="px-6 pt-6 pb-4" style={{ 
+        backgroundColor: 'rgba(255, 255, 255, 0.03)', 
+        borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+        borderBottomLeftRadius: '12px',
+        borderBottomRightRadius: '12px'
+      }}>
+        <div className="relative" style={{ height: '80px', width: '100%' }}>
+          {/* Progress line background - spans full width */}
           <div 
             className="absolute h-0.5 bg-gray-600 z-0" 
             style={{ 
-              top: '16px', /* Center of 32px circles (16px from top) */
-              left: `calc(50% / ${steps.length})`, /* Start from center of first circle */
-              right: `calc(50% / ${steps.length})` /* End at center of last circle */
+              top: '16px',
+              left: '8%', /* Start from left edge aligned with image preview */
+              right: '8%' /* End at right edge aligned with action buttons */
             }}
           ></div>
           
-          {/* Active progress line with gradient - ends at center of current step */}
+          {/* Active progress line with gradient */}
           <div 
             className="absolute h-0.5 transition-all duration-700 ease-in-out z-0"
             style={{ 
-              top: '16px', /* Center of 32px circles (16px from top) */
-              left: `calc(50% / ${steps.length})`, /* Start from center of first circle */
+              top: '16px',
+              left: '8%',
               width: currentStepIndex === 0 ? '0px' : 
-                `calc(${(currentStepIndex / (steps.length - 1)) * 100}% - ${(100 / steps.length)}% + ${(currentStepIndex / (steps.length - 1)) * (100 / steps.length * 2)}%)`,
+                `calc(${(currentStepIndex / (steps.length - 1)) * 84}%)`, /* Scale to 84% to match the background line */
               background: 'linear-gradient(90deg, #f97316 0%, #fb923c 50%, #fdba74 100%)',
               boxShadow: '0 0 8px rgba(249, 115, 22, 0.4), 0 0 16px rgba(249, 115, 22, 0.2)'
             }}
@@ -1580,7 +1995,15 @@ function Dashboard() {
             const isCurrent = index === currentStepIndex;
             
             return (
-              <div key={step.id} className="flex flex-col items-center relative z-10 flex-1">
+              <div 
+                key={step.id} 
+                className="flex flex-col items-center absolute z-10"
+                style={{
+                  left: `${8 + (index * (84 / (steps.length - 1)))}%`, /* Distribute evenly across the 84% width */
+                  transform: 'translateX(-50%)',
+                  top: '0px'
+                }}
+              >
                 <div 
                   className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
                     isCurrent 
@@ -1630,6 +2053,10 @@ function Dashboard() {
         return renderProofsView();
       case 'order-details':
         return renderOrderDetailsView();
+      case 'support':
+        return renderSupportView();
+      case 'settings':
+        return renderSettingsView();
       default:
         return renderDefaultView();
     }
@@ -1641,7 +2068,12 @@ function Dashboard() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white">📋 My Orders</h2>
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+            </svg>
+            Orders
+          </h2>
           <button 
             onClick={() => setCurrentView('default')}
             className="text-purple-400 hover:text-purple-300 font-medium transition-colors duration-200 text-sm"
@@ -1650,37 +2082,32 @@ function Dashboard() {
           </button>
         </div>
         
-        {/* Order Summary Section */}
-        <div className="space-y-6">
-          <h3 className="text-xl font-bold text-white border-b border-white/10 pb-2">📊 Order Summary</h3>
+        {/* Order Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="container-style p-6">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-blue-400 mb-2">
+                {orders.length}
+              </div>
+              <div className="text-sm text-gray-300">Total Orders</div>
+            </div>
+          </div>
           
-          {/* Order Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="container-style p-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-blue-400 mb-2">
-                  {orders.length}
-                </div>
-                <div className="text-sm text-gray-300">Total Orders</div>
+          <div className="container-style p-6">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-green-400 mb-2">
+                {orders.reduce((sum, order) => sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0)}
               </div>
+              <div className="text-sm text-gray-300">Total Stickers</div>
             </div>
-            
-            <div className="container-style p-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-green-400 mb-2">
-                  {orders.reduce((sum, order) => sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0)}
-                </div>
-                <div className="text-sm text-gray-300">Total Stickers</div>
+          </div>
+          
+          <div className="container-style p-6">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-purple-400 mb-2">
+                {orders.filter(order => order.status !== 'Delivered').length}
               </div>
-            </div>
-            
-            <div className="container-style p-6">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-purple-400 mb-2">
-                  {orders.filter(order => order.status !== 'Delivered').length}
-                </div>
-                <div className="text-sm text-gray-300">Active Orders</div>
-              </div>
+              <div className="text-sm text-gray-300">Active Orders</div>
             </div>
           </div>
         </div>
@@ -1696,14 +2123,14 @@ function Dashboard() {
         >
           {/* Table Header */}
           <div className="px-6 py-3 border-b border-white/10 bg-white/5">
-            <div className="grid grid-cols-16 gap-6 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+            <div className="grid grid-cols-20 gap-4 text-xs font-semibold text-gray-300 uppercase tracking-wider">
               <div className="col-span-2">Preview</div>
-              <div className="col-span-2">Mission</div>
-              <div className="col-span-3">Items</div>
+              <div className="col-span-3">Order</div>
+              <div className="col-span-4">Items</div>
               <div className="col-span-3">Status</div>
               <div className="col-span-2">Date</div>
               <div className="col-span-2">Total</div>
-              <div className="col-span-2">Actions</div>
+              <div className="col-span-4">Actions</div>
             </div>
           </div>
           
@@ -1719,7 +2146,8 @@ function Dashboard() {
               return (
                 <div key={order.id}>
                   <div className="px-6 py-4 hover:bg-white/5 transition-colors duration-200">
-                    <div className="grid grid-cols-16 gap-6 items-center">
+                    {/* Desktop Row Layout */}
+                    <div className="hidden md:grid grid-cols-20 gap-4 items-center">
                       
                       {/* Preview Column - Side by Side Images */}
                       <div className="col-span-2">
@@ -1746,7 +2174,7 @@ function Dashboard() {
                               <div key={`preview-${item.id}-${index}`} className="flex-shrink-0">
                                 {productImage ? (
                                   <div 
-                                    className="w-12 h-12 rounded-lg bg-white/10 border border-white/20 p-1 flex items-center justify-center cursor-pointer hover:border-blue-400/60 transition-all duration-200 hover:scale-105"
+                                    className="w-12 h-12 rounded-lg bg-white/10 border border-white/20 p-1 flex items-center justify-center cursor-pointer hover:border-blue-400/60 transition-all duration-200 hover:scale-105 relative"
                                     onClick={() => {
                                       // Set the selected image for highlighting in design vault
                                       setSelectedDesignImage(productImage);
@@ -1765,10 +2193,22 @@ function Dashboard() {
                                         }
                                       }}
                                     />
+                                    {/* Re-Order Pill */}
+                                    {itemData.isReorder && (
+                                      <div className="absolute -top-1 -right-1 bg-amber-500 text-black text-xs px-1 py-0.5 rounded-full text-[8px] font-bold leading-none">
+                                        RE
+                                      </div>
+                                    )}
                                   </div>
                                 ) : (
-                                  <div className="w-12 h-12 rounded-lg bg-gray-600 flex items-center justify-center text-gray-400 border border-white/20 text-lg">
+                                  <div className="w-12 h-12 rounded-lg bg-gray-600 flex items-center justify-center text-gray-400 border border-white/20 text-lg relative">
                                     📄
+                                    {/* Re-Order Pill */}
+                                    {itemData.isReorder && (
+                                      <div className="absolute -top-1 -right-1 bg-amber-500 text-black text-xs px-1 py-0.5 rounded-full text-[8px] font-bold leading-none">
+                                        RE
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -1783,18 +2223,15 @@ function Dashboard() {
                         </div>
                       </div>
                       
-                      {/* Mission Column */}
-                      <div className="col-span-2">
+                      {/* Order Column */}
+                      <div className="col-span-3">
                         <div className="font-semibold text-white text-sm">
-                          Mission {getOrderDisplayNumber(order)}
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          {order.items.length} styles
+                          {getOrderDisplayNumber(order)}
                         </div>
                       </div>
-                      
+
                       {/* Items Column - Product Types with Quantities */}
-                      <div className="col-span-3">
+                      <div className="col-span-4">
                         <div className="space-y-1">
                           {(() => {
                             // Group items by product type and sum quantities
@@ -1868,11 +2305,11 @@ function Dashboard() {
                       </div>
                       
                       {/* Actions Column */}
-                      <div className="col-span-2">
-                        <div className="flex flex-col gap-2">
+                      <div className="col-span-4">
+                        <div className="flex flex-col md:flex-row gap-1 md:gap-2">
                           <button
                             onClick={() => handleViewOrderDetails(order)}
-                            className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
+                            className="px-2 md:px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1 flex-1 whitespace-nowrap cursor-pointer"
                             style={{
                               backgroundColor: 'rgba(59, 130, 246, 0.2)',
                               border: '1px solid rgba(59, 130, 246, 0.3)',
@@ -1886,7 +2323,7 @@ function Dashboard() {
                           </button>
                           <button
                             onClick={() => handleReorder(order.id)}
-                            className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
+                            className="px-2 md:px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1 flex-1 cursor-pointer"
                             style={{
                               backgroundColor: 'rgba(245, 158, 11, 0.2)',
                               border: '1px solid rgba(245, 158, 11, 0.3)',
@@ -1902,8 +2339,158 @@ function Dashboard() {
                       </div>
                       
                     </div>
+
+                    {/* Mobile Card Layout */}
+                    <div className="md:hidden">
+                      <div className="bg-white/5 rounded-lg p-4 border border-white/10 space-y-4">
+                        {/* Header Row */}
+                        <div className="flex items-center justify-between">
+                          <div className="font-semibold text-white text-base">
+                            {getOrderDisplayNumber(order)}
+                          </div>
+                          <div className="text-sm font-semibold text-white">
+                            ${order.total}
+                          </div>
+                        </div>
+
+                        {/* Preview Images */}
+                        <div className="flex gap-2">
+                          {order.items.slice(0, 3).map((item, index) => {
+                            const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+                            let productImage = null;
+                            if (itemData.customFiles?.[0]) {
+                              productImage = itemData.customFiles[0];
+                            } else if (itemData.image) {
+                              productImage = itemData.image;
+                            } else if (item.customFiles?.[0]) {
+                              productImage = item.customFiles[0];
+                            } else if (item.image) {
+                              productImage = item.image;
+                            }
+
+                            return (
+                              <div key={index} className="w-16 h-16 rounded-lg overflow-hidden border border-white/10 bg-black/20">
+                                {productImage ? (
+                                  <img 
+                                    src={productImage} 
+                                    alt={item.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-lg">📄</div>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {order.items.length > 3 && (
+                            <div className="w-16 h-16 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 text-xs font-medium">
+                              +{order.items.length - 3}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Items and Status Row */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <div className="text-xs text-gray-400 mb-1">Items</div>
+                            <div className="space-y-1">
+                              {(() => {
+                                const productTypes: { [key: string]: number } = {};
+                                
+                                order.items.forEach(item => {
+                                  const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+                                  const quantity = itemData.quantity || item.quantity || 0;
+                                  const name = itemData.name || item.name || 'Custom Sticker';
+                                  
+                                  let productType = 'Vinyl Stickers';
+                                  if (name.toLowerCase().includes('holographic') || name.toLowerCase().includes('holo')) {
+                                    productType = 'Holographic Stickers';
+                                  } else if (name.toLowerCase().includes('clear') || name.toLowerCase().includes('transparent')) {
+                                    productType = 'Clear Stickers';
+                                  } else if (name.toLowerCase().includes('white') || name.toLowerCase().includes('opaque')) {
+                                    productType = 'White Stickers';
+                                  } else if (name.toLowerCase().includes('metallic') || name.toLowerCase().includes('foil')) {
+                                    productType = 'Metallic Stickers';
+                                  }
+                                  
+                                  if (productTypes[productType]) {
+                                    productTypes[productType] += quantity;
+                                  } else {
+                                    productTypes[productType] = quantity;
+                                  }
+                                });
+                                
+                                return Object.entries(productTypes).slice(0, 2).map(([type, quantity]: [string, number]) => (
+                                  <div key={type} className="text-xs text-white">
+                                    {quantity} {type}
+                                  </div>
+                                ));
+                              })()}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="text-xs text-gray-400 mb-1">Status</div>
+                            <div className="flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${getStatusColor(order.status)}`}>
+                                <div className="w-full h-full rounded-full animate-pulse"></div>
+                              </div>
+                              <span className="text-xs text-gray-300 font-medium">
+                                {getStatusDisplayText(order.status)}
+                              </span>
+                            </div>
+                            {order.trackingNumber && (
+                              <div className="text-xs text-purple-300 mt-1">
+                                📦 {order.trackingNumber}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Date */}
+                        <div className="text-xs text-gray-400">
+                          {new Date(order.date).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleViewOrderDetails(order)}
+                            className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
+                            style={{
+                              backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                              border: '1px solid rgba(59, 130, 246, 0.3)',
+                              color: 'white'
+                            }}
+                          >
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                            </svg>
+                            View Details
+                          </button>
+                          <button
+                            onClick={() => handleReorder(order.id)}
+                            className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
+                            style={{
+                              backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                              color: 'white'
+                            }}
+                          >
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                            </svg>
+                            Reorder
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  
+
                   {/* Order Status Messages - Keep proof messages as requested */}
                   {order.status === 'Proof Review Needed' && (
                     <div className="px-6 pb-4">
@@ -1911,12 +2498,12 @@ function Dashboard() {
                         <div className="flex items-center gap-2 mb-2">
                           <div className="w-3 h-3 rounded-full bg-orange-500 animate-pulse"></div>
                           <span className="text-orange-300 font-semibold text-sm">⚠️ Proof Review Required</span>
-                        </div>
+                          </div>
                         <p className="text-orange-200 text-sm">
                           Your design proof is ready for review. Please approve or request changes.
                         </p>
-                      </div>
-                    </div>
+                          </div>
+                        </div>
                   )}
                   
                   {order.status !== 'Delivered' && order.status !== 'Proof Review Needed' && (
@@ -1926,9 +2513,9 @@ function Dashboard() {
                       </div>
                     </div>
                   )}
-                </div>
-              );
-            })}
+                              </div>
+                            );
+                          })}
           </div>
         </div>
         
@@ -1936,9 +2523,9 @@ function Dashboard() {
           <div className="text-center py-12">
             <div className="text-gray-400 text-lg mb-2">No orders yet</div>
             <p className="text-gray-500 text-sm">Start your first sticker order to see them here.</p>
-          </div>
-        )}
-      </div>
+                            </div>
+                          )}
+                        </div>
     );
   };
 
@@ -1976,24 +2563,29 @@ function Dashboard() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white">💰 Financial Overview</h2>
-          <button 
+          <h2 className="text-2xl md:text-2xl font-bold text-white flex items-center gap-2">
+            <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Finances
+          </h2>
+          <button
             onClick={() => setCurrentView('default')}
-            className="text-purple-400 hover:text-purple-300 font-medium transition-colors duration-200 text-sm"
+            className="hidden md:block text-purple-400 hover:text-purple-300 font-medium transition-colors duration-200 text-sm"
           >
             ← Back to Dashboard
           </button>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="rounded-xl p-4 text-center"
-               style={{
+                            style={{
                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
                  border: '1px solid rgba(59, 130, 246, 0.3)'
                }}>
-            <h3 className="text-blue-300 text-sm font-medium">Finances</h3>
+            <h3 className="text-blue-300 text-sm font-medium">Invested</h3>
             <p className="text-white text-2xl font-bold">${totalSpent.toFixed(2)}</p>
-          </div>
+                      </div>
           <div className="rounded-xl p-4 text-center"
                style={{
                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
@@ -2009,113 +2601,66 @@ function Dashboard() {
                }}>
             <h3 className="text-purple-300 text-sm font-medium">Total Orders</h3>
             <p className="text-white text-2xl font-bold">{orders.length}</p>
-          </div>
-        </div>
+                    </div>
+                  </div>
 
-        {/* Monthly Spending Line Chart */}
+        {/* Monthly Spending Bar Chart */}
         <div className="container-style p-6">
           <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-            <i className="fas fa-chart-line text-blue-400"></i>
+            <i className="fas fa-chart-bar text-blue-400"></i>
             Monthly Spending (12 Months)
           </h3>
           
           {last12Months.some((d: any) => d.total > 0) ? (
-            <div className="relative h-80 px-4">
-              {/* Y-axis labels */}
-              <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-gray-400 pr-2">
-                <span>${maxSpending.toFixed(0)}</span>
-                <span>${(maxSpending * 0.75).toFixed(0)}</span>
-                <span>${(maxSpending * 0.5).toFixed(0)}</span>
-                <span>${(maxSpending * 0.25).toFixed(0)}</span>
-                <span>$0</span>
-              </div>
-              
-              {/* Chart area */}
-              <div className="ml-12 h-full relative">
-                {/* Grid lines */}
-                <div className="absolute inset-0">
-                  {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
-                    <div
-                      key={ratio}
-                      className="absolute w-full border-t border-white/10"
-                      style={{ bottom: `${ratio * 100}%` }}
-                    />
+            <div className="relative" style={{ height: '320px' }}>
+              {/* Bar Chart Container */}
+              <div className="h-full relative">
+                {/* Y-axis grid lines and labels */}
+                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                  {[100, 75, 50, 25, 0].map((percent) => (
+                    <div key={percent} className="flex items-center">
+                      <span className="text-xs text-gray-400 w-12 text-right pr-2">
+                        ${((maxSpending * percent) / 100).toFixed(0)}
+                      </span>
+                      <div className="flex-1 border-t border-white/5"></div>
+                    </div>
                   ))}
                 </div>
                 
-                {/* Line chart */}
-                <svg className="absolute inset-0 w-full h-full" style={{ overflow: 'visible' }}>
-                  {/* Define the line path */}
-                  <defs>
-                    <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="rgba(139, 92, 246, 0.8)" />
-                      <stop offset="50%" stopColor="rgba(59, 130, 246, 0.8)" />
-                      <stop offset="100%" stopColor="rgba(16, 185, 129, 0.8)" />
-                    </linearGradient>
-                  </defs>
-                  
-                  {/* Draw the dotted line */}
-                  <polyline
-                    fill="none"
-                    stroke="url(#lineGradient)"
-                    strokeWidth="3"
-                    strokeDasharray="8,4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    points={last12Months.map((data: any, index: number) => {
-                      const x = (index / (last12Months.length - 1)) * 100;
-                      const y = 100 - (data.total / maxSpending) * 100;
-                      return `${x}%,${y}%`;
-                    }).join(' ')}
-                    style={{
-                      filter: 'drop-shadow(0 0 4px rgba(59, 130, 246, 0.3))',
-                      animation: `lineGrow 2s ease-out forwards`
-                    }}
-                  />
-                  
-                  {/* Draw data points */}
-                  {last12Months.map((data: any, index: number) => {
-                    const x = (index / (last12Months.length - 1)) * 100;
-                    const y = 100 - (data.total / maxSpending) * 100;
+                {/* Bars */}
+                <div className="h-full flex items-end justify-between px-14 pb-8 pt-4">
+                  {last12Months.map((month, index) => {
+                    const heightPercent = maxSpending > 0 ? (month.total / maxSpending) * 100 : 0;
                     return (
-                      <g key={data.key}>
-                        <circle
-                          cx={`${x}%`}
-                          cy={`${y}%`}
-                          r="4"
-                          fill="rgba(59, 130, 246, 0.9)"
-                          stroke="white"
-                          strokeWidth="2"
-                          style={{
-                            filter: 'drop-shadow(0 0 4px rgba(59, 130, 246, 0.5))',
-                            animation: `pointAppear 0.5s ease-out ${index * 0.1}s both`
-                          }}
-                        />
-                        {data.total > 0 && (
-                          <text
-                            x={`${x}%`}
-                            y={`${y - 8}%`}
-                            textAnchor="middle"
-                            className="text-xs fill-green-400 font-semibold"
-                            style={{
-                              animation: `textAppear 0.5s ease-out ${index * 0.1 + 0.5}s both`
+                      <div key={month.key} className="flex-1 flex flex-col items-center justify-end mx-1 group">
+                        <div className="relative w-full">
+                          {/* Hover tooltip */}
+                          {month.total > 0 && (
+                            <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                              <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                                ${month.total.toFixed(2)}
+                              </div>
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 -translate-y-1">
+                                <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Bar */}
+                          <div 
+                            className="w-full bg-gradient-to-t from-blue-600 to-blue-400 rounded-t transition-all duration-500 hover:from-blue-500 hover:to-blue-300"
+                            style={{ 
+                              height: `${Math.max(heightPercent * 2.5, month.total > 0 ? 8 : 0)}px`,
+                              boxShadow: month.total > 0 ? '0 0 10px rgba(59, 130, 246, 0.5)' : 'none'
                             }}
-                          >
-                            ${data.total.toFixed(0)}
-                          </text>
-                        )}
-                      </g>
+                          ></div>
+                        </div>
+                        
+                        {/* Month label */}
+                        <span className="text-xs text-gray-400 mt-2">{month.month}</span>
+                      </div>
                     );
                   })}
-                </svg>
-                
-                {/* X-axis labels */}
-                <div className="absolute -bottom-8 left-0 right-0 flex justify-between text-xs text-gray-400">
-                  {last12Months.map((data: any) => (
-                    <span key={data.key} className="text-center" title={data.fullMonth}>
-                      {data.month}
-                    </span>
-                  ))}
                 </div>
               </div>
             </div>
@@ -2137,173 +2682,228 @@ function Dashboard() {
           
           {orders.length > 0 ? (
             <div className="space-y-6">
-              {/* Overall ROI Summary */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div className="text-center p-4 rounded-lg"
-                     style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-                  <h4 className="text-red-300 text-sm font-medium">Total Cost</h4>
-                  <p className="text-white text-xl font-bold">${totalSpent.toFixed(2)}</p>
-                </div>
-                <div className="text-center p-4 rounded-lg"
-                     style={{ backgroundColor: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
-                  <h4 className="text-green-300 text-sm font-medium">Potential Revenue</h4>
-                  <p className="text-white text-xl font-bold">${(totalSpent * 3).toFixed(2)}</p>
-                  <p className="text-xs text-gray-400">@3x markup</p>
-                </div>
-                <div className="text-center p-4 rounded-lg"
-                     style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
-                  <h4 className="text-blue-300 text-sm font-medium">Potential Profit</h4>
-                  <p className="text-white text-xl font-bold">${(totalSpent * 2).toFixed(2)}</p>
-                </div>
-                <div className="text-center p-4 rounded-lg"
-                     style={{ backgroundColor: 'rgba(168, 85, 247, 0.1)', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
-                  <h4 className="text-purple-300 text-sm font-medium">Potential ROI</h4>
-                  <p className="text-white text-xl font-bold">200%</p>
-                </div>
-              </div>
+              {/* Get most recent order for calculator */}
+              {(() => {
+                const recentOrder = orders[0]; // Most recent order
+                if (!recentOrder) return null;
+                
+                // Calculate metrics for recent order
+                const totalQuantity = recentOrder.items.reduce((sum, item) => sum + item.quantity, 0);
+                const costPerUnit = recentOrder.total / totalQuantity;
+                const suggestedSellingPrice = costPerUnit * 3; // 3x markup
+                
+                // Calculate actual ROI if selling price is provided
+                const actualSellingPrice = sellingPrices[recentOrder.id] || 0;
+                const actualRevenue = actualSellingPrice * totalQuantity;
+                const actualProfit = actualRevenue - recentOrder.total;
+                const actualROI = recentOrder.total > 0 ? ((actualProfit / recentOrder.total) * 100) : 0;
+                
+                // Get the first item with an image
+                let firstImage = null;
+                let firstName = '';
+                for (const item of recentOrder.items) {
+                  const itemData = recentOrder._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+                  if (itemData.customFiles?.[0] || itemData.image || item.customFiles?.[0] || item.image) {
+                    firstImage = itemData.customFiles?.[0] || itemData.image || item.customFiles?.[0] || item.image;
+                    firstName = itemData.name || item.name || 'Custom Sticker';
+                    break;
+                  }
+                }
 
-                             {/* Individual Order ROI Analysis */}
-               <div className="space-y-4">
-                 <h4 className="text-lg font-semibold text-white">Order Analysis</h4>
-                 {orders.map((order) => {
-                   // Calculate per-order metrics
-                   const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
-                   const costPerUnit = order.total / totalQuantity;
-                   const suggestedSellingPrice = costPerUnit * 3; // 3x markup
-                   const potentialProfit = (suggestedSellingPrice - costPerUnit) * totalQuantity;
-                   const potentialROI = ((potentialProfit / order.total) * 100);
-                   
-                   // Calculate actual ROI if selling price is provided
-                   const actualSellingPrice = sellingPrices[order.id] || 0;
-                   const actualRevenue = actualSellingPrice * totalQuantity;
-                   const actualProfit = actualRevenue - order.total;
-                   const actualROI = order.total > 0 ? ((actualProfit / order.total) * 100) : 0;
-
-                  return (
-                    <div key={order.id} 
-                         className="rounded-lg p-4 border"
+                return (
+                  <div>
+                    {/* Recent Order Display */}
+                    <div className="rounded-lg border mb-6"
                          style={{
-                           backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                           borderColor: 'rgba(255, 255, 255, 0.1)'
+                           backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                           borderColor: 'rgba(255, 255, 255, 0.15)'
                          }}>
-                                             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
-                         <div>
-                           <h5 className="font-semibold text-white">Mission {getOrderDisplayNumber(order)}</h5>
-                           <p className="text-sm text-gray-400">
-                             {totalQuantity} units • ${costPerUnit.toFixed(2)} cost per unit
-                           </p>
-                         </div>
-                         <div className="text-right">
-                           <p className="text-sm text-gray-400">Total Cost</p>
-                           <p className="text-white font-bold">${order.total.toFixed(2)}</p>
-                         </div>
-                       </div>
-
-                       {/* Actual Selling Price Input */}
-                       <div className="mb-4 p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
-                         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                           <div className="flex-1">
-                             <label className="block text-sm font-medium text-blue-300 mb-2">
-                               Your Selling Price (per unit)
-                             </label>
-                             <div className="flex items-center gap-2">
-                               <span className="text-white">$</span>
-                               <input
-                                 type="number"
-                                 step="0.01"
-                                 min="0"
-                                 placeholder={suggestedSellingPrice.toFixed(2)}
-                                 value={sellingPrices[order.id] || ''}
-                                 onChange={(e) => {
-                                   const value = parseFloat(e.target.value) || 0;
-                                   setSellingPrices(prev => ({
-                                     ...prev,
-                                     [order.id]: value
-                                   }));
-                                 }}
-                                 className="flex-1 px-3 py-2 rounded border bg-white/10 border-white/20 text-white placeholder-gray-400 focus:border-blue-400 focus:outline-none"
-                               />
-                               <span className="text-gray-400 text-sm">per unit</span>
-                             </div>
-                           </div>
-                           {actualSellingPrice > 0 && (
-                             <div className="text-center sm:text-right">
-                               <p className="text-sm text-blue-300">Actual Performance</p>
-                               <p className="text-white font-bold">${actualRevenue.toFixed(2)} revenue</p>
-                               <p className={`text-sm font-bold ${actualProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                 {actualProfit >= 0 ? '+' : ''}${actualProfit.toFixed(2)} profit
-                               </p>
-                               <p className={`text-xs ${actualROI >= 0 ? 'text-green-300' : 'text-red-300'}`}>
-                                 {actualROI.toFixed(1)}% ROI
-                               </p>
-                             </div>
-                           )}
-                         </div>
-                       </div>
-
-                      {/* ROI Scenarios */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {/* Conservative (2x) */}
-                        <div className="p-3 rounded bg-white/5">
-                          <div className="text-center">
-                            <p className="text-xs text-gray-400">Conservative (2x)</p>
-                            <p className="text-sm text-white font-medium">${(costPerUnit * 2).toFixed(2)}/unit</p>
-                            <p className="text-green-400 font-bold">
-                              ${((costPerUnit * 2 - costPerUnit) * totalQuantity).toFixed(2)} profit
-                            </p>
-                            <p className="text-xs text-purple-300">100% ROI</p>
+                      <div className="p-4">
+                        <div className="flex items-start gap-4">
+                          {/* Preview Image */}
+                          <div className="flex-shrink-0">
+                            {firstImage ? (
+                              <div className="w-20 h-20 rounded-lg bg-white/10 border border-white/20 p-2 flex items-center justify-center">
+                                <img 
+                                  src={firstImage} 
+                                  alt={firstName}
+                                  className="max-w-full max-h-full object-contain rounded"
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-20 h-20 rounded-lg bg-gray-600 flex items-center justify-center text-gray-400 border border-white/20 text-2xl">
+                                📄
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Order Details */}
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-semibold text-white text-lg">
+                                Mission {getOrderDisplayNumber(recentOrder)}
+                              </h4>
+                              <span className="text-xs text-gray-400">
+                                {new Date(recentOrder.date).toLocaleDateString('en-US', { 
+                                  month: 'short', 
+                                  day: 'numeric' 
+                                })}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                              <div>
+                                <p className="text-gray-400">Items</p>
+                                <p className="text-white font-medium">{recentOrder.items.length} {recentOrder.items.length === 1 ? 'style' : 'styles'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-400">Quantity</p>
+                                <p className="text-white font-medium">{totalQuantity} stickers</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-400">Cost per unit</p>
+                                <p className="text-white font-medium">${costPerUnit.toFixed(2)}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-400">Total cost</p>
+                                <p className="text-white font-medium">${recentOrder.total.toFixed(2)}</p>
+                              </div>
+                            </div>
                           </div>
                         </div>
-
-                        {/* Recommended (3x) */}
-                        <div className="p-3 rounded bg-green-500/10 border border-green-500/30">
-                          <div className="text-center">
-                            <p className="text-xs text-green-300">Recommended (3x)</p>
-                            <p className="text-sm text-white font-medium">${suggestedSellingPrice.toFixed(2)}/unit</p>
-                            <p className="text-green-400 font-bold">
-                              ${potentialProfit.toFixed(2)} profit
-                            </p>
-                            <p className="text-xs text-green-300">{potentialROI.toFixed(0)}% ROI</p>
+                        
+                        {/* Selling Price Input */}
+                        <div className="mt-6 p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                          <label className="block text-sm font-medium text-blue-300 mb-3">
+                            What are you selling each sticker for?
+                          </label>
+                          <div className="flex items-center gap-3">
+                            <span className="text-white text-lg">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder={suggestedSellingPrice.toFixed(2)}
+                              value={sellingPrices[recentOrder.id] || ''}
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value) || 0;
+                                setSellingPrices(prev => ({
+                                  ...prev,
+                                  [recentOrder.id]: value
+                                }));
+                              }}
+                              className="flex-1 px-6 md:px-4 py-3 rounded-lg border bg-white/10 border-white/20 text-white placeholder-gray-400 focus:border-blue-400 focus:outline-none text-lg"
+                            />
+                            <span className="text-gray-400">per sticker</span>
                           </div>
+                          
+                          {/* Real-time calculations */}
+                          {actualSellingPrice > 0 && (
+                            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                              <div className="text-center p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                                <p className="text-xs text-green-300 mb-1">Revenue</p>
+                                <p className="text-white font-bold text-lg">${actualRevenue.toFixed(2)}</p>
+                              </div>
+                              <div className={`text-center p-3 rounded-lg ${actualProfit >= 0 ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'} border`}>
+                                <p className={`text-xs mb-1 ${actualProfit >= 0 ? 'text-green-300' : 'text-red-300'}`}>Profit</p>
+                                <p className={`font-bold text-lg ${actualProfit >= 0 ? 'text-white' : 'text-red-300'}`}>
+                                  {actualProfit >= 0 ? '+' : ''}${actualProfit.toFixed(2)}
+                                </p>
+                              </div>
+                              <div className={`text-center p-3 rounded-lg ${actualROI >= 0 ? 'bg-purple-500/10 border-purple-500/20' : 'bg-red-500/10 border-red-500/20'} border`}>
+                                <p className={`text-xs mb-1 ${actualROI >= 0 ? 'text-purple-300' : 'text-red-300'}`}>ROI</p>
+                                <p className={`font-bold text-lg ${actualROI >= 0 ? 'text-white' : 'text-red-300'}`}>
+                                  {actualROI.toFixed(0)}%
+                                </p>
+                              </div>
+                              <div className="text-center p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                                <p className="text-xs text-blue-300 mb-1">Margin</p>
+                                <p className="text-white font-bold text-lg">
+                                  {actualRevenue > 0 ? ((actualProfit / actualRevenue) * 100).toFixed(0) : 0}%
+                                </p>
+                              </div>
+                            </div>
+                          )}
                         </div>
-
-                        {/* Aggressive (4x) */}
-                        <div className="p-3 rounded bg-white/5">
-                          <div className="text-center">
-                            <p className="text-xs text-gray-400">Aggressive (4x)</p>
-                            <p className="text-sm text-white font-medium">${(costPerUnit * 4).toFixed(2)}/unit</p>
-                            <p className="text-green-400 font-bold">
-                              ${((costPerUnit * 4 - costPerUnit) * totalQuantity).toFixed(2)} profit
-                            </p>
-                            <p className="text-xs text-purple-300">300% ROI</p>
+                        
+                        {/* Quick Price Suggestions */}
+                        <div className="mt-4">
+                          <p className="text-sm text-gray-400 mb-3">Quick pricing options:</p>
+                          <div className="grid grid-cols-3 gap-3">
+                            <button
+                              onClick={() => setSellingPrices(prev => ({ ...prev, [recentOrder.id]: 1 }))}
+                              className="p-3 rounded-lg border transition-all hover:scale-105"
+                              style={{
+                                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                borderColor: sellingPrices[recentOrder.id] === 1 ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'
+                              }}
+                            >
+                              <p className="text-xs text-gray-400 mb-1">Conservative</p>
+                              <p className="text-white font-bold">$1.00</p>
+                              <p className="text-xs text-gray-500">{costPerUnit > 1 ? 'Loss' : `+${((1 - costPerUnit) / costPerUnit * 100).toFixed(0)}%`}</p>
+                            </button>
+                            <button
+                              onClick={() => setSellingPrices(prev => ({ ...prev, [recentOrder.id]: 3 }))}
+                              className="p-3 rounded-lg border transition-all hover:scale-105"
+                              style={{
+                                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                                borderColor: sellingPrices[recentOrder.id] === 3 ? 'rgba(34, 197, 94, 0.5)' : 'rgba(34, 197, 94, 0.3)'
+                              }}
+                            >
+                              <p className="text-xs text-green-300 mb-1 flex items-center gap-1">
+                                <i className="fas fa-check"></i> Default
+                              </p>
+                              <p className="text-white font-bold">$3.00</p>
+                              <p className="text-xs text-green-400">+{((3 - costPerUnit) / costPerUnit * 100).toFixed(0)}%</p>
+                            </button>
+                            <button
+                              onClick={() => setSellingPrices(prev => ({ ...prev, [recentOrder.id]: 5 }))}
+                              className="p-3 rounded-lg border transition-all hover:scale-105"
+                              style={{
+                                backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                                borderColor: sellingPrices[recentOrder.id] === 5 ? 'rgba(168, 85, 247, 0.5)' : 'rgba(168, 85, 247, 0.3)'
+                              }}
+                            >
+                              <p className="text-xs text-purple-300 mb-1">Aggressive</p>
+                              <p className="text-white font-bold">$5.00</p>
+                              <p className="text-xs text-purple-400">+{((5 - costPerUnit) / costPerUnit * 100).toFixed(0)}%</p>
+                            </button>
                           </div>
                         </div>
                       </div>
+                    </div>
 
-                      {/* Quick Action */}
-                      <div className="mt-4 flex justify-between items-center">
-                        <div className="text-xs text-gray-400">
-                          Market research suggests 2.5-4x markup for custom stickers
+                    {/* Overall Summary */}
+                    <div className="mt-6 p-4 rounded-lg" style={{
+                      backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                      border: '1px solid rgba(168, 85, 247, 0.3)'
+                    }}>
+                      <h4 className="text-purple-300 font-semibold mb-2">All-Time Summary</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-400">Total Investment</p>
+                          <p className="text-white font-bold">${totalSpent.toFixed(2)}</p>
                         </div>
-                                                 <button className="px-3 py-1 rounded text-xs font-medium transition-colors"
-                                 style={{
-                                   backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                                   color: '#60a5fa',
-                                   border: '1px solid rgba(59, 130, 246, 0.3)'
-                                 }}
-                                 onClick={() => {
-                                   const analysisText = actualSellingPrice > 0 
-                                     ? `Cost: $${costPerUnit.toFixed(2)}/unit\nActual selling price: $${actualSellingPrice.toFixed(2)}/unit\nActual revenue: $${actualRevenue.toFixed(2)}\nActual profit: $${actualProfit.toFixed(2)}\nActual ROI: ${actualROI.toFixed(1)}%\n\nSuggested price: $${suggestedSellingPrice.toFixed(2)}/unit\nPotential profit: $${potentialProfit.toFixed(2)}\nPotential ROI: ${potentialROI.toFixed(0)}%`
-                                     : `Cost: $${costPerUnit.toFixed(2)}/unit\nSuggested price: $${suggestedSellingPrice.toFixed(2)}/unit\nPotential profit: $${potentialProfit.toFixed(2)}\nPotential ROI: ${potentialROI.toFixed(0)}%`;
-                                   navigator.clipboard.writeText(analysisText);
-                                 }}>
-                           📋 Copy Analysis
-                </button>
-              </div>
-            </div>
-                  );
-                })}
-        </div>
+                        <div>
+                          <p className="text-gray-400">Total Orders</p>
+                          <p className="text-white font-bold">{orders.length}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400">Total Stickers</p>
+                          <p className="text-white font-bold">
+                            {orders.reduce((sum, order) => 
+                              sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0
+                            )}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400">Avg Order Value</p>
+                          <p className="text-white font-bold">${(totalSpent / orders.length).toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Profitability Tips */}
               <div className="rounded-lg p-4"
@@ -2459,7 +3059,7 @@ function Dashboard() {
                 <button
                   onClick={() => handleReorder(order.id)}
                   disabled={reorderingId === order.id}
-                  className="px-4 py-2 rounded-lg font-bold transition-all duration-200 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-6 md:px-4 py-2 rounded-lg font-bold transition-all duration-200 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   style={{
                     backgroundColor: reorderingId === order.id ? '#666' : '#ffd713',
                     color: '#030140',
@@ -2513,8 +3113,7 @@ function Dashboard() {
             image: item.image || '',
             design: item.design || '',
             timesOrdered: orders.reduce((count, o) => 
-              count + o.items.filter(i => i.name === item.name).reduce((sum, i) => sum + i.quantity, 0), 0
-            ),
+              count + o.items.filter(i => i.name === item.name).reduce((sum, i) => sum + i.quantity, 0), 0),
             lastOrderId: order.id
           });
         }
@@ -2524,7 +3123,12 @@ function Dashboard() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white">🎨 Design Vault</h2>
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 18a4.6 4.4 0 0 1 0 -9h0a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-12" />
+            </svg>
+            Designs
+          </h2>
           <button 
             onClick={() => setCurrentView('default')}
             className="text-purple-400 hover:text-purple-300 font-medium transition-colors duration-200 text-sm"
@@ -2578,10 +3182,12 @@ function Dashboard() {
                     📥 Download
                   </button>
                   <div className="grid grid-cols-2 gap-2">
-                    <button className="py-2 px-3 rounded-lg text-xs font-medium text-white transition-all duration-300 hover:scale-105"
+                    <button className="py-2 px-3 rounded-lg text-xs font-medium text-white transition-all duration-300 hover:scale-105 backdrop-blur-md"
                             style={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                              border: '1px solid rgba(255, 255, 255, 0.2)'
+                              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              backdropFilter: 'blur(10px)',
+                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
                             }}>
                       🔗 Share
                     </button>
@@ -2797,7 +3403,7 @@ function Dashboard() {
                             backgroundColor: 'transparent' 
                           }}
                         ></div>
-                        <span className="text-xs font-medium text-white whitespace-nowrap">
+                        <span className="text-xs font-medium text-white md:whitespace-nowrap">
                           This is the cut line, it will not show up on the print.
                         </span>
                       </div>
@@ -2913,7 +3519,7 @@ function Dashboard() {
                       {/* Action Buttons */}
                       <div className="space-y-3">
                         <button
-                          className="w-full py-3 px-4 rounded-lg border transition-all duration-200 hover:scale-[1.02] text-sm font-medium backdrop-blur-md"
+                          className="w-full py-3 px-6 md:px-4 rounded-lg border transition-all duration-200 hover:scale-[1.02] text-sm font-medium backdrop-blur-md"
                           style={{
                             background: 'rgba(34, 197, 94, 0.1)',
                             borderColor: 'rgba(34, 197, 94, 0.3)',
@@ -2926,7 +3532,7 @@ function Dashboard() {
                         </button>
 
                         <button
-                          className="w-full py-3 px-4 rounded-lg border transition-all duration-200 hover:scale-[1.02] text-sm font-medium backdrop-blur-md"
+                          className="w-full py-3 px-6 md:px-4 rounded-lg border transition-all duration-200 hover:scale-[1.02] text-sm font-medium backdrop-blur-md"
                           style={{
                             background: 'rgba(251, 146, 60, 0.1)',
                             borderColor: 'rgba(251, 146, 60, 0.3)',
@@ -3024,14 +3630,14 @@ function Dashboard() {
                               <button
                                 onClick={handleSendReplacement}
                                 disabled={uploadingFile}
-                                className="flex-1 py-2 px-4 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                                className="flex-1 py-2 px-6 md:px-4 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
                               >
                                 {uploadingFile ? 'Sending...' : 'Send Replacement'}
                               </button>
                               <button
                                 onClick={handleCancelReplacement}
                                 disabled={uploadingFile}
-                                className="px-4 py-2 rounded-lg bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                                className="px-6 md:px-4 py-2 rounded-lg bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
                               >
                                 Cancel
                               </button>
@@ -3364,24 +3970,7 @@ function Dashboard() {
         {/* Show orders with proofs but not matching review criteria */}
         {proofsToReview.length === 0 && orders.some(o => (o.proofs && o.proofs.length > 0) || o.proofUrl) && (
           <div className="mt-6 p-4 bg-blue-900/20 border border-blue-400/30 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <h4 className="text-blue-300 font-medium">You have proofs in other statuses</h4>
-            </div>
-            <p className="text-blue-200 text-sm mb-3">
-              Some of your orders have proofs that may be in production or already approved.
-            </p>
-            <Link
-              href="/proofs"
-              className="inline-flex items-center gap-2 text-cyan-400 hover:text-cyan-300 text-sm"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2M7 7l10 10M17 7l-10 10" />
-              </svg>
-              View All Proofs
-            </Link>
+
           </div>
         )}
       </div>
@@ -3449,7 +4038,7 @@ function Dashboard() {
           <div className="flex items-center gap-4">
             <button
               onClick={generatePrintPDF}
-              className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 flex items-center gap-2"
+              className="px-6 md:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 flex items-center gap-2"
               style={{
                 backgroundColor: 'rgba(16, 185, 129, 0.2)',
                 border: '1px solid rgba(16, 185, 129, 0.3)',
@@ -3464,7 +4053,7 @@ function Dashboard() {
             </button>
             <button
               onClick={generateDownloadPDF}
-              className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 flex items-center gap-2"
+              className="px-6 md:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 flex items-center gap-2"
               style={{
                 backgroundColor: 'rgba(139, 92, 246, 0.2)',
                 border: '1px solid rgba(139, 92, 246, 0.3)',
@@ -3697,6 +4286,287 @@ function Dashboard() {
     );
   };
 
+  const renderSupportView = () => {
+    const concernReasons = [
+      { value: 'order-issue', label: 'Order Issue' },
+      { value: 'proof-concerns', label: 'Proof Concerns' },
+      { value: 'shipping-delay', label: 'Shipping Delay' },
+      { value: 'quality-issue', label: 'Quality Issue' },
+      { value: 'refund-request', label: 'Refund Request' },
+      { value: 'design-help', label: 'Design Help Needed' },
+      { value: 'billing-question', label: 'Billing Question' },
+      { value: 'technical-issue', label: 'Technical Issue' },
+      { value: 'product-inquiry', label: 'Product Inquiry' },
+      { value: 'other', label: 'Other' }
+    ];
+
+
+
+    return (
+      <div className="container-style rounded-2xl p-6 md:p-8">
+        <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+          <span className="text-3xl">🛟</span>
+          Get Support
+        </h2>
+        
+        <form onSubmit={handleContactSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="support-name" className="block text-sm font-medium text-gray-300 mb-2">
+                Name
+              </label>
+              <input
+                type="text"
+                id="support-name"
+                name="name"
+                value={contactFormData.name}
+                onChange={handleContactChange}
+                required
+                className="w-full px-6 md:px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}
+                placeholder="Your name"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="support-email" className="block text-sm font-medium text-gray-300 mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                id="support-email"
+                name="email"
+                value={contactFormData.email}
+                onChange={handleContactChange}
+                required
+                className="w-full px-6 md:px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}
+                placeholder="your@email.com"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="support-reason" className="block text-sm font-medium text-gray-300 mb-2">
+              Reason for Contact
+            </label>
+            <select
+              id="support-reason"
+              name="subject"
+              value={contactFormData.subject}
+              onChange={handleContactChange}
+              required
+              className="w-full px-6 md:px-4 py-3 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.2)'
+              }}
+            >
+              <option value="" style={{ backgroundColor: '#030140' }}>Select a reason</option>
+              {concernReasons.map(reason => (
+                <option key={reason.value} value={reason.value} style={{ backgroundColor: '#030140' }}>
+                  {reason.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Related Order (Optional)
+            </label>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowOrderDropdown(!showOrderDropdown)}
+                className="w-full px-6 md:px-4 py-3 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center justify-between"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}
+              >
+                <span>
+                  {contactFormData.relatedOrder ? 
+                    (() => {
+                      const selectedOrder = orders.find(order => order.id === contactFormData.relatedOrder);
+                      return selectedOrder ? (
+                        <div className="flex items-center gap-3">
+                          <img 
+                            src={selectedOrder.items[0]?.image || 'https://via.placeholder.com/40'} 
+                            alt="Order preview"
+                            className="w-10 h-10 rounded object-cover"
+                          />
+                          <span>Order #{getOrderDisplayNumber(selectedOrder)} - ${selectedOrder.total.toFixed(2)}</span>
+                        </div>
+                      ) : 'Select an order';
+                    })() : 
+                    'Select an order (optional)'
+                  }
+                </span>
+                <svg className={`w-5 h-5 transition-transform ${showOrderDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {showOrderDropdown && (
+                <div className="absolute top-full left-0 right-0 mt-1 rounded-lg shadow-xl z-10 max-h-64 overflow-y-auto"
+                     style={{
+                       backgroundColor: 'rgba(3, 1, 64, 0.95)',
+                       backdropFilter: 'blur(20px)',
+                       border: '1px solid rgba(255, 255, 255, 0.15)'
+                     }}>
+                  <div className="p-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setContactFormData(prev => ({ ...prev, relatedOrder: '' }));
+                        setShowOrderDropdown(false);
+                      }}
+                      className="w-full p-3 rounded-lg text-left hover:bg-white/10 transition-colors text-gray-300"
+                    >
+                      No specific order
+                    </button>
+                    
+                    {orders.map((order) => (
+                      <button
+                        key={order.id}
+                        type="button"
+                        onClick={() => {
+                          setContactFormData(prev => ({ ...prev, relatedOrder: order.id }));
+                          setShowOrderDropdown(false);
+                        }}
+                        className="w-full p-3 rounded-lg text-left hover:bg-white/10 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <img 
+                            src={order.items[0]?.image || 'https://via.placeholder.com/40'} 
+                            alt={order.items[0]?.name}
+                            className="w-12 h-12 rounded object-cover"
+                          />
+                          <div>
+                            <div className="text-white font-medium">Order #{getOrderDisplayNumber(order)}</div>
+                            <div className="text-gray-400 text-sm">{new Date(order.date).toLocaleDateString()} - ${order.total.toFixed(2)}</div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="support-message" className="block text-sm font-medium text-gray-300 mb-2">
+              Message
+            </label>
+            <textarea
+              id="support-message"
+              name="message"
+              value={contactFormData.message}
+              onChange={handleContactChange}
+              required
+              rows={5}
+              className="w-full px-6 md:px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.2)'
+              }}
+              placeholder="Please describe your issue or question..."
+            />
+          </div>
+
+          <div className="flex gap-4">
+            <button
+              type="submit"
+              disabled={isSubmittingContact}
+              className="flex-1 py-3 px-6 md:px-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: '#ffd713',
+                color: '#030140',
+                boxShadow: '0 0 20px rgba(255, 215, 19, 0.3)'
+              }}
+            >
+              {isSubmittingContact ? (
+                <span className="flex items-center justify-center">
+                  <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Sending...
+                </span>
+              ) : 'Submit Request'}
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => {
+                // Save form data to localStorage for later
+                localStorage.setItem('supportFormDraft', JSON.stringify(contactFormData));
+                setActionNotification({ message: 'Support request saved for later', type: 'info' });
+                setTimeout(() => setActionNotification(null), 3000);
+              }}
+              className="px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:bg-white/10"
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: 'white'
+              }}
+            >
+              Save for Later
+            </button>
+          </div>
+        </form>
+
+        {/* Success Message */}
+        {contactSubmitted && (
+          <div className="mt-6 p-4 rounded-lg bg-green-500/20 border border-green-400/50">
+            <p className="text-green-200 flex items-center gap-2">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              Support request sent! We'll get back to you within 24 hours.
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderSettingsView = () => {
+    return (
+      <div className="container-style rounded-2xl p-6 md:p-8">
+        <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+          <span className="text-3xl">⚙️</span>
+          Settings
+        </h2>
+        
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-4">Profile Settings</h3>
+            <p className="text-gray-300">Profile settings coming soon...</p>
+          </div>
+          
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-4">Notification Preferences</h3>
+            <p className="text-gray-300">Notification preferences coming soon...</p>
+          </div>
+          
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-4">Account Security</h3>
+            <p className="text-gray-300">Security settings coming soon...</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderDefaultView = () => (
     <>
       {/* Order Completion Success Message */}
@@ -3726,93 +4596,168 @@ function Dashboard() {
 
 
 
-      {/* Current Deals - Priority Display */}
-      <div className="container-style p-6">
-        <div className="mb-4">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-2">
-            🎯 Current Deals
-            <span className="text-xs bg-red-500/20 text-red-300 px-2 py-1 rounded-full">
-              Limited Time
-            </span>
-          </h2>
-          <p className="text-sm text-gray-400">Exclusive offers just for you</p>
-        </div>
-        
-        {/* Desktop Grid */}
-        <div className="hidden md:grid grid-cols-3 gap-4">
-          {/* Deal 1 - Reorder Discount */}
-          <div className="rounded-lg p-4 border border-yellow-400/30"
-               style={{ backgroundColor: 'rgba(255, 215, 19, 0.1)' }}>
-            <div className="text-center">
-              <div className="text-xs font-bold px-3 py-1 rounded mb-3 inline-block"
-                   style={{ background: 'linear-gradient(135deg, #ffd713, #ffed4e)', color: '#030140' }}>
-                10% OFF
-              </div>
-              <p className="text-sm font-semibold text-white mb-1">🔄 Reorder Special</p>
-              <p className="text-xs text-gray-300">10% off any repeat order</p>
+      {/* Current Deals - Mobile: Swipeable, Desktop: Grid */}
+      <div className="mt-3 lg:mt-0">
+        <div 
+          className="rounded-2xl overflow-hidden mb-6"
+          style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(12px)'
+          }}
+        >
+          <div className="px-6 py-4 border-b border-white/10">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                🎯 Current Deals
+                <span className="text-xs bg-red-500/20 text-red-300 px-2 py-1 rounded-full">
+                  Limited Time
+                </span>
+              </h2>
             </div>
           </div>
-
-          {/* Deal 2 - Free Shipping */}
-          <div className="rounded-lg p-4 border border-green-400/30"
-               style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)' }}>
-            <div className="text-center">
-              <div className="text-xs font-bold px-3 py-1 rounded text-white mb-3 inline-block"
-                   style={{ background: 'linear-gradient(135deg, #10b981, #34d399)' }}>
-                FREE
-              </div>
-              <p className="text-sm font-semibold text-white mb-1">🚚 Free Shipping</p>
-              <p className="text-xs text-gray-300">Orders over $50</p>
-            </div>
-          </div>
-
-          {/* Deal 3 - Bulk Discount */}
-          <div className="rounded-lg p-4 border border-purple-400/30"
-               style={{ backgroundColor: 'rgba(139, 92, 246, 0.1)' }}>
-            <div className="text-center">
-              <div className="text-xs font-bold px-3 py-1 rounded text-white mb-3 inline-block"
-                   style={{ background: 'linear-gradient(135deg, #8b5cf6, #a78bfa)' }}>
-                15% OFF
-              </div>
-              <p className="text-sm font-semibold text-white mb-1">📦 Bulk Orders</p>
-              <p className="text-xs text-gray-300">15% off 500+ stickers</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Swipeable Carousel */}
-        <div className="md:hidden">
-          <div 
-            className="flex gap-4 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-2"
-            style={{
-              scrollbarWidth: 'none',
-              msOverflowStyle: 'none'
-            }}
-          >
-            {/* Create infinite scroll effect by repeating deals */}
-            {[
-              { emoji: '🔄', title: 'Reorder Special', desc: '10% off any repeat order', discount: '10% OFF', bg: 'rgba(255, 215, 19, 0.1)', border: 'border-yellow-400/30', gradient: 'linear-gradient(135deg, #ffd713, #ffed4e)', color: '#030140' },
-              { emoji: '🚚', title: 'Free Shipping', desc: 'Orders over $50', discount: 'FREE', bg: 'rgba(16, 185, 129, 0.1)', border: 'border-green-400/30', gradient: 'linear-gradient(135deg, #10b981, #34d399)', color: 'white' },
-              { emoji: '📦', title: 'Bulk Orders', desc: '15% off 500+ stickers', discount: '15% OFF', bg: 'rgba(139, 92, 246, 0.1)', border: 'border-purple-400/30', gradient: 'linear-gradient(135deg, #8b5cf6, #a78bfa)', color: 'white' },
-              { emoji: '🔄', title: 'Reorder Special', desc: '10% off any repeat order', discount: '10% OFF', bg: 'rgba(255, 215, 19, 0.1)', border: 'border-yellow-400/30', gradient: 'linear-gradient(135deg, #ffd713, #ffed4e)', color: '#030140' },
-              { emoji: '🚚', title: 'Free Shipping', desc: 'Orders over $50', discount: 'FREE', bg: 'rgba(16, 185, 129, 0.1)', border: 'border-green-400/30', gradient: 'linear-gradient(135deg, #10b981, #34d399)', color: 'white' },
-              { emoji: '📦', title: 'Bulk Orders', desc: '15% off 500+ stickers', discount: '15% OFF', bg: 'rgba(139, 92, 246, 0.1)', border: 'border-purple-400/30', gradient: 'linear-gradient(135deg, #8b5cf6, #a78bfa)', color: 'white' }
-            ].map((deal, index) => (
-              <div 
-                key={index}
-                className={`flex-none w-64 rounded-lg p-4 border ${deal.border} snap-start`}
-                style={{ backgroundColor: deal.bg }}
-              >
-                <div className="text-center">
-                  <div className="text-xs font-bold px-3 py-1 rounded mb-3 inline-block"
-                       style={{ background: deal.gradient, color: deal.color }}>
-                    {deal.discount}
+          <div className="p-6">
+          
+          {/* Mobile: Horizontal Scroll */}
+          <div className="lg:hidden">
+            <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
+              {/* Deal 1 - Reorder Discount */}
+              <button 
+                onClick={() => setCurrentView('all-orders')}
+                className="flex-shrink-0 w-64 rounded-lg p-3 border border-yellow-400/30 transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer"
+                style={{ 
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
+                }}>
+                <div className="flex items-center gap-3">
+                  <div className="text-xs font-bold px-2 py-1 rounded flex-shrink-0"
+                       style={{ background: 'linear-gradient(135deg, #ffd713, #ffed4e)', color: '#030140' }}>
+                    10% OFF
                   </div>
-                  <p className="text-sm font-semibold text-white mb-1">{deal.emoji} {deal.title}</p>
-                  <p className="text-xs text-gray-300">{deal.desc}</p>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-semibold text-white">🔄 Reorder Special</p>
+                    <p className="text-xs text-gray-300">10% off any repeat order</p>
+                  </div>
+                </div>
+              </button>
+
+              {/* Deal 2 - Free Next-Day Shipping */}
+              <Link href="/products">
+                <div className="flex-shrink-0 w-64 rounded-lg p-3 border border-green-400/30 transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer"
+                     style={{ 
+                       background: 'rgba(255, 255, 255, 0.05)',
+                       border: '1px solid rgba(255, 255, 255, 0.1)',
+                       boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                       backdropFilter: 'blur(12px)'
+                     }}>
+                  <div className="flex items-center gap-3">
+                    <div className="text-xs font-bold px-2 py-1 rounded text-white flex-shrink-0"
+                         style={{ background: 'linear-gradient(135deg, #10b981, #34d399)' }}>
+                      FREE
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="text-sm font-semibold text-white">🚀 Next-Day Shipping</p>
+                      <p className="text-xs text-gray-300">1,000+ stickers</p>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+
+              {/* Deal 3 - Holographic Discount */}
+              <Link href="/products/holographic-stickers">
+                <div className="flex-shrink-0 w-64 rounded-lg p-3 border border-purple-400/30 transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer"
+                     style={{ 
+                       background: 'rgba(255, 255, 255, 0.05)',
+                       border: '1px solid rgba(255, 255, 255, 0.1)',
+                       boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                       backdropFilter: 'blur(12px)'
+                     }}>
+                  <div className="flex items-center gap-3">
+                    <div className="text-xs font-bold px-2 py-1 rounded text-white flex-shrink-0"
+                         style={{ background: 'linear-gradient(135deg, #8b5cf6, #a78bfa)' }}>
+                      20% OFF
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="text-sm font-semibold text-white">✨ Holographic</p>
+                      <p className="text-xs text-gray-300">All holographic stickers</p>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            </div>
+          </div>
+
+          {/* Desktop: Grid Layout */}
+          <div className="hidden lg:grid grid-cols-3 gap-3">
+            {/* Deal 1 - Reorder Discount */}
+            <button 
+              onClick={() => setCurrentView('all-orders')}
+              className="rounded-lg p-3 border border-yellow-400/30 transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer"
+              style={{ 
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(12px)'
+              }}>
+              <div className="flex items-center gap-3">
+                <div className="text-xs font-bold px-2 py-1 rounded flex-shrink-0"
+                     style={{ background: 'linear-gradient(135deg, #ffd713, #ffed4e)', color: '#030140' }}>
+                  10% OFF
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="text-sm font-semibold text-white">🔄 Reorder Special</p>
+                  <p className="text-xs text-gray-300">10% off any repeat order</p>
                 </div>
               </div>
-            ))}
+            </button>
+
+            {/* Deal 2 - Free Next-Day Shipping */}
+            <Link href="/products">
+              <div className="rounded-lg p-3 border border-green-400/30 transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer"
+                   style={{ 
+                     background: 'rgba(255, 255, 255, 0.05)',
+                     border: '1px solid rgba(255, 255, 255, 0.1)',
+                     boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                     backdropFilter: 'blur(12px)'
+                   }}>
+                <div className="flex items-center gap-3">
+                  <div className="text-xs font-bold px-2 py-1 rounded text-white flex-shrink-0"
+                       style={{ background: 'linear-gradient(135deg, #10b981, #34d399)' }}>
+                    FREE
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-semibold text-white">🚀 Next-Day Shipping</p>
+                    <p className="text-xs text-gray-300">1,000+ stickers</p>
+                  </div>
+                </div>
+              </div>
+            </Link>
+
+            {/* Deal 3 - Holographic Discount */}
+            <Link href="/products/holographic-stickers">
+              <div className="rounded-lg p-3 border border-purple-400/30 transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer"
+                   style={{ 
+                     background: 'rgba(255, 255, 255, 0.05)',
+                     border: '1px solid rgba(255, 255, 255, 0.1)',
+                     boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                     backdropFilter: 'blur(12px)'
+                   }}>
+                <div className="flex items-center gap-3">
+                  <div className="text-xs font-bold px-2 py-1 rounded text-white flex-shrink-0"
+                       style={{ background: 'linear-gradient(135deg, #8b5cf6, #a78bfa)' }}>
+                    20% OFF
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-semibold text-white">✨ Holographic</p>
+                    <p className="text-xs text-gray-300">All holographic stickers</p>
+                  </div>
+                </div>
+              </div>
+            </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -3822,11 +4767,12 @@ function Dashboard() {
         const lastDeliveredOrder = orders.filter(order => order.status === 'Delivered')[0];
         return lastDeliveredOrder ? (
           <div 
-            className="rounded-xl shadow-xl overflow-hidden"
+            className="rounded-2xl overflow-hidden"
             style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255, 255, 255, 0.15)'
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(12px)'
             }}
           >
             <div className="px-6 py-4 border-b border-white/10">
@@ -3914,10 +4860,12 @@ function Dashboard() {
       {/* Active Orders - Excel-Style Table */}
       {orders.filter(order => order.status !== 'Delivered' && order.status !== 'Cancelled').length > 0 && (
         <div 
-          className="container-style overflow-hidden mb-6"
+          className="rounded-2xl overflow-hidden mb-6"
           style={{
+            background: 'rgba(255, 255, 255, 0.05)',
             border: '2px dashed rgba(249, 115, 22, 0.6)',
-            boxShadow: '0 0 20px rgba(249, 115, 22, 0.3), 0 0 40px rgba(249, 115, 22, 0.1), inset 0 0 20px rgba(249, 115, 22, 0.1)'
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 20px rgba(249, 115, 22, 0.3), 0 0 40px rgba(249, 115, 22, 0.1), inset 0 0 20px rgba(249, 115, 22, 0.1)',
+            backdropFilter: 'blur(12px)'
           }}
         >
           <div className="px-6 py-4 border-b border-white/10">
@@ -3937,16 +4885,15 @@ function Dashboard() {
             </div>
           </div>
           
-          {/* Table Header */}
-          <div className="px-6 py-3 border-b border-white/10 bg-white/5">
-            <div className="grid grid-cols-16 gap-6 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+          {/* Table Header - Desktop Only */}
+          <div className="hidden md:block px-6 py-3 border-b border-white/10 bg-white/5">
+            <div className="grid grid-cols-16 gap-4 text-xs font-semibold text-gray-300 uppercase tracking-wider">
               <div className="col-span-2">Preview</div>
-              <div className="col-span-2">Mission</div>
-              <div className="col-span-3">Items</div>
-              <div className="col-span-3">Status</div>
+              <div className="col-span-3">ORDER #</div>
+              <div className="col-span-4">Items</div>
               <div className="col-span-2">Date</div>
               <div className="col-span-2">Total</div>
-              <div className="col-span-2">Actions</div>
+              <div className="col-span-3">Actions</div>
             </div>
           </div>
           
@@ -3982,12 +4929,13 @@ function Dashboard() {
               return (
                 <div key={order.id}>
                   <div className="px-6 py-4 hover:bg-white/5 transition-colors duration-200">
-                    <div className="grid grid-cols-16 gap-6 items-center">
+                    {/* Desktop Row Layout */}
+                    <div className="hidden md:grid grid-cols-16 gap-4 items-center">
                     
                     {/* Preview Column - Side by Side Images */}
-                    <div className="col-span-2">
-                      <div className="flex gap-2">
-                        {order.items.slice(0, 2).map((item, index) => {
+                      <div className="col-span-2">
+                        <div className="flex gap-2">
+                          {order.items.slice(0, 2).map((item, index) => {
                           // Get the full item data with images
                           const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
                           
@@ -4005,7 +4953,7 @@ function Dashboard() {
                           
                           const name = itemData.name || item.name || 'Custom Sticker';
                           
-                          return (
+                            return (
                             <div key={`preview-${item.id}-${index}`} className="flex-shrink-0">
                               {productImage ? (
                                 <div 
@@ -4034,122 +4982,107 @@ function Dashboard() {
                                   📄
                                 </div>
                               )}
-                            </div>
-                          );
-                        })}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                    
-                    {/* Mission Column */}
-                    <div className="col-span-2">
-                      <div className="font-semibold text-white text-sm">
-                        Mission {getOrderDisplayNumber(order)}
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        {order.items.length} styles
-                      </div>
-                    </div>
-                    
-                    {/* Items Column - Product Types with Quantities */}
+                      
+                                        {/* Order Column */}
                     <div className="col-span-3">
-                      <div className="space-y-1">
-                        {(() => {
-                          // Group items by product type and sum quantities
-                          const productTypes: { [key: string]: number } = {};
-                          
-                          order.items.forEach(item => {
-                            const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
-                            const quantity = itemData.quantity || item.quantity || 0;
-                            const name = itemData.name || item.name || 'Custom Sticker';
+                      <div className="font-semibold text-white text-sm">
+                        {getOrderDisplayNumber(order)}
+                      </div>
+                    </div>
+
+                      {/* Items Column - Product Types with Quantities */}
+                      <div className="col-span-4">
+                        <div className="space-y-1">
+                          {(() => {
+                            // Group items by product type and sum quantities
+                            const productTypes: { [key: string]: number } = {};
                             
-                            // Determine product type from name
-                            let productType = 'Vinyl Stickers';
-                            if (name.toLowerCase().includes('holographic') || name.toLowerCase().includes('holo')) {
-                              productType = 'Holographic Stickers';
-                            } else if (name.toLowerCase().includes('clear') || name.toLowerCase().includes('transparent')) {
-                              productType = 'Clear Stickers';
-                            } else if (name.toLowerCase().includes('white') || name.toLowerCase().includes('opaque')) {
-                              productType = 'White Stickers';
-                            } else if (name.toLowerCase().includes('metallic') || name.toLowerCase().includes('foil')) {
-                              productType = 'Metallic Stickers';
-                            }
+                            order.items.forEach(item => {
+                              const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+                              const quantity = itemData.quantity || item.quantity || 0;
+                              const name = itemData.name || item.name || 'Custom Sticker';
+                              
+                              // Determine product type from name
+                              let productType = 'Vinyl Stickers';
+                              if (name.toLowerCase().includes('holographic') || name.toLowerCase().includes('holo')) {
+                                productType = 'Holographic Stickers';
+                              } else if (name.toLowerCase().includes('clear') || name.toLowerCase().includes('transparent')) {
+                                productType = 'Clear Stickers';
+                              } else if (name.toLowerCase().includes('white') || name.toLowerCase().includes('opaque')) {
+                                productType = 'White Stickers';
+                              } else if (name.toLowerCase().includes('metallic') || name.toLowerCase().includes('foil')) {
+                                productType = 'Metallic Stickers';
+                              }
+                              
+                              if (productTypes[productType]) {
+                                productTypes[productType] += quantity;
+                              } else {
+                                productTypes[productType] = quantity;
+                              }
+                            });
                             
-                            if (productTypes[productType]) {
-                              productTypes[productType] += quantity;
-                            } else {
-                              productTypes[productType] = quantity;
-                            }
-                          });
-                          
                           return Object.entries(productTypes).map(([type, quantity]: [string, number]) => (
                             <div key={type} className="text-sm text-white">
-                              {quantity} {type}
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    </div>
-                    
-                    {/* Status Column */}
-                    <div className="col-span-3">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${getStatusColor(order.status)}`}>
-                          <div className="w-full h-full rounded-full animate-pulse"></div>
+                                {quantity} {type}
+                              </div>
+                            ));
+                          })()}
                         </div>
-                        <span className="text-xs text-orange-300 font-medium">
-                          {getStatusDisplayText(order.status)}
-                        </span>
                       </div>
-                    </div>
-                    
-                    {/* Date Column */}
-                    <div className="col-span-2">
-                      <div className="text-xs text-gray-400">
-                        {new Date(order.date).toLocaleDateString('en-US', { 
-                          month: 'short', 
-                          day: 'numeric' 
-                        })}
+
+                      {/* Date Column */}
+                      <div className="col-span-2">
+                        <div className="text-xs text-gray-400">
+                          {new Date(order.date).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric'
+                          })}
+                        </div>
                       </div>
-                    </div>
-                    
-                    {/* Total Column */}
-                    <div className="col-span-2">
-                      <div className="text-sm font-semibold text-white">
-                        ${order.total}
+
+                      {/* Total Column */}
+                      <div className="col-span-2">
+                        <div className="text-sm font-semibold text-white">
+                          ${order.total}
+                        </div>
                       </div>
-                    </div>
-                    
-                    {/* Actions Column */}
-                    <div className="col-span-2">
+
+                      {/* Actions Column */}
+                    <div className="col-span-3">
                       <div className="flex flex-col gap-2">
-                        <button
-                          onClick={() => handleViewOrderDetails(order)}
+                          <button
+                            onClick={() => handleViewOrderDetails(order)}
                           className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
-                          style={{
-                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                            border: '1px solid rgba(59, 130, 246, 0.3)',
-                            color: 'white'
-                          }}
-                        >
-                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-                          </svg>
-                          View Details
-                        </button>
-                        <button
-                          onClick={() => handleReorder(order.id)}
+                            style={{
+                              backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                              border: '1px solid rgba(59, 130, 246, 0.3)',
+                              color: 'white'
+                            }}
+                          >
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                            </svg>
+                            View Details
+                          </button>
+                          <button
+                            onClick={() => handleReorder(order.id)}
                           className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
-                          style={{
-                            backgroundColor: 'rgba(245, 158, 11, 0.2)',
-                            border: '1px solid rgba(245, 158, 11, 0.3)',
-                            color: 'white'
-                          }}
-                        >
-                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                            <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-                          </svg>
-                          Reorder
-                        </button>
+                            style={{
+                              backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                              color: 'white'
+                            }}
+                          >
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                            </svg>
+                            Reorder
+                          </button>
                         
                         {order.status === 'Proof Review Needed' && (
                           <button
@@ -4164,12 +5097,161 @@ function Dashboard() {
                             Review Proof
                           </button>
                         )}
+                        </div>
                       </div>
-                    </div>
                     
                     </div>
+
+                    {/* Mobile Card Layout */}
+                    <div className="md:hidden">
+                      <div className="bg-white/5 rounded-lg p-4 border border-white/10 space-y-4">
+                        {/* Header Row */}
+                        <div className="flex items-center justify-between">
+                          <div className="font-semibold text-white text-base">
+                            {getOrderDisplayNumber(order)}
+                          </div>
+                          <div className="text-sm font-semibold text-white">
+                            ${order.total}
+                          </div>
+                        </div>
+
+                        {/* Preview Images */}
+                        <div className="flex gap-2">
+                          {order.items.slice(0, 3).map((item, index) => {
+                            const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+                            let productImage = null;
+                            if (itemData.customFiles?.[0]) {
+                              productImage = itemData.customFiles[0];
+                            } else if (itemData.image) {
+                              productImage = itemData.image;
+                            } else if (item.customFiles?.[0]) {
+                              productImage = item.customFiles[0];
+                            } else if (item.image) {
+                              productImage = item.image;
+                            }
+
+                            return (
+                              <div key={index} className="w-16 h-16 rounded-lg overflow-hidden border border-white/10 bg-black/20">
+                                {productImage ? (
+                                  <img 
+                                    src={productImage} 
+                                    alt={item.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-lg">📄</div>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {order.items.length > 3 && (
+                            <div className="w-16 h-16 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 text-xs font-medium">
+                              +{order.items.length - 3}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Items and Date Row */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <div className="text-xs text-gray-400 mb-1">Items</div>
+                            <div className="space-y-1">
+                              {(() => {
+                                const productTypes: { [key: string]: number } = {};
+                                
+                                order.items.forEach(item => {
+                                  const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+                                  const quantity = itemData.quantity || item.quantity || 0;
+                                  const name = itemData.name || item.name || 'Custom Sticker';
+                                  
+                                  let productType = 'Vinyl Stickers';
+                                  if (name.toLowerCase().includes('holographic') || name.toLowerCase().includes('holo')) {
+                                    productType = 'Holographic Stickers';
+                                  } else if (name.toLowerCase().includes('clear') || name.toLowerCase().includes('transparent')) {
+                                    productType = 'Clear Stickers';
+                                  } else if (name.toLowerCase().includes('white') || name.toLowerCase().includes('opaque')) {
+                                    productType = 'White Stickers';
+                                  } else if (name.toLowerCase().includes('metallic') || name.toLowerCase().includes('foil')) {
+                                    productType = 'Metallic Stickers';
+                                  }
+                                  
+                                  if (productTypes[productType]) {
+                                    productTypes[productType] += quantity;
+                                  } else {
+                                    productTypes[productType] = quantity;
+                                  }
+                                });
+                                
+                                return Object.entries(productTypes).slice(0, 2).map(([type, quantity]: [string, number]) => (
+                                  <div key={type} className="text-xs text-white">
+                                    {quantity} {type}
+                                  </div>
+                                ));
+                              })()}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="text-xs text-gray-400 mb-1">Date</div>
+                            <div className="text-xs text-white">
+                              {new Date(order.date).toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric',
+                                year: 'numeric'
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleViewOrderDetails(order)}
+                            className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
+                            style={{
+                              backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                              border: '1px solid rgba(59, 130, 246, 0.3)',
+                              color: 'white'
+                            }}
+                          >
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                            </svg>
+                            View Details
+                          </button>
+                          <button
+                            onClick={() => handleReorder(order.id)}
+                            className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
+                            style={{
+                              backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                              color: 'white'
+                            }}
+                          >
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                            </svg>
+                            Reorder
+                          </button>
+                        </div>
+
+                        {order.status === 'Proof Review Needed' && (
+                          <button
+                            onClick={() => setCurrentView('proofs')}
+                            className="w-full px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105"
+                            style={{
+                              backgroundColor: 'rgba(249, 115, 22, 0.2)',
+                              border: '1px solid rgba(249, 115, 22, 0.3)',
+                              color: 'white'
+                            }}
+                          >
+                            Review Proof
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  
+
                   {/* Progress Tracker Subrow */}
                   {renderOrderProgressTracker(order)}
                 </div>
@@ -4179,232 +5261,246 @@ function Dashboard() {
         </div>
       )}
 
-      {/* Recent Orders History */}
-      <div 
-        className="rounded-xl shadow-xl overflow-hidden"
-        style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.08)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.15)'
-        }}
-      >
-        <div className="px-6 py-4 border-b border-white/10">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-white">📋 Order History</h2>
-            <button 
-              onClick={() => setCurrentView('all-orders')}
-              className="text-purple-400 hover:text-purple-300 font-medium transition-colors duration-200 text-sm"
-            >
-              View All →
-            </button>
-          </div>
-        </div>
-        {/* Table Header */}
-        <div className="px-6 py-3 border-b border-white/10 bg-white/5">
-          <div className="grid grid-cols-16 gap-6 text-xs font-semibold text-gray-300 uppercase tracking-wider">
-            <div className="col-span-2">Preview</div>
-            <div className="col-span-2">Mission</div>
-            <div className="col-span-3">Items</div>
-            <div className="col-span-3">Status</div>
-            <div className="col-span-2">Date</div>
-            <div className="col-span-2">Total</div>
-            <div className="col-span-2">Actions</div>
-          </div>
-        </div>
+      {/* Quick Order Section - Sticker Types */}
+      <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-white">🚀 Quick Order</h2>
+          <Link 
+            href="/products"
+            className="text-purple-400 hover:text-purple-300 font-medium transition-colors duration-200 text-sm"
+          >
+            View All Products →
+          </Link>
+                          </div>
         
-        {/* Table Body */}
-        <div className="divide-y divide-white/5">
-          {orders.slice(0, 3).map((order) => {
-            // Calculate total stickers
-            const totalStickers = order.items.reduce((sum, item) => {
-              const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
-              return sum + (itemData.quantity || item.quantity || 0);
-            }, 0);
-            
-            return (
-              <div key={order.id} className="px-6 py-4 hover:bg-white/5 transition-colors duration-200">
-                <div className="grid grid-cols-16 gap-6 items-center">
-                  {/* Preview Column - Side by Side Images */}
-                  <div className="col-span-2">
-                    <div className="flex gap-2">
-                      {order.items.slice(0, 2).map((item, index) => {
-                        // Get the full item data with images
-                        const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
-                        
-                        // Try to get product image from various sources
-                        let productImage = null;
-                        if (itemData.customFiles?.[0]) {
-                          productImage = itemData.customFiles[0];
-                        } else if (itemData.image) {
-                          productImage = itemData.image;
-                        } else if (item.customFiles?.[0]) {
-                          productImage = item.customFiles[0];
-                        } else if (item.image) {
-                          productImage = item.image;
-                        }
-                        
-                        const name = itemData.name || item.name || 'Custom Sticker';
-                        
-                        return (
-                          <div key={`preview-${item.id}-${index}`} className="flex-shrink-0">
-                            {productImage ? (
-                              <div 
-                                className="w-12 h-12 rounded-lg bg-white/10 border border-white/20 p-1 flex items-center justify-center cursor-pointer hover:border-blue-400/60 transition-all duration-200 hover:scale-105"
-                                onClick={() => {
-                                  // Set the selected image for highlighting in design vault
-                                  setSelectedDesignImage(productImage);
-                                  setCurrentView('design-vault');
-                                }}
-                                title={`Click to view ${name} in Design Vault`}
-                              >
-                                <img 
-                                  src={productImage} 
-                                  alt={name}
-                                  className="max-w-full max-h-full object-contain rounded"
-                                  onError={(e) => {
-                                    const parent = e.currentTarget.parentElement;
-                                    if (parent) {
-                                      parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-gray-400 text-lg">📄</div>';
-                                    }
-                                  }}
+        {/* Desktop Grid */}
+        <div className="hidden md:grid grid-cols-3 lg:grid-cols-5 gap-4">
+          {/* Vinyl Stickers */}
+          <Link href="/products/vinyl-stickers">
+            <div 
+              className="text-center group cursor-pointer rounded-2xl p-4 transition-all duration-500 hover:scale-105 hover:shadow-lg transform overflow-hidden"
+              style={{ 
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(12px)'
+              }}
+            >
+              <div className="w-24 h-24 mx-auto mb-3 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                <img 
+                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
+                  alt="Vinyl Stickers" 
+                  className="w-full h-full object-contain"
+                  style={{
+                    filter: 'drop-shadow(0 0 8px rgba(168, 242, 106, 0.3))'
+                  }}
+                />
+                          </div>
+              <h3 className="text-sm font-semibold text-white group-hover:text-green-400 transition-colors">Vinyl →</h3>
+                        </div>
+          </Link>
+
+          {/* Holographic Stickers */}
+          <Link href="/products/holographic-stickers">
+            <div 
+              className="text-center group cursor-pointer rounded-2xl p-4 transition-all duration-500 hover:scale-105 hover:shadow-lg transform overflow-hidden"
+              style={{ 
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(12px)'
+              }}
+            >
+              <div className="w-24 h-24 mx-auto mb-3 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                <img 
+                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
+                  alt="Holographic Stickers" 
+                  className="w-full h-full object-contain"
+                  style={{
+                    filter: 'drop-shadow(0 0 8px rgba(168, 85, 247, 0.3))'
+                  }}
                                 />
                               </div>
-                            ) : (
-                              <div className="w-12 h-12 rounded-lg bg-gray-600 flex items-center justify-center text-gray-400 border border-white/20 text-lg">
-                                📄
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  
-                  {/* Mission Column */}
-                  <div className="col-span-2">
-                    <div className="font-semibold text-white text-sm">
-                      Mission {getOrderDisplayNumber(order)}
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      {order.items.length} styles
-                    </div>
-                  </div>
-                  
-                  {/* Items Column - Product Types with Quantities */}
-                  <div className="col-span-3">
-                    <div className="space-y-1">
-                      {(() => {
-                        // Group items by product type and sum quantities
-                        const productTypes: { [key: string]: number } = {};
-                        
-                        order.items.forEach(item => {
-                          const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
-                          const quantity = itemData.quantity || item.quantity || 0;
-                          const name = itemData.name || item.name || 'Custom Sticker';
-                          
-                          // Determine product type from name
-                          let productType = 'Vinyl Stickers';
-                          if (name.toLowerCase().includes('holographic') || name.toLowerCase().includes('holo')) {
-                            productType = 'Holographic Stickers';
-                          } else if (name.toLowerCase().includes('clear') || name.toLowerCase().includes('transparent')) {
-                            productType = 'Clear Stickers';
-                          } else if (name.toLowerCase().includes('white') || name.toLowerCase().includes('opaque')) {
-                            productType = 'White Stickers';
-                          } else if (name.toLowerCase().includes('metallic') || name.toLowerCase().includes('foil')) {
-                            productType = 'Metallic Stickers';
-                          }
-                          
-                          if (productTypes[productType]) {
-                            productTypes[productType] += quantity;
-                          } else {
-                            productTypes[productType] = quantity;
-                          }
-                        });
-                        
-                        return Object.entries(productTypes).map(([type, quantity]: [string, number]) => (
-                          <div key={type} className="text-sm text-white">
-                            {quantity} {type}
-                          </div>
-                        ));
-                      })()}
-                    </div>
-                  </div>
-                  
-                  {/* Status Column */}
-                  <div className="col-span-3">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${getStatusColor(order.status)}`}>
-                        <div className="w-full h-full rounded-full animate-pulse"></div>
-                      </div>
-                      <span className="text-xs text-gray-300 font-medium">
-                        {getStatusDisplayText(order.status)}
-                      </span>
-                    </div>
-                    {order.trackingNumber && (
-                      <div className="text-xs text-purple-300 mt-1">
-                        📦 {order.trackingNumber}
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Date Column */}
-                  <div className="col-span-2">
-                    <div className="text-xs text-gray-400">
-                      {new Date(order.date).toLocaleDateString('en-US', { 
-                        month: 'short', 
-                        day: 'numeric' 
-                      })}
-                    </div>
-                  </div>
-                  
-                  {/* Total Column */}
-                  <div className="col-span-2">
-                    <div className="text-sm font-semibold text-white">
-                      ${order.total}
-                    </div>
-                  </div>
-                  
-                  {/* Actions Column */}
-                  <div className="col-span-2">
-                    <div className="flex flex-col gap-2">
-                      <button
-                        onClick={() => handleViewOrderDetails(order)}
-                        className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
-                        style={{
-                          backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                          border: '1px solid rgba(59, 130, 246, 0.3)',
-                          color: 'white'
-                        }}
-                      >
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                          <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-                        </svg>
-                        View Details
-                      </button>
-                      <button
-                        onClick={() => handleReorder(order.id)}
-                        className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
-                        style={{
-                          backgroundColor: 'rgba(245, 158, 11, 0.2)',
-                          border: '1px solid rgba(245, 158, 11, 0.3)',
-                          color: 'white'
-                        }}
-                      >
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                          <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-                        </svg>
-                        Reorder
-                      </button>
-                    </div>
-                  </div>
-                </div>
+              <h3 className="text-sm font-semibold text-white group-hover:text-purple-400 transition-colors">Holographic →</h3>
+            </div>
+          </Link>
+
+          {/* Glitter Stickers */}
+          <Link href="/products/glitter-stickers">
+            <div 
+              className="text-center group cursor-pointer rounded-2xl p-4 transition-all duration-500 hover:scale-105 hover:shadow-lg transform overflow-hidden"
+              style={{ 
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(12px)'
+              }}
+            >
+              <div className="w-24 h-24 mx-auto mb-3 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                <img 
+                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
+                  alt="Glitter Stickers" 
+                  className="w-full h-full object-contain"
+                  style={{
+                    filter: 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.3))'
+                  }}
+                />
               </div>
-            );
-          })}
+              <h3 className="text-sm font-semibold text-white group-hover:text-blue-400 transition-colors">Glitter →</h3>
+            </div>
+          </Link>
+
+          {/* Chrome Stickers */}
+          <Link href="/products/chrome-stickers">
+            <div 
+              className="text-center group cursor-pointer rounded-2xl p-4 transition-all duration-500 hover:scale-105 hover:shadow-lg transform overflow-hidden"
+              style={{ 
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(12px)'
+              }}
+            >
+              <div className="w-24 h-24 mx-auto mb-3 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                <img 
+                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
+                  alt="Chrome Stickers" 
+                  className="w-full h-full object-contain"
+                  style={{
+                    filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.3))'
+                  }}
+                />
+              </div>
+              <h3 className="text-sm font-semibold text-white group-hover:text-gray-300 transition-colors">Chrome →</h3>
+            </div>
+          </Link>
+
+          {/* Sticker Sheets */}
+          <Link href="/products/sticker-sheets">
+            <div 
+              className="text-center group cursor-pointer rounded-2xl p-4 transition-all duration-500 hover:scale-105 hover:shadow-lg transform overflow-hidden"
+              style={{ 
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(12px)'
+              }}
+            >
+              <div className="w-24 h-24 mx-auto mb-3 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                <img 
+                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749847809/StickerShuttle_StickerSheetsIcon_2_g61dty.svg" 
+                  alt="Sticker Sheets" 
+                  className="w-full h-full object-contain"
+                  style={{
+                    filter: 'drop-shadow(0 0 8px rgba(196, 181, 253, 0.3))'
+                  }}
+                />
+              </div>
+              <h3 className="text-sm font-semibold text-white group-hover:text-purple-300 transition-colors">Sheets →</h3>
+            </div>
+          </Link>
+        </div>
+
+        {/* Mobile Scrollable */}
+        <div className="md:hidden overflow-x-auto pb-2 -mx-4 px-6 md:px-4">
+          <div className="flex space-x-3">
+            {/* Vinyl Mobile */}
+            <Link href="/products/vinyl-stickers">
+              <div className="flex-shrink-0 w-32 text-center rounded-2xl p-3" style={{ 
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(12px)'
+              }}>
+                <div className="w-20 h-20 mx-auto mb-2">
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
+                    alt="Vinyl" 
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <h3 className="text-xs font-semibold text-white">Vinyl →</h3>
+              </div>
+            </Link>
+
+            {/* Holographic Mobile */}
+            <Link href="/products/holographic-stickers">
+              <div className="flex-shrink-0 w-32 text-center rounded-2xl p-3" style={{ 
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(12px)'
+              }}>
+                <div className="w-20 h-20 mx-auto mb-2">
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
+                    alt="Holographic" 
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <h3 className="text-xs font-semibold text-white">Holographic →</h3>
+              </div>
+            </Link>
+
+            {/* Glitter Mobile */}
+            <Link href="/products/glitter-stickers">
+              <div className="flex-shrink-0 w-32 text-center rounded-2xl p-3" style={{ 
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(12px)'
+              }}>
+                <div className="w-20 h-20 mx-auto mb-2">
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
+                    alt="Glitter" 
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <h3 className="text-xs font-semibold text-white">Glitter →</h3>
+              </div>
+            </Link>
+
+            {/* Chrome Mobile */}
+            <Link href="/products/chrome-stickers">
+              <div className="flex-shrink-0 w-32 text-center rounded-2xl p-3" style={{ 
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(12px)'
+              }}>
+                <div className="w-20 h-20 mx-auto mb-2">
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
+                    alt="Chrome" 
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <h3 className="text-xs font-semibold text-white">Chrome →</h3>
+              </div>
+            </Link>
+
+            {/* Sheets Mobile */}
+            <Link href="/products/sticker-sheets">
+              <div className="flex-shrink-0 w-32 text-center rounded-2xl p-3" style={{ 
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(12px)'
+              }}>
+                <div className="w-20 h-20 mx-auto mb-2">
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749847809/StickerShuttle_StickerSheetsIcon_2_g61dty.svg" 
+                    alt="Sheets" 
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <h3 className="text-xs font-semibold text-white">Sheets →</h3>
+              </div>
+            </Link>
+          </div>
         </div>
       </div>
-
-
     </>
   );
 
@@ -4419,8 +5515,8 @@ function Dashboard() {
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400 mx-auto mb-4"></div>
             <p className="text-gray-300">Loading your dashboard...</p>
-          </div>
-        </div>
+                            </div>
+                        </div>
       </Layout>
     );
   }
@@ -4483,14 +5579,16 @@ function Dashboard() {
           {recordingMode && (
             <div className="fixed top-4 right-4 z-50 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
               🔴 RECORDING MODE
-            </div>
+                                  </div>
           )}
           {/* Header Section */}
           <div className="pt-6 pb-6">
-            <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto max-w-sm sm:max-w-md md:max-w-full">
+            <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto max-w-sm sm:max-w-md md:max-w-full">
               {/* Header - Mission Control */}
               <div 
-                className="relative rounded-xl p-4 md:p-6 shadow-xl mb-6 overflow-hidden cursor-pointer group banner-gradient"
+                className={`relative rounded-xl p-4 md:p-6 shadow-xl mb-6 overflow-hidden cursor-pointer group banner-gradient ${
+                  profile?.banner_template_id === 1 ? 'stellar-void-animation' : ''
+                }`}
                 style={
                   profile?.banner_image_url 
                     ? {
@@ -4503,14 +5601,18 @@ function Dashboard() {
                     : profile?.banner_template
                       ? {
                           ...JSON.parse(profile.banner_template),
-                          border: '1px solid rgba(255, 255, 255, 0.15)'
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          animation: profile?.banner_template_id === 1 
+                            ? 'stellar-drift 8s ease-in-out infinite' 
+                            : 'stellar-drift 10s ease-in-out infinite'
                         }
                       : {
                           background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 25%, #ec4899 50%, #a855f7 75%, #ec4899 100%)',
                           backgroundSize: '400% 400%',
                           backgroundPosition: '0% 50%',
                           backgroundRepeat: 'no-repeat',
-                          border: '1px solid rgba(255, 255, 255, 0.15)'
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          animation: 'liquid-flow 8s ease-in-out infinite'
                         }
                 }
                 onClick={handleBannerClick}
@@ -4520,13 +5622,98 @@ function Dashboard() {
                 {/* Grain texture overlay for default gradient */}
                 {!profile?.banner_image_url && (
                   <div 
-                    className="absolute inset-0 opacity-30"
+                    className={`absolute inset-0 ${profile?.banner_template_id === 1 ? 'opacity-40 bg-noise' : 'opacity-30'}`}
                     style={{
                       backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='7' cy='7' r='1'/%3E%3Ccircle cx='27' cy='7' r='1'/%3E%3Ccircle cx='47' cy='7' r='1'/%3E%3Ccircle cx='17' cy='17' r='1'/%3E%3Ccircle cx='37' cy='17' r='1'/%3E%3Ccircle cx='7' cy='27' r='1'/%3E%3Ccircle cx='27' cy='27' r='1'/%3E%3Ccircle cx='47' cy='27' r='1'/%3E%3Ccircle cx='17' cy='37' r='1'/%3E%3Ccircle cx='37' cy='37' r='1'/%3E%3Ccircle cx='7' cy='47' r='1'/%3E%3Ccircle cx='27' cy='47' r='1'/%3E%3Ccircle cx='47' cy='47' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
                       backgroundSize: '60px 60px'
                     }}
                   ></div>
                 )}
+                
+                {/* Additional animated stars layer for Stellar Void */}
+                {profile?.banner_template_id === 1 && !profile?.banner_image_url && (
+                  <div className="absolute inset-0 pointer-events-none">
+                    <div 
+                      className="absolute w-1 h-1 bg-white rounded-full opacity-50"
+                      style={{
+                        left: '10%',
+                        top: '20%',
+                        animation: 'star-twinkle 9s ease-in-out infinite',
+                        animationDelay: '0s'
+                      }}
+                    />
+                    <div 
+                      className="absolute w-1 h-1 bg-white rounded-full opacity-40"
+                      style={{
+                        left: '30%',
+                        top: '60%',
+                        animation: 'star-twinkle 9s ease-in-out infinite',
+                        animationDelay: '3s'
+                      }}
+                    />
+                    <div 
+                      className="absolute w-1.5 h-1.5 bg-purple-300 rounded-full opacity-60"
+                      style={{
+                        left: '70%',
+                        top: '30%',
+                        animation: 'star-twinkle 9s ease-in-out infinite',
+                        animationDelay: '6s'
+                      }}
+                    />
+                    <div 
+                      className="absolute w-1 h-1 bg-white rounded-full opacity-50"
+                      style={{
+                        left: '85%',
+                        top: '70%',
+                        animation: 'star-twinkle 9s ease-in-out infinite',
+                        animationDelay: '1.5s'
+                      }}
+                    />
+                    <div 
+                      className="absolute w-1 h-1 bg-purple-200 rounded-full opacity-40"
+                      style={{
+                        left: '50%',
+                        top: '80%',
+                        animation: 'star-twinkle 9s ease-in-out infinite',
+                        animationDelay: '4.5s'
+                      }}
+                    />
+                  </div>
+                )}
+                
+                {/* Floating emojis for business templates */}
+                {profile?.banner_template && (() => {
+                  try {
+                    const templateData = JSON.parse(profile.banner_template);
+                    const selectedTemplate = bannerTemplates.find(t => 
+                      JSON.stringify(t.style) === JSON.stringify(templateData)
+                    );
+                    
+                    if (selectedTemplate?.emojis) {
+                      return (
+                        <div className="absolute inset-0 pointer-events-none z-5">
+                          {selectedTemplate.emojis.map((emoji, index) => (
+                            <span
+                              key={index}
+                              className="absolute text-2xl opacity-60"
+                              style={{
+                                left: `${15 + (index * 12) % 70}%`,
+                                top: `${20 + (index * 15) % 60}%`,
+                                animation: `float-${(index % 3) + 1} ${3 + (index % 2)}s ease-in-out infinite`,
+                                animationDelay: `${index * 0.5}s`
+                              }}
+                            >
+                              {emoji}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    }
+                  } catch (e) {
+                    // If parsing fails, just continue without emojis
+                  }
+                  return null;
+                              })()}
                 
                 {/* Dark overlay for text readability */}
                 <div className="absolute inset-0 bg-black/30 z-0"></div>
@@ -4537,8 +5724,8 @@ function Dashboard() {
                     <div className="text-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-2 mx-auto"></div>
                       <p className="text-white text-sm">Uploading banner...</p>
-                    </div>
-                  </div>
+                            </div>
+                          </div>
                 )}
                 
                 {/* Hover overlay with action icons */}
@@ -4599,7 +5786,7 @@ function Dashboard() {
                         }}
                       >
                         <svg className="w-6 h-6 text-red-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16a2 2 0 002-2V5a2 2 0 00-2-2H4a2 2 0 00-2 2v2" />
                         </svg>
                       </div>
                     )}
@@ -4650,7 +5837,7 @@ function Dashboard() {
                           style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif' }}>
                         Greetings, {getUserDisplayName()}
                       </h1>
-                      <p className="text-sm text-gray-400">
+                      <p className="text-sm text-gray-200">
                         Mission Control Dashboard
                       </p>
                     </div>
@@ -4674,7 +5861,7 @@ function Dashboard() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-3 h-3 bg-orange-500 rounded-full animate-pulse"></div>
-                      <div>
+                          <div>
                         <h3 className="text-orange-300 font-semibold text-sm">
                           ⚠️ Alert! You have {orders.filter(order => order.status === 'Proof Review Needed').length} proof(s) to approve
                         </h3>
@@ -4770,7 +5957,7 @@ function Dashboard() {
                                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)'
                              }}>
                           <svg className="w-4 lg:w-5 h-4 lg:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                           </svg>
                         </div>
                         <div className="min-w-0">
@@ -4800,7 +5987,7 @@ function Dashboard() {
                                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.15)'
                              }}>
                           <svg className="w-4 lg:w-5 h-4 lg:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                         </div>
                         <div className="min-w-0">
@@ -4833,7 +6020,7 @@ function Dashboard() {
                                boxShadow: '0 4px 12px rgba(236, 72, 153, 0.15)'
                              }}>
                           <svg className="w-4 lg:w-5 h-4 lg:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
                           </svg>
                         </div>
                         <div className="min-w-0">
@@ -4854,7 +6041,7 @@ function Dashboard() {
                         boxShadow: '0 8px 32px rgba(249, 115, 22, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
                       } : {}}
                     >
-                      <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2">
                         <div className="p-1.5 rounded-lg"
                              style={{
                                background: 'linear-gradient(135deg, #f97316, #fb923c)',
@@ -4864,19 +6051,19 @@ function Dashboard() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                           </svg>
-                        </div>
+                              </div>
                         <div className="min-w-0">
                           <h4 className="font-semibold text-white text-xs truncate">Proof Review</h4>
                           <p className="text-xs text-gray-300">
                             {orders.filter(order => order.status === 'Proof Review Needed' || order.status === 'Reviewing Changes').length} pending
                           </p>
-                        </div>
-                      </div>
+                            </div>
+                              </div>
                       {orders.filter(order => order.status === 'Proof Review Needed' || order.status === 'Reviewing Changes').length > 0 && (
                         <div className="absolute top-2 right-2 w-3 h-3 bg-orange-500 rounded-full animate-pulse"></div>
-                      )}
+                            )}
                     </button>
-                  </div>
+                          </div>
 
                   {/* Secondary Actions - Hidden on mobile, shown at bottom */}
                   <div className="hidden lg:block space-y-3">
@@ -4913,8 +6100,8 @@ function Dashboard() {
                       )}
                     </button>
 
-                    {/* Two-column layout for Get Support and Settings */}
-                    <div className="grid grid-cols-2 gap-3">
+                    {/* Get Support and Settings layout */}
+                    <div className="space-y-3">
                       <button 
                         onClick={handleGetSupport}
                         className="container-style block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden"
@@ -4928,7 +6115,7 @@ function Dashboard() {
                             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                          </div>
+                        </div>
                           <div>
                             <h4 className="font-semibold text-white text-sm">Get Support</h4>
                             <p className="text-xs text-gray-300">Contact ground crew</p>
@@ -4936,15 +6123,15 @@ function Dashboard() {
                         </div>
                       </button>
 
-                      <Link 
-                        href="/account/settings"
+                      <button 
+                        onClick={() => updateCurrentView('settings')}
                         className="container-style block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden"
                       >
                         <div className="flex items-center gap-3">
                           <div className="p-2 rounded-lg"
                                style={{
-                                 background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                                 boxShadow: '0 4px 12px rgba(99, 102, 241, 0.15)'
+                                 background: 'linear-gradient(135deg, #9333ea, #a855f7)',
+                                 boxShadow: '0 4px 12px rgba(147, 51, 234, 0.15)'
                                }}>
                             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -4953,22 +6140,22 @@ function Dashboard() {
                           </div>
                           <div>
                             <h4 className="font-semibold text-white text-sm">Settings</h4>
-                            <p className="text-xs text-gray-300">Account preferences</p>
+                            <p className="text-xs text-gray-300">Manage account</p>
                           </div>
                         </div>
-                      </Link>
+                      </button>
                     </div>
 
 
 
                     {/* Logout Button */}
-                    <button 
+                          <button
                       onClick={handleLogout}
-                      className="container-style block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left mt-4 border-t border-white/10 pt-6 opacity-75 relative overflow-hidden"
+                      className="container-style block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left opacity-75 relative overflow-hidden"
                     >
                       <div className="flex items-center gap-3">
                         <div className="p-2 rounded-lg"
-                             style={{
+                            style={{
                                background: 'linear-gradient(135deg, #6b7280, #9ca3af)',
                                boxShadow: '0 4px 12px rgba(107, 114, 128, 0.15)'
                              }}>
@@ -4992,117 +6179,63 @@ function Dashboard() {
 
                 {/* Mobile Action Buttons - Bottom of page */}
                 <div className="lg:hidden mt-6 space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* Get Support and Settings */}
+                  <div className="space-y-3">
                     <button 
-                      onClick={() => setCurrentView('design-vault')}
-                      className={`block p-3 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden ${currentView === 'design-vault' ? 'rounded-2xl' : 'container-style'}`}
-                      style={currentView === 'design-vault' ? {
-                        background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.4) 0%, rgba(236, 72, 153, 0.25) 50%, rgba(236, 72, 153, 0.1) 100%)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: '1px solid rgba(236, 72, 153, 0.4)',
-                        boxShadow: '0 8px 32px rgba(236, 72, 153, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                      } : {}}
+                      onClick={handleGetSupport}
+                      className="container-style block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden"
                     >
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg"
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg"
                              style={{
-                               background: 'linear-gradient(135deg, #ec4899, #f472b6)',
-                               boxShadow: '0 4px 12px rgba(236, 72, 153, 0.15)'
+                               background: 'linear-gradient(135deg, #ef4444, #f87171)',
+                               boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
                              }}>
-                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                         </div>
-                        <div className="min-w-0">
-                          <h4 className="font-semibold text-white text-xs whitespace-nowrap">Designs</h4>
-                          <p className="text-xs text-gray-300 truncate">Manage designs</p>
+                        <div>
+                          <h4 className="font-semibold text-white text-sm">Get Support</h4>
+                          <p className="text-xs text-gray-300">Contact ground crew</p>
                         </div>
                       </div>
                     </button>
 
                     <button 
-                      onClick={handleGetSupport}
-                      className="container-style block p-3 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden"
+                      onClick={() => updateCurrentView('settings')}
+                      className="container-style block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden"
                     >
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg"
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg"
                              style={{
-                               background: 'linear-gradient(135deg, #ef4444, #f87171)',
-                               boxShadow: '0 4px 16px rgba(239, 68, 68, 0.3)'
+                               background: 'linear-gradient(135deg, #9333ea, #a855f7)',
+                               boxShadow: '0 4px 12px rgba(147, 51, 234, 0.15)'
                              }}>
-                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                           </svg>
                         </div>
-                        <div className="min-w-0">
-                          <h4 className="font-semibold text-white text-xs whitespace-nowrap">Get Support</h4>
-                          <p className="text-xs text-gray-300 truncate">Contact ground crew</p>
+                        <div>
+                          <h4 className="font-semibold text-white text-sm">Settings</h4>
+                          <p className="text-xs text-gray-300">Manage account</p>
                         </div>
                       </div>
                     </button>
                   </div>
 
-                  <button 
-                    onClick={handleRaiseConcern}
-                    className="block rounded-lg p-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 w-full text-left"
-                    style={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                      backdropFilter: 'blur(20px)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)'
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg"
-                           style={{
-                             background: 'linear-gradient(135deg, #ef4444, #f87171)',
-                             boxShadow: '0 4px 16px rgba(239, 68, 68, 0.3)'
-                           }}>
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-white text-sm">⚠️ Raise a Concern</h4>
-                        <p className="text-xs text-gray-300">Report an issue</p>
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Mobile Logout Button */}
-                  <button 
-                    onClick={handleLogout}
-                    className="block rounded-2xl p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left mt-4 border-t border-white/10 pt-6 opacity-75 relative overflow-hidden"
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.02) 100%)',
-                      backdropFilter: 'blur(25px) saturate(180%)',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg"
-                           style={{
-                             background: 'linear-gradient(135deg, #6b7280, #9ca3af)',
-                             boxShadow: '0 4px 16px rgba(107, 114, 128, 0.3)'
-                           }}>
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                      </div>
-                      <div>
-                                                  <h4 className="font-semibold text-white text-sm">Log Out</h4>
-                        <p className="text-xs text-gray-300">End session</p>
-                      </div>
-                    </div>
-                  </button>
+                  
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+    </ErrorBoundary>
+  </Layout>
 
-      {/* Contact Form Modal */}
+  {/* Contact Form Modal */}
       {showContactForm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-xl shadow-2xl"
@@ -5151,7 +6284,7 @@ function Dashboard() {
                         value={contactFormData.name}
                         onChange={handleContactChange}
                         required
-                        className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        className="w-full px-6 md:px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                         style={{
                           backgroundColor: 'rgba(255, 255, 255, 0.1)',
                           border: '1px solid rgba(255, 255, 255, 0.2)'
@@ -5171,7 +6304,7 @@ function Dashboard() {
                         value={contactFormData.email}
                         onChange={handleContactChange}
                         required
-                        className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        className="w-full px-6 md:px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                         style={{
                           backgroundColor: 'rgba(255, 255, 255, 0.1)',
                           border: '1px solid rgba(255, 255, 255, 0.2)'
@@ -5191,13 +6324,13 @@ function Dashboard() {
                       value={contactFormData.subject}
                       onChange={handleContactChange}
                       required
-                      className="w-full px-4 py-3 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-6 md:px-4 py-3 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                       style={{
                         backgroundColor: 'rgba(255, 255, 255, 0.1)',
                         border: '1px solid rgba(255, 255, 255, 0.2)',
-                        color: 'white'
-                      }}
-                    >
+                              color: 'white'
+                            }}
+                          >
                       <option value="" style={{ backgroundColor: '#030140', color: 'white' }}>Select a topic</option>
                       <option value="concern" style={{ backgroundColor: '#030140', color: 'white' }}>Raise a Concern</option>
                       <option value="order-issue" style={{ backgroundColor: '#030140', color: 'white' }}>Order Issue</option>
@@ -5217,7 +6350,7 @@ function Dashboard() {
                       <button
                         type="button"
                         onClick={() => setShowOrderDropdown(!showOrderDropdown)}
-                        className="w-full px-4 py-3 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center justify-between"
+                        className="w-full px-6 md:px-4 py-3 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center justify-between"
                         style={{
                           backgroundColor: 'rgba(255, 255, 255, 0.1)',
                           border: '1px solid rgba(255, 255, 255, 0.2)'
@@ -5234,8 +6367,8 @@ function Dashboard() {
                         </span>
                         <svg className={`w-5 h-5 transition-transform ${showOrderDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
+                            </svg>
+                          </button>
 
                       {showOrderDropdown && (
                         <div className="absolute top-full left-0 right-0 mt-1 rounded-lg shadow-xl z-10 max-h-64 overflow-y-auto"
@@ -5245,7 +6378,7 @@ function Dashboard() {
                                border: '1px solid rgba(255, 255, 255, 0.15)'
                              }}>
                           <div className="p-2">
-                            <button
+                          <button
                               type="button"
                               onClick={() => {
                                 setContactFormData(prev => ({ ...prev, relatedOrder: '' }));
@@ -5315,8 +6448,8 @@ function Dashboard() {
                       onChange={handleContactChange}
                       required
                       rows={6}
-                      className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                      style={{
+                      className="w-full px-6 md:px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                            style={{
                         backgroundColor: 'rgba(255, 255, 255, 0.1)',
                         border: '1px solid rgba(255, 255, 255, 0.2)'
                       }}
@@ -5332,9 +6465,9 @@ function Dashboard() {
                       style={{
                         backgroundColor: 'rgba(255, 255, 255, 0.1)',
                         border: '1px solid rgba(255, 255, 255, 0.2)',
-                        color: 'white'
-                      }}
-                    >
+                              color: 'white'
+                            }}
+                          >
                       Cancel
                     </button>
                     <button
@@ -5372,12 +6505,7 @@ function Dashboard() {
       {showReorderPopup && reorderOrderData && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div 
-            className="rounded-xl p-6 max-w-md w-full shadow-xl relative"
-            style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255, 255, 255, 0.15)'
-            }}
+            className="container-style p-6 max-w-lg w-full relative"
           >
             {/* Close Button */}
             <button
@@ -5386,6 +6514,8 @@ function Dashboard() {
                 setReorderOrderData(null);
                 setRemovedRushItems(new Set());
                 setRemovedItems(new Set());
+                setUpdatedQuantities({});
+                setUpdatedPrices({});
               }}
               className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors duration-200"
               title="Close"
@@ -5401,227 +6531,225 @@ function Dashboard() {
                   <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Reorder Confirmation</h3>
-              <p className="text-gray-300 mb-4">
-                Do you want to change anything about your order?
-              </p>
-              
-                             {/* Order Summary */}
-               <div className="bg-white/5 rounded-lg p-4 mb-6 text-left">
-                 <h4 className="font-semibold text-white mb-3">Order Summary:</h4>
-                 <div className="space-y-4">
-                   {reorderOrderData.items.map((item: any, index: number) => {
-                     // Skip removed items
-                     if (removedItems.has(index)) return null;
-                     
-                     // Get full item data if available
-                     const itemData = reorderOrderData._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
-                     
-                     return (
-                       <div key={index} className="border border-white/10 rounded-lg p-3 relative">
-                         {/* Remove Item Button */}
-                         <button
-                           onClick={() => handleRemoveItem(index)}
-                           className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-colors duration-200 z-10"
-                           title="Remove item from order"
-                         >
-                           <svg className="w-3.5 h-3.5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                             <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                           </svg>
-                         </button>
-                         
-                         <div className="flex items-start gap-3 mb-3">
-                           <div className="w-10 h-10 rounded bg-white/10 flex items-center justify-center flex-shrink-0">
-                             {item.image || itemData.customFiles?.[0] ? (
-                               <img 
-                                 src={item.image || itemData.customFiles?.[0]} 
-                                 alt={item.name || itemData.productName} 
-                                 className="w-full h-full object-cover rounded" 
-                               />
-                             ) : (
-                               <span className="text-xs">📄</span>
-                             )}
-                           </div>
-                           <div className="flex-1">
-                             <div className="text-white font-medium mb-1">
-                               {itemData.productName || item.name}
-                             </div>
-                             <div className="text-gray-400 text-sm">
-                               Qty: {itemData.quantity || item.quantity}
-                             </div>
-                             <div className="text-green-400 text-sm font-semibold">
-                               ${(() => {
-                                 const totalPrice = item.totalPrice || ((item.unitPrice || 0) * (item.quantity || 1));
-                                 return isNaN(totalPrice) ? '0.00' : totalPrice.toFixed(2);
-                               })()}
-                             </div>
-                           </div>
-                         </div>
-                         
-                         {/* Item Details */}
-                         <div className="grid grid-cols-2 gap-2 text-xs">
-                           {(() => {
-                             const selections = itemData.calculatorSelections || {};
-                             const details = [];
-                             
-                             // Add size
-                             if (selections.sizePreset?.displayValue || selections.size?.displayValue || item.size) {
-                               details.push({
-                                 label: 'Size',
-                                 value: selections.sizePreset?.displayValue || selections.size?.displayValue || item.size,
-                                 color: 'text-yellow-300'
-                               });
-                             }
-                             
-                             // Add cut/shape
-                             if (selections.cut?.displayValue || selections.shape?.displayValue) {
-                               details.push({
-                                 label: 'Cut',
-                                 value: selections.cut?.displayValue || selections.shape?.displayValue,
-                                 color: 'text-green-300'
-                               });
-                             }
-                             
-                             // Add material
-                             if (selections.material?.displayValue || item.material) {
-                               details.push({
-                                 label: 'Material',
-                                 value: selections.material?.displayValue || item.material,
-                                 color: 'text-purple-300'
-                               });
-                             }
-                             
-                             // Add white base option
-                             if (selections.whiteOption?.displayValue || selections.whiteBase?.displayValue) {
-                               let whiteBaseValue = selections.whiteOption?.displayValue || selections.whiteBase?.displayValue;
-                               // Fix partial-white display
-                               if (whiteBaseValue === 'partial-white') {
-                                 whiteBaseValue = 'Partial White';
-                               }
-                               details.push({
-                                 label: 'White Base',
-                                 value: whiteBaseValue,
-                                 color: 'text-gray-300'
-                               });
-                             }
-                             
-                             // Add proof option
-                             if (selections.sendProof?.displayValue || selections.proof?.displayValue) {
-                               details.push({
-                                 label: 'Proof',
-                                 value: selections.sendProof?.displayValue || selections.proof?.displayValue,
-                                 color: 'text-blue-300'
-                               });
-                             }
-                             
-                             // Add rush order (only if not removed)
-                             if (!removedRushItems.has(index) && (selections.rushOrder?.displayValue || selections.rush?.displayValue)) {
-                               const rushValue = selections.rushOrder?.displayValue || selections.rush?.displayValue;
-                               if (rushValue === 'Rush Order' || rushValue === 'rush' || rushValue === true) {
-                                 details.push({
-                                   label: 'Rush',
-                                   value: 'Rush Order',
-                                   color: 'text-orange-300',
-                                   removable: true,
-                                   itemIndex: index
-                                 });
-                               }
-                             }
-                             
-                             return details.map((detail, idx) => (
-                               <div key={idx} className="flex justify-between items-center">
-                                 <span className="text-gray-400">{detail.label}:</span>
-                                 <div className="flex items-center gap-2">
-                                   <span className={detail.color}>{detail.value}</span>
-                                   {detail.removable && (
-                                     <button
-                                       onClick={() => handleRemoveRushOrder(detail.itemIndex)}
-                                       className="w-4 h-4 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-colors duration-200"
-                                       title="Remove Rush Order"
-                                     >
-                                       <svg className="w-2.5 h-2.5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                                         <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                       </svg>
-                                     </button>
-                                   )}
-                                 </div>
-                               </div>
-                             ));
-                           })()}
-                           
-                           {/* Customer Notes */}
-                           {(itemData.customerNotes || item.notes) && (
-                             <div className="col-span-2 mt-2 pt-2 border-t border-white/10">
-                               <div className="text-gray-400 text-xs mb-1">Notes:</div>
-                               <div className="text-gray-300 text-xs italic">
-                                 {itemData.customerNotes || item.notes}
-                               </div>
-                             </div>
-                           )}
-                         </div>
-                       </div>
-                     );
-                   })}
-                   
-                   {/* Show message if all items are removed */}
-                   {reorderOrderData.items.every((_: any, index: number) => removedItems.has(index)) && (
-                     <div className="text-sm text-gray-400 text-center py-4 border border-white/10 rounded-lg">
-                       All items have been removed from this order
-                     </div>
-                   )}
-                 </div>
-                 
-                 <div className="border-t border-white/10 mt-4 pt-3">
-                   <div className="flex justify-between text-white font-semibold">
-                     <span>Total:</span>
-                     <span>${(() => {
-                       const total = reorderOrderData.total || 0;
-                       return isNaN(total) ? '0.00' : total.toFixed(2);
-                     })()}</span>
-                   </div>
-                 </div>
-               </div>
+              <h3 className="text-xl font-bold text-white mb-2">Reorder with Changes?</h3>
+              <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-3 mb-4">
+                <p className="text-green-300 text-sm font-medium flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  🎉 10% Off for Reordering!
+                </p>
+              </div>
+
+            </div>
+            
+            {/* Order Items */}
+            <div className="space-y-4 mb-6">
+              {reorderOrderData.items.map((item: any, index: number) => {
+                // Skip removed items
+                if (removedItems.has(index)) return null;
+                
+                                  // Get full item data if available
+                  const itemData = reorderOrderData._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+                  const originalQty = itemData.quantity || item.quantity || 1;
+                  const currentQty = updatedQuantities[index] ?? originalQty;
+                
+                return (
+                  <div key={index} className="border border-white/10 bg-white/5 rounded-lg p-3 relative">
+                      {/* Remove Item Button */}
+                      <button
+                        onClick={() => handleRemoveItem(index)}
+                        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-colors duration-200 z-10"
+                        title="Remove item from order"
+                      >
+                        <svg className="w-3.5 h-3.5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                      
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="w-10 h-10 rounded bg-white/10 flex items-center justify-center flex-shrink-0">
+                          {item.image || itemData.customFiles?.[0] ? (
+                            <img 
+                              src={item.image || itemData.customFiles?.[0]} 
+                              alt={item.name || itemData.productName} 
+                              className="w-full h-full object-cover rounded" 
+                            />
+                          ) : (
+                            <span className="text-xs">📄</span>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-white font-medium mb-2">
+                            {itemData.productName || item.name}
+                          </div>
+                          
+                          {/* Quantity Controls - Main Focus */}
+                          <div className="bg-white/10 rounded-lg p-3 mb-2">
+                            <label className="block text-xs text-gray-300 mb-2">Quantity:</label>
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    const newQty = Math.max(50, currentQty - 50);
+                                    handleQuantityUpdate(index, newQty);
+                                  }}
+                                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+                                >
+                                  -
+                                </button>
+                                <div className="min-w-[80px] px-3 py-2 bg-white/5 border border-white/20 rounded text-center text-white font-mono">
+                                  {currentQty.toLocaleString()}
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    const newQty = currentQty + 50;
+                                    handleQuantityUpdate(index, newQty);
+                                  }}
+                                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <div className="text-xs text-gray-400">
+                                Min: 50
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="text-green-400 text-sm font-semibold">
+                            ${(() => {
+                              // Use updated price if available, otherwise calculate or use original
+                              if (updatedPrices[index]) {
+                                return updatedPrices[index].total.toFixed(2);
+                              }
+                              const totalPrice = item.totalPrice || ((item.unitPrice || 0) * currentQty);
+                              return isNaN(totalPrice) ? '0.00' : totalPrice.toFixed(2);
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Collapsed Item Details */}
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {(() => {
+                          const selections = itemData.calculatorSelections || {};
+                          const details = [];
+                          
+                          // Add size
+                          if (selections.sizePreset?.displayValue || selections.size?.displayValue || item.size) {
+                            details.push({
+                              label: 'Size',
+                              value: selections.sizePreset?.displayValue || selections.size?.displayValue || item.size,
+                              color: 'text-yellow-300'
+                            });
+                          }
+                          
+                          // Add material
+                          if (selections.material?.displayValue || item.material) {
+                            details.push({
+                              label: 'Material',
+                              value: selections.material?.displayValue || item.material,
+                              color: 'text-purple-300'
+                            });
+                          }
+                          
+                          // Add cut/shape (limit to first 4 details)
+                          if (details.length < 4 && (selections.cut?.displayValue || selections.shape?.displayValue)) {
+                            details.push({
+                              label: 'Cut',
+                              value: selections.cut?.displayValue || selections.shape?.displayValue,
+                              color: 'text-green-300'
+                            });
+                          }
+                          
+                          return details.slice(0, 4).map((detail, idx) => (
+                            <div key={idx} className="flex justify-between items-center">
+                              <span className="text-gray-400">{detail.label}:</span>
+                              <span className={detail.color}>{detail.value}</span>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                              {/* Show message if all items are removed */}
+              {reorderOrderData.items.every((_: any, index: number) => removedItems.has(index)) && (
+                <div className="text-sm text-gray-400 text-center py-4 border border-white/10 bg-white/5 rounded-lg">
+                  All items have been removed from this order
+                </div>
+              )}
+            </div>
+            
+            {/* Estimated Total */}
+            <div className="border-t border-white/10 mt-4 pt-3 mb-6">
+                              <div className="flex justify-between text-white font-semibold">
+                  <span>Estimated Total:</span>
+                  <span>${(() => {
+                    // Calculate total with updated quantities and prices
+                    let calculatedTotal = 0;
+                    
+                    reorderOrderData.items.forEach((item: any, index: number) => {
+                      // Skip removed items
+                      if (removedItems.has(index)) return;
+                      
+                      // Use updated price if available, otherwise use original
+                      if (updatedPrices[index]) {
+                        calculatedTotal += updatedPrices[index].total;
+                      } else {
+                        const originalQty = item.quantity || 1;
+                        const currentQty = updatedQuantities[index] ?? originalQty;
+                        const unitPrice = item.unitPrice || item.totalPrice / originalQty || 0;
+                        calculatedTotal += unitPrice * currentQty;
+                      }
+                    });
+                    
+                    const discountedTotal = calculatedTotal * 0.9; // 10% off
+                    return isNaN(discountedTotal) ? '0.00' : discountedTotal.toFixed(2);
+                  })()}</span>
+                </div>
+              <div className="text-xs text-green-400 text-right">
+                (10% reorder discount applied)
+              </div>
             </div>
 
             <div className="flex flex-col gap-3">
-              {/* Keep Same - Tab Style Button */}
+              {/* Keep Same - Signup Button Style */}
               <button
                 onClick={() => handleReorderConfirm(false)}
                 disabled={reorderOrderData.items.every((_: any, index: number) => removedItems.has(index))}
-                className="container-style w-full p-4 font-semibold text-white transition-all duration-300 transform hover:scale-105 hover:shadow-2xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                className="w-full py-3 px-4 rounded-lg font-bold transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: reorderOrderData.items.every((_: any, index: number) => removedItems.has(index)) 
-                    ? 'rgba(255, 255, 255, 0.02)' 
-                    : 'linear-gradient(135deg, rgba(34, 197, 94, 0.6), rgba(16, 185, 129, 0.4))',
-                  borderColor: reorderOrderData.items.every((_: any, index: number) => removedItems.has(index))
-                    ? 'rgba(255, 255, 255, 0.05)'
-                    : 'rgba(34, 197, 94, 0.5)'
+                    ? '#666' 
+                    : 'linear-gradient(135deg, #ffd713, #ffed4e)',
+                  color: '#030140',
+                  border: 'none'
                 }}
               >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <svg className="w-5 h-5 inline mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
-                No, keep it the same
+                Add to Cart & Checkout
               </button>
 
-              {/* Make Changes - Tab Style Button */}
+              {/* Make Changes - Light Grey Button */}
               <button
                 onClick={() => handleReorderConfirm(true)}
                 disabled={reorderOrderData.items.every((_: any, index: number) => removedItems.has(index))}
-                className="container-style w-full p-4 font-semibold text-white transition-all duration-300 transform hover:scale-105 hover:shadow-2xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                className="w-full py-3 px-4 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed border border-gray-400/30"
                 style={{
                   background: reorderOrderData.items.every((_: any, index: number) => removedItems.has(index))
-                    ? 'rgba(255, 255, 255, 0.02)'
-                    : 'linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(217, 119, 6, 0.2))',
-                  borderColor: reorderOrderData.items.every((_: any, index: number) => removedItems.has(index))
-                    ? 'rgba(255, 255, 255, 0.05)'
-                    : 'rgba(245, 158, 11, 0.3)'
+                    ? '#444'
+                    : '#6B7280'
                 }}
               >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <svg className="w-5 h-5 inline mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                   <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                 </svg>
-                Wait! Let me make changes
+                Customize & Add to Cart
               </button>
             </div>
           </div>
@@ -5632,7 +6760,7 @@ function Dashboard() {
       {showBannerTemplates && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div 
-            className="max-w-4xl w-full max-h-[80vh] overflow-y-auto rounded-2xl shadow-2xl"
+            className="max-w-4xl w-full max-h-[80vh] overflow-y-auto rounded-2xl shadow-2xl banner-template-popup"
             style={{
               backgroundColor: 'rgba(3, 1, 64, 0.95)',
               backdropFilter: 'blur(20px)',
@@ -5652,62 +6780,129 @@ function Dashboard() {
                   </svg>
                 </button>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {bannerTemplates.map((template) => (
-                  <div
-                    key={template.id}
-                    className="relative cursor-pointer group"
-                    onClick={() => handleSelectBannerTemplate(template)}
-                  >
-                    {/* Template Preview */}
-                    <div 
-                      className="w-full h-24 rounded-lg border-2 border-white/20 hover:border-white/40 transition-all duration-200 transform hover:scale-105 relative overflow-hidden"
-                      style={template.style}
-                    >
-                      {/* Overlay */}
-                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
-                        <div className="bg-white/20 backdrop-blur-sm rounded-full p-2">
-                          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
+              
+              <p className="text-gray-300 text-center mb-6">Select a template or close to keep current banner</p>
+              
+              {/* Template Categories */}
+              <div className="space-y-8">
+                {/* Default/Cosmic Templates */}
+                <div>
+                  <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <span className="text-purple-400">🌌</span>
+                    Cosmic Templates
+                  </h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {bannerTemplates.filter(template => template.category === 'cosmic').map((template) => (
+                      <div
+                        key={template.id}
+                        className="relative rounded-lg overflow-hidden cursor-pointer transform hover:scale-105 transition-all duration-200 border border-white/10 hover:border-purple-400/50"
+                        onClick={() => handleSelectBannerTemplate(template)}
+                      >
+                        <div 
+                          className="h-24 w-full relative"
+                          style={template.style}
+                        >
+                          {template.isDefault && (
+                            <div className="absolute top-2 right-2 bg-green-500/80 text-white text-xs px-2 py-1 rounded-full">
+                              Default
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/20"></div>
+                          <div className="absolute bottom-2 left-2 text-white text-sm font-medium">
+                            {template.name}
+                          </div>
                         </div>
                       </div>
-                    </div>
-
-                    {/* Template Name */}
-                    <div className="mt-2 text-center">
-                      <p className="text-white text-sm font-medium">{template.name}</p>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
 
-              <div className="mt-6 text-center">
+                {/* Business Templates */}
+                <div>
+                  <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <span className="text-yellow-400">💼</span>
+                    Business Templates
+                  </h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {bannerTemplates.filter(template => template.category === 'business').map((template) => (
+                      <div
+                        key={template.id}
+                        className="relative rounded-lg overflow-hidden cursor-pointer transform hover:scale-105 transition-all duration-200 border border-white/10 hover:border-yellow-400/50"
+                        onClick={() => handleSelectBannerTemplate(template)}
+                      >
+                        <div 
+                          className="h-24 w-full relative"
+                          style={template.style}
+                        >
+                          {/* Show sample emojis for business templates */}
+                          {template.emojis && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="flex gap-1 text-lg opacity-60">
+                                {template.emojis.slice(0, 3).map((emoji, index) => (
+                                  <span key={index}>{emoji}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/20"></div>
+                          <div className="absolute bottom-2 left-2 text-white text-sm font-medium">
+                            {template.name}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Cyber Templates */}
+                <div>
+                  <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <span className="text-cyan-400">🔮</span>
+                    Cyber Templates
+                  </h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {bannerTemplates.filter(template => template.category === 'cyber').map((template) => (
+                      <div
+                        key={template.id}
+                        className="relative rounded-lg overflow-hidden cursor-pointer transform hover:scale-105 transition-all duration-200 border border-white/10 hover:border-cyan-400/50"
+                        onClick={() => handleSelectBannerTemplate(template)}
+                      >
+                        <div 
+                          className="h-24 w-full relative"
+                          style={template.style}
+                        >
+                          <div className="absolute inset-0 bg-black/20"></div>
+                          <div className="absolute bottom-2 left-2 text-white text-sm font-medium">
+                            {template.name}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-8 text-center">
                 <button
                   onClick={() => setShowBannerTemplates(false)}
-                  className="px-6 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors duration-200"
+                  className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors duration-200"
                 >
-                  Cancel
+                  Close
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
-
-            </ErrorBoundary>
-    </Layout>
-
     </>
-      );
-  }
-  
-  // Disable static generation for this page to prevent build-time GraphQL errors
-  export async function getServerSideProps() {
-    return {
-      props: {}
-    };
-  }
-  
-  export default Dashboard;
+  );
+};
+
+// Disable static generation for this page to prevent build-time GraphQL errors
+export async function getServerSideProps() {
+  return {
+    props: {}
+  };
+}
+
+export default Dashboard;

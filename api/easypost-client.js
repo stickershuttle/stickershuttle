@@ -40,6 +40,8 @@ class EasyPostService {
             console.error(`❌ EasyPost API key not found`);
             console.error('Available environment variables:', Object.keys(process.env).filter(key => key.includes('EASYPOST')));
             console.error('Need: EASYPOST_API_KEY environment variable');
+            this.isConfigured = false;
+            this.client = null;
             return;
         }
 
@@ -68,6 +70,7 @@ class EasyPostService {
         } catch (error) {
             console.error('❌ Failed to initialize EasyPost client:', error);
             this.isConfigured = false;
+            this.client = null;
         }
     }
 
@@ -79,7 +82,26 @@ class EasyPostService {
     }
 
     isReady() {
-        return this.isConfigured && this.client;
+        const ready = !!(this.isConfigured && this.client);
+        
+        // Add detailed logging when isReady is called and returns false
+        if (!ready) {
+            console.log('🔍 EasyPost isReady() check failed:');
+            console.log('  - isConfigured:', this.isConfigured);
+            console.log('  - client exists:', !!this.client);
+            console.log('  - EASYPOST_API_KEY exists:', !!process.env.EASYPOST_API_KEY);
+            
+            // Try to reinitialize if not configured
+            if (!this.isConfigured && process.env.EASYPOST_API_KEY) {
+                console.log('🔄 Attempting to reinitialize EasyPost client...');
+                this.init();
+                const retryReady = !!(this.isConfigured && this.client);
+                console.log('  - Reinitialization result:', retryReady ? 'SUCCESS' : 'FAILED');
+                return retryReady;
+            }
+        }
+        
+        return ready;
     }
 
     getClient() {

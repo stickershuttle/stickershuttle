@@ -149,6 +149,7 @@ export interface ProductCustomization {
   customFiles?: string[]; // Uploaded design files
   notes?: string;
   instagramOptIn?: boolean; // Permission to post content to Instagram
+  isReorder?: boolean; // Flag to indicate this is a reordered item
 }
 
 // Cart item with full customization

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { getSupabase } from '../lib/supabase';
 
 export default function UniversalFooter() {
   const [user, setUser] = useState<any>(null);
@@ -7,15 +8,9 @@ export default function UniversalFooter() {
   useEffect(() => {
     const checkUser = async () => {
       try {
-        const res = await fetch('/api/auth/verify', {
-          method: 'GET',
-          credentials: 'include',
-        });
-        
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data.user);
-        }
+        const supabase = await getSupabase();
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user || null);
       } catch (error) {
         console.error('Error checking user:', error);
       }
@@ -26,15 +21,10 @@ export default function UniversalFooter() {
 
   const handleSignOut = async () => {
     try {
-      const res = await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      
-      if (res.ok) {
-        setUser(null);
-        window.location.href = '/';
-      }
+      const supabase = await getSupabase();
+      await supabase.auth.signOut();
+      setUser(null);
+      window.location.href = '/';
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -43,7 +33,7 @@ export default function UniversalFooter() {
   return (
     <>
       <footer className="py-12 mt-8" style={{ backgroundColor: '#030140', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-        <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {/* Quick Links */}
             <div>
@@ -56,18 +46,6 @@ export default function UniversalFooter() {
                   <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
                     <span className="mr-2">🚚</span>
                     Shipping Process
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
-                    <span className="mr-2">💰</span>
-                    Profit Margin Calculator
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
-                    <span className="mr-2">📱</span>
-                    QR Code Generator
                   </a>
                 </li>
                 <li>

@@ -25,10 +25,77 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Add padding below header for non-admin pages */
+body:not(.admin-page) {
+  padding-top: 5px;
+}
+
+/* Fix for Android devices - ensure padding is applied */
+@media (max-width: 1023px) {
+  body:not(.admin-page) {
+    padding-top: 5px !important;
+  }
+}
+
+/* Tablet view - 90% width for content */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .container,
+  .max-w-7xl,
+  .max-w-6xl,
+  .max-w-5xl,
+  .max-w-4xl,
+  .max-w-3xl,
+  .max-w-2xl,
+  .max-w-xl {
+    max-width: 90% !important;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  
+  /* Specific width adjustments for common containers */
+  [class*="w-[95%"],
+  [class*="w-[90%"],
+  [class*="w-[85%"],
+  [class*="w-[80%"],
+  [class*="w-[75%"],
+  [class*="w-[70%"] {
+    width: 90% !important;
+  }
+  
+  /* Header container specific */
+  header .flex.items-center.justify-between {
+    padding-left: 5%;
+    padding-right: 5%;
+  }
+}
+
+/* Glassmorphism styles with #1a144a tint */
+.glassmorphism {
+  background: linear-gradient(135deg, rgba(26, 20, 74, 0.4) 0%, rgba(26, 20, 74, 0.2) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+}
+
+.glassmorphism-hover:hover {
+  background: linear-gradient(135deg, rgba(26, 20, 74, 0.5) 0%, rgba(26, 20, 74, 0.3) 100%);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* Updated header button with glassmorphism and #1a144a tint */
 .headerButton {
-  background-color: #10104c;
-  border: 1px solid #171765;
-  box-shadow: 3px 3px 0px #0e0e42;
+  background: linear-gradient(135deg, rgba(26, 20, 74, 0.35) 0%, rgba(26, 20, 74, 0.15) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+}
+
+.headerButton:hover {
+  background: linear-gradient(135deg, rgba(26, 20, 74, 0.45) 0%, rgba(26, 20, 74, 0.25) 100%);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .primaryButton {
@@ -38,10 +105,13 @@ body {
   box-shadow: 3px 3px 0px #cfaf13;
 }
 
+/* Updated sticker card with glassmorphism */
 .stickerCard {
-  background-color: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .header-button {
@@ -107,5 +177,178 @@ h1 {
 }
 
 .subtle-pulse {
+  animation: subtlePulse 2s ease-in-out infinite;
+}
+
+.subtle-pulse {
   animation: subtlePulse 3s ease-in-out infinite;
+}
+
+/* Floating animations for emojis */
+@keyframes float-1 {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-15px) rotate(5deg);
+  }
+}
+
+@keyframes float-2 {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-20px) rotate(-5deg);
+  }
+}
+
+@keyframes float-3 {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(3deg);
+  }
+}
+
+/* Space-themed animations */
+@keyframes twinkling-stars {
+  0%, 100% { 
+    background-position: 0% 0%, 100% 100%, 50% 50%, 80% 20%, 20% 80%;
+    opacity: 0.8;
+  }
+  25% { 
+    background-position: 10% 10%, 90% 90%, 60% 40%, 70% 30%, 30% 70%;
+    opacity: 1;
+  }
+  50% { 
+    background-position: 20% 20%, 80% 80%, 70% 30%, 60% 40%, 40% 60%;
+    opacity: 0.9;
+  }
+  75% { 
+    background-position: 30% 30%, 70% 70%, 40% 60%, 90% 10%, 10% 90%;
+    opacity: 0.7;
+  }
+}
+
+@keyframes nebula-drift {
+  0%, 100% { 
+    background-position: 0% 50%, 100% 50%, 50% 0%, 50% 100%;
+    transform: scale(1);
+  }
+  25% { 
+    background-position: 25% 25%, 75% 75%, 75% 25%, 25% 75%;
+    transform: scale(1.05);
+  }
+  50% { 
+    background-position: 50% 0%, 50% 100%, 100% 50%, 0% 50%;
+    transform: scale(1.1);
+  }
+  75% { 
+    background-position: 75% 75%, 25% 25%, 25% 75%, 75% 25%;
+    transform: scale(1.03);
+  }
+}
+
+@keyframes planetary-orbit {
+  0% { 
+    background-position: 0% 0%, 100% 100%, 50% 50%, 0% 100%;
+    transform: rotate(0deg);
+  }
+  25% { 
+    background-position: 50% 25%, 50% 75%, 75% 25%, 25% 75%;
+    transform: rotate(90deg);
+  }
+  50% { 
+    background-position: 100% 50%, 0% 50%, 100% 0%, 50% 100%;
+    transform: rotate(180deg);
+  }
+  75% { 
+    background-position: 50% 75%, 50% 25%, 25% 75%, 75% 25%;
+    transform: rotate(270deg);
+  }
+  100% { 
+    background-position: 0% 0%, 100% 100%, 50% 50%, 0% 100%;
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes cosmic-dust {
+  0%, 100% { 
+    background-position: 0% 0%, 100% 0%, 50% 50%, 0% 100%, 100% 100%;
+    opacity: 0.6;
+  }
+  20% { 
+    background-position: 20% 10%, 80% 10%, 60% 40%, 10% 90%, 90% 90%;
+    opacity: 0.8;
+  }
+  40% { 
+    background-position: 40% 20%, 60% 20%, 70% 30%, 20% 80%, 80% 80%;
+    opacity: 1;
+  }
+  60% { 
+    background-position: 60% 30%, 40% 30%, 80% 20%, 30% 70%, 70% 70%;
+    opacity: 0.9;
+  }
+  80% { 
+    background-position: 80% 40%, 20% 40%, 30% 70%, 40% 60%, 60% 60%;
+    opacity: 0.7;
+  }
+}
+
+@keyframes stellar-drift {
+  0%, 100% { 
+    background-position: 0% 50%, 100% 50%, 0% 0%, 100% 100%, 50% 50%;
+    transform: scale(1);
+  }
+  25% { 
+    background-position: 25% 25%, 75% 75%, 20% 20%, 80% 80%, 60% 40%;
+    transform: scale(1.02);
+  }
+  50% { 
+    background-position: 50% 0%, 50% 100%, 40% 40%, 60% 60%, 70% 30%;
+    transform: scale(1.05);
+  }
+  75% { 
+    background-position: 75% 75%, 25% 25%, 60% 60%, 40% 40%, 30% 70%;
+    transform: scale(1.03);
+  }
+}
+
+/* Custom scrollbar for banner template popup */
+.banner-template-popup {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(52, 152, 219, 0.7) rgba(255, 255, 255, 0.05);
+  padding-right: 8px;
+}
+
+.banner-template-popup::-webkit-scrollbar {
+  width: 6px;
+}
+
+.banner-template-popup::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 3px;
+  margin: 8px 0;
+}
+
+.banner-template-popup::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, rgba(52, 152, 219, 0.6), rgba(116, 185, 255, 0.8));
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.banner-template-popup::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, rgba(52, 152, 219, 0.8), rgba(116, 185, 255, 1));
+}
+
+/* Hide scrollbars while maintaining functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar { 
+  display: none;  /* Safari and Chrome */
 }

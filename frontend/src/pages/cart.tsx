@@ -760,6 +760,11 @@ export default function CartPage() {
     return sum + itemTotal;
   }, 0);
 
+  // Check if cart contains reorder items and calculate discount
+  const hasReorderItems = updatedCart.some(item => item.customization.isReorder);
+  const reorderDiscount = hasReorderItems ? subtotal * 0.1 : 0; // 10% discount
+  const finalTotal = subtotal - reorderDiscount;
+
   // Calculate rush order breakdown
   const rushOrderBreakdown = updatedCart.reduce((acc, item) => {
     if (item.customization.selections?.rush?.value === true) {
@@ -792,8 +797,8 @@ export default function CartPage() {
 
   return (
     <Layout title="Your Cart - Sticker Shuttle">
-      <section className="py-8">
-        <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
+      <section className="pt-7 pb-8">
+        <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
           
 
 
@@ -880,7 +885,7 @@ export default function CartPage() {
                   <div className="flex gap-3 justify-center mb-4">
                     <a
                       href="/login"
-                      className="px-4 py-2 text-sm font-medium text-center rounded-lg transition-all duration-200 transform hover:scale-105"
+                      className="px-6 md:px-4 py-2 text-sm font-medium text-center rounded-lg transition-all duration-200 transform hover:scale-105"
                       style={{
                         background: 'rgba(255, 255, 255, 0.2)',
                         border: '1px solid rgba(255, 255, 255, 0.3)',
@@ -891,7 +896,7 @@ export default function CartPage() {
                     </a>
                     <a
                       href="/signup"
-                      className="px-4 py-2 text-sm font-medium text-center rounded-lg transition-all duration-200 transform hover:scale-105"
+                      className="px-6 md:px-4 py-2 text-sm font-medium text-center rounded-lg transition-all duration-200 transform hover:scale-105"
                       style={{
                         background: 'linear-gradient(135deg, #ffd713, #ffed4e)',
                         color: '#030140',
@@ -916,7 +921,7 @@ export default function CartPage() {
             <h1 className="text-3xl font-bold text-white">Your Cart</h1>
             <Link 
               href="/products/vinyl-stickers"
-              className="px-4 py-2 bg-purple-500/20 border border-purple-400/30 rounded-lg text-purple-200 hover:bg-purple-500/30 transition-colors flex items-center gap-2 text-sm font-medium"
+              className="px-6 md:px-4 py-2 bg-purple-500/20 border border-purple-400/30 rounded-lg text-purple-200 hover:bg-purple-500/30 transition-colors flex items-center gap-2 text-sm font-medium"
             >
               ➕ Add More Designs
             </Link>
@@ -1264,13 +1269,25 @@ export default function CartPage() {
                                  target.style.display = 'none';
                                }}
                              />
+                             {/* Reorder Badge */}
+                             {item.customization.isReorder && (
+                               <div className="absolute -top-2 -right-2 bg-amber-500 text-black text-xs px-2 py-1 rounded-full font-bold leading-none">
+                                 RE-ORDER
+                               </div>
+                             )}
                            </div>
                          ) : (
-                           <div className="aspect-square rounded-xl bg-gradient-to-br from-white/10 to-white/5 border-2 border-white/15 flex items-center justify-center text-white/50">
+                           <div className="relative aspect-square rounded-xl bg-gradient-to-br from-white/10 to-white/5 border-2 border-white/15 flex items-center justify-center text-white/50">
                              <div className="text-center">
                                <div className="text-2xl mb-2">📁</div>
                                <span className="text-sm font-medium">No image uploaded</span>
                              </div>
+                             {/* Reorder Badge */}
+                             {item.customization.isReorder && (
+                               <div className="absolute -top-2 -right-2 bg-amber-500 text-black text-xs px-2 py-1 rounded-full font-bold leading-none">
+                                 RE-ORDER
+                               </div>
+                             )}
                            </div>
                          )}
                        </div>
@@ -1444,7 +1461,7 @@ export default function CartPage() {
                                {/* Desktop Label */}
                                <label htmlFor={`quantity-${item.id}`} className="hidden sm:block text-white font-medium text-sm">Quantity:</label>
                                
-                               <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-2">
+                               <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-6 md:px-4 py-2">
                                  <button
                                    onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
                                    className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/20 rounded-full transition-colors text-lg"
@@ -1659,10 +1676,16 @@ export default function CartPage() {
                          <span>Shipping</span>
                          <span>FREE {totalQuantity >= 1000 ? '(Next Day Air)' : ''}</span>
                        </div>
+                       {hasReorderItems && (
+                         <div className="flex justify-between text-amber-300">
+                           <span>Reorder Discount (10%)</span>
+                           <span>-${reorderDiscount.toFixed(2)}</span>
+                         </div>
+                       )}
                        <hr className="border-white/20" />
                        <div className="flex justify-between text-lg font-bold text-white">
                          <span>Total</span>
-                         <span>${subtotal.toFixed(2)}</span>
+                         <span>${finalTotal.toFixed(2)}</span>
                        </div>
                      </div>
 
@@ -1670,7 +1693,10 @@ export default function CartPage() {
                      <div className="space-y-3">
                        {/* Enhanced Checkout Button - NEW Phase 2 Implementation */}
                        <CartCheckoutButton
-                         cartItems={updatedCart}
+                         cartItems={updatedCart.map(item => ({
+                           ...item,
+                           totalPrice: item.customization.isReorder ? item.totalPrice * 0.9 : item.totalPrice
+                         }))}
                          className="w-full px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center gap-2 text-lg checkout-button-yellow"
                          onCheckoutStart={() => {
                            console.log('🚀 Starting enhanced cart checkout with user context:', updatedCart.length, 'items');
@@ -1718,7 +1744,7 @@ export default function CartPage() {
                        
                        <button 
                          onClick={clearCart} 
-                         className="w-full px-4 py-2 rounded-lg text-white/90 hover:bg-white/20 transition-colors flex items-center justify-center gap-2 backdrop-blur-sm"
+                         className="w-full px-6 md:px-4 py-2 rounded-lg text-white/90 hover:bg-white/20 transition-colors flex items-center justify-center gap-2 backdrop-blur-sm"
                          style={{
                            background: 'rgba(255, 255, 255, 0.1)',
                            border: '1px solid rgba(255, 255, 255, 0.2)'
@@ -1919,3 +1945,6 @@ export default function CartPage() {
     </Layout>
   );
 } 
+
+
+

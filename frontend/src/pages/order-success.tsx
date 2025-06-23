@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import { useCart } from '@/components/CartContext';
 
 export default function OrderSuccess() {
   const router = useRouter();
   const [countdown, setCountdown] = useState(5);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const { clearCart } = useCart();
 
   useEffect(() => {
+    // Clear cart immediately when order success page loads
+    console.log('🛒 Clearing cart after successful payment');
+    clearCart();
+
     // Start countdown
     const timer = setInterval(() => {
       setCountdown((prev) => {
@@ -21,7 +27,7 @@ export default function OrderSuccess() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [clearCart]);
 
   const handleRedirect = () => {
     setIsRedirecting(true);

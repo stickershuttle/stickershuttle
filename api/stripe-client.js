@@ -41,7 +41,7 @@ class StripeClient {
             currency: orderData.currency || 'usd',
             product_data: {
               name: item.name || item.title,
-              description: item.description || `${item.name} - Custom Stickers`,
+              description: item.description || `${item.name} - Custom Stickers (${item.quantity} pieces)`,
               metadata: {
                 productId: item.productId,
                 sku: item.sku,
@@ -51,12 +51,15 @@ class StripeClient {
                 material: item.calculatorSelections?.material?.displayValue || '',
                 cut: item.calculatorSelections?.cut?.displayValue || '',
                 // Add essential product info
-                category: item.category || 'custom-stickers'
+                category: item.category || 'custom-stickers',
+                actualQuantity: item.quantity.toString() // Store actual quantity in metadata
               }
             },
-            unit_amount: Math.round(item.unitPrice * 100), // Convert to cents
+            // Fix: Use total price directly to avoid rounding issues
+            // Set quantity to 1 and use total price as unit amount
+            unit_amount: Math.round(item.totalPrice * 100), // Total price in cents
           },
-          quantity: item.quantity,
+          quantity: 1, // Always 1, actual quantity is in product description and metadata
         })),
         mode: 'payment',
         success_url: `${orderData.successUrl}?session_id={CHECKOUT_SESSION_ID}`,

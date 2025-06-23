@@ -16,7 +16,7 @@ export default function Products() {
   return (
     <Layout title="Products - Sticker Shuttle">
         {/* Main Content */}
-        <main className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto py-12 px-4">
+        <main className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto py-12 px-6 md:px-4">
           {/* Hero */}
           <div className="text-center mb-8 relative">
             {/* Background Grid - Enhanced visibility */}
@@ -89,11 +89,12 @@ export default function Products() {
             {/* Vinyl Stickers */}
             <Link href="/products/vinyl-stickers">
               <div 
-                className="text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                className="text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
                 }}
               >
                 <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-2 transition-transform duration-500 ease-out">
@@ -125,11 +126,12 @@ export default function Products() {
             {/* Holographic Stickers */}
             <Link href="/products/holographic-stickers">
               <div 
-                className="text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                className="text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
                 }}
               >
                 <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-2 transition-transform duration-500 ease-out">
@@ -161,11 +163,12 @@ export default function Products() {
             {/* Glitter Stickers */}
             <Link href="/products/glitter-stickers">
               <div 
-                className="text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                className="text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
                 }}
               >
                 <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-2 transition-transform duration-500 ease-out">
@@ -197,11 +200,12 @@ export default function Products() {
             {/* Chrome Stickers */}
             <Link href="/products/chrome-stickers">
               <div 
-                className="text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                className="text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
                 }}
               >
                 <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-1 transition-transform duration-500 ease-out">
@@ -233,11 +237,12 @@ export default function Products() {
             {/* Clear Stickers */}
             <Link href="/products/clear-stickers">
               <div 
-                className="text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                className="text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
                 }}
               >
                 <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-1 transition-transform duration-500 ease-out">
@@ -269,11 +274,12 @@ export default function Products() {
             {/* Sticker Sheets */}
             <Link href="/products/sticker-sheets">
               <div 
-                className="text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                className="text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
                 }}
               >
                 <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-1 transition-transform duration-500 ease-out">
@@ -329,11 +335,12 @@ export default function Products() {
             >
             <Link href="/products/vinyl-stickers">
               <div 
-                className="text-center rounded-xl p-6 flex flex-col" 
+                className="text-center rounded-2xl p-6 flex flex-col" 
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)',
                   height: '220px'
                 }}
               >
@@ -353,11 +360,12 @@ export default function Products() {
 
             <Link href="/products/holographic-stickers">
               <div 
-                className="text-center rounded-xl p-6 flex flex-col" 
+                className="text-center rounded-2xl p-6 flex flex-col" 
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)',
                   height: '220px'
                 }}
               >
@@ -377,11 +385,12 @@ export default function Products() {
 
             <Link href="/products/glitter-stickers">
               <div 
-                className="text-center rounded-xl p-6 flex flex-col" 
+                className="text-center rounded-2xl p-6 flex flex-col" 
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)',
                   height: '220px'
                 }}
               >
@@ -401,11 +410,12 @@ export default function Products() {
 
             <Link href="/products/chrome-stickers">
               <div 
-                className="text-center rounded-xl p-6 flex flex-col" 
+                className="text-center rounded-2xl p-6 flex flex-col" 
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)',
                   height: '220px'
                 }}
               >
@@ -425,11 +435,12 @@ export default function Products() {
 
             <Link href="/products/clear-stickers">
               <div 
-                className="text-center rounded-xl p-6 flex flex-col" 
+                className="text-center rounded-2xl p-6 flex flex-col" 
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)',
                   height: '220px'
                 }}
               >
@@ -449,11 +460,12 @@ export default function Products() {
 
             <Link href="/products/sticker-sheets">
               <div 
-                className="text-center rounded-xl p-6 flex flex-col"
+                className="text-center rounded-2xl p-6 flex flex-col"
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)',
                   gridColumn: 'span 2',
                   height: '220px'
                 }}
@@ -489,11 +501,12 @@ export default function Products() {
               {/* Vinyl Banners */}
               <Link href="/products/vinyl-banners">
                 <div 
-                  className="text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  className="text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
                   style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)'
                   }}
                 >
                   <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-1 transition-transform duration-500 ease-out">
@@ -534,11 +547,12 @@ export default function Products() {
               >
                 <Link href="/products/vinyl-banners">
                   <div 
-                    className="text-center rounded-xl p-6 flex flex-col"
+                    className="text-center rounded-2xl p-6 flex flex-col"
                     style={{ 
-                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      background: 'rgba(255, 255, 255, 0.05)',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
-                      boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                      backdropFilter: 'blur(12px)',
                       height: '220px'
                     }}
                   >
@@ -563,3 +577,6 @@ export default function Products() {
     </Layout>
   );
 } 
+
+
+

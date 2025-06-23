@@ -69,15 +69,18 @@ export default function Home() {
   return (
     <Layout title="Sticker Shuttle - Custom Stickers & Vinyl Signs">
         {/* Hero Section with Banner Background */}
-        <section className="py-4">
-          <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
+        <section className="relative pt-[20px]">
+          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4 pb-4">
             <div 
-              className="bg-white bg-opacity-5 backdrop-blur-sm rounded-2xl p-12 relative overflow-hidden"
+              className="rounded-2xl p-12 relative overflow-hidden min-h-[400px]"
               style={{
-                backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593651/StickerShuttle_Banner_Main_1_bntyjg.webp)',
+                backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591772/StickerShuttle_Banner_Main_1_bntyjg.webp)',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat'
+                backgroundRepeat: 'no-repeat',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(12px)'
               }}
             >
               <div className="text-center relative z-10">
@@ -92,16 +95,7 @@ export default function Home() {
                 <div className="flex flex-col items-center gap-4 mb-4">
                   <a 
                     href="/products"
-                    className="px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-105 inline-block"
-                    style={{
-                      backgroundColor: '#ffd713',
-                      color: '#030140',
-                      boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
-                      borderRadius: '10px',
-                      border: 'solid',
-                      borderWidth: '0.03125rem',
-                      borderColor: '#8d9912'
-                    }}
+                    className="primaryButton px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-105 inline-block rounded-lg"
                   >
                     Start Here →
                   </a>
@@ -132,7 +126,7 @@ export default function Home() {
 
         {/* Brands Section - Infinite Scroll */}
         <section className="py-4">
-          <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
+          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4">
             <div className="flex justify-center mb-4">
               <div 
                 className="px-4 py-1.5 rounded-full text-center text-sm text-gray-300"
@@ -191,21 +185,22 @@ export default function Home() {
 
         {/* Product Types Section - With Click to Show Features */}
         <section className="py-4">
-          <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4 relative">
+          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4 relative">
             
             {/* Desktop/Tablet Grid */}
             <div className="hidden md:grid md:grid-cols-5 gap-4 group/container">
               {/* Vinyl Stickers */}
               <Link href="/products/vinyl-stickers">
                 <div 
-                  className="vinyl-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
-                  style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  className="vinyl-hover text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)'
                   }}
                 >
-                  <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-3 transition-transform duration-500 ease-out">
+                  <div className="w-32 h-32 md:w-40 md:h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-3 transition-transform duration-500 ease-out">
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
                       alt="Vinyl Stickers" 
@@ -234,11 +229,12 @@ export default function Home() {
               {/* Holographic Stickers */}
               <Link href="/products/holographic-stickers">
                 <div 
-                  className="holographic-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
-                  style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  className="holographic-hover text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)'
                   }}
                 >
                   <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-3 transition-transform duration-500 ease-out">
@@ -270,11 +266,12 @@ export default function Home() {
               {/* Glitter Stickers */}
               <Link href="/products/glitter-stickers">
                 <div 
-                  className="glitter-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
-                  style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  className="glitter-hover text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)'
                   }}
                 >
                   <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-2 transition-transform duration-500 ease-out">
@@ -306,11 +303,12 @@ export default function Home() {
               {/* Chrome Stickers */}
               <Link href="/products/chrome-stickers">
                 <div 
-                  className="chrome-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
-                  style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  className="chrome-hover text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)'
                   }}
                 >
                   <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-2 transition-transform duration-500 ease-out">
@@ -342,11 +340,12 @@ export default function Home() {
               {/* Sticker Sheets */}
               <Link href="/products/sticker-sheets">
                 <div 
-                  className="banner-hover text-center group/card cursor-pointer rounded-xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
-                  style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  className="banner-hover text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)'
                   }}
                 >
                   <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-1 transition-transform duration-500 ease-out">
@@ -381,11 +380,15 @@ export default function Home() {
               <div className="flex space-x-4 w-max">
                 {/* Vinyl Stickers Mobile */}
                 <Link href="/products/vinyl-stickers">
-                  <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                  }}>
+                  <div 
+                    className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                      backdropFilter: 'blur(12px)'
+                    }}
+                  >
                     <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
                       <img 
                         src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
@@ -402,11 +405,15 @@ export default function Home() {
 
                 {/* Holographic Stickers Mobile */}
                 <Link href="/products/holographic-stickers">
-                  <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                  }}>
+                  <div 
+                    className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                      backdropFilter: 'blur(12px)'
+                    }}
+                  >
                     <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
                       <img 
                         src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
@@ -423,11 +430,15 @@ export default function Home() {
 
                 {/* Glitter Stickers Mobile */}
                 <Link href="/products/glitter-stickers">
-                  <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                  }}>
+                  <div 
+                    className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                      backdropFilter: 'blur(12px)'
+                    }}
+                  >
                     <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
                       <img 
                         src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
@@ -444,11 +455,15 @@ export default function Home() {
 
                 {/* Chrome Stickers Mobile */}
                 <Link href="/products/chrome-stickers">
-                  <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                  }}>
+                  <div 
+                    className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                      backdropFilter: 'blur(12px)'
+                    }}
+                  >
                     <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
                       <img 
                         src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
@@ -465,11 +480,15 @@ export default function Home() {
 
                 {/* Sticker Sheets Mobile */}
                 <Link href="/products/sticker-sheets">
-                  <div className="flex-shrink-0 w-48 text-center rounded-xl p-6" style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                  }}>
+                  <div 
+                    className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                      backdropFilter: 'blur(12px)'
+                    }}
+                  >
                     <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
                       <img 
                         src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749847809/StickerShuttle_StickerSheetsIcon_2_g61dty.svg" 
@@ -490,9 +509,9 @@ export default function Home() {
 
         {/* USA Banner */}
         <section className="py-4">
-          <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
+          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4">
             <div 
-              className="py-6 rounded-xl relative overflow-hidden flex items-center justify-center"
+              className="py-6 px-6 md:px-0 rounded-xl relative overflow-hidden flex items-center justify-center"
               style={{
                 backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749596480/860Oi6KbTFeIC4n1x6FsPA_agnu8p.jpg)',
                 backgroundSize: '150%',
@@ -513,15 +532,16 @@ export default function Home() {
 
         {/* Benefits Section */}
         <section className="py-4">
-          <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
+          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4">
             <div className="flex flex-col space-y-4 md:grid md:grid-cols-3 md:gap-4 md:space-y-0">
               {/* Free Shipping */}
               <div 
-                className="rounded-xl p-6"
+                className="rounded-2xl p-6"
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
                 }}
               >
                 <div className="flex items-center">
@@ -542,11 +562,12 @@ export default function Home() {
 
               {/* Quality */}
               <div 
-                className="rounded-xl p-6"
+                className="rounded-2xl p-6"
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
                 }}
               >
                 <div className="flex items-center">
@@ -567,11 +588,12 @@ export default function Home() {
 
               {/* Free Proof */}
               <div 
-                className="rounded-xl p-6"
+                className="rounded-2xl p-6"
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
                 }}
               >
                 <div className="flex items-center">
@@ -595,7 +617,7 @@ export default function Home() {
 
         {/* Video Section */}
         <section className="py-4">
-          <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
+          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4">
             <div className="flex flex-col space-y-6 lg:grid lg:grid-cols-2 lg:gap-8 lg:space-y-0 lg:items-stretch">
               {/* Video */}
               <div className="relative rounded-xl overflow-hidden cursor-pointer" onClick={toggleVideo}>
@@ -628,11 +650,12 @@ export default function Home() {
 
               {/* Content Container - Hidden on tablet/mobile */}
               <div 
-                className="hidden lg:flex rounded-xl p-8 flex-col justify-center"
+                className="hidden md:flex rounded-2xl p-6 md:p-8 flex-col justify-center"
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)',
                   minHeight: '400px',
                   height: '100%'
                 }}
@@ -679,7 +702,7 @@ export default function Home() {
 
         {/* Testimonials Section */}
         <section className="py-8">
-          <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
+          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4">
             {/* Header */}
             <div className="text-center mb-6 mt-4">
               <div className="flex justify-center mb-4">
@@ -696,11 +719,12 @@ export default function Home() {
             <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Review 1 - Certified Garbage Rat */}
               <div 
-                className="rounded-xl p-6 flex flex-col"
+                className="rounded-2xl p-6 flex flex-col"
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
                 }}
               >
                 <div className="flex items-center mb-4">
@@ -730,11 +754,12 @@ export default function Home() {
 
               {/* Review 2 - Panda Reaper */}
               <div 
-                className="rounded-xl p-6 flex flex-col"
+                className="rounded-2xl p-6 flex flex-col"
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
                 }}
               >
                 <div className="flex items-center mb-4">
@@ -764,11 +789,12 @@ export default function Home() {
 
               {/* Review 3 - Anita J */}
               <div 
-                className="rounded-xl p-6 flex flex-col"
+                className="rounded-2xl p-6 flex flex-col"
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
                 }}
               >
                 <div className="flex items-center mb-4">
@@ -798,11 +824,12 @@ export default function Home() {
 
               {/* Review 4 - Rach Plants */}
               <div 
-                className="rounded-xl p-6 flex flex-col"
+                className="rounded-2xl p-6 flex flex-col"
                 style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
                 }}
               >
                 <div className="flex items-center mb-4">
@@ -840,11 +867,12 @@ export default function Home() {
               <div className="flex space-x-4 w-max" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                 {/* Review 1 - Certified Garbage Rat Mobile */}
                 <div 
-                  className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
+                  className="flex-shrink-0 w-72 rounded-2xl p-6 flex flex-col"
                   style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)'
                   }}
                 >
                   <div className="flex items-center mb-4">
@@ -874,11 +902,12 @@ export default function Home() {
 
                 {/* Review 2 - Panda Reaper Mobile */}
                 <div 
-                  className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
+                  className="flex-shrink-0 w-72 rounded-2xl p-6 flex flex-col"
                   style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)'
                   }}
                 >
                   <div className="flex items-center mb-4">
@@ -908,11 +937,12 @@ export default function Home() {
 
                 {/* Review 3 - Anita J Mobile */}
                 <div 
-                  className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
+                  className="flex-shrink-0 w-72 rounded-2xl p-6 flex flex-col"
                   style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)'
                   }}
                 >
                   <div className="flex items-center mb-4">
@@ -942,11 +972,12 @@ export default function Home() {
 
                 {/* Review 4 - Rach Plants Mobile */}
                 <div 
-                  className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
+                  className="flex-shrink-0 w-72 rounded-2xl p-6 flex flex-col"
                   style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)'
                   }}
                 >
                   <div className="flex items-center mb-4">
@@ -978,17 +1009,19 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Quick Login Banner */}
-        <section className="py-4">
-          <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto px-4">
-            <div 
-              className="rounded-2xl p-8 text-center relative overflow-hidden"
-              style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-              }}
-            >
+        {/* Quick Login Banner - Only show when not logged in */}
+        {!user && !loading && (
+          <section className="py-4">
+            <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4">
+              <div 
+                className="rounded-2xl p-8 text-center relative overflow-hidden"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
+                }}
+              >
               {/* Background decoration - Stars */}
               <div className="absolute inset-0 opacity-20">
                 {/* Top stars */}
@@ -1046,9 +1079,10 @@ export default function Home() {
                   </Link>
                 </div>
               </div>
+                          </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* Custom CSS for infinite scroll animation */}
         <style jsx>{`

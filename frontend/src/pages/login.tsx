@@ -152,7 +152,7 @@ export default function Login() {
         ></div>
       </div>
       
-      <div className="min-h-screen flex items-start justify-center px-4 relative z-10 pt-8" style={{ backgroundColor: 'transparent' }}>
+      <div className="min-h-screen flex items-start justify-center px-6 md:px-4 relative z-10 pt-8" style={{ backgroundColor: 'transparent' }}>
         {/* Mobile Layout */}
         <div className="lg:hidden max-w-md mx-auto w-full">
           {/* Header */}
@@ -241,7 +241,7 @@ export default function Login() {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-6 md:px-4 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                     placeholder="john@example.com"
                     required
                   />
@@ -257,7 +257,7 @@ export default function Login() {
                     name="phone"
                     value={formData.phone}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-6 md:px-4 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                     placeholder="+1 (555) 123-4567"
                     required
                   />
@@ -275,7 +275,7 @@ export default function Login() {
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                  className="w-full px-6 md:px-4 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                   placeholder="Enter your password"
                   required
                 />
@@ -299,7 +299,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 px-4 rounded-lg font-bold text-lg transition-all duration-200 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 px-6 md:px-4 rounded-lg font-bold text-lg transition-all duration-200 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: loading ? '#666' : 'linear-gradient(135deg, #ffd713, #ffed4e)',
                   color: '#030140',
@@ -400,7 +400,7 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setLoginMethod('email')}
-                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
+                    className={`flex-1 py-2 px-6 md:px-4 rounded-md text-sm font-medium transition-all duration-200 ${
                       loginMethod === 'email'
                         ? 'bg-purple-600 text-white shadow-md'
                         : 'text-gray-300 hover:text-white'
@@ -411,7 +411,7 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setLoginMethod('phone')}
-                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
+                    className={`flex-1 py-2 px-6 md:px-4 rounded-md text-sm font-medium transition-all duration-200 ${
                       loginMethod === 'phone'
                         ? 'bg-purple-600 text-white shadow-md'
                         : 'text-gray-300 hover:text-white'
@@ -435,7 +435,7 @@ export default function Login() {
                         name="email"
                         value={formData.email}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                        className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                         placeholder="john@example.com"
                         required
                       />
@@ -451,7 +451,7 @@ export default function Login() {
                         name="phone"
                         value={formData.phone}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                        className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                         placeholder="+1 (555) 123-4567"
                         required
                       />
@@ -469,7 +469,7 @@ export default function Login() {
                       name="password"
                       value={formData.password}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                      className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                       placeholder="Enter your password"
                       required
                     />
@@ -493,7 +493,7 @@ export default function Login() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3 px-4 rounded-lg font-bold text-lg transition-all duration-200 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full py-3 px-6 md:px-4 rounded-lg font-bold text-lg transition-all duration-200 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{
                       background: loading ? '#666' : 'linear-gradient(135deg, #ffd713, #ffed4e)',
                       color: '#030140',
@@ -521,3 +521,4 @@ export default function Login() {
     </Layout>
   );
 } 
+

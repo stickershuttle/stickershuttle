@@ -181,7 +181,7 @@ const defaultColumns = [
   { id: 'material', name: 'Material', width: 'px-2', align: 'left' },
   { id: 'size', name: 'Size', width: 'px-2', align: 'left' },
   { id: 'notes', name: 'Notes', width: 'px-3', align: 'left' },
-  { id: 'actions', name: 'Actions', width: 'px-3', align: 'center' }
+  { id: 'actions', name: 'Actions', width: 'px-6', align: 'center' }
 ];
 
 export default function AdminOrders() {
@@ -351,6 +351,14 @@ export default function AdminOrders() {
             return order.proof_status === 'awaiting_approval';
           case 'approved':
             return order.proof_status === 'approved';
+          case 'label-created':
+            return order.proof_status === 'approved' && order.trackingNumber && !order.proof_status?.includes('shipped');
+          case 'shipped':
+            return order.proof_status === 'shipped' || (order.fulfillmentStatus === 'partial' && order.trackingNumber);
+          case 'out-for-delivery':
+            return order.orderStatus === 'Out for Delivery' || order.fulfillmentStatus === 'out_for_delivery';
+          case 'delivered':
+            return order.orderStatus === 'Delivered' || order.fulfillmentStatus === 'fulfilled';
           default:
             return true;
         }
@@ -490,16 +498,32 @@ export default function AdminOrders() {
     }
   };
 
-  // Get proof status (for now all are Building Proof)
+  // Get proof status (updated with shipping statuses)
   const getProofStatus = (order: Order) => {
     // Check the actual proof_status from the database
     if (order.proof_status === 'awaiting_approval') {
       return 'Awaiting Approval';
     }
     if (order.proof_status === 'approved') {
+      // Check if label has been created
+      if (order.trackingNumber && !order.proof_status?.includes('shipped')) {
+        return 'Label Created';
+      }
       return 'Proof Approved';
     }
-    // Default to Building Proof if no proofs sent yet
+    if (order.proof_status === 'shipped' || (order.fulfillmentStatus === 'partial' && order.trackingNumber)) {
+      return 'Shipped';
+    }
+    if (order.orderStatus === 'Out for Delivery' || order.fulfillmentStatus === 'out_for_delivery') {
+      return 'Out for Delivery';
+    }
+    if (order.orderStatus === 'Delivered' || order.fulfillmentStatus === 'fulfilled') {
+      return 'Delivered';
+    }
+    if (order.proof_status === 'changes_requested') {
+      return 'Changes Requested';
+    }
+    // Default to building proof
     return 'Building Proof';
   };
 
@@ -507,13 +531,23 @@ export default function AdminOrders() {
   const getProofStatusColor = (status: string) => {
     switch (status) {
       case 'Building Proof':
-        return 'bg-yellow-400';
+        return 'bg-yellow-900 bg-opacity-40 text-yellow-300';
       case 'Awaiting Approval':
-        return 'bg-cyan-400'; // Changed from orange to neon blue
+        return 'bg-orange-900 bg-opacity-40 text-orange-300';
       case 'Proof Approved':
-        return 'bg-green-400';
+        return 'bg-green-900 bg-opacity-40 text-green-300';
+      case 'Label Created':
+        return 'bg-blue-900 bg-opacity-40 text-blue-300';
+      case 'Shipped':
+        return 'bg-purple-900 bg-opacity-40 text-purple-300';
+      case 'Out for Delivery':
+        return 'bg-indigo-900 bg-opacity-40 text-indigo-300';
+      case 'Delivered':
+        return 'bg-green-900 bg-opacity-40 text-green-300';
+      case 'Changes Requested':
+        return 'bg-amber-900 bg-opacity-40 text-amber-300';
       default:
-        return 'bg-gray-400';
+        return 'bg-gray-800 bg-opacity-40 text-gray-300';
     }
   };
 
@@ -795,22 +829,19 @@ export default function AdminOrders() {
                   {/* Filter Dropdown */}
                   <div className="relative">
                     <select
-                      aria-label="Filter orders by status"
                       value={filterStatus}
                       onChange={(e) => setFilterStatus(e.target.value)}
-                      className="appearance-none bg-transparent border border-white/20 rounded-xl px-4 py-2 pl-10 text-white text-sm font-medium focus:outline-none focus:border-purple-400 transition-all cursor-pointer hover:scale-105"
-                      style={{
-                        backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                        backgroundRepeat: 'no-repeat',
-                        backgroundPosition: 'right 8px center',
-                        backgroundSize: '16px',
-                        paddingRight: '32px'
-                      }}
+                      className="bg-gray-800 border border-gray-600 rounded px-3 py-1 text-sm"
+                      aria-label="Filter orders by status"
                     >
-                      <option value="all" style={{ backgroundColor: '#030140' }}>All Orders</option>
-                      <option value="building" style={{ backgroundColor: '#030140' }}>Building Proof</option>
-                      <option value="awaiting" style={{ backgroundColor: '#030140' }}>Awaiting Approval</option>
-                      <option value="approved" style={{ backgroundColor: '#030140' }}>Proof Approved</option>
+                      <option value="all">All Orders</option>
+                      <option value="building">Building</option>
+                      <option value="awaiting">Awaiting Approval</option>
+                      <option value="approved">Approved</option>
+                      <option value="label-created">Label Created</option>
+                      <option value="shipped">Shipped</option>
+                      <option value="out-for-delivery">Out for Delivery</option>
+                      <option value="delivered">Delivered</option>
                     </select>
                     <svg className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -1148,8 +1179,8 @@ export default function AdminOrders() {
                                 </div>
                               </td>
                               {/* Actions */}
-                              <td className="px-3 py-4 text-center">
-                                <div className="flex items-center justify-center gap-1">
+                              <td className="px-6 py-4 text-center">
+                                <div className="flex items-center justify-center gap-2">
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();

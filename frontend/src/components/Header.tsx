@@ -61,7 +61,7 @@ export default function Header() {
   return (
     <>
     <header className="w-full relative z-50" style={{ backgroundColor: '#030140' }}>
-      <div className="w-[95%] md:w-[90%] lg:w-[70%] mx-auto py-4 px-4">
+      <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto py-4 px-4">
         <div className="flex items-center justify-between relative">
           {/* Mobile/Tablet Left Side - Hamburger */}
           <div className="lg:hidden flex items-center">
