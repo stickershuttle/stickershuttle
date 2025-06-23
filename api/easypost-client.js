@@ -14,15 +14,10 @@ class EasyPostService {
         console.log('NODE_ENV:', process.env.NODE_ENV);
         console.log('EASYPOST_TEST_MODE:', process.env.EASYPOST_TEST_MODE);
         console.log('EASYPOST_API_KEY:', process.env.EASYPOST_API_KEY ? 'SET' : 'NOT SET');
-        console.log('EASYPOST_TEST_API_KEY:', process.env.EASYPOST_TEST_API_KEY ? 'SET' : 'NOT SET');
-        console.log('EASYPOST_PROD_API_KEY:', process.env.EASYPOST_PROD_API_KEY ? 'SET' : 'NOT SET');
         
-        // Show first few characters of keys for debugging
-        if (process.env.EASYPOST_TEST_API_KEY) {
-            console.log('EASYPOST_TEST_API_KEY value:', process.env.EASYPOST_TEST_API_KEY.substring(0, 8) + '...');
-        }
-        if (process.env.EASYPOST_PROD_API_KEY) {
-            console.log('EASYPOST_PROD_API_KEY value:', process.env.EASYPOST_PROD_API_KEY.substring(0, 8) + '...');
+        // Show first few characters of key for debugging
+        if (process.env.EASYPOST_API_KEY) {
+            console.log('EASYPOST_API_KEY value:', process.env.EASYPOST_API_KEY.substring(0, 8) + '...');
         }
         
         // Determine if we're in test/development mode
@@ -35,30 +30,16 @@ class EasyPostService {
         const isTestMode = isTestModeEnv || isDevEnvironment;
         console.log('🎯 Final calculated test mode:', isTestMode);
         
-        // Use test or production API key based on mode
-        let apiKey;
-        if (isTestMode) {
-            // For test mode, use test key
-            apiKey = process.env.EASYPOST_TEST_API_KEY;
-            console.log('🔑 Test mode - using EASYPOST_TEST_API_KEY');
-        } else {
-            // For production mode, use prod key
-            apiKey = process.env.EASYPOST_PROD_API_KEY;
-            console.log('🔑 Production mode - using EASYPOST_PROD_API_KEY');
-        }
-        
-        // Fallback to generic EASYPOST_API_KEY if no specific key found
-        if (!apiKey) {
-            apiKey = process.env.EASYPOST_API_KEY;
-            console.log('🔑 Fallback - using EASYPOST_API_KEY');
-        }
+        // Get the API key (standard EasyPost approach)
+        const apiKey = process.env.EASYPOST_API_KEY;
+        console.log('🔑 Using standard EASYPOST_API_KEY');
         
         console.log('🎯 Final API key found:', apiKey ? `${apiKey.substring(0, 8)}...` : 'NONE');
             
         if (!apiKey) {
-            console.error(`❌ No EasyPost API key found in environment variables`);
+            console.error(`❌ EasyPost API key not found`);
             console.error('Available environment variables:', Object.keys(process.env).filter(key => key.includes('EASYPOST')));
-            console.error('Need: EASYPOST_TEST_API_KEY, EASYPOST_PROD_API_KEY, or EASYPOST_API_KEY');
+            console.error('Need: EASYPOST_API_KEY environment variable');
             return;
         }
 
