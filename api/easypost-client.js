@@ -72,7 +72,7 @@ class EasyPostService {
     }
 
     detectKeyType(apiKey) {
-        if (apiKey && (apiKey.includes('_test_') || apiKey.startsWith('EZSK_test_'))) {
+        if (apiKey && (apiKey.includes('_test_') || apiKey.startsWith('EZSK_test_') || apiKey.startsWith('EZTK'))) {
             return 'test';
         }
         return 'production';
