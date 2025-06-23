@@ -239,13 +239,16 @@ async function sendDiscordNotification(payload: NotificationPayload): Promise<{ 
     const isNewOrder = payload.orderStatus === 'Awaiting Proof Approval' || payload.orderStatus === 'Creating Proofs'
     const statusEmoji = getStatusEmoji(payload.orderStatus)
     
+    // Process order items to get detailed product information
+    const orderItemsInfo = formatOrderItemsForDiscord(payload.orderItems)
+    
     const discordMessage = {
       content: isNewOrder ? `🚨 **NEW ORDER ALERT** 🚨` : `📋 **ORDER UPDATE** 📋`,
       embeds: [{
         title: isNewOrder ? "🎉 New Sticker Shuttle Order!" : `${statusEmoji} Order Status Update`,
         description: isNewOrder ? 
-          `You have a new order that needs attention!` : 
-          `Order status changed to: **${payload.orderStatus}**`,
+          `You have a new order that needs attention!\n\n**Order Items:**\n${orderItemsInfo.summary}` : 
+          `Order status changed to: **${payload.orderStatus}**\n\n**Order Items:**\n${orderItemsInfo.summary}`,
         color: isNewOrder ? 0x00ff00 : getStatusColor(payload.orderStatus),
         fields: [
           { name: "📋 Order Number", value: payload.orderNumber, inline: true },
@@ -253,11 +256,21 @@ async function sendDiscordNotification(payload: NotificationPayload): Promise<{ 
           { name: "💰 Total", value: `$${payload.orderTotal.toFixed(2)}`, inline: true },
           { name: "📧 Email", value: payload.customerEmail, inline: true },
           { name: "📊 Status", value: payload.orderStatus, inline: true },
-          { name: "🕐 Time", value: new Date().toLocaleString(), inline: true }
+          { name: "🕐 Time", value: new Date().toLocaleString(), inline: true },
+          ...orderItemsInfo.detailFields
         ],
         footer: {
           text: "Sticker Shuttle Order System"
         }
+      }],
+      components: [{
+        type: 1, // Action Row
+        components: [{
+          type: 2, // Button
+          style: 5, // Link style
+          label: "📋 View Order in Admin",
+          url: `https://stickershuttle.vercel.app/admin/orders/${payload.orderNumber}`
+        }]
       }]
     }
 
@@ -286,6 +299,102 @@ async function sendDiscordNotification(payload: NotificationPayload): Promise<{ 
   } catch (error) {
     console.error('❌ Discord notification failed:', error)
     return { success: false, message: error.message }
+  }
+}
+
+function formatOrderItemsForDiscord(orderItems: any[]) {
+  if (!orderItems || orderItems.length === 0) {
+    return {
+      summary: "No items found",
+      detailFields: []
+    }
+  }
+
+  const summary = orderItems.map((item, index) => {
+    // Extract product information
+    const quantity = item.quantity || 1
+    const productName = item.productName || item.name || 'Custom Stickers'
+    
+    // Get sticker type from product category or name
+    let stickerType = 'Vinyl Stickers' // default
+    if (item.productCategory) {
+      const category = item.productCategory.toLowerCase()
+      if (category.includes('holographic')) stickerType = 'Holographic Stickers'
+      else if (category.includes('chrome')) stickerType = 'Chrome Stickers'
+      else if (category.includes('glitter')) stickerType = 'Glitter Stickers'
+      else if (category.includes('clear')) stickerType = 'Clear Stickers'
+      else if (category.includes('banner')) stickerType = 'Vinyl Banner'
+      else if (category.includes('sheet')) stickerType = 'Sticker Sheets'
+    }
+    
+    // Extract selections (try different possible structures)
+    const selections = item.calculatorSelections || item.calculator_selections || {}
+    const material = selections.material?.displayValue || selections.material?.value || 'Premium Vinyl'
+    const size = selections.size?.displayValue || selections.size?.value || 
+                (selections.size?.width && selections.size?.height ? 
+                 `${selections.size.width}" × ${selections.size.height}"` : 'Standard')
+    
+    return `• **${quantity}x** ${stickerType} (${size}) - ${material}`
+  }).join('\n')
+
+  // Create detail fields for first item (most important for quick view)
+  const firstItem = orderItems[0]
+  const firstSelections = firstItem.calculatorSelections || firstItem.calculator_selections || {}
+  
+  const detailFields: any[] = []
+  
+  // Add quantity field
+  const totalQuantity = orderItems.reduce((sum, item) => sum + (item.quantity || 1), 0)
+  detailFields.push({
+    name: "📦 Total Quantity", 
+    value: `${totalQuantity} pieces`, 
+    inline: true
+  })
+  
+  // Add size field if available
+  if (firstSelections.size) {
+    const sizeValue = firstSelections.size.displayValue || firstSelections.size.value ||
+                     (firstSelections.size.width && firstSelections.size.height ? 
+                      `${firstSelections.size.width}" × ${firstSelections.size.height}"` : null)
+    if (sizeValue) {
+      detailFields.push({
+        name: "📏 Size", 
+        value: sizeValue, 
+        inline: true
+      })
+    }
+  }
+  
+  // Add material field if available
+  if (firstSelections.material) {
+    detailFields.push({
+      name: "🎨 Material", 
+      value: firstSelections.material.displayValue || firstSelections.material.value, 
+      inline: true
+    })
+  }
+  
+  // Add cut/shape if available
+  if (firstSelections.cut) {
+    detailFields.push({
+      name: "✂️ Cut", 
+      value: firstSelections.cut.displayValue || firstSelections.cut.value, 
+      inline: true
+    })
+  }
+  
+  // Add rush order if applicable
+  if (firstSelections.rush?.value === true) {
+    detailFields.push({
+      name: "⚡ Rush Order", 
+      value: "Yes - 24hr turnaround", 
+      inline: true
+    })
+  }
+
+  return {
+    summary: summary.length > 0 ? summary : "Custom order items",
+    detailFields
   }
 }
 
