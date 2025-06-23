@@ -2220,12 +2220,19 @@ const resolvers = {
         console.log('easyPostClient.isConfigured:', easyPostClient.isConfigured);
         console.log('easyPostClient.client exists:', !!easyPostClient.client);
         
+        // Try to reinitialize if not ready
         if (!easyPostClient.isReady()) {
-          console.log('❌ EasyPost client not ready - returning error');
-          return {
-            success: false,
-            error: 'EasyPost service is not configured'
-          };
+          console.log('❌ EasyPost client not ready - attempting to reinitialize...');
+          easyPostClient.init();
+          console.log('🔄 After reinit - isReady():', easyPostClient.isReady());
+          
+          if (!easyPostClient.isReady()) {
+            console.log('❌ EasyPost client still not ready after reinit - returning error');
+            return {
+              success: false,
+              error: 'EasyPost service is not configured'
+            };
+          }
         }
         
         console.log('✅ EasyPost client is ready - proceeding with shipment creation');
