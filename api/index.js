@@ -26,13 +26,107 @@ app.use('/api', uploadRoutes);
 // Add Stripe webhook routes (before body parsing middleware)
 app.use('/webhooks', stripeWebhookHandlers);
 
+// Add EasyPost webhook routes (before Apollo setup)
+app.use('/webhooks', stripeWebhookHandlers);
+
+// Add EasyPost webhook endpoint
+app.post('/webhooks/easypost', express.raw({ type: 'application/json' }), async (req, res) => {
+  console.log('📦 EasyPost webhook received');
+  
+  try {
+    const event = req.body;
+    const eventData = JSON.parse(event.toString());
+    
+    console.log('🔍 EasyPost Event:', {
+      type: eventData.description,
+      object: eventData.result?.object,
+      trackingCode: eventData.result?.tracking_code,
+      status: eventData.result?.status
+    });
+    
+    // Handle tracker updates
+    if (eventData.result && eventData.result.object === 'Tracker') {
+      const tracker = eventData.result;
+      const trackingCode = tracker.tracking_code;
+      const status = tracker.status;
+      const estDeliveryDate = tracker.est_delivery_date;
+      
+      console.log(`📍 Tracking update: ${trackingCode} -> ${status}`);
+      
+      // Update order in database
+      if (supabaseClient.isReady()) {
+        const client = supabaseClient.getServiceClient();
+        
+        // Find order by tracking number
+        const { data: orders, error: findError } = await client
+          .from('orders_main')
+          .select('id, fulfillment_status')
+          .eq('tracking_number', trackingCode);
+          
+        if (findError) {
+          console.error('❌ Error finding order:', findError);
+        } else if (orders && orders.length > 0) {
+          const order = orders[0];
+          
+          // Map EasyPost status to our fulfillment status
+          let fulfillmentStatus = order.fulfillment_status;
+          let orderStatus = 'Shipped';
+          
+          switch (status) {
+            case 'pre_transit':
+            case 'in_transit':
+              fulfillmentStatus = 'partial';
+              orderStatus = 'Shipped';
+              break;
+            case 'out_for_delivery':
+              fulfillmentStatus = 'partial';
+              orderStatus = 'Out for Delivery';
+              break;
+            case 'delivered':
+              fulfillmentStatus = 'fulfilled';
+              orderStatus = 'Delivered';
+              break;
+            case 'exception':
+            case 'failure':
+              fulfillmentStatus = 'partial';
+              orderStatus = 'Shipping Issue';
+              break;
+          }
+          
+          // Update order
+          const { error: updateError } = await client
+            .from('orders_main')
+            .update({
+              fulfillment_status: fulfillmentStatus,
+              order_status: orderStatus,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', order.id);
+            
+          if (updateError) {
+            console.error('❌ Error updating order status:', updateError);
+          } else {
+            console.log(`✅ Order ${order.id} status updated to: ${orderStatus}`);
+          }
+        }
+      }
+    }
+    
+    res.status(200).json({ received: true });
+  } catch (error) {
+    console.error('❌ EasyPost webhook error:', error);
+    res.status(400).json({ error: 'Webhook processing failed' });
+  }
+});
+
 // Add health check before Apollo setup
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
     service: 'Sticker Shuttle API',
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    easypostConfigured: require('./easypost-client').isReady() // Added EasyPost status check
   });
 });
 
@@ -116,6 +210,9 @@ const typeDefs = gql`
     createEasyPostShipment(orderId: ID!, packageDimensions: PackageDimensionsInput): EasyPostShipmentResult
     buyEasyPostLabel(shipmentId: String!, rateId: String!, insurance: String): EasyPostLabelResult
     trackEasyPostShipment(trackingCode: String!): EasyPostTrackingResult
+    
+    # Manual tracking update mutation
+    updateOrderTracking(orderId: ID!): CustomerOrder
   }
 
   type Customer {
@@ -1983,6 +2080,7 @@ const resolvers = {
                 name: item.productName,
                 description: `${item.productName} - Custom Configuration`,
                 unitPrice: item.unitPrice,
+                totalPrice: item.totalPrice, // Add totalPrice for accurate Stripe calculations
                 quantity: item.quantity,
                 productId: item.productId,
                 sku: item.sku,
@@ -2116,12 +2214,21 @@ const resolvers = {
     // EasyPost Mutations
     createEasyPostShipment: async (_, { orderId, packageDimensions }) => {
       try {
+        console.log('🔍 DEBUG: EasyPost client status check...');
+        console.log('easyPostClient exists:', !!easyPostClient);
+        console.log('easyPostClient.isReady():', easyPostClient.isReady());
+        console.log('easyPostClient.isConfigured:', easyPostClient.isConfigured);
+        console.log('easyPostClient.client exists:', !!easyPostClient.client);
+        
         if (!easyPostClient.isReady()) {
+          console.log('❌ EasyPost client not ready - returning error');
           return {
             success: false,
             error: 'EasyPost service is not configured'
           };
         }
+        
+        console.log('✅ EasyPost client is ready - proceeding with shipment creation');
 
         if (!supabaseClient.isReady()) {
           return {
@@ -2195,11 +2302,48 @@ const resolvers = {
           };
         }
 
-        // Find the rate object (in a real scenario, you might need to fetch the shipment first)
-        const rate = { id: rateId };
+        // First, retrieve the shipment to get the complete rate object
+        const client = easyPostClient.getClient();
+        const shipment = await client.Shipment.retrieve(shipmentId);
         
-        // Buy the label
+        // Find the complete rate object by ID
+        const rate = shipment.rates.find(r => r.id === rateId);
+        if (!rate) {
+          return {
+            success: false,
+            error: 'Selected rate not found in shipment'
+          };
+        }
+        
+        // Buy the label with the complete rate object
         const boughtShipment = await easyPostClient.buyShipment(shipmentId, rate, insurance);
+
+        // Update the order with tracking information
+        if (boughtShipment.tracking_code && supabaseClient.isReady()) {
+          try {
+            const client = supabaseClient.getServiceClient();
+            const { error: updateError } = await client
+              .from('orders_main')
+              .update({
+                tracking_number: boughtShipment.tracking_code,
+                tracking_company: boughtShipment.selected_rate.carrier,
+                tracking_url: boughtShipment.tracker.public_url,
+                fulfillment_status: 'partial', // Changed from 'fulfilled' to 'partial' for shipped status
+                order_status: 'Shipped', // Add explicit order status
+                proof_status: 'shipped', // Add new proof status to track shipping
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', shipment.reference); // Using the reference field which should contain the order ID
+
+            if (updateError) {
+              console.error('❌ Failed to update order with tracking info:', updateError);
+            } else {
+              console.log('✅ Order updated with tracking information and status set to Shipped:', boughtShipment.tracking_code);
+            }
+          } catch (updateErr) {
+            console.error('❌ Error updating order with tracking info:', updateErr);
+          }
+        }
 
         return {
           success: true,
@@ -2269,6 +2413,91 @@ const resolvers = {
           success: false,
           error: error.message
         };
+      }
+    },
+
+    // Manual tracking update for testing/debugging
+    updateOrderTracking: async (_, { orderId }) => {
+      try {
+        if (!supabaseClient.isReady()) {
+          throw new Error('Order service is currently unavailable');
+        }
+
+        // Get the order with tracking info
+        const client = supabaseClient.getServiceClient();
+        const { data: order, error: orderError } = await client
+          .from('orders_main')
+          .select('id, tracking_number, tracking_company')
+          .eq('id', orderId)
+          .single();
+
+        if (orderError || !order || !order.tracking_number) {
+          throw new Error('Order not found or no tracking number available');
+        }
+
+        // Get latest tracking info from EasyPost
+        if (!easyPostClient.isReady()) {
+          throw new Error('EasyPost service is not configured');
+        }
+
+        const tracker = await easyPostClient.trackShipment(order.tracking_number);
+        
+        // Update order status based on tracking status
+        let fulfillmentStatus = 'partial';
+        let orderStatus = 'Shipped';
+        
+        switch (tracker.status) {
+          case 'pre_transit':
+          case 'in_transit':
+            fulfillmentStatus = 'partial';
+            orderStatus = 'Shipped';
+            break;
+          case 'out_for_delivery':
+            fulfillmentStatus = 'partial';
+            orderStatus = 'Out for Delivery';
+            break;
+          case 'delivered':
+            fulfillmentStatus = 'fulfilled';
+            orderStatus = 'Delivered';
+            break;
+          case 'exception':
+          case 'failure':
+            fulfillmentStatus = 'partial';
+            orderStatus = 'Shipping Issue';
+            break;
+        }
+
+        // Update the order
+        const { data: updatedOrder, error: updateError } = await client
+          .from('orders_main')
+          .update({
+            fulfillment_status: fulfillmentStatus,
+            order_status: orderStatus,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', orderId)
+          .select(`
+            *,
+            order_items_new(*)
+          `)
+          .single();
+
+        if (updateError) {
+          throw new Error(`Failed to update order: ${updateError.message}`);
+        }
+
+        return {
+          ...updatedOrder,
+          trackingInfo: {
+            status: tracker.status,
+            carrier: tracker.carrier,
+            est_delivery_date: tracker.est_delivery_date,
+            public_url: tracker.public_url
+          }
+        };
+      } catch (error) {
+        console.error('Error updating order tracking:', error);
+        throw new Error(error.message);
       }
     }
   }
