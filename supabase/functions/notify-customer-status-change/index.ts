@@ -247,38 +247,41 @@ async function sendDiscordNotification(payload: NotificationPayload): Promise<{ 
       item.calculator_selections?.rush?.value === true
     )
     
-    // Create description in your exact format
+    // Create description in your exact format with bold titles
     let description = ''
     if (isNewOrder) {
       description = isRushOrder ? 
-        '💸 Rush Order!\n\n' : 
-        '💸 New Order!\n\n'
+        '💸 **Rush Order!**\n\n' : 
+        '💸 **New Order!**\n\n'
     } else {
-      description = `💸 Order Update!\n\nStatus: ${payload.orderStatus}\n\n`
+      description = `💸 **Order Update!**\n\n**Status:** ${payload.orderStatus}\n\n`
     }
     
     // Add total
-    description += `Total: $${payload.orderTotal.toFixed(2)}\n\n`
+    description += `**Total:** $${payload.orderTotal.toFixed(2)}\n\n`
     
     // Add order items
-    description += `Order Items:\n${orderItemsInfo.summary}\n\n`
+    description += `**Order Items:**\n${orderItemsInfo.summary}\n\n`
     
-    // Add product details
+    // Add product details with bold titles
     if (orderItemsInfo.detailFields.length > 0) {
       orderItemsInfo.detailFields.forEach(field => {
-        description += `${field.name}\n${field.value}\n`
+        description += `**${field.name}**\n${field.value}\n`
       })
       description += '\n'
     }
     
-    // Add order info
-    description += `Order Number\n${payload.orderNumber}\n`
-    description += `Customer\n${payload.customerName || "N/A"}\n`
-    description += `Email\n${payload.customerEmail}\n`
-    description += `Time\n${new Date().toLocaleString()}`
+    // Add order info with bold titles
+    description += `**Order Number**\n${payload.orderNumber}\n`
+    description += `**Customer**\n${payload.customerName || "N/A"}\n`
+    description += `**Email**\n${payload.customerEmail}\n`
+    description += `**Time**\n${new Date().toLocaleString()}`
     
     const discordMessage = {
-      content: description,
+      embeds: [{
+        description: description,
+        color: isNewOrder ? (isRushOrder ? 0xff6600 : 0x00ff00) : getStatusColor(payload.orderStatus)
+      }],
       components: [{
         type: 1, // Action Row
         components: [{
@@ -290,9 +293,9 @@ async function sendDiscordNotification(payload: NotificationPayload): Promise<{ 
       }]
     }
 
-    // Add tracking info if available (append to content)
+    // Add tracking info if available (append to description)
     if (payload.trackingNumber) {
-      discordMessage.content += `\nTracking\n${payload.trackingNumber}`
+      discordMessage.embeds[0].description += `\n**Tracking**\n${payload.trackingNumber}`
     }
 
     const response = await fetch(discordWebhookUrl, {
