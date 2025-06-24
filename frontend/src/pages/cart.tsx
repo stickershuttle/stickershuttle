@@ -799,9 +799,6 @@ export default function CartPage() {
     <Layout title="Your Cart - Sticker Shuttle">
       <section className="pt-7 pb-8">
         <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
-          
-
-
           {/* Login Recommendation - Mobile Banner */}
           {showLoginBanner && (
             <div className="mb-6 p-4 rounded-lg backdrop-blur-md md:hidden" style={{

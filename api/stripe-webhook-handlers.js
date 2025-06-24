@@ -1,6 +1,8 @@
 const express = require('express');
 const stripeClient = require('./stripe-client');
 const supabaseClient = require('./supabase-client');
+const notificationHelpers = require('./notification-helpers');
+const { discountManager } = require('./discount-manager');
 
 const router = express.Router();
 
@@ -61,6 +63,24 @@ router.post('/stripe', async (req, res) => {
   } catch (error) {
     console.error('❌ Error processing webhook:', error);
     res.status(500).send('Webhook processing error');
+  }
+});
+
+// Test endpoint for Discord notifications
+router.post('/test-discord-notification/:orderId', async (req, res) => {
+  try {
+    console.log('🧪 Test endpoint: Testing Discord notification for order', req.params.orderId);
+    
+    const result = await notificationHelpers.triggerOrderStatusNotification(req.params.orderId, 'Awaiting Payment');
+    
+    res.json({ 
+      success: result.success, 
+      message: result.message || 'Notification test completed',
+      orderId: req.params.orderId
+    });
+  } catch (error) {
+    console.error('Test Discord notification error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -127,6 +147,12 @@ async function handleCheckoutSessionCompleted(session) {
       // Update the existing order with payment details
       const client = supabaseClient.getServiceClient();
       
+      // Check if this is a reorder by looking at line items metadata
+      const isReorder = fullSession.line_items?.data?.some(lineItem => {
+        const itemMetadata = lineItem.price.product.metadata || {};
+        return itemMetadata.isReorder === 'true';
+      }) || false;
+      
       // Generate order number (e.g., SS-2024-001234)
       const orderNumber = await generateOrderNumber(client);
       
@@ -135,7 +161,7 @@ async function handleCheckoutSessionCompleted(session) {
         .update({
           stripe_payment_intent_id: fullSession.payment_intent,
           stripe_session_id: session.id,
-          order_status: 'Creating Proofs',
+          order_status: isReorder ? 'In Production' : 'Creating Proofs',
           financial_status: 'paid',
           order_number: orderNumber,
           subtotal_price: (fullSession.amount_subtotal / 100).toFixed(2),
@@ -163,6 +189,71 @@ async function handleCheckoutSessionCompleted(session) {
       }
       
       console.log('✅ Order updated successfully:', updatedOrder?.id);
+      
+      // Credits are now deducted at checkout time, not in webhook
+      // Just ensure the order is updated with credits_applied field
+      if (cartMetadata?.creditsApplied && parseFloat(cartMetadata.creditsApplied) > 0 && metadata.userId !== 'guest') {
+        try {
+          console.log('💳 Updating order with credits already applied:', cartMetadata.creditsApplied);
+          console.log('💳 Order ID:', updatedOrder.id);
+          
+          // Just update the order record to track credits used
+          await client
+            .from('orders_main')
+            .update({
+              credits_applied: parseFloat(cartMetadata.creditsApplied),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', updatedOrder.id);
+          
+          console.log('✅ Order updated with credits tracking');
+        } catch (updateError) {
+          console.error('⚠️ Failed to update order with credits tracking:', updateError);
+          // Don't fail the order processing for this error
+        }
+      } else {
+        console.log('💳 No credits to track:', {
+          creditsApplied: cartMetadata?.creditsApplied,
+          userId: metadata.userId,
+          isGuest: metadata.userId === 'guest'
+        });
+      }
+      
+      // Record discount usage if a discount was applied
+      if (cartMetadata?.discountCode && updatedOrder) {
+        try {
+          console.log('🏷️ Recording discount usage for code:', cartMetadata.discountCode);
+          
+          // Get the discount code ID from database
+          const { data: discountCode } = await client
+            .from('discount_codes')
+            .select('id')
+            .eq('code', cartMetadata.discountCode.toUpperCase())
+            .single();
+          
+          if (discountCode) {
+            await discountManager.recordUsage(
+              discountCode.id,
+              updatedOrder.id,
+              metadata.userId !== 'guest' ? metadata.userId : null,
+              metadata.userId === 'guest' ? customer.email : null,
+              parseFloat(cartMetadata.discountAmount || 0)
+            );
+            console.log('✅ Discount usage recorded');
+          }
+        } catch (discountError) {
+          console.error('⚠️ Failed to record discount usage:', discountError);
+          // Don't fail the order processing for discount recording errors
+        }
+      }
+      
+      // Trigger Discord notification for new order (manual trigger since status wasn't changed)
+      try {
+        console.log('📱 Triggering Discord notification for new order...');
+        await notificationHelpers.triggerOrderStatusNotification(updatedOrder.id, 'Awaiting Payment');
+      } catch (notificationError) {
+        console.error('⚠️ Failed to send Discord notification (order still processed):', notificationError);
+      }
       
       // Update line items with Stripe line item IDs if needed
       if (fullSession.line_items?.data) {
@@ -232,13 +323,19 @@ async function handleCheckoutSessionCompleted(session) {
     // If no existing order, create a new one (fallback for direct Stripe checkouts)
     console.log('📝 No existing order found, creating new order...');
     
+    // Check if this is a reorder by looking at line items metadata
+    const isReorder = fullSession.line_items?.data?.some(lineItem => {
+      const itemMetadata = lineItem.price.product.metadata || {};
+      return itemMetadata.isReorder === 'true';
+    }) || false;
+    
     // Create order data for Supabase
     const orderData = {
       user_id: metadata.userId !== 'guest' ? metadata.userId : null,
       guest_email: metadata.userId === 'guest' ? customer.email : null,
       stripe_payment_intent_id: fullSession.payment_intent,
       stripe_session_id: session.id,
-      order_status: 'Creating Proofs',
+      order_status: isReorder ? 'In Production' : 'Creating Proofs',
       financial_status: 'paid',
       fulfillment_status: 'unfulfilled',
       subtotal_price: (fullSession.amount_subtotal / 100).toFixed(2),
@@ -339,6 +436,40 @@ async function handleCheckoutSessionCompleted(session) {
       }
       
       console.log('✅ New order created:', order?.id);
+      
+      // Credits are now deducted at checkout time, not in webhook
+      // Just update order tracking for new orders (credits already deducted)
+      if (cartMetadata?.creditsApplied && parseFloat(cartMetadata.creditsApplied) > 0 && metadata.userId !== 'guest' && order?.id) {
+        try {
+          console.log('💳 Updating new order with credits already applied:', cartMetadata.creditsApplied);
+          console.log('💳 Order ID:', order.id);
+          
+          // Just update the order record to track credits used
+          const client = supabaseClient.getServiceClient();
+          await client
+            .from('orders_main')
+            .update({
+              credits_applied: parseFloat(cartMetadata.creditsApplied),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', order.id);
+          
+          console.log('✅ New order updated with credits tracking');
+        } catch (updateError) {
+          console.error('⚠️ Failed to update new order with credits tracking:', updateError);
+          // Don't fail the order processing for this error
+        }
+      }
+      
+      // Trigger Discord notification for new order (manual trigger since status wasn't changed)
+      if (order?.id) {
+        try {
+          console.log('📱 Triggering Discord notification for new order...');
+          await notificationHelpers.triggerOrderStatusNotification(order.id, 'Awaiting Payment');
+        } catch (notificationError) {
+          console.error('⚠️ Failed to send Discord notification (order still processed):', notificationError);
+        }
+      }
     }
     
   } catch (error) {
@@ -358,8 +489,35 @@ async function handlePaymentIntentSucceeded(paymentIntent) {
 async function handlePaymentIntentFailed(paymentIntent) {
   console.log('❌ Payment intent failed:', paymentIntent.id);
   
-  // Update order status if exists
+  // Update order status if exists and handle credit reversal
   if (paymentIntent.metadata?.customerOrderId && supabaseClient.isReady()) {
+    const client = supabaseClient.getServiceClient();
+    
+    // Get the failed order to check if credits were applied
+    const { data: order } = await client
+      .from('orders_main')
+      .select('id, user_id, credits_applied')
+      .eq('id', paymentIntent.metadata.customerOrderId)
+      .single();
+    
+    if (order && order.credits_applied > 0 && order.user_id) {
+      try {
+        console.log('💳 Reversing credits for failed payment:', order.credits_applied);
+        
+        // Add back the credits that were deducted
+        const creditHandlers = require('./credit-handlers');
+        await creditHandlers.addUserCredits({
+          userId: order.user_id,
+          amount: order.credits_applied,
+          reason: 'Credit reversal due to payment failure'
+        }, null);
+        
+        console.log('✅ Credits reversed successfully');
+      } catch (creditError) {
+        console.error('⚠️ Failed to reverse credits:', creditError);
+      }
+    }
+    
     await supabaseClient.updateOrderStatus(paymentIntent.metadata.customerOrderId, {
       financial_status: 'failed',
       order_status: 'Payment Failed'
@@ -410,21 +568,24 @@ async function generateOrderNumber(supabaseClient) {
       return `SS-${Date.now().toString().slice(-6)}`;
     }
     
-    let nextNumber = 1;
+    let nextNumber = 1000; // Start from 1000 for 4-digit format
     
     if (existingOrders && existingOrders.length > 0) {
       const lastOrderNumber = existingOrders[0].order_number;
       console.log('📊 Last order number found:', lastOrderNumber);
       
-      // Extract the number from SS-00001 format
+      // Extract the number from SS-1000 format (handles both old 5-digit and new 4-digit)
       const match = lastOrderNumber.match(/SS-(\d+)/);
       if (match) {
-        nextNumber = parseInt(match[1]) + 1;
+        const lastNumber = parseInt(match[1]);
+        // If the last number is less than 1000 (old format), start from 1000
+        // Otherwise, increment from the last number
+        nextNumber = lastNumber < 1000 ? 1000 : lastNumber + 1;
       }
     }
     
-    // Generate order number: SS-00001 (5 digit number)
-    const orderNumber = `SS-${String(nextNumber).padStart(5, '0')}`;
+    // Generate order number: SS-1000 (4 digit number starting from 1000)
+    const orderNumber = `SS-${nextNumber}`;
     console.log('📝 Generated new order number:', orderNumber);
     
     return orderNumber;

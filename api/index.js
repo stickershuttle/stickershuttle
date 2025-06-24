@@ -1,4 +1,5 @@
 require('dotenv').config({ path: '../.env.local' });
+require('dotenv').config({ path: './.env.local' });
 require('dotenv').config({ path: './.env' });
 require('dotenv').config();
 
@@ -10,6 +11,15 @@ const supabaseClient = require('./supabase-client');
 const stripeClient = require('./stripe-client');
 const stripeWebhookHandlers = require('./stripe-webhook-handlers');
 const easyPostClient = require('./easypost-client');
+const EasyPostTrackingEnhancer = require('./easypost-tracking-enhancer');
+const { discountManager } = require('./discount-manager');
+const creditHandlers = require('./credit-handlers');
+
+// Initialize enhanced tracking
+const trackingEnhancer = new EasyPostTrackingEnhancer(easyPostClient);
+
+// Initialize credit handlers with Supabase client
+creditHandlers.initializeWithSupabase(supabaseClient);
 
 // Log initial status of all services
 console.log('🚀 Initial service status:');
@@ -35,7 +45,7 @@ app.use('/webhooks', stripeWebhookHandlers);
 // Add EasyPost webhook routes (before Apollo setup)
 app.use('/webhooks', stripeWebhookHandlers);
 
-// Add EasyPost webhook endpoint
+// Add EasyPost webhook endpoint with enhanced tracking
 app.post('/webhooks/easypost', express.raw({ type: 'application/json' }), async (req, res) => {
   console.log('📦 EasyPost webhook received');
   
@@ -47,74 +57,23 @@ app.post('/webhooks/easypost', express.raw({ type: 'application/json' }), async 
       type: eventData.description,
       object: eventData.result?.object,
       trackingCode: eventData.result?.tracking_code,
-      status: eventData.result?.status
+      status: eventData.result?.status,
+      carrier: eventData.result?.carrier
     });
     
-    // Handle tracker updates
+    // Handle tracker updates with enhanced processing
     if (eventData.result && eventData.result.object === 'Tracker') {
       const tracker = eventData.result;
-      const trackingCode = tracker.tracking_code;
-      const status = tracker.status;
-      const estDeliveryDate = tracker.est_delivery_date;
       
-      console.log(`📍 Tracking update: ${trackingCode} -> ${status}`);
+      console.log(`📍 Enhanced tracking update: ${tracker.tracking_code} -> ${tracker.status}`);
       
-      // Update order in database
-      if (supabaseClient.isReady()) {
-        const client = supabaseClient.getServiceClient();
-        
-        // Find order by tracking number
-        const { data: orders, error: findError } = await client
-          .from('orders_main')
-          .select('id, fulfillment_status')
-          .eq('tracking_number', trackingCode);
-          
-        if (findError) {
-          console.error('❌ Error finding order:', findError);
-        } else if (orders && orders.length > 0) {
-          const order = orders[0];
-          
-          // Map EasyPost status to our fulfillment status
-          let fulfillmentStatus = order.fulfillment_status;
-          let orderStatus = 'Shipped';
-          
-          switch (status) {
-            case 'pre_transit':
-            case 'in_transit':
-              fulfillmentStatus = 'partial';
-              orderStatus = 'Shipped';
-              break;
-            case 'out_for_delivery':
-              fulfillmentStatus = 'partial';
-              orderStatus = 'Out for Delivery';
-              break;
-            case 'delivered':
-              fulfillmentStatus = 'fulfilled';
-              orderStatus = 'Delivered';
-              break;
-            case 'exception':
-            case 'failure':
-              fulfillmentStatus = 'partial';
-              orderStatus = 'Shipping Issue';
-              break;
-          }
-          
-          // Update order
-          const { error: updateError } = await client
-            .from('orders_main')
-            .update({
-              fulfillment_status: fulfillmentStatus,
-              order_status: orderStatus,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', order.id);
-            
-          if (updateError) {
-            console.error('❌ Error updating order status:', updateError);
-          } else {
-            console.log(`✅ Order ${order.id} status updated to: ${orderStatus}`);
-          }
-        }
+      // Use enhanced tracking processor
+      const success = await trackingEnhancer.processTrackingUpdate(tracker);
+      
+      if (success) {
+        console.log('✅ Tracking update processed successfully');
+      } else {
+        console.warn('⚠️ Tracking update processing failed');
       }
     }
     
@@ -211,6 +170,30 @@ const typeDefs = gql`
     getAllOrders: [CustomerOrder]
     getAllCustomers: [Customer!]!
     getAnalyticsData(timeRange: String): AnalyticsData
+    
+    # Review queries
+    getProductReviews(productId: String!, limit: Int, offset: Int): [Review!]!
+    getProductReviewStats(productId: String!): ReviewStats!
+    canUserReviewProduct(userId: ID!, productId: String!): Boolean!
+    getUserReviews(userId: ID!): [Review!]!
+    
+    # Order Review Queries
+    getOrderReview(orderId: ID!): Review
+    canUserReviewOrder(userId: ID!, orderId: ID!): Boolean!
+    
+    # Discount queries
+    validateDiscountCode(code: String!, orderAmount: Float!): DiscountValidation!
+    getAllDiscountCodes: [DiscountCode!]!
+    getDiscountCodeStats(codeId: ID!): DiscountCodeStats!
+    
+    # Credit queries
+    getUserCreditBalance(userId: String!): CreditBalance!
+    getUnreadCreditNotifications(userId: String!): [CreditNotification!]!
+    getAllCreditTransactions(limit: Int, offset: Int): CreditTransactionList!
+    getUserCreditHistory(userId: String!): UserCreditHistory!
+    
+    # User queries
+    getAllUsers: [User!]!
   }
 
   type Mutation {
@@ -226,6 +209,22 @@ const typeDefs = gql`
     updateProofFileByCustomer(orderId: ID!, proofId: ID!, newFileUrl: String!, originalFileName: String): CustomerOrder
     updateOrderFileByCustomer(orderId: ID!, newFileUrl: String!, originalFileName: String): CustomerOrder
     removeProof(orderId: ID!, proofId: ID!): CustomerOrder
+    
+    # Review mutations
+    createReview(input: CreateReviewInput!): Review!
+    updateReview(reviewId: ID!, input: UpdateReviewInput!): Review!
+    deleteReview(reviewId: ID!): Boolean!
+    voteOnReview(reviewId: ID!, isHelpful: Boolean!): Review!
+    
+    # Order Review Mutations
+    createOrderReview(input: CreateOrderReviewInput!): Review!
+    updateOrderReview(reviewId: ID!, input: UpdateOrderReviewInput!): Review!
+    deleteOrderReview(reviewId: ID!): Boolean!
+    
+    # EasyPost tracking mutations
+    createEasyPostTracker(trackingCode: String!, orderId: ID!, carrier: String): TrackingResult
+    refreshOrderTracking(orderId: ID!): TrackingResult
+    refreshAllActiveTracking: BatchTrackingResult
     addProofNotes(orderId: ID!, proofId: ID!, adminNotes: String, customerNotes: String): CustomerOrder
     approveProof(orderId: ID!, proofId: ID!, adminNotes: String): CustomerOrder
     requestProofChanges(orderId: ID!, proofId: ID!, adminNotes: String!): CustomerOrder
@@ -237,11 +236,23 @@ const typeDefs = gql`
     
     # EasyPost shipping mutations
     createEasyPostShipment(orderId: ID!, packageDimensions: PackageDimensionsInput): EasyPostShipmentResult
-    buyEasyPostLabel(shipmentId: String!, rateId: String!, insurance: String): EasyPostLabelResult
+    buyEasyPostLabel(shipmentId: String!, rateId: String!, orderId: String!, insurance: String): EasyPostLabelResult
     trackEasyPostShipment(trackingCode: String!): EasyPostTrackingResult
     
     # Manual tracking update mutation
     updateOrderTracking(orderId: ID!): CustomerOrder
+    
+    # Discount mutations
+    createDiscountCode(input: CreateDiscountCodeInput!): DiscountCode!
+    updateDiscountCode(id: ID!, input: UpdateDiscountCodeInput!): DiscountCode!
+    deleteDiscountCode(id: ID!): Boolean!
+    applyDiscountToCheckout(code: String!, orderAmount: Float!): DiscountValidation!
+    
+    # Credit mutations
+    markCreditNotificationsRead(userId: String!): MutationResult!
+    addUserCredits(input: AddUserCreditsInput!): AddUserCreditsResult!
+    addCreditsToAllUsers(amount: Float!, reason: String!): AddCreditsToAllUsersResult!
+    applyCreditsToOrder(orderId: String!, amount: Float!): ApplyCreditsResult!
   }
 
   type Customer {
@@ -261,6 +272,16 @@ const typeDefs = gql`
     orders: [CustomerOrder!]!
   }
 
+  type User {
+    id: ID!
+    email: String!
+    firstName: String
+    lastName: String
+    company: String
+    createdAt: String!
+    lastSignIn: String
+  }
+
   type Address {
     first_name: String
     last_name: String
@@ -277,6 +298,38 @@ const typeDefs = gql`
   type DeleteResult {
     success: Boolean!
     message: String
+  }
+
+  # Review Types
+  type Review {
+    id: ID!
+    userId: ID!
+    productId: String!
+    productCategory: String!
+    rating: Int!
+    title: String
+    comment: String
+    isVerifiedPurchase: Boolean!
+    orderId: ID
+    helpfulVotes: Int!
+    totalVotes: Int!
+    status: String!
+    createdAt: String!
+    updatedAt: String!
+    userEmail: String
+    userFirstName: String
+    userLastName: String
+    userDisplayName: String
+  }
+
+  type ReviewStats {
+    totalReviews: Int!
+    averageRating: Float!
+    rating5Count: Int!
+    rating4Count: Int!
+    rating3Count: Int!
+    rating2Count: Int!
+    rating1Count: Int!
   }
 
   # Customer Order Types
@@ -314,6 +367,8 @@ const typeDefs = gql`
     proof_status: String
     proof_sent_at: String
     proof_link: String
+    discountCode: String
+    discountAmount: Float
   }
 
   type OrderProof {
@@ -360,6 +415,23 @@ const typeDefs = gql`
     success: Boolean!
     claimedOrdersCount: Int!
     message: String
+  }
+
+  type TrackingResult {
+    success: Boolean!
+    message: String!
+    trackingCode: String
+    status: String
+    carrier: String
+    publicUrl: String
+    estDeliveryDate: String
+  }
+
+  type BatchTrackingResult {
+    success: Boolean!
+    message: String!
+    processedCount: Int!
+    errors: [String!]
   }
 
   scalar JSON
@@ -417,6 +489,9 @@ const typeDefs = gql`
     shippingAddress: AddressInput!
     billingAddress: AddressInput
     orderNote: String
+    discountCode: String
+    discountAmount: Float
+    creditsToApply: Float
   }
 
   input CartItemInput {
@@ -474,6 +549,8 @@ const typeDefs = gql`
     customerOrder: CustomerOrder
     message: String
     errors: [String]
+    creditsApplied: Float
+    remainingCredits: Float
   }
 
   # EasyPost Types
@@ -585,6 +662,34 @@ const typeDefs = gql`
     adminNotes: String
   }
 
+  # Review Input Types
+  input CreateReviewInput {
+    productId: String!
+    productCategory: String!
+    rating: Int!
+    title: String
+    comment: String
+  }
+
+  input UpdateReviewInput {
+    rating: Int
+    title: String
+    comment: String
+  }
+  
+  input CreateOrderReviewInput {
+    orderId: ID!
+    rating: Int!
+    title: String
+    comment: String
+  }
+  
+  input UpdateOrderReviewInput {
+    rating: Int
+    title: String
+    comment: String
+  }
+
   type AnalyticsData {
     summary: SummaryMetrics
     dailySales: [DailySalesData]
@@ -628,6 +733,139 @@ const typeDefs = gql`
     quantity: Int
     orders: Int
   }
+
+  # Discount Types
+  type DiscountCode {
+    id: ID!
+    code: String!
+    description: String
+    discountType: String!
+    discountValue: Float!
+    minimumOrderAmount: Float
+    usageLimit: Int
+    usageCount: Int!
+    validFrom: String!
+    validUntil: String
+    active: Boolean!
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  type DiscountValidation {
+    valid: Boolean!
+    discountCode: DiscountCode
+    discountAmount: Float
+    message: String
+  }
+
+  type DiscountCodeStats {
+    totalUsage: Int!
+    totalDiscountGiven: Float!
+    averageOrderValue: Float!
+    recentUsage: [DiscountUsage!]!
+  }
+
+  type DiscountUsage {
+    id: ID!
+    orderId: ID!
+    userId: ID
+    guestEmail: String
+    usedAt: String!
+    discountAmount: Float!
+  }
+
+  input CreateDiscountCodeInput {
+    code: String!
+    description: String
+    discountType: String!
+    discountValue: Float!
+    minimumOrderAmount: Float
+    usageLimit: Int
+    validFrom: String
+    validUntil: String
+    active: Boolean
+  }
+
+  input UpdateDiscountCodeInput {
+    description: String
+    discountType: String
+    discountValue: Float
+    minimumOrderAmount: Float
+    usageLimit: Int
+    validFrom: String
+    validUntil: String
+    active: Boolean
+  }
+  
+  # Credit Types
+  type CreditBalance {
+    balance: Float!
+    transactionCount: Int!
+    lastTransactionDate: String
+  }
+  
+  type CreditNotification {
+    id: String!
+    creditId: String!
+    amount: Float!
+    reason: String
+    createdAt: String!
+  }
+  
+  type CreditTransaction {
+    id: String!
+    userId: String!
+    userEmail: String!
+    userName: String!
+    amount: Float!
+    balance: Float!
+    reason: String
+    transactionType: String!
+    orderId: String
+    orderNumber: String
+    createdAt: String!
+    createdBy: String
+    expiresAt: String
+  }
+  
+  type CreditTransactionList {
+    transactions: [CreditTransaction!]!
+    totalCount: Int!
+  }
+  
+  type UserCreditHistory {
+    transactions: [CreditTransaction!]!
+    currentBalance: Float!
+  }
+  
+  type MutationResult {
+    success: Boolean!
+  }
+  
+  type AddUserCreditsResult {
+    success: Boolean!
+    credit: CreditTransaction
+    error: String
+  }
+  
+  type AddCreditsToAllUsersResult {
+    success: Boolean!
+    usersUpdated: Int
+    error: String
+  }
+  
+  type ApplyCreditsResult {
+    success: Boolean!
+    remainingBalance: Float
+    error: String
+  }
+  
+  input AddUserCreditsInput {
+    userId: String!
+    amount: Float!
+    reason: String
+    expiresAt: String
+  }
 `;
 
 // 2. Resolvers
@@ -643,8 +881,8 @@ const resolvers = {
     fulfillmentStatus: (parent) => parent.fulfillment_status || parent.fulfillmentStatus,
     financialStatus: (parent) => parent.financial_status || parent.financialStatus,
     trackingNumber: (parent) => parent.tracking_number || parent.trackingNumber,
-    trackingCompany: (parent) => parent.tracking_company || parent.trackingCompany,
-    trackingUrl: (parent) => parent.tracking_url || parent.trackingUrl,
+                trackingCompany: (parent) => parent.tracking_company || parent.trackingCompany,
+      trackingUrl: (parent) => parent.tracking_url || parent.trackingUrl,
     subtotalPrice: (parent) => parent.subtotal_price || parent.subtotalPrice,
     totalTax: (parent) => parent.total_tax || parent.totalTax,
     totalPrice: (parent) => parent.total_price || parent.totalPrice,
@@ -663,7 +901,9 @@ const resolvers = {
     proofs: (parent) => parent.proofs || [],
     proof_status: (parent) => parent.proof_status || parent.proofStatus,
     proof_sent_at: (parent) => parent.proof_sent_at || parent.proofSentAt,
-    proof_link: (parent) => parent.proof_link || parent.proofLink
+    proof_link: (parent) => parent.proof_link || parent.proofLink,
+    discountCode: (parent) => parent.discount_code || parent.discountCode,
+    discountAmount: (parent) => parent.discount_amount || parent.discountAmount
   },
 
   OrderItem: {
@@ -696,6 +936,22 @@ const resolvers = {
     uploadedBy: (parent) => parent.uploadedBy || parent.uploaded_by,
     customerNotes: (parent) => parent.customerNotes || parent.customer_notes,
     adminNotes: (parent) => parent.adminNotes || parent.admin_notes
+  },
+
+  Review: {
+    userId: (parent) => parent.user_id || parent.userId,
+    productId: (parent) => parent.product_id || parent.productId,
+    productCategory: (parent) => parent.product_category || parent.productCategory,
+    isVerifiedPurchase: (parent) => parent.is_verified_purchase || parent.isVerifiedPurchase,
+    orderId: (parent) => parent.order_id || parent.orderId,
+    helpfulVotes: (parent) => parent.helpful_votes || parent.helpfulVotes,
+    totalVotes: (parent) => parent.total_votes || parent.totalVotes,
+    createdAt: (parent) => parent.created_at || parent.createdAt,
+    updatedAt: (parent) => parent.updated_at || parent.updatedAt,
+    userEmail: (parent) => parent.user_email || parent.userEmail,
+    userFirstName: (parent) => parent.user_first_name || parent.userFirstName,
+    userLastName: (parent) => parent.user_last_name || parent.userLastName,
+    userDisplayName: (parent) => parent.user_display_name || parent.userDisplayName
   },
 
   Query: {
@@ -752,7 +1008,7 @@ const resolvers = {
         }
         
         // Map RPC function results to match GraphQL schema expectations (camelCase field names)
-        return paidOrders.map(order => {
+        const ordersWithTracking = await Promise.all(paidOrders.map(async order => {
           // Get proof data for this order
           const orderProofData = proofsData[order.order_id] || {
             proofs: [],
@@ -760,6 +1016,29 @@ const resolvers = {
             proof_sent_at: null,
             proof_link: null
           };
+          
+          // Fetch tracking data separately for each order
+          let trackingData = {
+            tracking_number: null,
+            tracking_company: null,
+            tracking_url: null
+          };
+          
+          try {
+            const { data: trackingInfo, error: trackingError } = await client
+              .from('orders_main')
+              .select('tracking_number, tracking_company, tracking_url')
+              .eq('id', order.order_id)
+              .single();
+              
+            if (!trackingError && trackingInfo) {
+              trackingData = trackingInfo;
+              console.log(`📦 Tracking data for order ${order.order_id}:`, trackingData);
+            }
+          } catch (err) {
+            console.log(`⚠️ Could not fetch tracking for order ${order.order_id}`);
+          }
+          
           // Calculate order total from items since RPC doesn't provide order-level total
           const calculatedTotal = (order.items || []).reduce((sum, item) => {
             const itemTotal = Number(item.total_price) || 0;
@@ -803,13 +1082,13 @@ const resolvers = {
             guestEmail: null, // RPC doesn't return this
             stripePaymentIntentId: null, // RPC doesn't return this
             stripeCheckoutSessionId: null, // RPC doesn't return this
-            orderNumber: null, // RPC doesn't return this
+            orderNumber: order.order_number || null, // Get order_number from RPC
             orderStatus: order.order_status || 'Processing',
             fulfillmentStatus: order.fulfillment_status || 'unfulfilled',
             financialStatus: order.financial_status || 'pending',
-            trackingNumber: null, // RPC doesn't return this
-            trackingCompany: null,
-            trackingUrl: null,
+            trackingNumber: trackingData.tracking_number || null, // Use fetched tracking data
+            trackingCompany: trackingData.tracking_company || null,
+            trackingUrl: trackingData.tracking_url || null,
             subtotalPrice: null, // RPC doesn't return this
             totalTax: null, // RPC doesn't return this
             totalPrice: calculatedTotal, // Use calculated total from items
@@ -855,7 +1134,9 @@ const resolvers = {
           };
 
           return mappedOrder;
-        });
+        }));
+        
+        return ordersWithTracking;
       } catch (error) {
         console.error('Error fetching user orders:', error);
         throw new Error(error.message);
@@ -1386,6 +1667,387 @@ const resolvers = {
         console.error('Error fetching analytics data:', error);
         throw new Error('Failed to fetch analytics data');
       }
+    },
+
+    // Review Queries
+    getProductReviews: async (_, { productId, limit = 50, offset = 0 }) => {
+      try {
+        const client = supabaseClient.getServiceClient();
+        const { data, error } = await client
+          .rpc('get_product_reviews', { 
+            p_product_id: productId, 
+            p_limit: limit, 
+            p_offset: offset 
+          });
+
+        if (error) {
+          console.error('Error fetching product reviews:', error);
+          throw new Error('Failed to fetch product reviews');
+        }
+
+        return data || [];
+      } catch (error) {
+        console.error('Error in getProductReviews:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    getProductReviewStats: async (_, { productId }) => {
+      try {
+        const client = supabaseClient.getServiceClient();
+        const { data, error } = await client
+          .rpc('get_product_review_stats', { p_product_id: productId });
+
+        if (error) {
+          console.error('Error fetching product review stats:', error);
+          throw new Error('Failed to fetch product review stats');
+        }
+
+        // If no reviews exist, return zero stats
+        if (!data || data.length === 0) {
+          return {
+            totalReviews: 0,
+            averageRating: 0,
+            rating5Count: 0,
+            rating4Count: 0,
+            rating3Count: 0,
+            rating2Count: 0,
+            rating1Count: 0
+          };
+        }
+
+        return data[0];
+      } catch (error) {
+        console.error('Error in getProductReviewStats:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    canUserReviewProduct: async (_, { userId, productId }, context) => {
+      const { user } = context;
+      if (!user) {
+        return false;
+      }
+
+      try {
+        const client = supabaseClient.getServiceClient();
+        const { data, error } = await client
+          .rpc('can_user_review_product', { 
+            p_user_id: userId, 
+            p_product_id: productId 
+          });
+
+        if (error) {
+          console.error('Error checking if user can review product:', error);
+          return false;
+        }
+
+        return data || false;
+      } catch (error) {
+        console.error('Error in canUserReviewProduct:', error);
+        return false;
+      }
+    },
+
+    getUserReviews: async (_, { userId }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const client = supabaseClient.getServiceClient();
+        const { data, error } = await client
+          .from('reviews')
+          .select(`
+            *,
+            auth.users!inner(email)
+          `)
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching user reviews:', error);
+          throw new Error('Failed to fetch user reviews');
+        }
+
+        return data || [];
+      } catch (error) {
+        console.error('Error in getUserReviews:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    // Order Review Queries
+    getOrderReview: async (_, { orderId }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const client = supabaseClient.getServiceClient();
+        
+        // Check if user owns the order
+        const { data: order, error: orderError } = await client
+          .from('orders_main')
+          .select('id, user_id')
+          .eq('id', orderId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (orderError) {
+          throw new Error('Order not found or access denied');
+        }
+
+        // Get the review for this order
+        const { data: review, error: reviewError } = await client
+          .from('reviews')
+          .select(`
+            *,
+            auth.users!inner(email)
+          `)
+          .eq('order_id', orderId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (reviewError && reviewError.code !== 'PGRST116') {
+          console.error('Error fetching order review:', reviewError);
+          throw new Error('Failed to fetch review');
+        }
+
+        if (!review) {
+          return null;
+        }
+
+        return {
+          ...review,
+          userEmail: review.users?.email || user.email,
+          userFirstName: user.user_metadata?.first_name || '',
+          userLastName: user.user_metadata?.last_name || '',
+          userDisplayName: `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || 'Anonymous User'
+        };
+      } catch (error) {
+        console.error('Error in getOrderReview:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    canUserReviewOrder: async (_, { userId, orderId }) => {
+      try {
+        const client = supabaseClient.getServiceClient();
+        
+        // Check if order exists and belongs to user
+        const { data: order, error: orderError } = await client
+          .from('orders_main')
+          .select('id, user_id, financial_status')
+          .eq('id', orderId)
+          .eq('user_id', userId)
+          .single();
+
+        if (orderError) {
+          return false;
+        }
+
+        // Only allow reviews for paid orders
+        if (order.financial_status !== 'paid') {
+          return false;
+        }
+
+        // Check if user has already reviewed this order
+        const { data: existingReview, error: reviewError } = await client
+          .from('reviews')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('order_id', orderId)
+          .single();
+
+        if (reviewError && reviewError.code !== 'PGRST116') {
+          return false;
+        }
+
+        // User can review if no existing review found
+        return !existingReview;
+      } catch (error) {
+        console.error('Error in canUserReviewOrder:', error);
+        return false;
+      }
+    },
+
+    // Discount queries
+    validateDiscountCode: async (_, { code, orderAmount }, context) => {
+      try {
+        console.log('🏷️ Validating discount code from GraphQL:', code);
+        
+        // Get user info from context if available
+        const userId = context.user?.id || null;
+        const guestEmail = context.guestEmail || null;
+        
+        const result = await discountManager.validateCode(code, orderAmount, userId, guestEmail);
+        
+        // Map the result to GraphQL schema
+        return {
+          valid: result.valid,
+          discountCode: result.discountCode ? {
+            id: result.discountCode.id,
+            code: result.discountCode.code,
+            description: result.discountCode.description,
+            discountType: result.discountCode.discountType,
+            discountValue: result.discountCode.discountValue,
+            minimumOrderAmount: result.discountCode.minimumOrderAmount,
+            usageLimit: result.discountCode.usageLimit,
+            usageCount: result.discountCode.usageCount,
+            validFrom: result.discountCode.validFrom,
+            validUntil: result.discountCode.validUntil,
+            active: result.discountCode.active,
+            createdAt: result.discountCode.createdAt,
+            updatedAt: result.discountCode.updatedAt
+          } : null,
+          discountAmount: result.discountAmount,
+          message: result.message
+        };
+      } catch (error) {
+        console.error('❌ Error validating discount code:', error);
+        return {
+          valid: false,
+          discountCode: null,
+          discountAmount: 0,
+          message: 'Error validating discount code'
+        };
+      }
+    },
+
+    getAllDiscountCodes: async () => {
+      try {
+        console.log('📋 Fetching all discount codes');
+        const codes = await discountManager.getAllDiscountCodes();
+        
+        // Map database fields to GraphQL schema
+        return codes.map(code => ({
+          id: code.id,
+          code: code.code,
+          description: code.description,
+          discountType: code.discount_type,
+          discountValue: parseFloat(code.discount_value),
+          minimumOrderAmount: parseFloat(code.minimum_order_amount),
+          usageLimit: code.usage_limit,
+          usageCount: code.usage_count,
+          validFrom: code.valid_from,
+          validUntil: code.valid_until,
+          active: code.active,
+          createdAt: code.created_at,
+          updatedAt: code.updated_at
+        }));
+      } catch (error) {
+        console.error('❌ Error fetching discount codes:', error);
+        throw new Error('Failed to fetch discount codes');
+      }
+    },
+
+    getDiscountCodeStats: async (_, { codeId }) => {
+      try {
+        console.log('📊 Fetching discount code stats for:', codeId);
+        return await discountManager.getDiscountStats(codeId);
+      } catch (error) {
+        console.error('❌ Error fetching discount stats:', error);
+        throw new Error('Failed to fetch discount statistics');
+      }
+    },
+    
+    // Credit queries
+    getUserCreditBalance: async (_, { userId }) => {
+      try {
+        return await creditHandlers.getUserCreditBalance(userId);
+      } catch (error) {
+        console.error('❌ Error fetching user credit balance:', error);
+        throw new Error('Failed to fetch credit balance');
+      }
+    },
+    
+    getUnreadCreditNotifications: async (_, { userId }) => {
+      try {
+        return await creditHandlers.getUnreadCreditNotifications(userId);
+      } catch (error) {
+        console.error('❌ Error fetching credit notifications:', error);
+        throw new Error('Failed to fetch credit notifications');
+      }
+    },
+    
+    getAllCreditTransactions: async (_, { limit, offset }) => {
+      try {
+        return await creditHandlers.getAllCreditTransactions(limit, offset);
+      } catch (error) {
+        console.error('❌ Error fetching credit transactions:', error);
+        throw new Error('Failed to fetch credit transactions');
+      }
+    },
+    
+    getUserCreditHistory: async (_, { userId }) => {
+      try {
+        return await creditHandlers.getUserCreditHistory(userId);
+      } catch (error) {
+        console.error('❌ Error fetching user credit history:', error);
+        throw new Error('Failed to fetch credit history');
+      }
+    },
+
+    getAllUsers: async (_, args, context) => {
+      try {
+        // TODO: Add admin authentication check
+        const { user } = context;
+        if (!user) {
+          throw new Error('Authentication required');
+        }
+
+        console.log('📋 Fetching all users using admin API...');
+        const client = supabaseClient.getServiceClient();
+        
+        // Use Supabase Admin API to list users
+        const { data: authData, error: authError } = await client.auth.admin.listUsers();
+        
+        if (authError) {
+          console.error('❌ Error fetching auth users:', authError);
+          throw new Error('Failed to fetch users from auth');
+        }
+
+        const authUsers = authData.users || [];
+
+        // Get user profiles for additional info
+        const { data: profiles, error: profileError } = await client
+          .from('user_profiles')
+          .select('user_id, first_name, last_name, company_name');
+        
+        if (profileError) {
+          console.warn('⚠️ Error fetching user profiles:', profileError);
+        }
+
+        // Create profile lookup map
+        const profileMap = new Map(
+          (profiles || []).map(p => [p.user_id, p])
+        );
+
+        // Format users for GraphQL response
+        const formattedUsers = authUsers.map(user => {
+          const profile = profileMap.get(user.id);
+          
+          return {
+            id: user.id,
+            email: user.email,
+            firstName: user.user_metadata?.first_name || profile?.first_name || null,
+            lastName: user.user_metadata?.last_name || profile?.last_name || null,
+            company: profile?.company_name || null,
+            createdAt: user.created_at,
+            lastSignIn: user.last_sign_in_at
+          };
+        });
+
+        console.log(`✅ Successfully fetched ${formattedUsers.length} users`);
+        return formattedUsers;
+      } catch (error) {
+        console.error('❌ Error fetching all users:', error);
+        throw new Error('Failed to fetch users');
+      }
     }
   },
 
@@ -1553,6 +2215,18 @@ const resolvers = {
          
        if (updateError) {
          throw new Error(`Failed to update proof status: ${updateError.message}`);
+       }
+       
+       // Send Discord notification if proof was approved
+       if (status === 'approved') {
+         try {
+           console.log('📱 Sending Discord notification for proof approval...');
+           const notificationHelpers = require('./notification-helpers');
+           await notificationHelpers.sendProofApprovalNotification(updatedOrder, proofId);
+         } catch (notifError) {
+           console.error('❌ Failed to send Discord notification:', notifError);
+           // Don't throw - we still want to return the updated order
+         }
        }
        
        return updatedOrder;
@@ -1988,6 +2662,139 @@ const resolvers = {
      }
    },
 
+    // EasyPost tracking mutations
+    createEasyPostTracker: async (_, { trackingCode, orderId, carrier }) => {
+      try {
+        if (!easyPostClient.isReady()) {
+          throw new Error('EasyPost service is currently unavailable');
+        }
+
+        const result = await trackingEnhancer.createTracker(trackingCode, orderId, carrier);
+        
+        return {
+          success: true,
+          message: 'Tracker created successfully',
+          trackingCode: result.tracking_code,
+          status: result.status,
+          carrier: result.carrier,
+          publicUrl: result.public_url,
+          estDeliveryDate: result.est_delivery_date
+        };
+      } catch (error) {
+        console.error('Error creating EasyPost tracker:', error);
+        return {
+          success: false,
+          message: error.message,
+          trackingCode: trackingCode,
+          status: null,
+          carrier: null,
+          publicUrl: null,
+          estDeliveryDate: null
+        };
+      }
+    },
+
+    refreshOrderTracking: async (_, { orderId }) => {
+      try {
+        if (!supabaseClient.isReady()) {
+          throw new Error('Order service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get order tracking number
+        const { data: order, error } = await client
+          .from('orders_main')
+          .select('tracking_number')
+          .eq('id', orderId)
+          .single();
+
+        if (error || !order?.tracking_number) {
+          throw new Error('Order not found or no tracking number available');
+        }
+
+        const trackingStatus = await trackingEnhancer.getTrackingStatus(order.tracking_number);
+        
+        // Process the update
+        const mockTracker = {
+          tracking_code: order.tracking_number,
+          status: trackingStatus.status,
+          carrier: trackingStatus.carrier,
+          public_url: trackingStatus.public_url,
+          est_delivery_date: trackingStatus.est_delivery_date,
+          tracking_details: trackingStatus.tracking_details
+        };
+
+        await trackingEnhancer.processTrackingUpdate(mockTracker);
+
+        return {
+          success: true,
+          message: 'Tracking refreshed successfully',
+          trackingCode: order.tracking_number,
+          status: trackingStatus.status,
+          carrier: trackingStatus.carrier,
+          publicUrl: trackingStatus.public_url,
+          estDeliveryDate: trackingStatus.est_delivery_date
+        };
+      } catch (error) {
+        console.error('Error refreshing order tracking:', error);
+        return {
+          success: false,
+          message: error.message,
+          trackingCode: null,
+          status: null,
+          carrier: null,
+          publicUrl: null,
+          estDeliveryDate: null
+        };
+      }
+    },
+
+    refreshAllActiveTracking: async (_, args, context) => {
+      try {
+        if (!easyPostClient.isReady()) {
+          throw new Error('EasyPost service is currently unavailable');
+        }
+
+        console.log('🔄 Starting bulk tracking refresh...');
+        const startTime = Date.now();
+        
+        await trackingEnhancer.refreshAllActiveTracking();
+        
+        const endTime = Date.now();
+        const duration = (endTime - startTime) / 1000;
+
+        // Get count of active orders for reporting
+        let processedCount = 0;
+        if (supabaseClient.isReady()) {
+          const client = supabaseClient.getServiceClient();
+          const { data: orders } = await client
+            .from('orders_main')
+            .select('id')
+            .not('tracking_number', 'is', null)
+            .not('order_status', 'eq', 'Delivered')
+            .not('order_status', 'eq', 'Cancelled');
+          
+          processedCount = orders?.length || 0;
+        }
+
+        return {
+          success: true,
+          message: `Successfully refreshed tracking for ${processedCount} orders in ${duration}s`,
+          processedCount: processedCount,
+          errors: []
+        };
+      } catch (error) {
+        console.error('Error refreshing all tracking:', error);
+        return {
+          success: false,
+          message: error.message,
+          processedCount: 0,
+          errors: [error.message]
+        };
+      }
+    },
+
     // Stripe mutations
     createStripeCheckoutSession: async (_, { input }) => {
       try {
@@ -2031,78 +2838,109 @@ const resolvers = {
         const errors = [];
         let checkoutSession = null;
         let customerOrder = null;
+        let actualCreditsApplied = 0;
+        let remainingCredits = 0;
 
-        // Step 1: Prepare order in Supabase (as pending payment)
+        // Step 1: Calculate credits before creating order
+        const cartSubtotal = input.cartItems.reduce((sum, item) => sum + item.totalPrice, 0);
+        const discountAmount = input.discountAmount || 0;
+        const creditsToApply = input.creditsToApply || 0;
+        
+        // Apply credits if provided
+        if (creditsToApply > 0 && input.userId) {
+          try {
+            // Check user's credit balance
+            const creditBalance = await creditHandlers.getUserCreditBalance(input.userId);
+            remainingCredits = creditBalance.balance;
+            
+            // Calculate how much credit can be applied
+            const afterDiscountTotal = cartSubtotal - discountAmount;
+            actualCreditsApplied = Math.min(creditsToApply, creditBalance.balance, afterDiscountTotal);
+            
+            console.log('💳 Credit application:', {
+              requested: creditsToApply,
+              available: creditBalance.balance,
+              applied: actualCreditsApplied,
+              afterDiscountTotal
+            });
+          } catch (creditError) {
+            console.error('Error checking credits:', creditError);
+            // Continue without credits if there's an error
+          }
+        }
+
+        // Step 2: Prepare order in Supabase (as pending payment) with correct credits
         console.log('🔍 Checking Supabase client status...');
         console.log('Supabase ready?', supabaseClient.isReady());
-        
+
         if (supabaseClient.isReady()) {
           try {
-            const customerOrderData = {
-              user_id: input.userId || null,
-              guest_email: input.guestEmail || input.customerInfo.email,
-              order_status: 'Awaiting Payment',
-              fulfillment_status: 'unfulfilled',
-              financial_status: 'pending',
-              subtotal_price: input.cartItems.reduce((sum, item) => sum + item.totalPrice, 0),
-              total_tax: 0, // Will be updated after Stripe checkout
-              total_price: input.cartItems.reduce((sum, item) => sum + item.totalPrice, 0),
-              currency: 'USD',
-              customer_first_name: input.customerInfo.firstName,
-              customer_last_name: input.customerInfo.lastName,
-              customer_email: input.customerInfo.email,
-              customer_phone: input.customerInfo.phone,
-              shipping_address: input.shippingAddress,
-              billing_address: input.billingAddress || input.shippingAddress,
-              order_tags: generateOrderTags(input.cartItems).split(','),
-              order_note: input.orderNote,
-              order_created_at: new Date().toISOString(),
-              order_updated_at: new Date().toISOString()
+            console.log('🔍 Creating customer order in Supabase...');
+            
+            // Create order in Supabase with proper credits tracking
+            const orderData = {
+              userId: input.userId,
+              orderStatus: 'Payment Pending',
+              financialStatus: 'pending',
+              totalPrice: cartSubtotal - discountAmount - actualCreditsApplied,
+              subtotalPrice: cartSubtotal,
+              discountAmount: discountAmount,
+              creditsApplied: actualCreditsApplied,
+              customerInfo: input.customerInfo,
+              shippingAddress: input.shippingAddress,
+              cartItems: input.cartItems,
+              orderNote: input.orderNote || '',
+              discountCodes: input.discountCode ? [input.discountCode] : []
             };
 
-            console.log('📝 Order data prepared:', JSON.stringify(customerOrderData, null, 2));
-            console.log('🚀 Calling supabaseClient.createCustomerOrder...');
-            
-            customerOrder = await supabaseClient.createCustomerOrder(customerOrderData);
+            customerOrder = await supabaseClient.createCustomerOrder(orderData);
             console.log('✅ Customer order created:', customerOrder?.id);
-            console.log('📊 Full order response:', JSON.stringify(customerOrder, null, 2));
 
-            // Create order items
-            if (customerOrder) {
-              const orderItems = input.cartItems.map(item => ({
-                order_id: customerOrder.id,
-                product_id: item.productId,
-                product_name: item.productName,
-                product_category: item.productCategory,
-                sku: item.sku,
-                quantity: item.quantity,
-                unit_price: item.unitPrice,
-                total_price: item.totalPrice,
-                calculator_selections: item.calculatorSelections,
-                custom_files: item.customFiles || [],
-                customer_notes: item.customerNotes,
-                instagram_handle: item.instagramHandle,
-                instagram_opt_in: item.instagramOptIn || false,
-                fulfillment_status: 'unfulfilled'
-              }));
-
-              await supabaseClient.createOrderItems(orderItems);
-              console.log('✅ Order items created');
+            // CRITICAL FIX: Actually deduct credits NOW, not in webhook
+            if (actualCreditsApplied > 0 && input.userId && customerOrder?.id) {
+              try {
+                console.log('💳 DEDUCTING credits immediately:', actualCreditsApplied);
+                console.log('💳 Order ID:', customerOrder.id);
+                console.log('💳 User ID:', input.userId);
+                
+                const creditResult = await creditHandlers.applyCreditsToOrder(
+                  customerOrder.id,
+                  actualCreditsApplied,
+                  input.userId
+                );
+                
+                if (creditResult.success) {
+                  console.log('✅ Credits deducted successfully, remaining balance:', creditResult.remainingBalance);
+                  remainingCredits = creditResult.remainingBalance;
+                } else {
+                  console.error('⚠️ Failed to deduct credits immediately:', creditResult.error);
+                  // If credit deduction fails, we should not proceed with checkout
+                  errors.push(`Credit deduction failed: ${creditResult.error}`);
+                  actualCreditsApplied = 0; // Reset credits applied
+                }
+              } catch (creditError) {
+                console.error('⚠️ Critical error deducting credits:', creditError);
+                errors.push(`Credit system error: ${creditError.message}`);
+                actualCreditsApplied = 0; // Reset credits applied
+              }
             }
           } catch (supabaseError) {
             console.error('❌ Supabase order creation failed:', supabaseError);
-            errors.push(`Order tracking setup failed: ${supabaseError.message}`);
+            errors.push(`Order creation failed: ${supabaseError.message}`);
           }
         } else {
           console.error('❌ Supabase client is not ready');
-          errors.push('Order tracking service is not available');
+          errors.push('Database service is not available');
         }
 
-        // Step 2: Create Stripe checkout session
+        // Step 3: Create Stripe checkout session
         if (stripeClient.isReady() && errors.length === 0) {
           try {
             console.log('🔍 Stripe client is ready, creating checkout session...');
             const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            
+            // Calculate final cart total (credits already calculated in Step 1)
+            const cartTotal = cartSubtotal - discountAmount - actualCreditsApplied;
             
             const checkoutData = {
               lineItems: input.cartItems.map(item => ({
@@ -2120,12 +2958,16 @@ const resolvers = {
               customerEmail: input.customerInfo.email,
               userId: input.userId,
               customerOrderId: customerOrder?.id,
-              orderNote: generateOrderNote(input.cartItems, input.orderNote),
+              // Simplified order note for Stripe metadata (under 500 chars)
+              orderNote: `${input.cartItems.length} items - $${cartTotal.toFixed(2)}${discountAmount > 0 ? ` (Discount: -$${discountAmount.toFixed(2)})` : ''}${actualCreditsApplied > 0 ? ` (Credits: -$${actualCreditsApplied.toFixed(2)})` : ''}`,
               cartMetadata: {
-                customFiles: input.cartItems[0]?.customFiles || [],
-                customerNotes: input.cartItems[0]?.customerNotes || '',
-                instagramHandle: input.cartItems[0]?.instagramHandle || '',
-                instagramOptIn: input.cartItems[0]?.instagramOptIn || false
+                itemCount: input.cartItems.length,
+                subtotalAmount: cartSubtotal.toFixed(2),
+                discountAmount: (discountAmount + actualCreditsApplied).toFixed(2), // Include credits in total discount
+                creditsApplied: actualCreditsApplied.toFixed(2),
+                totalAmount: cartTotal.toFixed(2),
+                customerEmail: input.customerInfo.email,
+                discountCode: input.discountCode || null
               }
             };
 
@@ -2178,7 +3020,9 @@ const resolvers = {
           message: errors.length === 0 
             ? 'Checkout session created successfully'
             : 'Order created with some issues',
-          errors: errors.length > 0 ? errors : null
+          errors: errors.length > 0 ? errors : null,
+          creditsApplied: actualCreditsApplied,
+          remainingCredits: remainingCredits - actualCreditsApplied
         };
       } catch (error) {
         console.error('❌ Stripe cart order processing failed:', error);
@@ -2191,7 +3035,9 @@ const resolvers = {
           checkoutUrl: null,
           customerOrder: null,
           message: `Critical error: ${error.message}`,
-          errors: [error.message]
+          errors: [error.message],
+          creditsApplied: 0,
+          remainingCredits: 0
         };
       }
     },
@@ -2354,8 +3200,16 @@ const resolvers = {
       }
     },
 
-    buyEasyPostLabel: async (_, { shipmentId, rateId, insurance }) => {
+    buyEasyPostLabel: async (_, { shipmentId, rateId, orderId, insurance }) => {
       try {
+        console.log('🎯 buyEasyPostLabel called with:', {
+          shipmentId,
+          rateId,
+          orderId,
+          insurance,
+          hasOrderId: !!orderId
+        });
+        
         if (!easyPostClient.isReady()) {
           return {
             success: false,
@@ -2366,6 +3220,12 @@ const resolvers = {
         // First, retrieve the shipment to get the complete rate object
         const client = easyPostClient.getClient();
         const shipment = await client.Shipment.retrieve(shipmentId);
+        
+        console.log('📦 Retrieved shipment for label purchase:', {
+          id: shipment.id,
+          reference: shipment.reference,
+          has_reference: !!shipment.reference
+        });
         
         // Find the complete rate object by ID
         const rate = shipment.rates.find(r => r.id === rateId);
@@ -2383,23 +3243,41 @@ const resolvers = {
         if (boughtShipment.tracking_code && supabaseClient.isReady()) {
           try {
             const client = supabaseClient.getServiceClient();
+            
+            console.log('📋 Updating order with ID:', orderId);
+            
             const { error: updateError } = await client
               .from('orders_main')
               .update({
                 tracking_number: boughtShipment.tracking_code,
-                tracking_company: boughtShipment.selected_rate.carrier,
-                tracking_url: boughtShipment.tracker.public_url,
+                tracking_company: boughtShipment.tracker?.carrier || boughtShipment.selected_rate?.carrier,
+                tracking_url: boughtShipment.tracker?.public_url,
                 fulfillment_status: 'partial', // Changed from 'fulfilled' to 'partial' for shipped status
                 order_status: 'Shipped', // Add explicit order status
-                proof_status: 'shipped', // Add new proof status to track shipping
+                proof_status: 'label_printed', // Changed from 'shipped' to 'label_printed' to distinguish label printing from actual shipping
                 updated_at: new Date().toISOString()
               })
-              .eq('id', shipment.reference); // Using the reference field which should contain the order ID
+              .eq('id', orderId); // Use the orderId parameter directly
 
             if (updateError) {
               console.error('❌ Failed to update order with tracking info:', updateError);
+              console.error('Order ID attempted:', orderId);
             } else {
               console.log('✅ Order updated with tracking information and status set to Shipped:', boughtShipment.tracking_code);
+              console.log('Updated order ID:', orderId);
+              
+              // Verify the update
+              const { data: verifyOrder, error: verifyError } = await client
+                .from('orders_main')
+                .select('id, order_status, proof_status, tracking_number, tracking_company, tracking_url')
+                .eq('id', orderId)
+                .single();
+                
+              if (verifyError) {
+                console.error('❌ Error verifying order update:', verifyError);
+              } else {
+                console.log('✅ Verified order status:', verifyOrder);
+              }
             }
           } catch (updateErr) {
             console.error('❌ Error updating order with tracking info:', updateErr);
@@ -2488,7 +3366,7 @@ const resolvers = {
         const client = supabaseClient.getServiceClient();
         const { data: order, error: orderError } = await client
           .from('orders_main')
-          .select('id, tracking_number, tracking_company')
+          .select('id, tracking_number, tracking_company, proof_status')
           .eq('id', orderId)
           .single();
 
@@ -2506,25 +3384,30 @@ const resolvers = {
         // Update order status based on tracking status
         let fulfillmentStatus = 'partial';
         let orderStatus = 'Shipped';
+        let proofStatus = order.proof_status || 'label_printed';
         
         switch (tracker.status) {
           case 'pre_transit':
           case 'in_transit':
             fulfillmentStatus = 'partial';
             orderStatus = 'Shipped';
+            proofStatus = 'shipped';
             break;
           case 'out_for_delivery':
             fulfillmentStatus = 'partial';
             orderStatus = 'Out for Delivery';
+            proofStatus = 'shipped';
             break;
           case 'delivered':
             fulfillmentStatus = 'fulfilled';
             orderStatus = 'Delivered';
+            proofStatus = 'delivered';
             break;
           case 'exception':
           case 'failure':
             fulfillmentStatus = 'partial';
             orderStatus = 'Shipping Issue';
+            proofStatus = 'shipped';
             break;
         }
 
@@ -2534,6 +3417,7 @@ const resolvers = {
           .update({
             fulfillment_status: fulfillmentStatus,
             order_status: orderStatus,
+            proof_status: proofStatus,
             updated_at: new Date().toISOString()
           })
           .eq('id', orderId)
@@ -2559,6 +3443,602 @@ const resolvers = {
       } catch (error) {
         console.error('Error updating order tracking:', error);
         throw new Error(error.message);
+      }
+    },
+
+    // Review Mutations
+    createReview: async (_, { input }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const client = supabaseClient.getServiceClient();
+        
+        // Check if user has already reviewed this product
+        const { data: existingReview, error: checkError } = await client
+          .from('reviews')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('product_id', input.productId)
+          .single();
+
+        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+          throw new Error('Failed to check existing reviews');
+        }
+
+        if (existingReview) {
+          throw new Error('You have already reviewed this product');
+        }
+
+        // Check if user has purchased this product
+        const canReview = await client
+          .rpc('can_user_review_product', { 
+            p_user_id: user.id, 
+            p_product_id: input.productId 
+          });
+
+        if (canReview.error) {
+          throw new Error('Failed to verify purchase eligibility');
+        }
+
+        if (!canReview.data) {
+          throw new Error('You can only review products you have purchased');
+        }
+
+        // Find the order that contains this product for verification
+        const { data: orderData, error: orderError } = await client
+          .from('orders_main')
+          .select(`
+            id,
+            order_items_new!inner(product_id)
+          `)
+          .eq('user_id', user.id)
+          .eq('financial_status', 'paid')
+          .eq('order_items_new.product_id', input.productId)
+          .limit(1)
+          .single();
+
+        // Create the review
+        const { data: newReview, error: createError } = await client
+          .from('reviews')
+          .insert({
+            user_id: user.id,
+            product_id: input.productId,
+            product_category: input.productCategory,
+            rating: input.rating,
+            title: input.title,
+            comment: input.comment,
+            is_verified_purchase: !orderError && orderData ? true : false,
+            order_id: !orderError && orderData ? orderData.id : null,
+            status: 'active'
+          })
+          .select(`
+            *,
+            auth.users!inner(email)
+          `)
+          .single();
+
+        if (createError) {
+          console.error('Error creating review:', createError);
+          throw new Error('Failed to create review');
+        }
+
+        return {
+          ...newReview,
+          userEmail: newReview.users?.email || user.email,
+          userFirstName: user.user_metadata?.first_name || '',
+          userLastName: user.user_metadata?.last_name || '',
+          userDisplayName: `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || 'Anonymous User'
+        };
+      } catch (error) {
+        console.error('Error in createReview:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    updateReview: async (_, { reviewId, input }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const client = supabaseClient.getServiceClient();
+        
+        // Check if review exists and belongs to user
+        const { data: existingReview, error: checkError } = await client
+          .from('reviews')
+          .select('id, user_id')
+          .eq('id', reviewId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (checkError) {
+          throw new Error('Review not found or access denied');
+        }
+
+        // Update the review
+        const updateData = {};
+        if (input.rating !== undefined) updateData.rating = input.rating;
+        if (input.title !== undefined) updateData.title = input.title;
+        if (input.comment !== undefined) updateData.comment = input.comment;
+        updateData.updated_at = new Date().toISOString();
+
+        const { data: updatedReview, error: updateError } = await client
+          .from('reviews')
+          .update(updateData)
+          .eq('id', reviewId)
+          .select(`
+            *,
+            auth.users!inner(email)
+          `)
+          .single();
+
+        if (updateError) {
+          console.error('Error updating review:', updateError);
+          throw new Error('Failed to update review');
+        }
+
+        return {
+          ...updatedReview,
+          userEmail: updatedReview.users?.email || user.email,
+          userFirstName: user.user_metadata?.first_name || '',
+          userLastName: user.user_metadata?.last_name || '',
+          userDisplayName: `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || 'Anonymous User'
+        };
+      } catch (error) {
+        console.error('Error in updateReview:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    deleteReview: async (_, { reviewId }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const client = supabaseClient.getServiceClient();
+        
+        // Check if review exists and belongs to user
+        const { data: existingReview, error: checkError } = await client
+          .from('reviews')
+          .select('id, user_id')
+          .eq('id', reviewId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (checkError) {
+          throw new Error('Review not found or access denied');
+        }
+
+        // Delete the review
+        const { error: deleteError } = await client
+          .from('reviews')
+          .delete()
+          .eq('id', reviewId);
+
+        if (deleteError) {
+          console.error('Error deleting review:', deleteError);
+          throw new Error('Failed to delete review');
+        }
+
+        return true;
+      } catch (error) {
+        console.error('Error in deleteReview:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    voteOnReview: async (_, { reviewId, isHelpful }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const client = supabaseClient.getServiceClient();
+        
+        // Check if review exists
+        const { data: review, error: reviewError } = await client
+          .from('reviews')
+          .select('id')
+          .eq('id', reviewId)
+          .single();
+
+        if (reviewError) {
+          throw new Error('Review not found');
+        }
+
+        // Upsert the vote (insert or update)
+        const { error: voteError } = await client
+          .from('review_votes')
+          .upsert({
+            review_id: reviewId,
+            user_id: user.id,
+            is_helpful: isHelpful
+          }, {
+            onConflict: 'review_id,user_id'
+          });
+
+        if (voteError) {
+          console.error('Error voting on review:', voteError);
+          throw new Error('Failed to vote on review');
+        }
+
+        // Get updated review with vote counts
+        const { data: updatedReview, error: fetchError } = await client
+          .rpc('get_product_reviews', { 
+            p_product_id: review.product_id, 
+            p_limit: 1, 
+            p_offset: 0 
+          })
+          .eq('id', reviewId)
+          .single();
+
+        if (fetchError) {
+          console.error('Error fetching updated review:', fetchError);
+          throw new Error('Failed to fetch updated review');
+        }
+
+        return updatedReview;
+      } catch (error) {
+        console.error('Error in voteOnReview:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    // Order Review Mutations
+    createOrderReview: async (_, { input }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const client = supabaseClient.getServiceClient();
+        
+        // Check if order exists and belongs to user
+        const { data: order, error: orderError } = await client
+          .from('orders_main')
+          .select('id, user_id, financial_status')
+          .eq('id', input.orderId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (orderError) {
+          throw new Error('Order not found or access denied');
+        }
+
+        // Only allow reviews for paid orders
+        if (order.financial_status !== 'paid') {
+          throw new Error('You can only review completed orders');
+        }
+
+        // Check if user has already reviewed this order
+        const { data: existingReview, error: checkError } = await client
+          .from('reviews')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('order_id', input.orderId)
+          .eq('product_category', 'order')
+          .single();
+
+        if (checkError && checkError.code !== 'PGRST116') {
+          throw new Error('Failed to check existing reviews');
+        }
+
+        if (existingReview) {
+          throw new Error('You have already reviewed this order');
+        }
+
+        // Create the order review
+        const { data: newReview, error: createError } = await client
+          .from('reviews')
+          .insert({
+            user_id: user.id,
+            product_id: 'order-' + input.orderId, // Use order ID as product ID for order reviews
+            product_category: 'order',
+            rating: input.rating,
+            title: input.title || '',
+            comment: input.comment || '',
+            is_verified_purchase: true, // Order reviews are always verified
+            order_id: input.orderId,
+            status: 'active'
+          })
+          .select(`
+            *,
+            auth.users!inner(email)
+          `)
+          .single();
+
+        if (createError) {
+          console.error('Error creating order review:', createError);
+          throw new Error('Failed to create review');
+        }
+
+        return {
+          ...newReview,
+          userEmail: newReview.users?.email || user.email,
+          userFirstName: user.user_metadata?.first_name || '',
+          userLastName: user.user_metadata?.last_name || '',
+          userDisplayName: `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || 'Anonymous User'
+        };
+      } catch (error) {
+        console.error('Error in createOrderReview:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    updateOrderReview: async (_, { reviewId, input }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const client = supabaseClient.getServiceClient();
+        
+        // Check if review exists and belongs to user
+        const { data: existingReview, error: checkError } = await client
+          .from('reviews')
+          .select('id, user_id, order_id')
+          .eq('id', reviewId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (checkError) {
+          throw new Error('Review not found or access denied');
+        }
+
+        // Ensure this is an order review
+        if (!existingReview.order_id) {
+          throw new Error('Invalid review type');
+        }
+
+        // Update the review
+        const updateData = {};
+        if (input.rating !== undefined) updateData.rating = input.rating;
+        if (input.title !== undefined) updateData.title = input.title;
+        if (input.comment !== undefined) updateData.comment = input.comment;
+        updateData.updated_at = new Date().toISOString();
+
+        const { data: updatedReview, error: updateError } = await client
+          .from('reviews')
+          .update(updateData)
+          .eq('id', reviewId)
+          .select(`
+            *,
+            auth.users!inner(email)
+          `)
+          .single();
+
+        if (updateError) {
+          console.error('Error updating order review:', updateError);
+          throw new Error('Failed to update review');
+        }
+
+        return {
+          ...updatedReview,
+          userEmail: updatedReview.users?.email || user.email,
+          userFirstName: user.user_metadata?.first_name || '',
+          userLastName: user.user_metadata?.last_name || '',
+          userDisplayName: `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || 'Anonymous User'
+        };
+      } catch (error) {
+        console.error('Error in updateOrderReview:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    deleteOrderReview: async (_, { reviewId }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const client = supabaseClient.getServiceClient();
+        
+        // Check if review exists and belongs to user
+        const { data: existingReview, error: checkError } = await client
+          .from('reviews')
+          .select('id, user_id, order_id')
+          .eq('id', reviewId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (checkError) {
+          throw new Error('Review not found or access denied');
+        }
+
+        // Ensure this is an order review
+        if (!existingReview.order_id) {
+          throw new Error('Invalid review type');
+        }
+
+        // Delete the review
+        const { error: deleteError } = await client
+          .from('reviews')
+          .delete()
+          .eq('id', reviewId);
+
+        if (deleteError) {
+          console.error('Error deleting order review:', deleteError);
+          throw new Error('Failed to delete review');
+        }
+
+        return true;
+      } catch (error) {
+        console.error('Error in deleteOrderReview:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    // Discount mutations
+    createDiscountCode: async (_, { input }, context) => {
+      try {
+        console.log('🎫 Creating discount code:', input);
+        
+        // TODO: Add admin authentication check here
+        // if (!context.user || !isAdmin(context.user)) {
+        //   throw new AuthenticationError('Admin access required');
+        // }
+        
+        const code = await discountManager.createDiscountCode(input);
+        
+        // Map database fields to GraphQL schema
+        return {
+          id: code.id,
+          code: code.code,
+          description: code.description,
+          discountType: code.discount_type,
+          discountValue: parseFloat(code.discount_value),
+          minimumOrderAmount: parseFloat(code.minimum_order_amount),
+          usageLimit: code.usage_limit,
+          usageCount: code.usage_count,
+          validFrom: code.valid_from,
+          validUntil: code.valid_until,
+          active: code.active,
+          createdAt: code.created_at,
+          updatedAt: code.updated_at
+        };
+      } catch (error) {
+        console.error('❌ Error creating discount code:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    updateDiscountCode: async (_, { id, input }, context) => {
+      try {
+        console.log('📝 Updating discount code:', id, input);
+        
+        // TODO: Add admin authentication check here
+        
+        const code = await discountManager.updateDiscountCode(id, input);
+        
+        // Map database fields to GraphQL schema
+        return {
+          id: code.id,
+          code: code.code,
+          description: code.description,
+          discountType: code.discount_type,
+          discountValue: parseFloat(code.discount_value),
+          minimumOrderAmount: parseFloat(code.minimum_order_amount),
+          usageLimit: code.usage_limit,
+          usageCount: code.usage_count,
+          validFrom: code.valid_from,
+          validUntil: code.valid_until,
+          active: code.active,
+          createdAt: code.created_at,
+          updatedAt: code.updated_at
+        };
+      } catch (error) {
+        console.error('❌ Error updating discount code:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    deleteDiscountCode: async (_, { id }, context) => {
+      try {
+        console.log('🗑️ Deleting discount code:', id);
+        
+        // TODO: Add admin authentication check here
+        
+        return await discountManager.deleteDiscountCode(id);
+      } catch (error) {
+        console.error('❌ Error deleting discount code:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    applyDiscountToCheckout: async (_, { code, orderAmount }, context) => {
+      try {
+        console.log('💰 Applying discount to checkout:', code, orderAmount);
+        
+        // Get user info from context if available
+        const userId = context.user?.id || null;
+        const guestEmail = context.guestEmail || null;
+        
+        const result = await discountManager.validateCode(code, orderAmount, userId, guestEmail);
+        
+        // Map the result to GraphQL schema
+        return {
+          valid: result.valid,
+          discountCode: result.discountCode ? {
+            id: result.discountCode.id,
+            code: result.discountCode.code,
+            description: result.discountCode.description,
+            discountType: result.discountCode.discountType,
+            discountValue: result.discountCode.discountValue,
+            minimumOrderAmount: result.discountCode.minimumOrderAmount,
+            usageLimit: result.discountCode.usageLimit,
+            usageCount: result.discountCode.usageCount,
+            validFrom: result.discountCode.validFrom,
+            validUntil: result.discountCode.validUntil,
+            active: result.discountCode.active,
+            createdAt: result.discountCode.createdAt,
+            updatedAt: result.discountCode.updatedAt
+          } : null,
+          discountAmount: result.discountAmount,
+          message: result.message
+        };
+      } catch (error) {
+        console.error('❌ Error applying discount:', error);
+        return {
+          valid: false,
+          discountCode: null,
+          discountAmount: 0,
+          message: 'Error applying discount'
+        };
+      }
+    },
+    
+    // Credit mutations
+    markCreditNotificationsRead: async (_, { userId }) => {
+      try {
+        return await creditHandlers.markCreditNotificationsRead(userId);
+      } catch (error) {
+        console.error('❌ Error marking credit notifications as read:', error);
+        throw new Error('Failed to mark notifications as read');
+      }
+    },
+    
+    addUserCredits: async (_, { input }, context) => {
+      try {
+        // TODO: Add admin authentication check
+        const adminUserId = context.user?.id || null;
+        return await creditHandlers.addUserCredits(input, adminUserId);
+      } catch (error) {
+        console.error('❌ Error adding user credits:', error);
+        throw new Error('Failed to add credits');
+      }
+    },
+    
+    addCreditsToAllUsers: async (_, { amount, reason }, context) => {
+      try {
+        // TODO: Add admin authentication check
+        const adminUserId = context.user?.id || null;
+        return await creditHandlers.addCreditsToAllUsers(amount, reason, adminUserId);
+      } catch (error) {
+        console.error('❌ Error adding credits to all users:', error);
+        throw new Error('Failed to add credits to all users');
+      }
+    },
+    
+    applyCreditsToOrder: async (_, { orderId, amount }, context) => {
+      try {
+        const userId = context.user?.id;
+        if (!userId) {
+          throw new Error('Authentication required');
+        }
+        return await creditHandlers.applyCreditsToOrder(orderId, amount, userId);
+      } catch (error) {
+        console.error('❌ Error applying credits to order:', error);
+        throw new Error('Failed to apply credits');
       }
     }
   }
