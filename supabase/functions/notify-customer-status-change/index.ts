@@ -230,9 +230,19 @@ async function sendDiscordNotification(payload: NotificationPayload): Promise<{ 
   const discordWebhookUrl = Deno.env.get('DISCORD_WEBHOOK_URL')
   
   if (!discordWebhookUrl) {
-    console.log('⏭️ Discord webhook URL not configured, skipping Discord notification')
-    return { success: false, message: 'Discord webhook not configured' }
+    console.log('Discord webhook URL not configured')
+    return new Response(JSON.stringify({ 
+      success: false, 
+      message: 'Discord webhook not configured' 
+    }), { status: 200 })
   }
+
+  // Security: Log webhook usage without exposing URL
+  console.log('📱 Discord webhook notification triggered', {
+    orderId: payload.orderNumber,
+    hasWebhook: true,
+    timestamp: new Date().toISOString()
+  })
 
   try {
     // Create different messages based on order status

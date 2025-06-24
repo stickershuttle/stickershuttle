@@ -1,0 +1,75 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+🎨 Frontend
+Next.js 13+ - React framework with App Router
+React 18 - UI library
+TypeScript - Type-safe JavaScript
+Tailwind CSS - Utility-first CSS framework
+Apollo Client - GraphQL client
+PostHog - Analytics tracking
+🔧 Backend
+Node.js 18 - JavaScript runtime
+Apollo Server - GraphQL server
+Express.js - Web framework
+GraphQL - API query language
+Nodemon - Development auto-reload
+🗄️ Database & Auth
+Supabase - PostgreSQL database + Auth
+PostgreSQL - Primary database
+Supabase Realtime - Live data updates
+Supabase Edge Functions - Serverless functions
+💳 Payment & Commerce
+Stripe - Payment processing
+Stripe Checkout - Hosted checkout
+Stripe Webhooks - Payment events
+📦 Shipping & Logistics
+EasyPost API - Multi-carrier shipping
+USPS, UPS, FedEx - Carrier integrations
+Real-time tracking - Delivery updates
+🖼️ Media & Storage
+Cloudinary - Image/file storage & CDN
+PDF Generation - Invoice/proof creation
+Sharp - Image processing
+📧 Communications
+Discord Webhooks - Order notifications
+Email (via Supabase) - Customer emails
+Klaviyo - Email marketing integration
+🚀 Infrastructure & Deployment
+Frontend Hosting
+Vercel - Frontend deployment
+Vercel Edge Network - Global CDN
+GitHub Actions - CI/CD pipeline
+Backend Hosting
+Railway - Backend deployment
+Docker/Podman - Containerization
+GitHub Container Registry - Image storage
+🛠️ Development Tools
+Git/GitHub - Version control
+ESLint - Code linting
+VS Code/Cursor - Development environment
+Podman Compose - Local development
+📊 Monitoring & Analytics
+PostHog - User analytics
+Vercel Analytics - Performance metrics
+Error tracking - Built-in logging
+🔒 Security
+JWT - Authentication tokens
+Environment Variables - Secret management
+HTTPS - SSL certificates
+CORS - Cross-origin policies
+📱 Additional Technologies
+PWA Ready - Progressive web app capable
+Responsive Design - Mobile-first approach
+WebSockets - Real-time updates
+REST APIs - Third-party integrations
+🧩 Key Libraries
+React Hook Form - Form handling
+React Query - Data fetching
+date-fns - Date manipulation
+uuid - Unique ID generation
+
+
+multer - File upload handling

@@ -14,6 +14,10 @@ interface AdminContextType {
   setShowMarketingDropdown: (show: boolean) => void;
   showShippingDropdown: boolean;
   setShowShippingDropdown: (show: boolean) => void;
+  isMobileMenuOpen: boolean;
+  setIsMobileMenuOpen: (open: boolean) => void;
+  showQuickActions: boolean;
+  setShowQuickActions: (show: boolean) => void;
 }
 
 const AdminContext = createContext<AdminContextType>({
@@ -21,6 +25,10 @@ const AdminContext = createContext<AdminContextType>({
   setShowMarketingDropdown: () => {},
   showShippingDropdown: false,
   setShowShippingDropdown: () => {},
+  isMobileMenuOpen: false,
+  setIsMobileMenuOpen: () => {},
+  showQuickActions: false,
+  setShowQuickActions: () => {},
 });
 
 export const useAdminContext = () => useContext(AdminContext);
@@ -31,6 +39,8 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
   const [showShippingDropdown, setShowShippingDropdown] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [breadcrumbKey, setBreadcrumbKey] = useState(0);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
   
   // Ensure we only render breadcrumbs on client side to avoid hydration mismatch
   useEffect(() => {
@@ -41,6 +51,12 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
   useEffect(() => {
     setBreadcrumbKey(prev => prev + 1);
   }, [router.asPath, router.query]);
+  
+  // Close mobile menu on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+    setShowQuickActions(false);
+  }, [router.asPath]);
   
   // Get breadcrumb data based on current route
   const getBreadcrumbs = () => {
@@ -98,6 +114,27 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
             icon: null
           });
         }
+      } else if (segments[1] === 'abandoned-checkouts') {
+        breadcrumbs.push({
+          label: 'Abandoned Checkouts',
+          href: '/admin/abandoned-checkouts',
+          icon: (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          )
+        });
+      } else if (segments[1] === 'deals') {
+        breadcrumbs.push({
+          label: 'Deals',
+          href: '/admin/deals',
+          icon: (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
+            </svg>
+          )
+        });
       } else if (segments[1] === 'shipping-labels') {
         breadcrumbs.push({
           label: 'Shipping Labels',
@@ -135,6 +172,26 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
             icon: null
           });
         }
+      } else if (segments[1] === 'discounts') {
+        breadcrumbs.push({
+          label: 'Discounts',
+          href: '/admin/discounts',
+          icon: (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+          )
+        });
+      } else if (segments[1] === 'credits') {
+        breadcrumbs.push({
+          label: 'Credits',
+          href: '/admin/credits',
+          icon: (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )
+        });
       } 
       // Analytics temporarily hidden
       // else if (segments[1] === 'analytics') {
@@ -160,7 +217,11 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
       showMarketingDropdown,
       setShowMarketingDropdown,
       showShippingDropdown,
-      setShowShippingDropdown
+      setShowShippingDropdown,
+      isMobileMenuOpen,
+      setIsMobileMenuOpen,
+      showQuickActions,
+      setShowQuickActions
     }}>
       <Head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -181,12 +242,14 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
         <title>{title}</title>
       </Head>
       
-      <div className="min-h-screen text-white" style={{ backgroundColor: '#030140', fontFamily: 'Inter, sans-serif' }}>
+      <div className="min-h-screen text-white overflow-x-hidden" style={{ backgroundColor: '#030140', fontFamily: 'Inter, sans-serif' }}>
         <UniversalHeader />
         
-        {/* Breadcrumbs */}
+
+        
+        {/* Desktop Breadcrumbs */}
         <div 
-          className="fixed top-16 left-0 right-0 z-10 px-6 py-3"
+          className="hidden xl:block fixed top-16 left-0 right-0 z-10 px-6 py-3"
           style={{
             backgroundColor: 'rgba(3, 1, 64, 0.95)',
             backdropFilter: 'blur(10px)',
@@ -218,10 +281,10 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
           </nav>
         </div>
         
-        <main className="pt-32 min-h-screen flex">
-          {/* Sidebar */}
+        <main className="pt-20 xl:pt-32 min-h-screen flex">
+          {/* Desktop Sidebar */}
           <div
-            className="w-56 fixed left-0 h-screen pt-8 pr-4"
+            className="hidden xl:block w-56 fixed left-0 h-screen pt-8 pr-4"
             style={{
               backgroundColor: 'transparent',
               top: '104px',
@@ -245,31 +308,95 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
                 </div>
 
                 {/* Orders */}
-                <a
-                  href="/admin/orders"
-                  className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
-                    router.asPath.startsWith('/admin/orders')
-                      ? 'text-white bg-purple-500/15 border-l-3 border-purple-500'
-                      : 'text-gray-400 hover:text-white border-l-3 border-transparent'
-                  }`}
-                  onMouseEnter={(e) => {
-                    if (!router.asPath.startsWith('/admin/orders')) {
-                      e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
-                      e.currentTarget.style.color = '#A78BFA';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!router.asPath.startsWith('/admin/orders')) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = '';
-                    }
-                  }}
-                >
-                  <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                  </svg>
-                  Orders
-                </a>
+                <div className="relative">
+                  <a
+                    href="/admin/orders"
+                    className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
+                      router.asPath.startsWith('/admin/orders') || router.asPath.startsWith('/admin/abandoned-checkouts')
+                        ? 'text-white bg-purple-500/15 border-l-3 border-purple-500'
+                        : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                    }`}
+                    onMouseEnter={(e) => {
+                      if (!router.asPath.startsWith('/admin/orders') && !router.asPath.startsWith('/admin/abandoned-checkouts')) {
+                        e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
+                        e.currentTarget.style.color = '#A78BFA';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!router.asPath.startsWith('/admin/orders') && !router.asPath.startsWith('/admin/abandoned-checkouts')) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = '';
+                      }
+                    }}
+                  >
+                    <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                    Orders
+                  </a>
+                  
+                  {/* Orders Submenu - Always visible when on orders pages */}
+                  {(router.asPath.startsWith('/admin/orders') || router.asPath.startsWith('/admin/abandoned-checkouts')) && (
+                    <div className="ml-8 mt-1">
+                      <a
+                        href="/admin/orders"
+                        className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
+                          router.asPath === '/admin/orders' || (router.asPath.startsWith('/admin/orders/') && !router.asPath.includes('abandoned'))
+                            ? 'text-purple-300 bg-purple-500/10'
+                            : 'text-gray-400 hover:text-purple-300'
+                        }`}
+                        style={{
+                          backgroundColor: router.asPath === '/admin/orders' || (router.asPath.startsWith('/admin/orders/') && !router.asPath.includes('abandoned')) ? 'rgba(168, 85, 247, 0.1)' : 'transparent'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (router.asPath !== '/admin/orders' && !router.asPath.startsWith('/admin/orders/')) {
+                            e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
+                            e.currentTarget.style.color = '#D8B4FE';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (router.asPath !== '/admin/orders' && !router.asPath.startsWith('/admin/orders/')) {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = '';
+                          }
+                        }}
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Paid Orders
+                      </a>
+                      <a
+                        href="/admin/abandoned-checkouts"
+                        className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
+                          router.asPath.startsWith('/admin/abandoned-checkouts')
+                            ? 'text-purple-300 bg-purple-500/10'
+                            : 'text-gray-400 hover:text-purple-300'
+                        }`}
+                        style={{
+                          backgroundColor: router.asPath.startsWith('/admin/abandoned-checkouts') ? 'rgba(168, 85, 247, 0.1)' : 'transparent'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!router.asPath.startsWith('/admin/abandoned-checkouts')) {
+                            e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
+                            e.currentTarget.style.color = '#D8B4FE';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!router.asPath.startsWith('/admin/abandoned-checkouts')) {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = '';
+                          }
+                        }}
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        Abandoned Checkouts
+                      </a>
+                    </div>
+                  )}
+                </div>
 
                 {/* Customers */}
                 <a
@@ -296,6 +423,88 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                   </svg>
                   Customers
+                </a>
+
+                {/* Discounts */}
+                <a
+                  href="/admin/discounts"
+                  className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
+                    router.asPath.startsWith('/admin/discounts')
+                      ? 'text-white bg-yellow-500/15 border-l-3 border-yellow-500'
+                      : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                  }`}
+                  onMouseEnter={(e) => {
+                    if (!router.asPath.startsWith('/admin/discounts')) {
+                      e.currentTarget.style.backgroundColor = 'rgba(250, 204, 21, 0.1)';
+                      e.currentTarget.style.color = '#FDE047';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!router.asPath.startsWith('/admin/discounts')) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '';
+                    }
+                  }}
+                >
+                  <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                  Discounts
+                </a>
+
+                {/* Deals */}
+                <a
+                  href="/admin/deals"
+                  className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
+                    router.asPath.startsWith('/admin/deals')
+                      ? 'text-white bg-orange-500/15 border-l-3 border-orange-500'
+                      : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                  }`}
+                  onMouseEnter={(e) => {
+                    if (!router.asPath.startsWith('/admin/deals')) {
+                      e.currentTarget.style.backgroundColor = 'rgba(251, 146, 60, 0.1)';
+                      e.currentTarget.style.color = '#FDBA74';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!router.asPath.startsWith('/admin/deals')) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '';
+                    }
+                  }}
+                >
+                  <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
+                  </svg>
+                  Deals
+                </a>
+
+                {/* Credits */}
+                <a
+                  href="/admin/credits"
+                  className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
+                    router.asPath.startsWith('/admin/credits')
+                      ? 'text-white bg-green-500/15 border-l-3 border-green-500'
+                      : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                  }`}
+                  onMouseEnter={(e) => {
+                    if (!router.asPath.startsWith('/admin/credits')) {
+                      e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.1)';
+                      e.currentTarget.style.color = '#86EFAC';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!router.asPath.startsWith('/admin/credits')) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '';
+                    }
+                  }}
+                >
+                  <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Credits
                 </a>
 
                 {/* Divider */}
@@ -554,16 +763,228 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
                   <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750290446/Github-desktop-logo-symbol.svg_hb06pq.png" alt="GitHub" className="w-5 h-5 mr-3 object-contain" />
                   GitHub
                 </a>
+
+                {/* PostHog */}
+                <a
+                  href="https://app.posthog.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all border-l-3 border-transparent"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(251, 146, 60, 0.1)';
+                    e.currentTarget.style.color = '#FED7AA';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '';
+                  }}
+                >
+                  <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750695141/9ca51ebe-fb09-4440-a9a4-a3fdb37ae3ad.png" alt="PostHog" className="w-5 h-5 mr-3 object-contain" />
+                  PostHog
+                </a>
               </nav>
             </div>
           </div>
 
-          {/* Main Content */}
-          <div className="flex-1 ml-56">
-          {children}
+                    {/* Main Content */}
+          <div className="flex-1 xl:ml-56 pb-32 xl:pb-0 overflow-x-hidden">
+            {children}
           </div>
         </main>
-        {/* Note: No footer for admin pages */}
+
+        {/* Quick Actions Menu */}
+        <div className="xl:hidden">
+          {showQuickActions && (
+            <>
+              {/* Backdrop */}
+              <div 
+                className="fixed inset-0 bg-black/50 z-40"
+                onClick={() => setShowQuickActions(false)}
+              />
+              
+              {/* Quick Actions Menu */}
+              <div className="fixed bottom-24 left-4 right-4 z-45">
+                <div 
+                  className="rounded-xl p-4 shadow-lg"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                    backdropFilter: 'blur(12px)',
+                  }}
+                >
+                  <h3 className="text-white font-semibold mb-3">Quick Actions</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Create Order */}
+                    <button className="flex flex-col items-center p-3 rounded-lg hover:bg-white/10 transition-colors">
+                      <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center mb-2">
+                        <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                      </div>
+                      <span className="text-xs text-white">New Order</span>
+                    </button>
+                    
+                    {/* Add Customer */}
+                    <button className="flex flex-col items-center p-3 rounded-lg hover:bg-white/10 transition-colors">
+                      <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center mb-2">
+                        <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                        </svg>
+                      </div>
+                      <span className="text-xs text-white">Add Customer</span>
+                    </button>
+                    
+                    {/* Create Discount */}
+                    <button className="flex flex-col items-center p-3 rounded-lg hover:bg-white/10 transition-colors">
+                      <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center mb-2">
+                        <svg className="w-5 h-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                      </div>
+                      <span className="text-xs text-white">New Discount</span>
+                    </button>
+                    
+                    {/* Analytics */}
+                    <button className="flex flex-col items-center p-3 rounded-lg hover:bg-white/10 transition-colors">
+                      <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center mb-2">
+                        <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      </div>
+                      <span className="text-xs text-white">Analytics</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        
+        {/* Mobile/Tablet Bottom Navigation Pill */}
+        <div className="xl:hidden fixed bottom-6 left-1/2 transform -translate-x-1/2 z-30">
+          <div 
+            className="rounded-full px-2 py-2 flex items-center gap-1"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+              backdropFilter: 'blur(12px)',
+            }}
+          >
+            {/* Orders */}
+            <a
+              href="/admin/orders"
+              className={`relative p-2.5 rounded-full transition-colors ${
+                router.asPath.startsWith('/admin/orders') 
+                  ? 'text-purple-400' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {router.asPath.startsWith('/admin/orders') && (
+                <div className="absolute inset-px rounded-full bg-purple-500/20" style={{
+                  boxShadow: '0 0 12px rgba(168, 85, 247, 0.5)'
+                }}></div>
+              )}
+              <svg className="w-5 h-5 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
+            </a>
+            
+            {/* Customers */}
+            <a
+              href="/admin/customers"
+              className={`relative p-2.5 rounded-full transition-colors ${
+                router.asPath.startsWith('/admin/customers') 
+                  ? 'text-blue-400' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {router.asPath.startsWith('/admin/customers') && (
+                <div className="absolute inset-px rounded-full bg-blue-500/20" style={{
+                  boxShadow: '0 0 12px rgba(59, 130, 246, 0.5)'
+                }}></div>
+              )}
+              <svg className="w-5 h-5 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            </a>
+            
+            {/* Discounts */}
+            <a
+              href="/admin/discounts"
+              className={`relative p-2.5 rounded-full transition-colors ${
+                router.asPath.startsWith('/admin/discounts') 
+                  ? 'text-yellow-400' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {router.asPath.startsWith('/admin/discounts') && (
+                <div className="absolute inset-px rounded-full bg-yellow-500/20" style={{
+                  boxShadow: '0 0 12px rgba(234, 179, 8, 0.5)'
+                }}></div>
+              )}
+              <svg className="w-5 h-5 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+            </a>
+            
+            {/* Deals */}
+            <a
+              href="/admin/deals"
+              className={`relative p-2.5 rounded-full transition-colors ${
+                router.asPath.startsWith('/admin/deals') 
+                  ? 'text-orange-400' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {router.asPath.startsWith('/admin/deals') && (
+                <div className="absolute inset-px rounded-full bg-orange-500/20" style={{
+                  boxShadow: '0 0 12px rgba(251, 146, 60, 0.5)'
+                }}></div>
+              )}
+              <svg className="w-5 h-5 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
+              </svg>
+            </a>
+          </div>
+        </div>
+
+        {/* Mobile/Tablet Search Button */}
+        <button
+          className="xl:hidden fixed bottom-6 left-6 w-12 h-12 rounded-full flex items-center justify-center shadow-lg z-30"
+          style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+            backdropFilter: 'blur(12px)',
+          }}
+          title="Search"
+          aria-label="Search"
+        >
+          <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </button>
+
+        {/* Mobile Add Button */}
+        <button
+          onClick={() => setShowQuickActions(!showQuickActions)}
+          className="xl:hidden fixed bottom-6 right-6 w-12 h-12 rounded-full flex items-center justify-center shadow-lg z-30"
+          style={{
+            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+            backdropFilter: 'blur(25px) saturate(180%)',
+            border: '1px solid rgba(59, 130, 246, 0.4)',
+            boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+          }}
+          title="Quick Actions"
+          aria-label="Quick Actions"
+        >
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+        </button>
       </div>
     </AdminContext.Provider>
   );

@@ -108,7 +108,7 @@ export default function Home() {
         </div>
                 <div className="flex justify-center px-4">
                   <div 
-                    className="px-4 py-1.5 rounded-full text-center text-xs font-medium text-white border shadow-lg transition-all duration-300 hover:scale-105"
+                    className="px-4 py-1.5 rounded-full text-center text-xs font-medium text-white border shadow-lg"
                     style={{
                       background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.05) 100%)',
                       backdropFilter: 'blur(20px) saturate(180%)',
@@ -148,32 +148,32 @@ export default function Home() {
                 }}
               >
                 {/* First set of brands */}
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593661/StickerShuttle_Brands_AndHealth_bawirz.png" alt="AndHealth" width={120} height={80} className="h-20 w-auto" priority />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593675/Wahl-Icon-Web_tq0jqm.webp" alt="Wahl" width={120} height={80} className="h-20 w-auto" priority />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593600/Amazon-Go_by2gkb.png" alt="Amazon" width={120} height={80} className="h-20 w-auto" priority />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593604/ChickFilA-Icon-Web_anobg1.png" alt="Chick-fil-A" width={120} height={80} className="h-20 w-auto" priority />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_Nike_gmedyb.png" alt="Nike" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593671/StickerShuttle_Brands_XFinity_nz2obt.png" alt="Xfinity" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_SSPR_ewqax7.png" alt="SSPR" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593662/StickerShuttle_Brands_CGR_ryewlb.png" alt="CGR" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_WF_vrafue.png" alt="WF" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593666/StickerShuttle_Brands_UnoMas_ntorew.png" alt="UnoMas" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593610/LT-Icon_llqxai.png" alt="LT" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593661/StickerShuttle_Brands_AndHealth_bawirz.png" alt="AndHealth" width={120} height={80} className="h-20 w-auto brand-float-1" priority />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593675/Wahl-Icon-Web_tq0jqm.webp" alt="Wahl" width={120} height={80} className="h-20 w-auto brand-float-2" priority />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593600/Amazon-Go_by2gkb.png" alt="Amazon" width={120} height={80} className="h-20 w-auto brand-float-3" priority />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593604/ChickFilA-Icon-Web_anobg1.png" alt="Chick-fil-A" width={120} height={80} className="h-20 w-auto brand-float-4" priority />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_Nike_gmedyb.png" alt="Nike" width={120} height={80} className="h-20 w-auto brand-float-5" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593671/StickerShuttle_Brands_XFinity_nz2obt.png" alt="Xfinity" width={120} height={80} className="h-20 w-auto brand-float-6" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" width={120} height={80} className="h-20 w-auto brand-float-1" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_SSPR_ewqax7.png" alt="SSPR" width={120} height={80} className="h-20 w-auto brand-float-2" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593662/StickerShuttle_Brands_CGR_ryewlb.png" alt="CGR" width={120} height={80} className="h-20 w-auto brand-float-3" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_WF_vrafue.png" alt="WF" width={120} height={80} className="h-20 w-auto brand-float-4" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593666/StickerShuttle_Brands_UnoMas_ntorew.png" alt="UnoMas" width={120} height={80} className="h-20 w-auto brand-float-5" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593610/LT-Icon_llqxai.png" alt="LT" width={120} height={80} className="h-20 w-auto brand-float-6" />
                 
                 {/* Duplicate set for seamless loop */}
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593661/StickerShuttle_Brands_AndHealth_bawirz.png" alt="AndHealth" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593675/Wahl-Icon-Web_tq0jqm.webp" alt="Wahl" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593600/Amazon-Go_by2gkb.png" alt="Amazon" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593604/ChickFilA-Icon-Web_anobg1.png" alt="Chick-fil-A" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_Nike_gmedyb.png" alt="Nike" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593671/StickerShuttle_Brands_XFinity_nz2obt.png" alt="Xfinity" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_SSPR_ewqax7.png" alt="SSPR" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593662/StickerShuttle_Brands_CGR_ryewlb.png" alt="CGR" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_WF_vrafue.png" alt="WF" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593666/StickerShuttle_Brands_UnoMas_ntorew.png" alt="UnoMas" width={120} height={80} className="h-20 w-auto" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593610/LT-Icon_llqxai.png" alt="LT" width={120} height={80} className="h-20 w-auto" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593661/StickerShuttle_Brands_AndHealth_bawirz.png" alt="AndHealth" width={120} height={80} className="h-20 w-auto brand-float-1" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593675/Wahl-Icon-Web_tq0jqm.webp" alt="Wahl" width={120} height={80} className="h-20 w-auto brand-float-2" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593600/Amazon-Go_by2gkb.png" alt="Amazon" width={120} height={80} className="h-20 w-auto brand-float-3" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593604/ChickFilA-Icon-Web_anobg1.png" alt="Chick-fil-A" width={120} height={80} className="h-20 w-auto brand-float-4" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_Nike_gmedyb.png" alt="Nike" width={120} height={80} className="h-20 w-auto brand-float-5" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593671/StickerShuttle_Brands_XFinity_nz2obt.png" alt="Xfinity" width={120} height={80} className="h-20 w-auto brand-float-6" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" width={120} height={80} className="h-20 w-auto brand-float-1" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_SSPR_ewqax7.png" alt="SSPR" width={120} height={80} className="h-20 w-auto brand-float-2" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593662/StickerShuttle_Brands_CGR_ryewlb.png" alt="CGR" width={120} height={80} className="h-20 w-auto brand-float-3" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_WF_vrafue.png" alt="WF" width={120} height={80} className="h-20 w-auto brand-float-4" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593666/StickerShuttle_Brands_UnoMas_ntorew.png" alt="UnoMas" width={120} height={80} className="h-20 w-auto brand-float-5" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593610/LT-Icon_llqxai.png" alt="LT" width={120} height={80} className="h-20 w-auto brand-float-6" />
               </div>
               
               {/* Fade effects */}
@@ -188,11 +188,11 @@ export default function Home() {
           <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4 relative">
             
             {/* Desktop/Tablet Grid */}
-            <div className="hidden md:grid md:grid-cols-5 gap-4 group/container">
+            <div className="hidden sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 group/container">
               {/* Vinyl Stickers */}
               <Link href="/products/vinyl-stickers">
                 <div 
-                  className="vinyl-hover text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  className="vinyl-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -200,7 +200,7 @@ export default function Home() {
                     backdropFilter: 'blur(12px)'
                   }}
                 >
-                  <div className="w-32 h-32 md:w-40 md:h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-3 transition-transform duration-500 ease-out">
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-40 lg:h-40 mx-auto mb-4 lg:mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-3 transition-transform duration-500 ease-out">
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
                       alt="Vinyl Stickers" 
@@ -210,10 +210,10 @@ export default function Home() {
                       }}
                     />
                   </div>
-                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Vinyl Stickers →</h3>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Vinyl Stickers →</h3>
                   
                   {/* Hover to show features on desktop */}
-                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
+                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4 hidden lg:block">
                     <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
                       <div className="flex flex-wrap gap-2 justify-center">
                         <span className="px-3 py-1 text-xs rounded-full bg-green-500/20 text-green-200 border border-green-400/50">💧 Waterproof & UV Resistant</span>
@@ -229,7 +229,7 @@ export default function Home() {
               {/* Holographic Stickers */}
               <Link href="/products/holographic-stickers">
                 <div 
-                  className="holographic-hover text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  className="holographic-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -237,7 +237,7 @@ export default function Home() {
                     backdropFilter: 'blur(12px)'
                   }}
                 >
-                  <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-3 transition-transform duration-500 ease-out">
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-40 lg:h-40 mx-auto mb-4 lg:mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-3 transition-transform duration-500 ease-out">
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
                       alt="Holographic Stickers" 
@@ -247,10 +247,10 @@ export default function Home() {
                       }}
                     />
                   </div>
-                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Holographic Stickers →</h3>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Holographic Stickers →</h3>
                   
                   {/* Hover to show features on desktop */}
-                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
+                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4 hidden lg:block">
                     <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
                       <div className="flex flex-wrap gap-2 justify-center">
                         <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">💧 Waterproof & UV Resistant</span>
@@ -266,7 +266,7 @@ export default function Home() {
               {/* Glitter Stickers */}
               <Link href="/products/glitter-stickers">
                 <div 
-                  className="glitter-hover text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  className="glitter-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -274,7 +274,7 @@ export default function Home() {
                     backdropFilter: 'blur(12px)'
                   }}
                 >
-                  <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-2 transition-transform duration-500 ease-out">
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-40 lg:h-40 mx-auto mb-4 lg:mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-2 transition-transform duration-500 ease-out">
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
                       alt="Glitter Stickers" 
@@ -284,10 +284,10 @@ export default function Home() {
                       }}
                     />
                   </div>
-                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Glitter Stickers →</h3>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Glitter Stickers →</h3>
                   
                   {/* Hover to show features on desktop */}
-                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
+                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4 hidden lg:block">
                     <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
                       <div className="flex flex-wrap gap-2 justify-center">
                         <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">💧 Waterproof & UV Resistant</span>
@@ -303,7 +303,7 @@ export default function Home() {
               {/* Chrome Stickers */}
               <Link href="/products/chrome-stickers">
                 <div 
-                  className="chrome-hover text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  className="chrome-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -311,7 +311,7 @@ export default function Home() {
                     backdropFilter: 'blur(12px)'
                   }}
                 >
-                  <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-2 transition-transform duration-500 ease-out">
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-40 lg:h-40 mx-auto mb-4 lg:mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-2 transition-transform duration-500 ease-out">
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
                       alt="Chrome Stickers" 
@@ -321,10 +321,10 @@ export default function Home() {
                       }}
                     />
                   </div>
-                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Chrome Stickers →</h3>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Chrome Stickers →</h3>
                   
                   {/* Hover to show features on desktop */}
-                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
+                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4 hidden lg:block">
                     <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
                       <div className="flex flex-wrap gap-2 justify-center">
                         <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">💧 Waterproof & UV Resistant</span>
@@ -337,10 +337,10 @@ export default function Home() {
                 </div>
               </Link>
 
-              {/* Sticker Sheets */}
-              <Link href="/products/sticker-sheets">
+              {/* Clear Stickers - Mobile & Tablet Only */}
+              <Link href="/products/clear-stickers" className="lg:hidden">
                 <div 
-                  className="banner-hover text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  className="clear-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -348,7 +348,44 @@ export default function Home() {
                     backdropFilter: 'blur(12px)'
                   }}
                 >
-                  <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-1 transition-transform duration-500 ease-out">
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-40 lg:h-40 mx-auto mb-4 lg:mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-1 transition-transform duration-500 ease-out">
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749849590/StickerShuttle_ClearIcon_zxjnqc.svg" 
+                      alt="Clear Stickers" 
+                      className="w-full h-full object-contain"
+                      style={{
+                        filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.35)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.21))'
+                      }}
+                    />
+                  </div>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Clear Stickers →</h3>
+                  
+                  {/* Hover to show features on desktop */}
+                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4 hidden lg:block">
+                    <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        <span className="px-3 py-1 text-xs rounded-full bg-teal-500/20 text-teal-200 border border-teal-400/50">💧 Waterproof & UV Resistant</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-teal-500/20 text-teal-200 border border-teal-400/50">🛡️ Laminated with 5+ yr protection</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-teal-500/20 text-teal-200 border border-teal-400/50">🔍 Crystal Clear</span>
+                        <span className="px-3 py-1 text-xs rounded-full bg-teal-500/20 text-teal-200 border border-teal-400/50">💎 Transparent</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+
+              {/* Sticker Sheets */}
+              <Link href="/products/sticker-sheets">
+                <div 
+                  className="banner-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)'
+                  }}
+                >
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-40 lg:h-40 mx-auto mb-4 lg:mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-1 transition-transform duration-500 ease-out">
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749847809/StickerShuttle_StickerSheetsIcon_2_g61dty.svg" 
                       alt="Sticker Sheets" 
@@ -358,10 +395,10 @@ export default function Home() {
                       }}
                     />
                   </div>
-                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Sticker Sheets →</h3>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Sticker Sheets →</h3>
                   
                   {/* Hover to show features on desktop */}
-                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4">
+                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4 hidden lg:block">
                     <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
                       <div className="flex flex-wrap gap-2 justify-center">
                         <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">💧 Waterproof & UV Resistant</span>
@@ -376,7 +413,7 @@ export default function Home() {
             </div>
 
             {/* Mobile Scrollable Cards */}
-            <div className="md:hidden overflow-x-auto pb-4">
+            <div className="sm:hidden overflow-x-auto pb-4">
               <div className="flex space-x-4 w-max">
                 {/* Vinyl Stickers Mobile */}
                 <Link href="/products/vinyl-stickers">
@@ -478,6 +515,31 @@ export default function Home() {
                   </div>
                 </Link>
 
+                {/* Clear Stickers Mobile */}
+                <Link href="/products/clear-stickers">
+                  <div 
+                    className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                      backdropFilter: 'blur(12px)'
+                    }}
+                  >
+                    <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749849590/StickerShuttle_ClearIcon_zxjnqc.svg" 
+                        alt="Clear Stickers" 
+                        className="w-full h-full object-contain"
+                        style={{
+                          filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.5)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.3))'
+                        }}
+                      />
+                    </div>
+                    <h3 className="font-semibold text-white">Clear<br/>Stickers →</h3>
+                  </div>
+                </Link>
+
                 {/* Sticker Sheets Mobile */}
                 <Link href="/products/sticker-sheets">
                   <div 
@@ -507,28 +569,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* USA Banner */}
-        <section className="py-4">
-          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4">
-            <div 
-              className="py-6 px-6 md:px-0 rounded-xl relative overflow-hidden flex items-center justify-center"
-              style={{
-                backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749596480/860Oi6KbTFeIC4n1x6FsPA_agnu8p.jpg)',
-                backgroundSize: '150%',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-                backgroundColor: '#1a1a2e'
-              }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-black/20 to-black/30 rounded-xl"></div>
-              <div className="relative z-10 text-center">
-                <p className="text-white font-bold text-lg drop-shadow-lg">
-                  All stickers printed and vinyl materials used are made in the USA <span style={{filter: 'drop-shadow(0 0 8px rgba(255, 215, 19, 0.6)) drop-shadow(0 0 16px rgba(255, 215, 19, 0.4))', display: 'inline-block'}}>🇺🇸</span>
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
+
 
         {/* Benefits Section */}
         <section className="py-4">
@@ -1093,6 +1134,125 @@ export default function Home() {
             100% {
               transform: translateX(-50%);
             }
+          }
+          
+          /* Floating animations for brand icons */
+          @keyframes float1 {
+            0%, 100% {
+              transform: translateY(0px) rotate(-3deg);
+            }
+            25% {
+              transform: translateY(-3px) rotate(4.5deg);
+            }
+            50% {
+              transform: translateY(-6px) rotate(-5deg);
+            }
+            75% {
+              transform: translateY(-2px) rotate(3.8deg);
+            }
+          }
+          
+          @keyframes float2 {
+            0%, 100% {
+              transform: translateY(0px) rotate(2.5deg);
+            }
+            30% {
+              transform: translateY(-4px) rotate(-4.8deg);
+            }
+            60% {
+              transform: translateY(-2px) rotate(5.5deg);
+            }
+            90% {
+              transform: translateY(-5px) rotate(-3.2deg);
+            }
+          }
+          
+          @keyframes float3 {
+            0%, 100% {
+              transform: translateY(0px) rotate(-2deg);
+            }
+            20% {
+              transform: translateY(-2px) rotate(4.5deg);
+            }
+            40% {
+              transform: translateY(-5px) rotate(-5.5deg);
+            }
+            60% {
+              transform: translateY(-1px) rotate(3.2deg);
+            }
+            80% {
+              transform: translateY(-3px) rotate(-2.8deg);
+            }
+          }
+          
+          @keyframes float4 {
+            0%, 100% {
+              transform: translateY(0px) rotate(4deg);
+            }
+            25% {
+              transform: translateY(-3px) rotate(-5.2deg);
+            }
+            50% {
+              transform: translateY(-6px) rotate(6deg);
+            }
+            75% {
+              transform: translateY(-1px) rotate(-3.8deg);
+            }
+          }
+          
+          @keyframes float5 {
+            0%, 100% {
+              transform: translateY(0px) rotate(-3.5deg);
+            }
+            30% {
+              transform: translateY(-4px) rotate(5.2deg);
+            }
+            60% {
+              transform: translateY(-2px) rotate(-4.8deg);
+            }
+            85% {
+              transform: translateY(-5px) rotate(2.8deg);
+            }
+          }
+          
+          @keyframes float6 {
+            0%, 100% {
+              transform: translateY(0px) rotate(3.2deg);
+            }
+            35% {
+              transform: translateY(-3px) rotate(-5.8deg);
+            }
+            65% {
+              transform: translateY(-4px) rotate(4.8deg);
+            }
+            85% {
+              transform: translateY(-1px) rotate(-3.5deg);
+            }
+          }
+          
+          /* Brand floating classes */
+          .brand-float-1 {
+            animation: float1 8s ease-in-out infinite;
+          }
+          
+          .brand-float-2 {
+            animation: float2 9s ease-in-out infinite;
+          }
+          
+          .brand-float-3 {
+            animation: float3 7s ease-in-out infinite;
+          }
+          
+          .brand-float-4 {
+            animation: float4 10s ease-in-out infinite;
+          }
+          
+          .brand-float-5 {
+            animation: float5 8.5s ease-in-out infinite;
+          }
+          
+          .brand-float-6 {
+            animation: float6 9.5s ease-in-out infinite;
           }
           
           /* Hide scrollbar on mobile reviews */

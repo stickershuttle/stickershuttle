@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from '@/components/AdminLayout';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { getSupabase } from '../../lib/supabase';
-import ProofUpload from '@/components/ProofUpload';
+import {
+  LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+} from 'recharts';
 
 
 // GraphQL query to get all orders for admin
@@ -123,6 +125,9 @@ interface Order {
   trackingNumber?: string;
   trackingCompany?: string;
   trackingUrl?: string;
+  easypostTrackerId?: string;
+  estimatedDeliveryDate?: string;
+  trackingDetails?: any;
   subtotalPrice?: number;
   totalTax?: number;
   totalPrice: number;
@@ -165,6 +170,7 @@ interface Order {
     status: string;
     customerNotes?: string;
     adminNotes?: string;
+    approvedAt?: string;
   }>;
 }
 
@@ -180,7 +186,7 @@ const defaultColumns = [
   { id: 'shape', name: 'Shape', width: 'px-2', align: 'left' },
   { id: 'material', name: 'Material', width: 'px-2', align: 'left' },
   { id: 'size', name: 'Size', width: 'px-2', align: 'left' },
-  { id: 'notes', name: 'Notes', width: 'px-3', align: 'left' },
+
   { id: 'actions', name: 'Actions', width: 'px-6', align: 'center' }
 ];
 
@@ -195,6 +201,7 @@ export default function AdminOrders() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   const [columns, setColumns] = useState(defaultColumns);
+  const [timeFilter, setTimeFilter] = useState('30');  // '1' = today, '7' = last 7 days, '30' = last 30 days, etc.
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState('all');
 
@@ -205,6 +212,8 @@ export default function AdminOrders() {
   const [sendingProofs, setSendingProofs] = useState(false);
   const [proofsSent, setProofsSent] = useState<{ [key: string]: boolean }>({});
   const [newProofsCount, setNewProofsCount] = useState<{ [key: string]: number }>({});
+  const [showTrackingModal, setShowTrackingModal] = useState(false);
+  const [copiedTracking, setCopiedTracking] = useState<string | null>(null);
 
   // Helper function to select an order and update URL
   const selectOrder = (order: Order) => {
@@ -274,7 +283,7 @@ export default function AdminOrders() {
     }
 
     const customerOrders = data.getAllOrders.filter((order: Order) => 
-      order.customerEmail === customerEmail
+      order.customerEmail === customerEmail && order.financialStatus === 'paid'
     );
 
     const lifetimeValue = customerOrders.reduce((sum: number, order: Order) => 
@@ -292,7 +301,7 @@ export default function AdminOrders() {
     if (!order.customerEmail || !data?.getAllOrders) return 1;
     
     const customerOrders = data.getAllOrders
-      .filter((o: Order) => o.customerEmail === order.customerEmail)
+      .filter((o: Order) => o.customerEmail === order.customerEmail && o.financialStatus === 'paid')
       .sort((a: Order, b: Order) => {
         const dateA = new Date(a.orderCreatedAt || a.createdAt || '').getTime();
         const dateB = new Date(b.orderCreatedAt || b.createdAt || '').getTime();
@@ -341,6 +350,9 @@ export default function AdminOrders() {
 
     let orders = [...data.getAllOrders];
 
+    // Filter to only show paid orders
+    orders = orders.filter(order => order.financialStatus === 'paid');
+
     // Apply status filter
     if (filterStatus !== 'all') {
       orders = orders.filter(order => {
@@ -350,9 +362,9 @@ export default function AdminOrders() {
           case 'awaiting':
             return order.proof_status === 'awaiting_approval';
           case 'approved':
-            return order.proof_status === 'approved';
-          case 'label-created':
-            return order.proof_status === 'approved' && order.trackingNumber && !order.proof_status?.includes('shipped');
+            return order.proof_status === 'approved' || order.orderStatus === 'Printing';
+          case 'label-printed':
+            return order.proof_status === 'label_printed';
           case 'shipped':
             return order.proof_status === 'shipped' || (order.fulfillmentStatus === 'partial' && order.trackingNumber);
           case 'out-for-delivery':
@@ -498,8 +510,99 @@ export default function AdminOrders() {
     }
   };
 
+  // Copy tracking info to clipboard
+  const copyTrackingToClipboard = async (text: string, type: 'number' | 'url') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedTracking(type);
+      setTimeout(() => {
+        setCopiedTracking(null);
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  // Helper function to guess carrier from tracking number format
+  const guessCarrierFromTrackingNumber = (trackingNumber: string) => {
+    const cleanTracking = trackingNumber.replace(/\s/g, '').toUpperCase();
+    
+    // UPS tracking patterns
+    if (/^1Z[0-9A-Z]{16}$/.test(cleanTracking) || 
+        /^[0-9]{18}$/.test(cleanTracking) ||
+        /^T[0-9A-Z]{10}$/.test(cleanTracking)) {
+      return 'UPS';
+    }
+    
+    // FedEx tracking patterns
+    if (/^[0-9]{12}$/.test(cleanTracking) ||
+        /^[0-9]{14}$/.test(cleanTracking) ||
+        /^[0-9]{15}$/.test(cleanTracking) ||
+        /^[0-9]{20}$/.test(cleanTracking)) {
+      return 'FEDEX';
+    }
+    
+    // USPS tracking patterns
+    if (/^[0-9]{20}$/.test(cleanTracking) ||
+        /^[0-9]{13}$/.test(cleanTracking) ||
+        /^[A-Z]{2}[0-9]{9}[A-Z]{2}$/.test(cleanTracking) ||
+        /^[0-9A-Z]{13}$/.test(cleanTracking)) {
+      return 'USPS';
+    }
+    
+    return null;
+  };
+
+  // Create tracking URL based on carrier
+  const getTrackingUrl = (trackingNumber: string, carrier?: string) => {
+    const carrierGuess = carrier || guessCarrierFromTrackingNumber(trackingNumber);
+    
+    switch (carrierGuess?.toUpperCase()) {
+      case 'UPS':
+      case 'UPSDAP':
+        return `https://www.ups.com/track?tracknum=${trackingNumber}`;
+      case 'FEDEX':
+      case 'FEDEXDEFAULT':
+        return `https://www.fedex.com/fedextrack/?trknbr=${trackingNumber}`;
+      case 'USPS':
+        return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${trackingNumber}`;
+      default:
+        return `https://www.ups.com/track?tracknum=${trackingNumber}`;
+    }
+  };
+
+  // Handle view tracking
+  const handleViewTracking = (order: Order) => {
+    if (!order.trackingNumber) return;
+    
+    // Show tracking modal for selected order
+    if (selectedOrder && selectedOrder.id === order.id) {
+      setShowTrackingModal(true);
+    } else {
+      // For orders in the list, directly open tracking URL
+      const trackingUrl = getTrackingUrl(order.trackingNumber, order.trackingCompany);
+      if (trackingUrl) {
+        window.open(trackingUrl, '_blank', 'noopener,noreferrer');
+      }
+    }
+  };
+
+  // Handle track on carrier site
+  const handleTrackOnCarrierSite = (order: Order) => {
+    if (!order.trackingNumber) return;
+    
+    const trackingUrl = getTrackingUrl(order.trackingNumber, order.trackingCompany);
+    if (trackingUrl) {
+      window.open(trackingUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   // Get proof status (updated with shipping statuses)
   const getProofStatus = (order: Order) => {
+    // Check for orders that skip proofs and go directly to printing
+    if (order.orderStatus === 'Printing') {
+      return 'Printing';
+    }
     // Check the actual proof_status from the database
     if (order.proof_status === 'awaiting_approval') {
       return 'Awaiting Approval';
@@ -509,16 +612,19 @@ export default function AdminOrders() {
       if (order.trackingNumber && !order.proof_status?.includes('shipped')) {
         return 'Label Created';
       }
-      return 'Proof Approved';
+      return 'Printing';
+    }
+    if (order.proof_status === 'label_printed') {
+      return 'Label Printed';
     }
     if (order.proof_status === 'shipped' || (order.fulfillmentStatus === 'partial' && order.trackingNumber)) {
       return 'Shipped';
     }
+    if (order.proof_status === 'delivered' || order.orderStatus === 'Delivered' || order.fulfillmentStatus === 'fulfilled') {
+      return 'Delivered';
+    }
     if (order.orderStatus === 'Out for Delivery' || order.fulfillmentStatus === 'out_for_delivery') {
       return 'Out for Delivery';
-    }
-    if (order.orderStatus === 'Delivered' || order.fulfillmentStatus === 'fulfilled') {
-      return 'Delivered';
     }
     if (order.proof_status === 'changes_requested') {
       return 'Changes Requested';
@@ -534,9 +640,13 @@ export default function AdminOrders() {
         return 'bg-yellow-900 bg-opacity-40 text-yellow-300';
       case 'Awaiting Approval':
         return 'bg-orange-900 bg-opacity-40 text-orange-300';
+      case 'Printing':
+        return 'bg-green-900 bg-opacity-40 text-green-300';
       case 'Proof Approved':
         return 'bg-green-900 bg-opacity-40 text-green-300';
       case 'Label Created':
+        return 'bg-blue-900 bg-opacity-40 text-blue-300';
+      case 'Label Printed':
         return 'bg-blue-900 bg-opacity-40 text-blue-300';
       case 'Shipped':
         return 'bg-purple-900 bg-opacity-40 text-purple-300';
@@ -552,6 +662,20 @@ export default function AdminOrders() {
   };
 
 
+
+  // Group items by product name and sum quantities
+  const groupItemsByProduct = (items: Order['items']) => {
+    const grouped = items.reduce((acc, item) => {
+      const key = item.productName;
+      if (!acc[key]) {
+        acc[key] = { ...item, totalQuantity: 0 };
+      }
+      acc[key].totalQuantity += item.quantity;
+      return acc;
+    }, {} as Record<string, Order['items'][0] & { totalQuantity: number }>);
+    
+    return Object.values(grouped);
+  };
 
   // Handle column sorting
   const handleColumnSort = (column: string) => {
@@ -588,116 +712,176 @@ export default function AdminOrders() {
     }
   };
 
-  // Print order slip
+  // Print order slip - formatted for 4x6 label
   const printOrderSlip = (order: Order) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    // Build items HTML separately to avoid complex template literal nesting
+    // Build a compact items list for 4x6 format
     const itemsHtml = order.items.map(item => {
       const selections = item.calculatorSelections || {};
       const size = selections.size || selections.sizePreset || {};
 
-      let specsHtml = '';
-      if (selections.cut?.displayValue) {
-        specsHtml += `Cut: ${selections.cut.displayValue}<br>`;
-      }
-      if (selections.material?.displayValue) {
-        specsHtml += `Material: ${selections.material.displayValue}<br>`;
-      }
+      const specs = [];
+      if (selections.cut?.displayValue) specs.push(selections.cut.displayValue);
+      if (selections.material?.displayValue) specs.push(selections.material.displayValue);
       if (size.width && size.height) {
-        specsHtml += `Size: ${size.width}" × ${size.height}"`;
+        specs.push(`${size.width}" × ${size.height}"`);
       } else if (size.displayValue) {
-        specsHtml += size.displayValue;
+        specs.push(size.displayValue);
       }
 
-      return `<tr>
-        <td>${item.productName}</td>
-        <td>${specsHtml}</td>
-        <td>${item.quantity}</td>
-        <td>${formatCurrency(item.unitPrice)}</td>
-        <td>${formatCurrency(item.totalPrice)}</td>
-      </tr>`;
+      return `<div class="item-row">
+        <div class="item-name">${item.productName} (${item.quantity})</div>
+        <div class="item-specs">${specs.join(' • ')}</div>
+      </div>`;
     }).join('');
 
     const orderSlipHtml = `<!DOCTYPE html>
 <html>
 <head>
-  <title>Order Slip - ${order.orderNumber || order.id}</title>
+  <title>Order Label - ${order.orderNumber || order.id}</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
-    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 20px; }
-    .logo { font-size: 24px; font-weight: bold; color: #030140; margin-bottom: 10px; }
-    .order-number { font-size: 18px; margin: 10px 0; }
-    .section { margin: 20px 0; border: 1px solid #ccc; padding: 15px; }
-    .section-title { font-weight: bold; font-size: 16px; margin-bottom: 10px; color: #030140; }
-    .info-row { display: flex; justify-content: space-between; margin: 5px 0; }
-    .label { font-weight: bold; color: #666; }
-    .value { color: #000; }
-    .items-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    .items-table th { background: #f0f0f0; padding: 10px; text-align: left; border: 1px solid #ccc; }
-    .items-table td { padding: 10px; border: 1px solid #ccc; }
-    .total-section { text-align: right; margin-top: 20px; font-size: 18px; }
-    .notes { background: #fffbf0; padding: 15px; margin-top: 20px; border: 1px solid #f0d0a0; }
-    @media print { body { padding: 0; } }
+    @page { 
+      size: 4in 6in; 
+      margin: 0.25in; 
+    }
+    body { 
+      font-family: Arial, sans-serif; 
+      font-size: 11px;
+      line-height: 1.3;
+      margin: 0;
+      padding: 0;
+      width: 3.5in;
+      height: 5.5in;
+      overflow: hidden;
+    }
+    .header { 
+      text-align: center; 
+      margin-bottom: 12px; 
+      border-bottom: 2px solid #000; 
+      padding-bottom: 8px; 
+    }
+    .logo { 
+      font-size: 16px; 
+      font-weight: bold; 
+      color: #000; 
+      margin-bottom: 4px; 
+    }
+    .order-number { 
+      font-size: 14px; 
+      font-weight: bold;
+      margin: 2px 0; 
+    }
+    .date { 
+      font-size: 9px; 
+      color: #666;
+    }
+    .section { 
+      margin-bottom: 10px; 
+      font-size: 10px;
+    }
+    .section-title { 
+      font-weight: bold; 
+      font-size: 11px; 
+      margin-bottom: 4px; 
+      color: #000; 
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 2px;
+    }
+    .customer-info {
+      margin-bottom: 8px;
+    }
+    .customer-name {
+      font-weight: bold;
+      font-size: 12px;
+      margin-bottom: 2px;
+    }
+    .customer-email {
+      font-size: 9px;
+      color: #666;
+    }
+    .address-line {
+      margin: 1px 0;
+      font-size: 10px;
+    }
+    .item-row {
+      margin-bottom: 6px;
+      padding: 4px;
+      background: #f8f8f8;
+      border-radius: 3px;
+    }
+    .item-name {
+      font-weight: bold;
+      font-size: 10px;
+      margin-bottom: 2px;
+    }
+    .item-specs {
+      font-size: 9px;
+      color: #666;
+    }
+    .total-section { 
+      text-align: center; 
+      margin-top: 10px; 
+      font-size: 14px;
+      font-weight: bold;
+      border: 2px solid #000;
+      padding: 6px;
+      background: #f0f0f0;
+    }
+    .notes { 
+      font-size: 9px;
+      margin-top: 8px;
+      padding: 4px;
+      background: #fffbf0;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+    }
+    .notes-title {
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+    @media print { 
+      body { 
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      } 
+    }
   </style>
 </head>
 <body>
   <div class="header">
     <div class="logo">STICKER SHUTTLE</div>
     <div class="order-number">Order #${order.orderNumber || order.id.split('-')[0].toUpperCase()}</div>
-    <div>Date: ${formatDate(order.orderCreatedAt)}</div>
+    <div class="date">${formatDate(order.orderCreatedAt)}</div>
   </div>
 
-  <div class="section">
-    <div class="section-title">Customer Information</div>
-    <div class="info-row">
-      <span class="label">Name:</span>
-      <span class="value">${order.customerFirstName} ${order.customerLastName}</span>
-    </div>
-    <div class="info-row">
-      <span class="label">Email:</span>
-      <span class="value">${order.customerEmail}</span>
-    </div>
-    ${order.customerPhone ? `<div class="info-row">
-      <span class="label">Phone:</span>
-      <span class="value">${order.customerPhone}</span>
-    </div>` : ''}
+  <div class="section customer-info">
+    <div class="section-title">Customer</div>
+    <div class="customer-name">${order.customerFirstName} ${order.customerLastName}</div>
+    <div class="customer-email">${order.customerEmail}</div>
+    ${order.customerPhone ? `<div class="customer-email">${order.customerPhone}</div>` : ''}
   </div>
 
   ${order.shippingAddress ? `<div class="section">
-    <div class="section-title">Shipping Address</div>
-    <div>${order.shippingAddress.first_name} ${order.shippingAddress.last_name}</div>
-    <div>${order.shippingAddress.address1}</div>
-    ${order.shippingAddress.address2 ? `<div>${order.shippingAddress.address2}</div>` : ''}
-    <div>${order.shippingAddress.city}, ${order.shippingAddress.province} ${order.shippingAddress.zip}</div>
-    <div>${order.shippingAddress.country}</div>
+    <div class="section-title">Ship To</div>
+    <div class="address-line">${order.shippingAddress.first_name} ${order.shippingAddress.last_name}</div>
+    <div class="address-line">${order.shippingAddress.address1}</div>
+    ${order.shippingAddress.address2 ? `<div class="address-line">${order.shippingAddress.address2}</div>` : ''}
+    <div class="address-line">${order.shippingAddress.city}, ${order.shippingAddress.province} ${order.shippingAddress.zip}</div>
   </div>` : ''}
 
   <div class="section">
-    <div class="section-title">Order Items</div>
-    <table class="items-table">
-      <thead>
-        <tr>
-          <th>Item</th>
-          <th>Specifications</th>
-          <th>Qty</th>
-          <th>Price</th>
-          <th>Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${itemsHtml}
-      </tbody>
-    </table>
+    <div class="section-title">Items</div>
+    ${itemsHtml}
   </div>
 
   <div class="total-section">
-    <strong>Total: ${formatCurrency(order.totalPrice)}</strong>
+    Total: ${formatCurrency(order.totalPrice)}
   </div>
 
   ${order.orderNote ? `<div class="notes">
-    <div class="section-title">Order Notes</div>
+    <div class="notes-title">Notes:</div>
     <div>${order.orderNote}</div>
   </div>` : ''}
 </body>
@@ -711,6 +895,136 @@ export default function AdminOrders() {
       printWindow.print();
     };
   };
+
+  // Get filtered orders based on time range
+  const getFilteredOrdersByTime = (orders: Order[], days: string) => {
+    if (!orders) return [];
+    
+    const now = new Date();
+    let cutoffDate = new Date();
+    
+    switch (days) {
+      case '1':
+        // Today
+        cutoffDate.setHours(0, 0, 0, 0);
+        break;
+      case '7':
+        cutoffDate.setDate(now.getDate() - 7);
+        break;
+      case '30':
+        cutoffDate.setDate(now.getDate() - 30);
+        break;
+      case '90':
+        cutoffDate.setDate(now.getDate() - 90);
+        break;
+      case '365':
+        cutoffDate.setFullYear(now.getFullYear() - 1);
+        break;
+      default:
+        return orders;
+    }
+    
+    return orders.filter(order => {
+      const orderDate = new Date(order.orderCreatedAt || order.createdAt || '');
+      return orderDate >= cutoffDate;
+    });
+  };
+
+  // Generate chart data
+  const generateChartData = (orders: Order[], days: string) => {
+    const filteredOrders = getFilteredOrdersByTime(orders?.filter(order => order.financialStatus === 'paid') || [], days);
+    
+    const dailyData = new Map();
+    const now = new Date();
+    
+    // Initialize data for the time period
+    let periodDays = parseInt(days);
+    if (days === '1') periodDays = 1;
+    
+    for (let i = periodDays - 1; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      if (days === '1') {
+        // For today, show hourly data
+        for (let hour = 0; hour < 24; hour++) {
+          const hourDate = new Date(date);
+          hourDate.setHours(hour, 0, 0, 0);
+          const key = hourDate.toISOString().slice(0, 13);
+          dailyData.set(key, { 
+            date: hourDate.getHours() + ':00', 
+            sales: 0, 
+            orders: 0 
+          });
+        }
+      } else {
+        const key = date.toISOString().split('T')[0];
+        dailyData.set(key, { 
+          date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), 
+          sales: 0, 
+          orders: 0 
+        });
+      }
+    }
+    
+    // Aggregate order data
+    filteredOrders.forEach(order => {
+      const orderDate = new Date(order.orderCreatedAt || order.createdAt || '');
+      let key: string;
+      
+      if (days === '1') {
+        // Hourly data for today
+        key = orderDate.toISOString().slice(0, 13);
+      } else {
+        // Daily data
+        key = orderDate.toISOString().split('T')[0];
+      }
+      
+      const existing = dailyData.get(key);
+      if (existing) {
+        existing.sales += order.totalPrice;
+        existing.orders += 1;
+      }
+    });
+    
+    return Array.from(dailyData.values());
+  };
+
+  // Get time filter label
+  const getTimeFilterLabel = (days: string) => {
+    switch (days) {
+      case '1': return 'Today';
+      case '7': return 'Last 7 days';
+      case '30': return 'Last 30 days';
+      case '90': return 'Last 90 days';
+      case '365': return 'Last 365 days';
+      default: return 'All time';
+    }
+  };
+
+  // Calculate analytics for time-filtered data
+  const timeFilteredAnalytics = useMemo(() => {
+    if (!data?.getAllOrders) return null;
+    
+    const allOrders = data.getAllOrders.filter((order: Order) => order.financialStatus === 'paid');
+    const filteredOrders = getFilteredOrdersByTime(allOrders, timeFilter);
+    
+    const totalSales = filteredOrders.reduce((sum: number, order: Order) => sum + order.totalPrice, 0);
+    const totalOrders = filteredOrders.length;
+    const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
+    const totalStickers = filteredOrders.reduce((total: number, order: any) => 
+      total + (order.items?.reduce((itemTotal: number, item: any) => itemTotal + (item.quantity || 0), 0) || 0), 0
+    );
+    
+    const chartData = generateChartData(allOrders, timeFilter);
+    
+    return {
+      totalSales,
+      totalOrders,
+      avgOrderValue,
+      totalStickers,
+      chartData
+    };
+  }, [data, timeFilter]);
 
 
 
@@ -732,7 +1046,7 @@ export default function AdminOrders() {
         }
         
         .table-row-hover:hover {
-          background-color: rgba(255, 255, 255, 0.08) !important;
+          background-color: rgba(3, 1, 64, 0.6) !important;
         }
         
         .sort-indicator {
@@ -754,78 +1068,369 @@ export default function AdminOrders() {
           backdrop-filter: blur(12px);
           border-radius: 16px;
         }
+        
+        details summary::-webkit-details-marker {
+          display: none;
+        }
+        
+        details summary {
+          list-style: none;
+        }
+        
+        details summary::after {
+          content: '';
+          display: inline-block;
+          width: 0.5rem;
+          height: 0.5rem;
+          border-right: 2px solid currentColor;
+          border-bottom: 2px solid currentColor;
+          transform: rotate(45deg);
+          transition: transform 0.2s;
+          margin-left: 0.5rem;
+        }
+        
+        details[open] summary::after {
+          transform: rotate(-135deg);
+        }
+        
+        /* Hide scrollbar for filter pills */
+        .filter-pills-container {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
+        }
+        
+        .filter-pills-container::-webkit-scrollbar {
+          display: none;  /* Chrome, Safari and Opera */
+        }
+        
+        @media (max-width: 768px) {
+          .mobile-order-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset;
+            backdrop-filter: blur(12px);
+          }
+          
+          .mobile-order-card:active {
+            transform: scale(0.98);
+          }
+        }
       `}</style>
-      <div className="min-h-screen" style={{ backgroundColor: '#030140' }}>
+      <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#030140' }}>
         {/* Main Content */}
         <div className="pt-8 pb-8">
-          <div className="w-full px-6">
+          <div className="w-full max-w-full px-4 md:px-6">
             {!selectedOrder ? (
               // Orders List View
               <>
-                {/* Analytics Cards */}
-                <div className="grid grid-cols-4 gap-4 mb-6">
-                  <div className="rounded-2xl p-6 transition-all duration-200 hover:scale-[1.02] glass-container">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs text-gray-400 uppercase tracking-wider">Total Sales</span>
-                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                      </svg>
-                    </div>
-                    <div className="flex items-end justify-between">
-                      <div>
-                        <p className="text-2xl font-bold transition-all duration-200 hover:scale-105" style={{ color: '#86efac' }}>
-                          {formatCurrency(data?.getAllOrders?.reduce((sum: number, order: Order) => sum + order.totalPrice, 0) || 0)}
-                        </p>
-                        <p className="text-xs text-green-400 mt-1">↑ 23%</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl p-6 transition-all duration-200 hover:scale-[1.02] glass-container">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs text-gray-400 uppercase tracking-wider">Avg Order Value</span>
-                    </div>
-                    <div className="flex items-end justify-between">
-                      <div>
-                        <p className="text-2xl font-bold transition-all duration-200 hover:scale-105" style={{ color: '#86efac' }}>
-                          {formatCurrency(
-                            data?.getAllOrders?.length
-                              ? (data.getAllOrders.reduce((sum: number, order: Order) => sum + order.totalPrice, 0) / data.getAllOrders.length)
-                              : 0
-                          )}
-                        </p>
-                        <p className="text-xs text-green-400 mt-1">↑ 23%</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl p-6 transition-all duration-200 hover:scale-[1.02] glass-container">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs text-gray-400 uppercase tracking-wider">Orders</span>
-                    </div>
-                    <div className="flex items-end justify-between">
-                      <div>
-                        <p className="text-2xl font-bold text-white transition-all duration-200 hover:scale-105">{data?.getAllOrders?.length || 0}</p>
-                        <p className="text-xs mt-1" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>—</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl p-6 transition-all duration-200 hover:scale-[1.02] glass-container">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs text-gray-400 uppercase tracking-wider">Conversion Rate</span>
-                    </div>
-                    <div className="flex items-end justify-between">
-                      <div>
-                        <p className="text-2xl font-bold text-white transition-all duration-200 hover:scale-105">2.9%</p>
-                        <p className="text-xs text-green-400 mt-1">↑ 31%</p>
-                      </div>
-                    </div>
+                {/* Time Filter Buttons */}
+                <div className="mb-6">
+                  <div className="flex flex-wrap gap-2 justify-center lg:justify-start">
+                    <button
+                      onClick={() => setTimeFilter('1')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        timeFilter === '1'
+                          ? 'text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      style={{
+                        background: timeFilter === '1' 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: `1px solid ${timeFilter === '1' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                        boxShadow: timeFilter === '1' 
+                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                      }}
+                    >
+                      Today
+                    </button>
+                    <button
+                      onClick={() => setTimeFilter('7')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        timeFilter === '7'
+                          ? 'text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      style={{
+                        background: timeFilter === '7' 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: `1px solid ${timeFilter === '7' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                        boxShadow: timeFilter === '7' 
+                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                      }}
+                    >
+                      Last 7 days
+                    </button>
+                    <button
+                      onClick={() => setTimeFilter('30')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        timeFilter === '30'
+                          ? 'text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      style={{
+                        background: timeFilter === '30' 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: `1px solid ${timeFilter === '30' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                        boxShadow: timeFilter === '30' 
+                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                      }}
+                    >
+                      Last 30 days
+                    </button>
+                    <button
+                      onClick={() => setTimeFilter('90')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        timeFilter === '90'
+                          ? 'text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      style={{
+                        background: timeFilter === '90' 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: `1px solid ${timeFilter === '90' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                        boxShadow: timeFilter === '90' 
+                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                      }}
+                    >
+                      Last 90 days
+                    </button>
+                    <button
+                      onClick={() => setTimeFilter('365')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        timeFilter === '365'
+                          ? 'text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      style={{
+                        background: timeFilter === '365' 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: `1px solid ${timeFilter === '365' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                        boxShadow: timeFilter === '365' 
+                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                      }}
+                    >
+                      Last year
+                    </button>
                   </div>
                 </div>
 
-                {/* Compact Filters */}
-                <div className="flex justify-end items-center gap-3 mb-4">
+                {/* Analytics Cards - Time Filtered */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                  <div className="glass-container p-4 lg:p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-400 uppercase tracking-wider">Total Sales</span>
+                      <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                      </svg>
+                    </div>
+                    <div className="text-lg lg:text-2xl font-bold" style={{ color: '#86efac' }}>
+                      {formatCurrency(timeFilteredAnalytics?.totalSales || 0)}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">{getTimeFilterLabel(timeFilter)}</div>
+                  </div>
+
+                  <div className="glass-container p-4 lg:p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-400 uppercase tracking-wider">Average Order Value</span>
+                    </div>
+                    <div className="text-lg lg:text-2xl font-bold text-white">
+                      {formatCurrency(timeFilteredAnalytics?.avgOrderValue || 0)}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">{getTimeFilterLabel(timeFilter)}</div>
+                  </div>
+
+                  <div className="glass-container p-4 lg:p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-400 uppercase tracking-wider">Orders</span>
+                    </div>
+                    <div className="text-lg lg:text-2xl font-bold text-white">
+                      {timeFilteredAnalytics?.totalOrders || 0}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">{getTimeFilterLabel(timeFilter)}</div>
+                  </div>
+
+                  <div className="glass-container p-4 lg:p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-400 uppercase tracking-wider">Stickers</span>
+                    </div>
+                    <div className="text-lg lg:text-2xl font-bold text-white">
+                      {timeFilteredAnalytics?.totalStickers || 0}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">{getTimeFilterLabel(timeFilter)}</div>
+                  </div>
+                </div>
+
+                {/* Sales Chart */}
+                {timeFilteredAnalytics?.chartData && timeFilteredAnalytics.chartData.length > 0 && (
+                  <div className="glass-container p-6 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-white">Sales Overview</h3>
+                      <div className="text-sm text-gray-400">{getTimeFilterLabel(timeFilter)}</div>
+                    </div>
+                    <div className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={timeFilteredAnalytics.chartData}>
+                          <defs>
+                            <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid 
+                            strokeDasharray="3 3" 
+                            stroke="rgba(255, 255, 255, 0.1)" 
+                            vertical={false}
+                          />
+                          <XAxis 
+                            dataKey="date" 
+                            stroke="rgba(255, 255, 255, 0.4)"
+                            fontSize={12}
+                            tick={{ fill: 'rgba(255, 255, 255, 0.7)' }}
+                            axisLine={{ stroke: 'rgba(255, 255, 255, 0.1)' }}
+                            tickLine={false}
+                          />
+                          <YAxis 
+                            stroke="rgba(255, 255, 255, 0.4)"
+                            fontSize={12}
+                            tick={{ fill: 'rgba(255, 255, 255, 0.7)' }}
+                            axisLine={{ stroke: 'rgba(255, 255, 255, 0.1)' }}
+                            tickLine={false}
+                            tickFormatter={(value) => `$${value}`}
+                          />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: 'rgba(3, 1, 64, 0.95)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              borderRadius: '12px',
+                              backdropFilter: 'blur(12px)',
+                              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
+                            }}
+                            labelStyle={{ color: 'rgba(255, 255, 255, 0.7)', marginBottom: '4px' }}
+                            itemStyle={{ color: '#fff' }}
+                            formatter={(value: number, name: string) => {
+                              if (name === 'sales') return [`$${value.toFixed(2)}`, 'Sales'];
+                              if (name === 'orders') return [value, 'Orders'];
+                              return [value, name];
+                            }}
+                          />
+                          <Area 
+                            type="monotone" 
+                            dataKey="sales" 
+                            stroke="#3b82f6" 
+                            strokeWidth={2}
+                            fillOpacity={1} 
+                            fill="url(#salesGradient)" 
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+
+                {/* Mobile/Tablet Filters */}
+                <div className="xl:hidden mb-4 px-4">
+                  {/* Filter pills */}
+                  <div className="flex gap-2 overflow-x-auto pb-2 filter-pills-container">
+                    <button 
+                      onClick={() => setFilterStatus('all')}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                        filterStatus === 'all' 
+                          ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' 
+                          : 'bg-transparent text-gray-400 border-gray-600'
+                      }`}
+                    >
+                      All
+                    </button>
+                    <button 
+                      onClick={() => setFilterStatus('building')}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                        filterStatus === 'building' 
+                          ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' 
+                          : 'bg-transparent text-gray-400 border-gray-600'
+                      }`}
+                    >
+                      Building
+                    </button>
+                    <button 
+                      onClick={() => setFilterStatus('awaiting')}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                        filterStatus === 'awaiting' 
+                          ? 'bg-orange-500/20 text-orange-300 border-orange-500/40' 
+                          : 'bg-transparent text-gray-400 border-gray-600'
+                      }`}
+                    >
+                      Awaiting
+                    </button>
+                    <button 
+                      onClick={() => setFilterStatus('approved')}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                        filterStatus === 'approved' 
+                          ? 'bg-green-500/20 text-green-300 border-green-500/40' 
+                          : 'bg-transparent text-gray-400 border-gray-600'
+                      }`}
+                    >
+                      Approved
+                    </button>
+                    <button 
+                      onClick={() => setFilterStatus('label-printed')}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                        filterStatus === 'label-printed' 
+                          ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40' 
+                          : 'bg-transparent text-gray-400 border-gray-600'
+                      }`}
+                    >
+                      Label Printed
+                    </button>
+                    <button 
+                      onClick={() => setFilterStatus('shipped')}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                        filterStatus === 'shipped' 
+                          ? 'bg-blue-500/20 text-blue-300 border-blue-500/40' 
+                          : 'bg-transparent text-gray-400 border-gray-600'
+                      }`}
+                    >
+                      Shipped
+                    </button>
+                    <button 
+                      onClick={() => setFilterStatus('out-for-delivery')}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                        filterStatus === 'out-for-delivery' 
+                          ? 'bg-teal-500/20 text-teal-300 border-teal-500/40' 
+                          : 'bg-transparent text-gray-400 border-gray-600'
+                      }`}
+                    >
+                      Out for Delivery
+                    </button>
+                    <button 
+                      onClick={() => setFilterStatus('delivered')}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                        filterStatus === 'delivered' 
+                          ? 'bg-green-600/20 text-green-400 border-green-600/40' 
+                          : 'bg-transparent text-gray-400 border-gray-600'
+                      }`}
+                    >
+                      Delivered
+                    </button>
+                  </div>
+                </div>
+
+                {/* Desktop Compact Filters */}
+                <div className="hidden xl:flex justify-end items-center gap-3 mb-4">
                   {/* Filter Dropdown */}
                   <div className="relative">
                     <select
@@ -838,7 +1443,7 @@ export default function AdminOrders() {
                       <option value="building">Building</option>
                       <option value="awaiting">Awaiting Approval</option>
                       <option value="approved">Approved</option>
-                      <option value="label-created">Label Created</option>
+                      <option value="label-printed">Label Printed</option>
                       <option value="shipped">Shipped</option>
                       <option value="out-for-delivery">Out for Delivery</option>
                       <option value="delivered">Delivered</option>
@@ -898,16 +1503,151 @@ export default function AdminOrders() {
                   </div>
                 </div>
 
-                {/* Orders Table */}
-                <div className="rounded-2xl overflow-hidden glass-container">
+                {/* Mobile/Tablet Orders List */}
+                <div className="xl:hidden">
+                  {/* Date Groups */}
+                  {(() => {
+                    // Group orders by date
+                    const ordersByDate = filteredOrders.reduce((groups: any, order: Order) => {
+                      const date = new Date(order.orderCreatedAt || order.createdAt || '');
+                      const dateKey = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+                      if (!groups[dateKey]) groups[dateKey] = [];
+                      groups[dateKey].push(order);
+                      return groups;
+                    }, {});
+
+                    return Object.entries(ordersByDate).map(([date, orders]: [string, any]) => (
+                      <div key={date}>
+                        <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2 px-4">{date}</h3>
+                        <div className="bg-black/20 border-y border-gray-700/50">
+                          {orders.map((order: Order, orderIndex: number) => {
+                            const firstItem = order.items[0] || {};
+                            const totalQuantity = order.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
+                            const itemImage = firstItem.customFiles?.[0] || null;
+                            const proofStatus = getProofStatus(order);
+                            
+                            return (
+                              <div
+                                key={order.id}
+                                onClick={() => selectOrder(order)}
+                                className="flex items-center px-4 py-4 cursor-pointer active:bg-white/5 transition-colors"
+                                style={{
+                                  borderBottom: orderIndex < orders.length - 1 ? '1px solid rgba(255, 255, 255, 0.08)' : 'none'
+                                }}
+                              >
+                                {/* Design Image */}
+                                <div className="flex-shrink-0 mr-3">
+                                  <div
+                                    className="rounded-lg overflow-hidden flex items-center justify-center"
+                                    style={{
+                                      width: '64px',
+                                      height: '64px',
+                                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                                    }}
+                                  >
+                                    {itemImage ? (
+                                      <img
+                                        src={itemImage}
+                                        alt="Design preview"
+                                        className="w-full h-full object-contain p-2"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center">
+                                        <svg className="w-8 h-8 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {/* Order Info */}
+                                <div className="flex-1 min-w-0">
+                                  {/* First Row: Order Number & Amount */}
+                                  <div className="flex justify-between items-center mb-1">
+                                    <span className="text-base font-semibold text-white truncate mr-2">
+                                      #{order.orderNumber || order.id.split('-')[0].toUpperCase()}
+                                    </span>
+                                    <span className="text-lg font-bold flex-shrink-0" style={{ color: '#86efac' }}>
+                                      {formatCurrency(order.totalPrice)}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* Second Row: Customer & Details */}
+                                  <div className="flex items-center text-sm text-gray-300 mb-2 flex-wrap">
+                                    <span className="truncate mr-1">
+                                      {order.customerFirstName} {order.customerLastName}
+                                    </span>
+                                    <span className="text-gray-500 mx-1">•</span>
+                                    <span className="text-gray-400 whitespace-nowrap">
+                                      {totalQuantity} item{totalQuantity !== 1 ? 's' : ''}
+                                    </span>
+                                    <span className="text-gray-500 mx-1">•</span>
+                                    <span className="text-gray-400 whitespace-nowrap">
+                                      {new Date(order.orderCreatedAt || order.createdAt || '').toLocaleTimeString('en-US', { 
+                                        hour: 'numeric', 
+                                        minute: '2-digit',
+                                        hour12: true 
+                                      })}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* Third Row: Status & Action */}
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getProofStatusColor(proofStatus)}`}>
+                                        {proofStatus}
+                                      </span>
+                                    </div>
+                                    
+                                    {/* Print Action */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        printOrderSlip(order);
+                                      }}
+                                      className="p-2 rounded-lg hover:bg-white/10 transition-colors flex-shrink-0"
+                                      title="Print Order Slip"
+                                      aria-label="Print Order Slip"
+                                    >
+                                      <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                  
+                  {/* Empty State */}
+                  {filteredOrders.length === 0 && (
+                    <div className="text-center py-12 px-4">
+                      <div className="text-gray-400">
+                        <svg className="mx-auto h-12 w-12 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                        </svg>
+                        <h3 className="text-lg font-medium text-white mb-1">No orders found</h3>
+                        <p className="text-sm">Try adjusting your filters or search terms</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Desktop Orders Table */}
+                <div className="hidden xl:block rounded-2xl overflow-hidden glass-container">
                   <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 450px)', overflowY: 'auto' }}>
                     <table className="min-w-full">
                       <thead
                         className="border-b border-gray-700 sticky top-0 z-20"
                         style={{
-                          backgroundColor: 'rgba(3, 1, 64, 0.98)',
-                          backdropFilter: 'blur(10px)',
-                          boxShadow: '0 1px 0 rgba(255, 255, 255, 0.1), 0 -1px 0 rgba(255, 255, 255, 0.1)'
+                          background: 'rgba(3, 1, 64, 0.95)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)'
                         }}
                       >
                         <tr>
@@ -991,9 +1731,7 @@ export default function AdminOrders() {
                           <th className="px-2 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
                             Size
                           </th>
-                          <th className="px-3 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
-                            Notes
-                          </th>
+
                           <th className="px-3 py-3 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider">
                             Actions
                           </th>
@@ -1016,7 +1754,7 @@ export default function AdminOrders() {
                               className="cursor-pointer table-row-hover"
                               style={{
                                 borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                                backgroundColor: 'transparent'
+                                backgroundColor: 'rgba(3, 1, 64, 0.3)'
                               }}
                               onClick={() => selectOrder(order)}
                             >
@@ -1030,7 +1768,9 @@ export default function AdminOrders() {
                                       height: '8px',
                                       minWidth: '8px',
                                       minHeight: '8px',
-                                      boxShadow: '0 0 10px currentColor'
+                                      boxShadow: '0 0 10px currentColor',
+                                      position: 'relative',
+                                      zIndex: 10
                                     }}
                                   ></div>
                                   <span className="text-xs text-gray-300 font-medium">{getProofStatus(order)}</span>
@@ -1038,24 +1778,65 @@ export default function AdminOrders() {
                               </td>
                               {/* Image Preview */}
                               <td className="px-3 py-4">
-                                <div
-                                  className="rounded-lg relative overflow-hidden flex items-center justify-center"
-                                  style={{
-                                    width: '64px',
-                                    height: '64px',
-                                    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                                    border: '1px solid rgba(255, 255, 255, 0.08)'
-                                  }}
-                                >
-                                  {firstItemImage ? (
-                                    <img
-                                      src={firstItemImage}
-                                      alt="Design preview"
-                                      className="w-full h-full object-contain p-4"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                      <span className="text-gray-500 text-xs">No image</span>
+                                <div className="flex gap-2">
+                                  {order.items.slice(0, 2).map((item: {
+                                    id: string;
+                                    productName: string;
+                                    productCategory?: string;
+                                    sku?: string;
+                                    quantity: number;
+                                    unitPrice: number;
+                                    totalPrice: number;
+                                    calculatorSelections?: any;
+                                    customFiles?: string[];
+                                    customerNotes?: string;
+                                    instagramHandle?: string;
+                                    instagramOptIn?: boolean;
+                                    customerReplacementFile?: string;
+                                    customerReplacementFileName?: string;
+                                    customerReplacementAt?: string;
+                                  }, index: number) => {
+                                    // Get the full item data with images
+                                    const itemImage = item.customFiles?.[0] || null;
+                                    
+                                    return (
+                                      <div key={`preview-${item.id}-${index}`} className="flex-shrink-0">
+                                        <div
+                                          className="rounded-lg relative overflow-hidden flex items-center justify-center"
+                                          style={{
+                                            width: '40px',
+                                            height: '40px',
+                                            backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                                            border: '1px solid rgba(255, 255, 255, 0.08)'
+                                          }}
+                                        >
+                                          {itemImage ? (
+                                            <img
+                                              src={itemImage}
+                                              alt="Design preview"
+                                              className="w-full h-full object-contain p-2"
+                                            />
+                                          ) : (
+                                            <div className="w-full h-full flex items-center justify-center">
+                                              <span className="text-gray-500 text-xs">📄</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                  {/* Only show additional count if there are more than 2 items */}
+                                  {order.items.length > 2 && (
+                                    <div 
+                                      className="flex items-center justify-center rounded-lg text-gray-400 text-xs font-medium"
+                                      style={{
+                                        width: '40px',
+                                        height: '40px',
+                                        backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                                        border: '1px solid rgba(255, 255, 255, 0.08)'
+                                      }}
+                                    >
+                                      +{order.items.length - 2}
                                     </div>
                                   )}
                                 </div>
@@ -1121,11 +1902,11 @@ export default function AdminOrders() {
                               {/* Items */}
                               <td className="pl-4 pr-2 py-4">
                                 <div className="space-y-1">
-                                  {order.items.map((item: any, idx: number) => (
+                                  {groupItemsByProduct(order.items).map((item: any, idx: number) => (
                                     <div key={idx}>
                                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-purple-300"
                                         style={{ backgroundColor: 'rgba(147, 51, 234, 0.2)', border: '1px solid rgba(147, 51, 234, 0.3)' }}>
-                                        {item.productName}
+                                        {item.productName} {item.totalQuantity > 1 ? `x${item.totalQuantity}` : ''}
                                       </span>
                                     </div>
                                   ))}
@@ -1166,58 +1947,67 @@ export default function AdminOrders() {
                                   <span className="text-gray-500">-</span>
                                 )}
                               </td>
-                              {/* Notes */}
-                              <td className="px-3 py-4">
-                                <div className="max-w-xs">
-                                  {order.orderNote ? (
-                                    <span className="text-sm text-gray-300 line-clamp-2" title={order.orderNote}>
-                                      {order.orderNote}
-                                    </span>
-                                  ) : (
-                                    <span className="text-sm text-gray-500">-</span>
-                                  )}
-                                </div>
-                              </td>
+
                               {/* Actions */}
                               <td className="px-6 py-4 text-center">
                                 <div className="flex items-center justify-center gap-2">
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      selectOrder(order);
-                                    }}
-                                    className="p-1.5 rounded-lg text-purple-400 hover:text-purple-300 hover:bg-purple-500 hover:bg-opacity-10 transition-all"
-                                    title="View Order Details"
-                                  >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
                                       printOrderSlip(order);
                                     }}
-                                    className="p-1.5 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-500 hover:bg-opacity-10 transition-all"
+                                    className="p-1.5 rounded-lg text-blue-300 transition-all"
+                                    style={{
+                                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                                      backdropFilter: 'blur(25px) saturate(180%)',
+                                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                                      boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                    }}
                                     title="Print Order Slip"
                                   >
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                     </svg>
                                   </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      router.push(`/admin/shipping-labels/${order.orderNumber || order.id.split('-')[0].toUpperCase()}`);
-                                    }}
-                                    className="p-1.5 rounded-lg text-green-400 hover:text-green-300 hover:bg-green-500 hover:bg-opacity-10 transition-all"
-                                    title="Create Shipping Label"
-                                  >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                                    </svg>
-                                  </button>
+                                  {order.trackingNumber ? (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleViewTracking(order);
+                                      }}
+                                      className="p-1.5 rounded-lg text-green-300 transition-all"
+                                      style={{
+                                        background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                                        backdropFilter: 'blur(25px) saturate(180%)',
+                                        border: '1px solid rgba(34, 197, 94, 0.4)',
+                                        boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                      }}
+                                      title="View Tracking"
+                                    >
+                                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                      </svg>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        router.push(`/admin/shipping-labels/${order.orderNumber || order.id.split('-')[0].toUpperCase()}`);
+                                      }}
+                                      className="p-1.5 rounded-lg text-green-300 transition-all"
+                                      style={{
+                                        background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                                        backdropFilter: 'blur(25px) saturate(180%)',
+                                        border: '1px solid rgba(34, 197, 94, 0.4)',
+                                        boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                      }}
+                                      title="Create Shipping Label"
+                                    >
+                                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                      </svg>
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -1242,10 +2032,231 @@ export default function AdminOrders() {
                 </div>
               </>
             ) : (
-              // Order Details View - Shopify-style layout
+              // Order Details View
               <div className="max-w-7xl mx-auto">
-                {/* Header */}
-                <div className="flex justify-between items-center mb-4">
+                {/* Mobile/Tablet Header */}
+                <div className="xl:hidden mb-4">
+                  <div className="flex items-center gap-3 px-4 mb-3">
+                    <button
+                      onClick={goBackToOrders}
+                      className="p-1"
+                      aria-label="Back to orders"
+                    >
+                      <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <div>
+                      <h1 className="text-lg font-semibold text-white">
+                        #{selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}
+                      </h1>
+                    </div>
+                  </div>
+                  
+                  {/* Mobile Order Summary */}
+                  <div>
+                    <div className="glass-container p-6">
+                      <div className="flex justify-between items-start mb-6">
+                        <h3 className="text-lg font-semibold text-white">Order Summary</h3>
+                        <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.financialStatus)}`}>
+                          {selectedOrder.financialStatus}
+                        </span>
+                      </div>
+
+                      {/* Order Items - Mobile Enhanced */}
+                      <div className="space-y-4 mb-6">
+                        {selectedOrder.items.map((item, idx) => {
+                          const selections = item.calculatorSelections || {};
+                          const size = selections.size || selections.sizePreset || {};
+                          const itemImage = item.customFiles?.[0] || null;
+
+                          return (
+                            <div key={idx} className="py-4 border-b border-gray-700 border-opacity-30 last:border-b-0">
+                              <div className="flex gap-4">
+                                {/* Product Image */}
+                                <div className="relative">
+                                  <div
+                                    className="rounded-lg overflow-hidden flex-shrink-0"
+                                    style={{
+                                      width: '80px',
+                                      height: '80px',
+                                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                                    }}
+                                  >
+                                    {itemImage ? (
+                                      <img
+                                        src={itemImage}
+                                        alt={`${item.productName} design`}
+                                        className="w-full h-full object-contain p-4"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center">
+                                        <svg className="w-8 h-8 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Product Details */}
+                                <div className="flex-1">
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <h4 className="font-semibold text-white text-base">{item.productName}</h4>
+                                      <p className="text-sm text-gray-400 mt-1">SKU: {item.sku || 'N/A'}</p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="font-semibold text-white">{formatCurrency(item.totalPrice)}</p>
+                                      <p className="text-sm text-gray-400">{formatCurrency(item.unitPrice)} × {item.quantity}</p>
+                                    </div>
+                                  </div>
+
+                                  {/* Specifications - No Pills */}
+                                  <div className="mt-3 space-y-1 text-sm">
+                                    {selections.cut?.displayValue && (
+                                      <div className="flex">
+                                        <span className="text-gray-500 w-20">Shape:</span>
+                                        <span className="text-gray-300">{selections.cut.displayValue}</span>
+                                      </div>
+                                    )}
+                                    {selections.material?.displayValue && (
+                                      <div className="flex">
+                                        <span className="text-gray-500 w-20">Material:</span>
+                                        <span className="text-gray-300">{selections.material.displayValue}</span>
+                                      </div>
+                                    )}
+                                    {(size.width && size.height) || size.displayValue ? (
+                                      <div className="flex">
+                                        <span className="text-gray-500 w-20">Size:</span>
+                                        <span className="text-gray-300">
+                                          {size.width && size.height ? `${size.width}" × ${size.height}"` : size.displayValue}
+                                        </span>
+                                      </div>
+                                    ) : null}
+                                  </div>
+
+                                  {/* Additional Details */}
+                                  {(item.customerNotes || item.instagramHandle) && (
+                                    <div className="mt-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
+                                      {item.customerNotes && (
+                                        <div className="text-sm">
+                                          <span className="text-gray-500">Note:</span>
+                                          <span className="text-gray-300 ml-2">{item.customerNotes}</span>
+                                        </div>
+                                      )}
+                                      {item.instagramHandle && (
+                                        <div className="text-sm mt-1">
+                                          <span className="text-gray-500">Instagram:</span>
+                                          <span className="text-gray-300 ml-2">@{item.instagramHandle}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Order Totals */}
+                      <div className="space-y-2 pt-4 border-t border-gray-700 border-opacity-30">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-400">Subtotal</span>
+                          <span className="text-white">{formatCurrency(selectedOrder.subtotalPrice || selectedOrder.totalPrice)}</span>
+                        </div>
+                        {selectedOrder.totalTax && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-400">Tax</span>
+                            <span className="text-white">{formatCurrency(selectedOrder.totalTax)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-base font-semibold pt-2">
+                          <span className="text-white">Total</span>
+                          <span style={{ color: '#86efac' }}>{formatCurrency(selectedOrder.totalPrice)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Mobile Approved Proofs Section - Collapsible */}
+                    {selectedOrder.proofs && selectedOrder.proofs.filter(p => p.status === 'approved').length > 0 && (
+                      <div className="mt-4">
+                        <details className="glass-container p-4">
+                          <summary className="flex items-center justify-between cursor-pointer">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                                <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </div>
+                              <h3 className="text-base font-semibold text-white">Approved Proofs</h3>
+                            </div>
+                          </summary>
+                          
+                          <div className="grid grid-cols-2 gap-3 mt-4">
+                            {selectedOrder.proofs.filter((p: any) => p.status === 'approved').map((proof: any, idx: number) => (
+                              <div key={idx} className="space-y-2">
+                                <div 
+                                  className="rounded-lg overflow-hidden aspect-square p-2"
+                                  style={{
+                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                                  }}
+                                >
+                                  <img 
+                                    src={proof.proofUrl} 
+                                    alt={proof.proofTitle}
+                                    className="w-full h-full object-contain"
+                                  />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-white truncate">{proof.proofTitle}</p>
+                                  <p className="text-xs text-gray-400">Approved</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      </div>
+                    )}
+
+                    {/* Mobile Action Buttons */}
+                    <div className="mt-4 space-y-2">
+                      {selectedOrder.trackingNumber ? (
+                        <button
+                          onClick={() => handleViewTracking(selectedOrder)}
+                          className="w-full py-3 rounded-lg text-sm font-medium text-white"
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                            backdropFilter: 'blur(25px) saturate(180%)',
+                            border: '1px solid rgba(59, 130, 246, 0.4)',
+                            boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                          }}
+                        >
+                          View Tracking
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => router.push(`/admin/shipping-labels/${selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}`)}
+                          className="w-full py-3 rounded-lg text-sm font-medium text-white"
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                            backdropFilter: 'blur(25px) saturate(180%)',
+                            border: '1px solid rgba(59, 130, 246, 0.4)',
+                            boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                          }}
+                        >
+                          Create shipping label
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Desktop Header */}
+                <div className="hidden xl:flex justify-between items-center mb-4">
                   <div className="flex items-center gap-4">
                     <button
                       onClick={goBackToOrders}
@@ -1274,7 +2285,9 @@ export default function AdminOrders() {
                           height: '8px',
                           minWidth: '8px',
                           minHeight: '8px',
-                          boxShadow: '0 0 8px currentColor'
+                          boxShadow: '0 0 8px currentColor',
+                          position: 'relative',
+                          zIndex: 10
                         }}
                       ></div>
                       <span className="text-xs font-medium text-gray-300">{getProofStatus(selectedOrder)}</span>
@@ -1283,10 +2296,12 @@ export default function AdminOrders() {
                     {/* Action Buttons */}
                     <button
                       onClick={() => printOrderSlip(selectedOrder)}
-                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105"
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105"
                       style={{
-                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                        border: '1px solid rgba(59, 130, 246, 0.4)'
+                        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: '1px solid rgba(59, 130, 246, 0.4)',
+                        boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                       }}
                     >
                       <svg className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1294,28 +2309,48 @@ export default function AdminOrders() {
                       </svg>
                       Print Order Slip
                     </button>
-                    <button
-                      onClick={() => router.push(`/admin/shipping-labels/${selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}`)}
-                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-black transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105"
-                      style={{
-                        backgroundColor: '#EAB308',
-                        border: '1px solid #CA8A04'
-                      }}
-                    >
-                      <svg className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                      </svg>
-                      Create Shipping Label
-                    </button>
+                    {selectedOrder.trackingNumber ? (
+                      <button
+                        onClick={() => handleViewTracking(selectedOrder)}
+                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(75, 85, 99, 0.4) 0%, rgba(75, 85, 99, 0.25) 50%, rgba(75, 85, 99, 0.1) 100%)',
+                          backdropFilter: 'blur(25px) saturate(180%)',
+                          border: '1px solid rgba(75, 85, 99, 0.4)',
+                          boxShadow: 'rgba(75, 85, 99, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                        }}
+                      >
+                        <svg className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                        View Tracking
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => router.push(`/admin/shipping-labels/${selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}`)}
+                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.4) 0%, rgba(234, 179, 8, 0.25) 50%, rgba(234, 179, 8, 0.1) 100%)',
+                          backdropFilter: 'blur(25px) saturate(180%)',
+                          border: '1px solid rgba(234, 179, 8, 0.4)',
+                          boxShadow: 'rgba(234, 179, 8, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                        }}
+                      >
+                        <svg className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                        Create Shipping Label
+                      </button>
+                    )}
                   </div>
                 </div>
 
                 {/* Two-column layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                   {/* Left Column - Order Details */}
-                  <div className="lg:col-span-2 space-y-6">
-                    {/* Order Summary */}
-                    <div className="glass-container p-6">
+                  <div className="xl:col-span-2 space-y-6">
+                    {/* Order Summary - Desktop Only */}
+                    <div className="hidden xl:block glass-container p-6">
                       <div className="flex justify-between items-start mb-6">
                         <h3 className="text-lg font-semibold text-white">Order Summary</h3>
                         <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.financialStatus)}`}>
@@ -1533,10 +2568,16 @@ export default function AdminOrders() {
                               }
                             }}
                             disabled={!selectedOrder.proofs || selectedOrder.proofs.length === 0}
-                            className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                            className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                             style={{
-                              backgroundColor: selectedOrder.proofs && selectedOrder.proofs.length > 0 ? 'rgba(59, 130, 246, 0.2)' : 'rgba(75, 85, 99, 0.2)',
-                              border: `1px solid ${selectedOrder.proofs && selectedOrder.proofs.length > 0 ? 'rgba(59, 130, 246, 0.4)' : 'rgba(75, 85, 99, 0.4)'}`
+                              background: selectedOrder.proofs && selectedOrder.proofs.length > 0 
+                                ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                                : 'linear-gradient(135deg, rgba(75, 85, 99, 0.4) 0%, rgba(75, 85, 99, 0.25) 50%, rgba(75, 85, 99, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: `1px solid ${selectedOrder.proofs && selectedOrder.proofs.length > 0 ? 'rgba(59, 130, 246, 0.4)' : 'rgba(75, 85, 99, 0.4)'}`,
+                              boxShadow: selectedOrder.proofs && selectedOrder.proofs.length > 0 
+                                ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                : 'rgba(75, 85, 99, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                             }}
                           >
                             <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1547,101 +2588,83 @@ export default function AdminOrders() {
                           </button>
                         )}
 
-                        <button
-                          onClick={() => router.push(`/admin/shipping-labels/${selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}`)}
-                          className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-black transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105"
-                          style={{
-                            backgroundColor: '#EAB308',
-                            border: '1px solid #CA8A04'
-                          }}
-                        >
-                          <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                          </svg>
-                          Create Shipping Label
-                        </button>
+                        {selectedOrder.trackingNumber ? (
+                          <button
+                            onClick={() => handleViewTracking(selectedOrder)}
+                            className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(75, 85, 99, 0.4) 0%, rgba(75, 85, 99, 0.25) 50%, rgba(75, 85, 99, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(75, 85, 99, 0.4)',
+                              boxShadow: 'rgba(75, 85, 99, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                            }}
+                          >
+                            <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                            View Tracking
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => router.push(`/admin/shipping-labels/${selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}`)}
+                            className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.4) 0%, rgba(234, 179, 8, 0.25) 50%, rgba(234, 179, 8, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(234, 179, 8, 0.4)',
+                              boxShadow: 'rgba(234, 179, 8, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                            }}
+                          >
+                            <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                            Create Shipping Label
+                          </button>
+                        )}
                       </div>
                     </div>
 
-                    {/* Proof Upload Section */}
-                    <div className="glass-container p-6">
-                      <div className="flex justify-between items-start mb-4">
-                        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                          <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                          </svg>
-                          Design Proofs
-                        </h3>
-                        
-                        {/* Cut Lines Selection - Moved to top right */}
-                        <div className="flex items-center gap-3">
-                          <span className="text-gray-400 text-sm">Include cut lines in proofs:</span>
-                          <div className="flex gap-2">
-                            <button
-                              className="px-3 py-1 rounded-full text-xs font-medium transition-all border flex items-center gap-2 bg-green-500/20 text-green-300 border-green-400/50"
-                            >
-                              <div className="w-4 h-0.5" style={{ backgroundColor: '#91c848' }}></div>
-                              Green Cut Line
-                            </button>
-                            <button
-                              className="px-3 py-1 rounded-full text-xs font-medium transition-all border flex items-center gap-2 bg-gray-600/20 text-gray-500 border-gray-600/50"
-                            >
-                              <div className="w-4 h-0.5" style={{ backgroundColor: '#9ca3af' }}></div>
-                              Grey Cut Line
-                            </button>
+                    {/* Approved Proofs Display - Collapsible - Desktop Only */}
+                    {selectedOrder.proofs && selectedOrder.proofs.filter((p: any) => p.status === 'approved').length > 0 && (
+                      <div className="hidden xl:block">
+                        <details className="glass-container p-6">
+                        <summary className="flex items-center justify-between cursor-pointer -m-6 p-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                              <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                            <h3 className="text-lg font-semibold text-white">Approved Proofs</h3>
                           </div>
+                        </summary>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-6">
+                          {selectedOrder.proofs.filter((p: any) => p.status === 'approved').map((proof: any) => (
+                            <div key={proof.id} className="space-y-2">
+                              <div 
+                                className="rounded-lg overflow-hidden aspect-square p-2"
+                                style={{
+                                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                                }}
+                              >
+                                <img 
+                                  src={proof.proofUrl} 
+                                  alt={proof.proofTitle}
+                                  className="w-full h-full object-contain"
+                                />
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-white truncate">{proof.proofTitle}</p>
+                                <p className="text-xs text-gray-400">Approved</p>
+                              </div>
+                            </div>
+                          ))}
                         </div>
+                                              </details>
                       </div>
-                      
-                      <ProofUpload
-                        orderId={selectedOrder.id}
-                        proofStatus={selectedOrder.proof_status}
-                        existingProofs={selectedOrder.proofs}
-                        isAdmin={true}
-                        orderItems={selectedOrder.items}
-                        hideCutLinesSection={true}
-                        onProofUploaded={(proof) => {
-                          console.log('Proof uploaded:', proof);
-                          // Refetch data to get updated proof information
-                          refetch();
-                          
-                          // Handle different proof actions
-                          if (proof.removed) {
-                            // Remove proof from local state
-                            setSelectedOrder(prev => {
-                              if (!prev) return prev;
-                              return {
-                                ...prev,
-                                proofs: (prev.proofs || []).filter(p => p.id !== proof.proofId)
-                              };
-                            });
-                          } else if (proof.replaced) {
-                            // Just refetch for replacements since proof ID stays the same
-                            // The refetch above will handle the update
-                          } else if (proof.sent) {
-                            // Proofs were sent - refetch will handle the status updates
-                            // Reset new proofs count since they've been sent
-                            setNewProofsCount(prev => ({ ...prev, [selectedOrder.id]: 0 }));
-                            // Mark proofs as sent in local state
-                            setProofsSent(prev => ({ ...prev, [selectedOrder.id]: true }));
-                          } else {
-                            // Add new proof to local state
-                            setSelectedOrder(prev => {
-                              if (!prev) return prev;
-                              return {
-                                ...prev,
-                                proofs: [...(prev.proofs || []), proof]
-                              };
-                            });
-                            // Track that we have a new proof for this order
-                            setNewProofsCount(prev => ({
-                              ...prev,
-                              [selectedOrder.id]: (prev[selectedOrder.id] || 0) + 1
-                            }));
-                          }
-                        }}
-                      />
-                    </div>
+                      )}
                   </div>
 
                   {/* Right Column - Customer Info */}
@@ -1827,14 +2850,148 @@ export default function AdminOrders() {
                                 <div className="w-2 h-2 rounded-full bg-green-400 mt-1.5"></div>
                                 <div className="flex-1">
                                   <p className="text-sm font-medium text-white">Proofs approved by customer</p>
-                                  <p className="text-xs text-gray-400">Ready for production</p>
+                                  <p className="text-xs text-gray-400">
+                                    {(() => {
+                                      const approvedProof = selectedOrder.proofs?.find(p => p.approvedAt);
+                                      return approvedProof?.approvedAt ? 
+                                        new Date(approvedProof.approvedAt).toLocaleDateString('en-US', {
+                                          weekday: 'short',
+                                          month: 'short',
+                                          day: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        }) : 'Customer approved the design';
+                                    })()}
+                                  </p>
                                 </div>
                               </div>
                             )}
                           </>
                         )}
+
+                        {/* Production Status */}
+                        {(selectedOrder.proof_status === 'approved' || selectedOrder.proof_status === 'label_printed' || selectedOrder.proof_status === 'shipped' || selectedOrder.proof_status === 'delivered') && (
+                          <div className="flex items-start gap-3">
+                            <div className="w-2 h-2 rounded-full bg-orange-400 mt-1.5"></div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-white">In production</p>
+                              <p className="text-xs text-gray-400">Order is being manufactured</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Shipping Label Printed */}
+                        {(selectedOrder.proof_status === 'label_printed' || selectedOrder.proof_status === 'shipped' || selectedOrder.proof_status === 'delivered') && selectedOrder.trackingNumber && (
+                          <div className="flex items-start gap-3">
+                            <div className="w-2 h-2 rounded-full bg-indigo-400 mt-1.5"></div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-white flex items-center gap-2">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                </svg>
+                                Shipping label created
+                              </p>
+                              <p className="text-xs text-gray-400">Tracking #: {selectedOrder.trackingNumber}</p>
+                              <p className="text-xs text-gray-400">Ready for pickup by carrier</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Package Dropped Off / In-Transit (Admin view) - Only show if EasyPost confirms */}
+                        {selectedOrder.trackingNumber && selectedOrder.trackingDetails && 
+                         (selectedOrder.trackingDetails.status === 'in_transit' || 
+                          selectedOrder.trackingDetails.status === 'out_for_delivery' || 
+                          selectedOrder.trackingDetails.status === 'delivered' ||
+                          (selectedOrder.trackingDetails.tracking_details && 
+                           selectedOrder.trackingDetails.tracking_details.some((event: any) => 
+                             event.status === 'in_transit' || event.message?.toLowerCase().includes('picked up')
+                           ))) && (
+                          <div className="flex items-start gap-3">
+                            <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5"></div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-white flex items-center gap-2">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Package dropped off at carrier
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                Picked up by {selectedOrder.trackingCompany || 'UPS'} - Now in transit
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Package In Transit / Shipped - Only show if EasyPost confirms */}
+                        {selectedOrder.trackingNumber && selectedOrder.trackingDetails && 
+                         (selectedOrder.trackingDetails.status === 'in_transit' || 
+                          selectedOrder.trackingDetails.status === 'out_for_delivery' || 
+                          selectedOrder.trackingDetails.status === 'delivered' ||
+                          (selectedOrder.trackingDetails.tracking_details && 
+                           selectedOrder.trackingDetails.tracking_details.some((event: any) => 
+                             event.status === 'in_transit'
+                           ))) && (
+                          <div className="flex items-start gap-3">
+                            <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5"></div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-white flex items-center gap-2">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                                Package in transit
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                Moving through {selectedOrder.trackingCompany || 'carrier'} network
+                              </p>
+                              {selectedOrder.trackingUrl && (
+                                <a 
+                                  href={selectedOrder.trackingUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-blue-400 hover:text-blue-300 underline"
+                                >
+                                  Track package →
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Out for Delivery */}
+                        {selectedOrder.orderStatus === 'Out for Delivery' && (
+                          <div className="flex items-start gap-3">
+                            <div className="w-2 h-2 rounded-full bg-yellow-500 mt-1.5 animate-pulse"></div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-white flex items-center gap-2">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Out for delivery
+                              </p>
+                              <p className="text-xs text-gray-400">Package is on the delivery vehicle</p>
+                              <p className="text-xs text-yellow-400">📦 Arriving today</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Package Delivered */}
+                        {selectedOrder.orderStatus === 'Delivered' && (
+                          <div className="flex items-start gap-3">
+                            <div className="w-2 h-2 rounded-full bg-green-500 mt-1.5"></div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-white flex items-center gap-2">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Package delivered
+                              </p>
+                              <p className="text-xs text-gray-400">Order completed successfully</p>
+                              <p className="text-xs text-green-400">✅ Thank you for your business!</p>
+                            </div>
+                          </div>
+                        )}
                         
-                        {/* Current Status */}
+                        {/* Current Status (for orders still in progress) */}
                         {selectedOrder.proof_status === 'awaiting_approval' ? (
                           <div className="flex items-start gap-3">
                             <div className="w-2 h-2 rounded-full bg-cyan-400 mt-1.5 animate-pulse"></div>
@@ -1843,15 +3000,23 @@ export default function AdminOrders() {
                               <p className="text-xs text-gray-400">Customer is reviewing proofs</p>
                             </div>
                           </div>
-                        ) : !selectedOrder.proof_sent_at && (
+                        ) : selectedOrder.proof_status === 'changes_requested' ? (
+                          <div className="flex items-start gap-3">
+                            <div className="w-2 h-2 rounded-full bg-amber-400 mt-1.5 animate-pulse"></div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-white">Changes requested</p>
+                              <p className="text-xs text-gray-400">Updating design based on feedback</p>
+                            </div>
+                          </div>
+                        ) : !selectedOrder.proof_sent_at && selectedOrder.financialStatus === 'paid' ? (
                           <div className="flex items-start gap-3">
                             <div className="w-2 h-2 rounded-full bg-yellow-400 mt-1.5 animate-pulse"></div>
                             <div className="flex-1">
                               <p className="text-sm font-medium text-white">Building proof</p>
-                              <p className="text-xs text-gray-400">In progress</p>
+                              <p className="text-xs text-gray-400">Creating design proof for approval</p>
                             </div>
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -1861,8 +3026,158 @@ export default function AdminOrders() {
           </div>
         </div>
 
+        {/* Tracking Modal */}
+        {showTrackingModal && selectedOrder && (
+          <div className="fixed inset-0 backdrop-blur-md flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
+            <div className="glass-container p-6 max-w-md w-full mx-4" style={{ 
+              maxWidth: '500px',
+              backgroundColor: 'rgba(3, 1, 64, 0.95)',
+              backdropFilter: 'blur(20px)',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+            }}>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                  Tracking Information
+                </h3>
+                <button
+                  onClick={() => setShowTrackingModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                  aria-label="Close tracking modal"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
+              <div className="space-y-4">
+                {/* Order Info */}
+                <div className="p-4 rounded-lg border border-gray-700 border-opacity-30">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="text-sm text-gray-400">Order Number</p>
+                      <p className="text-white font-semibold">#{selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-400">Status</p>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getProofStatusColor(getProofStatus(selectedOrder))}`}>
+                        {getProofStatus(selectedOrder)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
+                {/* Tracking Details */}
+                <div className="p-4 rounded-lg border border-gray-700 border-opacity-30">
+                  <div className="space-y-3">
+                                         <div>
+                       <p className="text-sm text-gray-400 mb-1">Tracking Number</p>
+                       <div className="flex items-center gap-2">
+                         <p className="text-white font-mono text-sm bg-gray-800 bg-opacity-50 px-3 py-2 rounded">{selectedOrder.trackingNumber}</p>
+                         <div className="relative">
+                           <button
+                             onClick={() => copyTrackingToClipboard(selectedOrder.trackingNumber || '', 'number')}
+                             className="text-gray-400 hover:text-white transition-colors"
+                             title="Copy tracking number"
+                           >
+                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                             </svg>
+                           </button>
+                           {copiedTracking === 'number' && (
+                             <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-green-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                               Copied!
+                             </div>
+                           )}
+                         </div>
+                       </div>
+                     </div>
+
+                    {selectedOrder.trackingCompany && (
+                      <div>
+                        <p className="text-sm text-gray-400 mb-1">Carrier</p>
+                        <p className="text-white text-sm">{selectedOrder.trackingCompany}</p>
+                      </div>
+                    )}
+
+                    {selectedOrder.trackingUrl && (
+                      <div>
+                        <p className="text-sm text-gray-400 mb-1">Carrier Tracking URL</p>
+                        <a
+                          href={selectedOrder.trackingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 hover:text-blue-300 text-sm underline break-all"
+                        >
+                          {selectedOrder.trackingUrl}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                                 {/* Action Buttons */}
+                 <div className="flex gap-3 mt-6">
+                   <button
+                     onClick={() => handleTrackOnCarrierSite(selectedOrder)}
+                     className="flex-1 inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105"
+                     style={{
+                       background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.4) 0%, rgba(234, 179, 8, 0.25) 50%, rgba(234, 179, 8, 0.1) 100%)',
+                       backdropFilter: 'blur(25px) saturate(180%)',
+                       border: '1px solid rgba(234, 179, 8, 0.4)',
+                       boxShadow: 'rgba(234, 179, 8, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                     }}
+                   >
+                     <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L8 16" />
+                     </svg>
+                     Track on Carrier Site
+                   </button>
+                   <div className="relative">
+                     <button
+                       onClick={() => {
+                         const trackingUrl = getTrackingUrl(selectedOrder.trackingNumber || '', selectedOrder.trackingCompany);
+                         copyTrackingToClipboard(trackingUrl, 'url');
+                       }}
+                       className="p-3 text-sm font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105"
+                       style={{
+                         background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                         backdropFilter: 'blur(25px) saturate(180%)',
+                         border: '1px solid rgba(59, 130, 246, 0.4)',
+                         boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                       }}
+                       title="Copy carrier tracking link"
+                     >
+                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                       </svg>
+                     </button>
+                     {copiedTracking === 'url' && (
+                       <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-green-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                         Link Copied!
+                       </div>
+                     )}
+                   </div>
+                   <button
+                     onClick={() => setShowTrackingModal(false)}
+                     className="px-4 py-3 text-sm font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105"
+                     style={{
+                       background: 'linear-gradient(135deg, rgba(75, 85, 99, 0.4) 0%, rgba(75, 85, 99, 0.25) 50%, rgba(75, 85, 99, 0.1) 100%)',
+                       backdropFilter: 'blur(25px) saturate(180%)',
+                       border: '1px solid rgba(75, 85, 99, 0.4)',
+                       boxShadow: 'rgba(75, 85, 99, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                     }}
+                   >
+                     Close
+                   </button>
+                 </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   );

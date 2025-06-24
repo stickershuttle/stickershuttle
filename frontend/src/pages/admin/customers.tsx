@@ -282,13 +282,36 @@ export default function AdminCustomers() {
           backdrop-filter: blur(12px);
           border-radius: 16px;
         }
+        
+        /* Hide scrollbar for filter pills */
+        .filter-pills-container {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
+        }
+        
+        .filter-pills-container::-webkit-scrollbar {
+          display: none;  /* Chrome, Safari and Opera */
+        }
+        
+        @media (max-width: 768px) {
+          .mobile-customer-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset;
+            backdrop-filter: blur(12px);
+          }
+          
+          .mobile-customer-card:active {
+            transform: scale(0.98);
+          }
+        }
       `}</style>
-      <div className="min-h-screen" style={{ backgroundColor: '#030140' }}>
+      <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#030140' }}>
         {/* Main Content */}
-        <div className="w-full pt-8 pb-8">
-          <div className="w-full px-6">
-            {/* Analytics Cards */}
-            <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="pt-8 pb-8">
+          <div className="w-full max-w-full px-4 md:px-6">
+            {/* Analytics Cards - Hidden on mobile, shown on desktop */}
+            <div className="hidden xl:grid grid-cols-4 gap-4 mb-6">
               <div className="rounded-2xl p-6 transition-all duration-200 hover:scale-[1.02] glass-container">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs text-gray-400 uppercase tracking-wider">Total Customers</span>
@@ -354,8 +377,85 @@ export default function AdminCustomers() {
               </div>
             </div>
 
-            {/* Filters */}
-            <div className="flex justify-end items-center gap-3 mb-4">
+            {/* Mobile Analytics Cards - Compact 2 column layout */}
+            <div className="xl:hidden grid grid-cols-2 gap-3 mb-4 px-4">
+              <div className="glass-container p-4">
+                <div className="text-xs text-gray-400 mb-1">Total Customers</div>
+                <div className="text-lg font-bold text-white">{totalStats.customers}</div>
+                <div className="text-xs text-gray-500 mt-1">All time</div>
+              </div>
+
+              <div className="glass-container p-4">
+                <div className="text-xs text-gray-400 mb-1">Total Revenue</div>
+                <div className="text-lg font-bold" style={{ color: '#86efac' }}>
+                  {formatCurrency(totalStats.revenue)}
+                </div>
+                <div className="text-xs text-green-400 mt-1">↑ 23%</div>
+              </div>
+
+              <div className="glass-container p-4">
+                <div className="text-xs text-gray-400 mb-1">Email Subscribers</div>
+                <div className="text-lg font-bold text-white">{totalStats.subscribedCount}</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {totalStats.customers > 0 
+                    ? `${Math.round((totalStats.subscribedCount / totalStats.customers) * 100)}% opt-in`
+                    : '0% opt-in'
+                  }
+                </div>
+              </div>
+
+              <div className="glass-container p-4">
+                <div className="text-xs text-gray-400 mb-1">Avg Value</div>
+                <div className="text-lg font-bold text-white">
+                  {formatCurrency(
+                    totalStats.customers > 0 
+                      ? totalStats.revenue / totalStats.customers
+                      : 0
+                  )}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">Lifetime</div>
+              </div>
+            </div>
+
+            {/* Mobile/Tablet Filters */}
+            <div className="xl:hidden mb-4 px-4">
+              {/* Filter pills */}
+              <div className="flex gap-2 overflow-x-auto pb-2 filter-pills-container">
+                <button 
+                  onClick={() => setFilterMarketingStatus('all')}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                    filterMarketingStatus === 'all' 
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' 
+                      : 'bg-transparent text-gray-400 border-gray-600'
+                  }`}
+                >
+                  All Customers
+                </button>
+                <button 
+                  onClick={() => setFilterMarketingStatus('subscribed')}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                    filterMarketingStatus === 'subscribed' 
+                      ? 'bg-green-500/20 text-green-300 border-green-500/40' 
+                      : 'bg-transparent text-gray-400 border-gray-600'
+                  }`}
+                >
+                  Email Subscribers
+                </button>
+                <button 
+                  onClick={() => setFilterMarketingStatus('unsubscribed')}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                    filterMarketingStatus === 'unsubscribed' 
+                      ? 'bg-gray-500/20 text-gray-300 border-gray-500/40' 
+                      : 'bg-transparent text-gray-400 border-gray-600'
+                  }`}
+                >
+                  Non-subscribers
+                </button>
+              </div>
+            </div>
+
+            {/* Desktop Filters */}
+            <div className="hidden xl:flex justify-end items-center gap-3 mb-4">
               {/* Filter Dropdown */}
               <div className="relative">
                 <select
@@ -396,8 +496,81 @@ export default function AdminCustomers() {
               </div>
             </div>
 
-            {/* Customers Table */}
-            <div className="rounded-2xl overflow-hidden glass-container">
+            {/* Mobile/Tablet Customer List */}
+            <div className="xl:hidden">
+              <div className="space-y-3 px-4">
+                {filteredCustomers.map((customer) => (
+                  <div
+                    key={customer.id}
+                    onClick={() => router.push(`/admin/customers/${encodeURIComponent(customer.email)}`)}
+                    className="mobile-customer-card rounded-xl p-4 cursor-pointer transition-all duration-200"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base font-semibold text-white truncate">
+                          {customer.firstName || customer.lastName
+                            ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim()
+                            : 'Unknown Customer'}
+                        </h3>
+                        <p className="text-sm text-gray-400 truncate">{customer.email}</p>
+                        {customer.city && customer.state && (
+                          <p className="text-xs text-gray-500 mt-1">{customer.city}, {customer.state}</p>
+                        )}
+                      </div>
+                      <div className="flex-shrink-0 text-right">
+                        <div className="text-lg font-bold" style={{ color: '#86efac' }}>
+                          {formatCurrency(customer.totalSpent)}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {customer.totalOrders} order{customer.totalOrders !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {customer.marketingOptIn ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-green-300"
+                            style={{ backgroundColor: 'rgba(145, 200, 72, 0.2)', border: '1px solid rgba(145, 200, 72, 0.3)' }}>
+                            <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Subscribed
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-gray-400"
+                            style={{ backgroundColor: 'rgba(156, 163, 175, 0.2)', border: '1px solid rgba(156, 163, 175, 0.3)' }}>
+                            Unsubscribed
+                          </span>
+                        )}
+                        {customer.totalOrders > 1 && (
+                          <span className="text-xs text-purple-400">Returning</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Last order: {formatDate(customer.lastOrderDate)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Empty State */}
+              {filteredCustomers.length === 0 && (
+                <div className="text-center py-12 px-4">
+                  <div className="text-gray-400">
+                    <svg className="mx-auto h-12 w-12 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    <h3 className="text-lg font-medium text-white mb-1">No customers found</h3>
+                    <p className="text-sm">Try adjusting your filters or search terms</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Customers Table */}
+            <div className="hidden xl:block rounded-2xl overflow-hidden glass-container">
               <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 450px)', overflowY: 'auto' }}>
                 <table className="min-w-full">
                   <thead

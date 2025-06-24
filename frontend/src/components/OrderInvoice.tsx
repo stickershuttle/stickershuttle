@@ -18,12 +18,11 @@ interface OrderItem {
 }
 
 interface OrderInvoiceProps {
-  order: {
-    id: string;
-    shopifyOrderNumber?: string;
-    shopifyOrderId?: string;
-    orderCreatedAt: string;
-    orderStatus: string;
+      order: {
+      id: string;
+      orderNumber?: string;
+      orderCreatedAt: string;
+      orderStatus: string;
     fulfillmentStatus?: string;
     totalPrice: number;
     currency?: string;
@@ -107,10 +106,7 @@ const OrderInvoice: React.FC<OrderInvoiceProps> = ({ order, onClose }) => {
         return;
       }
 
-      // Skip Shopify-specific fields unless they're the only data available
-      if (key === 'shopify_variant_id' || key === 'shopify_product_id') {
-        return;
-      }
+
 
       let displayValue = 'N/A';
       let label = key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1');
@@ -221,7 +217,7 @@ const OrderInvoice: React.FC<OrderInvoiceProps> = ({ order, onClose }) => {
                 {getStatusBadge(order.orderStatus)}
               </h2>
               <p className="text-gray-400 mt-1">
-                Order #{order.shopifyOrderNumber || order.shopifyOrderId || order.id}
+                                      Order #{order.orderNumber || order.id}
               </p>
             </div>
             <button
@@ -252,7 +248,7 @@ const OrderInvoice: React.FC<OrderInvoiceProps> = ({ order, onClose }) => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Order ID:</span>
-                  <span className="text-white font-mono">{order.shopifyOrderNumber || order.id}</span>
+                                      <span className="text-white font-mono">{order.orderNumber || order.id}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Status:</span>

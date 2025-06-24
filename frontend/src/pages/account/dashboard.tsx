@@ -1,12 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
 import Link from 'next/link';
 import { getSupabase } from '../../lib/supabase';
 import { useDashboardData } from '../../hooks/useDashboardData';
 import OrderInvoice from '../../components/OrderInvoice';
-import { useLazyQuery, useMutation, gql } from '@apollo/client';
+import { useLazyQuery, useMutation, gql, useApolloClient } from '@apollo/client';
 import { GET_ORDER_BY_ID } from '../../lib/order-mutations';
+import { 
+  GET_USER_CREDIT_BALANCE, 
+  GET_UNREAD_CREDIT_NOTIFICATIONS,
+  MARK_CREDIT_NOTIFICATIONS_READ,
+  GET_USER_EARNED_CREDITS_BY_ORDER
+} from '../../lib/credit-mutations';
+
 
 // Mutation to update proof status (same as proofs page)
 const UPDATE_PROOF_STATUS = gql`
@@ -25,6 +32,7 @@ import useInvoiceGenerator, { InvoiceData } from '../../components/InvoiceGenera
 import ErrorBoundary from '../../components/ErrorBoundary';
 import dynamic from 'next/dynamic';
 import { useCart } from '../../components/CartContext';
+import AnimatedCreditCounter from '../../components/AnimatedCreditCounter';
 import { generateCartItemId } from '../../types/product';
 import { 
   calculateRealPrice, 
@@ -58,6 +66,8 @@ interface Order {
   status: string;
   total: number;
   trackingNumber?: string | null;
+  trackingCompany?: string | null;
+  trackingUrl?: string | null;
   proofUrl?: string;
   items: OrderItem[];
   _fullOrderData?: any;
@@ -73,11 +83,17 @@ interface Order {
   }>;
   proof_status?: string;
   proof_sent_at?: string;
+  // Order status fields
+  orderStatus?: string;
+  orderCreatedAt?: string;
+  financialStatus?: string;
+  fulfillmentStatus?: string;
 }
 
 function Dashboard() {
   const router = useRouter();
   const { addToCart } = useCart();
+  const client = useApolloClient();
   const [profile, setProfile] = useState<any>(null);
 
   
@@ -121,6 +137,9 @@ function Dashboard() {
       console.error('Error updating proof status:', error);
     }
   });
+  
+  // Credit queries and mutations
+  const [markCreditNotificationsRead] = useMutation(MARK_CREDIT_NOTIFICATIONS_READ);
 
   // File upload state
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -171,6 +190,93 @@ function Dashboard() {
   const [updatedQuantities, setUpdatedQuantities] = useState<{ [index: number]: number }>({});
   const [updatedPrices, setUpdatedPrices] = useState<{ [index: number]: { total: number; perSticker: number } }>({});
   const [pricingData, setPricingData] = useState<any>(null);
+  // Calculate rush savings using useMemo to avoid infinite re-renders
+  const rushSavingsAmount = useMemo(() => {
+    if (!reorderOrderData || !showReorderPopup) return 0;
+    
+    let totalRushSavings = 0;
+    
+    reorderOrderData.items.forEach((item: any, index: number) => {
+      // Skip removed items
+      if (removedItems.has(index)) return;
+      
+      const itemData = reorderOrderData._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+      const hadRushOrder = itemData.calculatorSelections?.rush?.value === true;
+      const rushOrderRemoved = removedRushItems.has(index);
+      
+      if (hadRushOrder && rushOrderRemoved) {
+        if (updatedPrices[index]) {
+          // Calculate actual rush savings by applying 40% difference directly
+          const pricingWithoutRush = updatedPrices[index].total;
+          // Rush order adds 40%, so removing it saves 28.57% (1/1.4 = 0.714, so savings = 1 - 0.714 = 0.286)
+          const pricingWithRush = pricingWithoutRush / 0.714; // Reverse the 40% reduction
+          const savings = pricingWithRush - pricingWithoutRush;
+          totalRushSavings += savings;
+          
+          console.log(`💰 Rush savings calculation for item ${index}:`, {
+            pricingWithoutRush,
+            pricingWithRush,
+            savings,
+            expectedSavingsPercent: ((savings / pricingWithRush) * 100).toFixed(1) + '%'
+          });
+        } else {
+          // Calculate based on original price difference
+          const originalQty = item.quantity || 1;
+          const currentQty = updatedQuantities[index] ?? originalQty;
+          const originalUnitPrice = item.unitPrice || item.totalPrice / originalQty || 0;
+          const originalTotal = originalUnitPrice * currentQty;
+          
+          // Apply the same 40% savings calculation
+          const pricingWithRush = originalTotal;
+          const pricingWithoutRush = originalTotal / 1.4; // Remove 40% rush fee
+          const savings = pricingWithRush - pricingWithoutRush;
+          totalRushSavings += savings;
+        }
+      }
+    });
+    
+    return totalRushSavings;
+  }, [reorderOrderData, removedItems, removedRushItems, updatedPrices, updatedQuantities, showReorderPopup]);
+
+  // Settings view state (moved to top level to avoid hooks error)
+  const [settingsData, setSettingsData] = useState({
+    firstName: '',
+    lastName: '',
+    companyName: '',
+    email: '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [settingsNotification, setSettingsNotification] = useState<{
+    message: string;
+    type: 'success' | 'error' | 'info';
+  } | null>(null);
+  
+  // Credit system state
+  const [creditBalance, setCreditBalance] = useState<number>(0);
+  const [previousCreditBalance, setPreviousCreditBalance] = useState<number>(0);
+  const [creditNotifications, setCreditNotifications] = useState<any[]>([]);
+  const [showCreditNotification, setShowCreditNotification] = useState(false);
+  const [showAnimatedCounter, setShowAnimatedCounter] = useState(false);
+
+  // Add invoice data state and hook at top level
+  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
+  
+  // Call the hook at the top level with a default value
+  const { generatePrintPDF, generateDownloadPDF } = useInvoiceGenerator(invoiceData || {
+    orderNumber: '',
+    orderDate: new Date().toISOString(),
+    orderStatus: '',
+    totalPrice: 0,
+    currency: 'USD',
+    subtotal: 0,
+    tax: 0,
+    shipping: 0,
+    items: []
+  });
 
   // Add custom styles for animations
   useEffect(() => {
@@ -307,12 +413,32 @@ function Dashboard() {
     if (user && !profile) {
       fetchProfile();
     }
+    
+    // Fetch credit data when user is available
+    if (user && (user as any)?.id) {
+      (async () => {
+        await fetchCreditData();
+      })();
+    }
 
     // Load pricing data
     if (!pricingData) {
       loadPricing();
     }
   }, [user, userLoading, profile, router, pricingData]);
+
+  // Initialize settings form data when profile loads
+  useEffect(() => {
+    if (profile || user) {
+      setSettingsData(prev => ({
+        ...prev,
+        firstName: profile?.first_name || (user as any)?.user_metadata?.first_name || '',
+        lastName: profile?.last_name || (user as any)?.user_metadata?.last_name || '',
+        companyName: profile?.company_name || '',
+        email: (user as any)?.email || ''
+      }));
+    }
+  }, [profile, user]);
 
   // Check for order completion flag from URL
   useEffect(() => {
@@ -442,6 +568,107 @@ function Dashboard() {
       console.warn('Failed to load pricing data, using fallback pricing:', error);
     }
   };
+  
+  const fetchCreditData = async () => {
+    if (!user || !(user as any)?.id) return;
+    
+    try {
+      // Get Apollo Client instance from the hook
+      const apolloClient = client;
+      
+      // Fetch credit balance
+      const { data: balanceData } = await apolloClient.query({
+        query: GET_USER_CREDIT_BALANCE,
+        variables: { userId: (user as any).id }
+      });
+      
+      if (balanceData?.getUserCreditBalance) {
+        const newBalance = balanceData.getUserCreditBalance.balance || 0;
+        
+        // Check if balance increased and we have notifications
+        if (newBalance > creditBalance && creditBalance > 0) {
+          setPreviousCreditBalance(creditBalance);
+          setCreditBalance(newBalance);
+        } else {
+          setCreditBalance(newBalance);
+        }
+      }
+      
+      // Fetch unread credit notifications
+      const { data: notificationData } = await apolloClient.query({
+        query: GET_UNREAD_CREDIT_NOTIFICATIONS,
+        variables: { userId: (user as any).id }
+      });
+      
+      if (notificationData?.getUnreadCreditNotifications && notificationData.getUnreadCreditNotifications.length > 0) {
+        setCreditNotifications(notificationData.getUnreadCreditNotifications);
+        // If balance increased, show animated counter instead of static notification
+        const newBalance = balanceData?.getUserCreditBalance?.balance || 0;
+        if (newBalance > creditBalance && creditBalance > 0) {
+          setShowAnimatedCounter(true);
+          setShowCreditNotification(false);
+        } else {
+          setShowCreditNotification(true);
+          setShowAnimatedCounter(false);
+        }
+      }
+
+      // Fetch credit history for points earned display
+      const { data: creditHistoryData } = await apolloClient.query({
+        query: GET_USER_EARNED_CREDITS_BY_ORDER,
+        variables: { userId: (user as any).id }
+      });
+      
+      if (creditHistoryData?.getUserCreditHistory) {
+        // Store credit history on user object for access in financial view
+        (user as any).creditHistory = creditHistoryData.getUserCreditHistory;
+      }
+    } catch (error: any) {
+      console.error('Error fetching credit data:', error);
+      // Don't show error to user - credit system might not be set up yet
+      // Just set default values
+      setCreditBalance(0);
+      setCreditNotifications([]);
+      
+      // Log a helpful message for developers
+      if (error?.message?.includes('get_user_credit_balance')) {
+        console.warn('Credit system not set up. Please run the SQL scripts in Supabase:');
+        console.warn('1. docs/CREATE_CREDITS_SYSTEM.sql');
+        console.warn('2. docs/ADD_CREDITS_APPLIED_COLUMN.sql');
+      }
+    }
+  };
+  
+  const handleDismissCreditNotification = async () => {
+    if (!user || !(user as any)?.id) return;
+    
+    try {
+      await markCreditNotificationsRead({
+        variables: { userId: (user as any).id }
+      });
+      setShowCreditNotification(false);
+      setCreditNotifications([]);
+    } catch (error) {
+      console.error('Error marking credit notifications as read:', error);
+    }
+  };
+
+  const handleAnimatedCounterComplete = async () => {
+    setShowAnimatedCounter(false);
+    setPreviousCreditBalance(0);
+    
+    // Mark notifications as read
+    if (user && (user as any)?.id) {
+      try {
+        await markCreditNotificationsRead({
+          variables: { userId: (user as any).id }
+        });
+        setCreditNotifications([]);
+      } catch (error) {
+        console.error('Error marking credit notifications as read:', error);
+      }
+    }
+  };
 
   const fetchProfile = async () => {
     if (!user || !(user as any)?.id) {
@@ -469,8 +696,8 @@ function Dashboard() {
       const combinedProfile = {
         id: (user as any).id,
         email: (user as any).email,
-        first_name: (user as any).user_metadata?.first_name || '',
-        last_name: (user as any).user_metadata?.last_name || '',
+        first_name: profileData?.first_name || (user as any)?.user_metadata?.first_name || '',
+        last_name: profileData?.last_name || (user as any)?.user_metadata?.last_name || '',
         phone: (user as any).user_metadata?.phone || '',
         created_at: (user as any).created_at,
         // Profile data from user_profiles table
@@ -480,6 +707,7 @@ function Dashboard() {
         banner_image_public_id: profileData?.banner_image_public_id || null,
         display_name: profileData?.display_name || null,
         bio: profileData?.bio || null,
+        company_name: profileData?.company_name || null,
         // Banner template data
         banner_template: profileData?.banner_template || null,
         banner_template_id: profileData?.banner_template_id || null
@@ -940,8 +1168,7 @@ function Dashboard() {
           radial-gradient(ellipse at 80% 30%, rgba(75, 0, 130, 0.3) 0%, transparent 50%),
           radial-gradient(ellipse at 40% 40%, rgba(199, 21, 133, 0.3) 0%, transparent 40%),
           radial-gradient(ellipse at 60% 80%, rgba(138, 43, 226, 0.2) 0%, transparent 50%)
-        `,
-        animation: 'nebula-drift 15s ease-in-out infinite'
+        `
       }
     },
 
@@ -1048,57 +1275,14 @@ function Dashboard() {
     console.log(`🎯 Getting display number for order ${order.id}:`, {
       orderNumber: order.orderNumber,
       order_number: order.order_number,
-      fullOrderOrderNumber: order._fullOrderData?.orderNumber,
-      fullOrder_order_number: order._fullOrderData?.order_number,
-      fullOrder: order._fullOrderData
+      id: order.id
     });
     
-    // Priority 1: Check for order_number (the SS-00001 format from Stripe webhook)
-    if (order.orderNumber) {
-      console.log(`✅ Using orderNumber: ${order.orderNumber}`);
-      return order.orderNumber.startsWith('SS-') ? order.orderNumber : `SS-${order.orderNumber}`;
-    }
-    
-    if (order.order_number) {
-      console.log(`✅ Using order_number: ${order.order_number}`);
-      return order.order_number.startsWith('SS-') ? order.order_number : `SS-${order.order_number}`;
-    }
-    
-    // Priority 2: Check _fullOrderData for order_number
-    if (order._fullOrderData?.orderNumber) {
-      console.log(`✅ Using _fullOrderData.orderNumber: ${order._fullOrderData.orderNumber}`);
-      return order._fullOrderData.orderNumber.startsWith('SS-') ? order._fullOrderData.orderNumber : `SS-${order._fullOrderData.orderNumber}`;
-    }
-    
-    if (order._fullOrderData?.order_number) {
-      console.log(`✅ Using _fullOrderData.order_number: ${order._fullOrderData.order_number}`);
-      return order._fullOrderData.order_number.startsWith('SS-') ? order._fullOrderData.order_number : `SS-${order._fullOrderData.order_number}`;
-    }
-    
-    // Priority 3: Legacy - Try Shopify order numbers
-    if (order.shopifyOrderNumber) {
-      console.log(`⚠️ Using legacy shopifyOrderNumber: ${order.shopifyOrderNumber}`);
-      return order.shopifyOrderNumber.startsWith('SS-') ? order.shopifyOrderNumber : `SS-${order.shopifyOrderNumber}`;
-    }
-    
-    if (order._fullOrderData?.shopifyOrderNumber) {
-      console.log(`⚠️ Using legacy _fullOrderData.shopifyOrderNumber: ${order._fullOrderData.shopifyOrderNumber}`);
-      return order._fullOrderData.shopifyOrderNumber.startsWith('SS-') ? order._fullOrderData.shopifyOrderNumber : `SS-${order._fullOrderData.shopifyOrderNumber}`;
-    }
-    
-    if (order._fullOrderData?.shopify_order_number) {
-      console.log(`⚠️ Using legacy _fullOrderData.shopify_order_number: ${order._fullOrderData.shopify_order_number}`);
-      return order._fullOrderData.shopify_order_number.startsWith('SS-') ? order._fullOrderData.shopify_order_number : `SS-${order._fullOrderData.shopify_order_number}`;
-    }
-    
-    if (order.shopify_order_number) {
-      console.log(`⚠️ Using legacy snake_case shopify_order_number: ${order.shopify_order_number}`);
-      return order.shopify_order_number.startsWith('SS-') ? order.shopify_order_number : `SS-${order.shopify_order_number}`;
-    }
-    
-    // Last resort: Use internal ID but make it shorter and cleaner
-    console.log(`🔄 Fallback to internal ID: SS-${order.id.split('-')[0].toUpperCase()}`);
-    return `SS-${order.id.split('-')[0].toUpperCase()}`;
+    // Only show the order_number from supabase column
+    // If no order number exists, show the order ID as fallback
+    const displayNumber = order.orderNumber || order.order_number || order.id.split('-')[0].toUpperCase();
+    console.log(`✅ Display number: ${displayNumber}`);
+    return displayNumber;
   };
 
   const handleReorder = async (orderId: string) => {
@@ -1278,63 +1462,34 @@ function Dashboard() {
   };
 
   const handleRemoveRushOrder = (itemIndex: number) => {
+    // Add to removed rush items
     setRemovedRushItems(prev => new Set([...prev, itemIndex]));
     
-    // Update the reorder data to reflect the price change (remove rush fee)
-    if (reorderOrderData) {
-      const updatedOrderData = { ...reorderOrderData };
-      const fullItem = updatedOrderData._fullOrderData?.items?.[itemIndex];
-      const item = updatedOrderData.items[itemIndex];
-      
-      if (item && fullItem) {
-        // Get the actual rush price impact from calculator selections
-        const rushPriceImpact = fullItem.calculatorSelections?.rush?.priceImpact || 
-                               fullItem.calculatorSelections?.rushOrder?.priceImpact || 0;
-        
-        console.log(`🔄 Removing rush order from item ${itemIndex}:`, {
-          currentTotalPrice: item.totalPrice,
-          rushPriceImpact: rushPriceImpact,
-          newTotalPrice: (item.totalPrice || 0) - rushPriceImpact
-        });
-        
-        if (rushPriceImpact > 0) {
-          // Calculate new prices by subtracting the exact rush price impact
-          const newTotalPrice = (item.totalPrice || 0) - rushPriceImpact;
-          const newUnitPrice = newTotalPrice / (item.quantity || 1);
-          
-          // Update the item price
-          const updatedItem = { ...item, unitPrice: newUnitPrice, totalPrice: newTotalPrice };
-          updatedOrderData.items[itemIndex] = updatedItem;
-          
-          // Update the total order price
-          updatedOrderData.total = (updatedOrderData.total || 0) - rushPriceImpact;
-        }
-        
-        // Remove rush order from calculator selections - FIX: Create new array instead of modifying read-only array
-        if (fullItem.calculatorSelections) {
-          const updatedFullItem = { 
-            ...fullItem,
-            calculatorSelections: {
-              ...fullItem.calculatorSelections,
-              rushOrder: { displayValue: 'Standard', value: false, priceImpact: 0 },
-              rush: { displayValue: 'Standard', value: false, priceImpact: 0 }
-            }
-          };
-          
-          // Create a new items array instead of modifying the read-only one
-          const updatedFullOrderData = {
-            ...updatedOrderData._fullOrderData,
-            items: updatedOrderData._fullOrderData.items.map((fullOrderItem: any, index: number) => 
-              index === itemIndex ? updatedFullItem : fullOrderItem
-            )
-          };
-          
-          updatedOrderData._fullOrderData = updatedFullOrderData;
-        }
-        
-        setReorderOrderData(updatedOrderData);
+    // Force a pricing update for this item to trigger total recalculation
+    const item = reorderOrderData.items[itemIndex];
+    const currentQty = updatedQuantities[itemIndex] ?? (item.quantity || 1);
+    
+    // Calculate the reduced price (remove 40% rush fee)
+    const originalUnitPrice = item.unitPrice || item.totalPrice / (item.quantity || 1) || 0;
+    const originalTotalForQty = originalUnitPrice * currentQty;
+    const priceWithoutRush = originalTotalForQty / 1.4; // Remove 40% rush fee
+    const pricePerStickerWithoutRush = priceWithoutRush / currentQty;
+    
+    // Set the updated price to trigger the total recalculation
+    setUpdatedPrices(prev => ({ 
+      ...prev, 
+      [itemIndex]: {
+        total: priceWithoutRush,
+        perSticker: pricePerStickerWithoutRush
       }
-    }
+    }));
+    
+    console.log(`🔄 Rush order removed for item ${itemIndex}:`, {
+      originalTotal: originalTotalForQty,
+      newTotal: priceWithoutRush,
+      savings: originalTotalForQty - priceWithoutRush,
+      savingsPercent: ((originalTotalForQty - priceWithoutRush) / originalTotalForQty * 100).toFixed(1) + '%'
+    });
   };
 
   // Helper function to calculate area from size
@@ -1360,7 +1515,7 @@ function Dashboard() {
   };
 
   // Helper function to calculate pricing based on product type and selections
-  const calculateItemPricing = (item: any, quantity: number) => {
+  const calculateItemPricing = (item: any, quantity: number, itemIndex?: number) => {
     const itemData = reorderOrderData._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
     const selections = itemData.calculatorSelections || {};
     
@@ -1371,8 +1526,11 @@ function Dashboard() {
       selections.customHeight?.value
     );
     
-    // Check for rush order
-    const rushOrder = selections.rush?.value === true;
+    // Check for rush order - consider if it's been removed
+    const originalRushOrder = selections.rush?.value === true;
+    const rushOrderRemoved = itemIndex !== undefined && itemIndex >= 0 && removedRushItems.has(itemIndex);
+    const forceRush = (item as any)._forceRushCalculation === true || itemIndex === -1;
+    const rushOrder = forceRush ? originalRushOrder : (originalRushOrder && !rushOrderRemoved);
     
     // Get white option modifier (for holographic, chrome, clear, glitter)
     const whiteOptionModifiers = {
@@ -1455,7 +1613,7 @@ function Dashboard() {
     
     // Recalculate pricing
     const item = reorderOrderData.items[itemIndex];
-    const newPricing = calculateItemPricing(item, finalQuantity);
+    const newPricing = calculateItemPricing(item, finalQuantity, itemIndex);
     setUpdatedPrices(prev => ({ ...prev, [itemIndex]: newPricing }));
   };
 
@@ -1599,80 +1757,9 @@ function Dashboard() {
   const handleViewOrderDetails = (order: any) => {
     console.log('📋 Opening details view for order:', order.id);
     
-    // Use full order data if available, otherwise create a basic format
-    if (order._fullOrderData) {
-      console.log('✅ Using full order data for details');
-      const fullOrder = order._fullOrderData;
-      
-      // Transform full GraphQL data to OrderInvoice format
-      const orderDetails = {
-        id: fullOrder.id,
-        shopifyOrderNumber: fullOrder.shopifyOrderNumber || fullOrder.shopifyOrderId || order.id,
-        shopifyOrderId: fullOrder.shopifyOrderId,
-        orderCreatedAt: fullOrder.orderCreatedAt || fullOrder.createdAt,
-        orderStatus: fullOrder.orderStatus || 'Processing',
-        fulfillmentStatus: fullOrder.fulfillmentStatus || 'unfulfilled',
-        totalPrice: fullOrder.totalPrice || order.total,
-        currency: fullOrder.currency || 'USD',
-        customerFirstName: fullOrder.customerFirstName || '',
-        customerLastName: fullOrder.customerLastName || '',
-        customerEmail: fullOrder.customerEmail || '',
-        trackingNumber: fullOrder.trackingNumber || '',
-        trackingCompany: fullOrder.trackingCompany || '',
-        items: (fullOrder.items || []).map((item: any) => ({
-          id: item.id,
-          productName: item.productName || 'Custom Stickers',
-          productCategory: item.productCategory || 'vinyl-stickers',
-          quantity: item.quantity || 1,
-          unitPrice: item.unitPrice || 0,
-          totalPrice: item.totalPrice || 0,
-          calculatorSelections: item.calculatorSelections || {},
-          customFiles: item.customFiles || [],
-          customerNotes: item.customerNotes || ''
-        }))
-      };
-      
-      setSelectedOrderForInvoice(orderDetails);
-    } else {
-      console.log('⚠️ Using basic order data for details');
-      // Fallback to basic order format
-      const transformedOrder = {
-        id: order.id,
-        shopifyOrderNumber: order.id,
-        shopifyOrderId: order.id,
-        orderCreatedAt: order.date,
-        orderStatus: order.status,
-        fulfillmentStatus: order.status,
-        totalPrice: order.total,
-        currency: 'USD',
-        customerFirstName: '',
-        customerLastName: '',
-        customerEmail: '',
-        trackingNumber: order.trackingNumber || '',
-        trackingCompany: '',
-        items: order.items.map((item: any) => ({
-          id: item.id.toString(),
-          productName: item.name,
-          productCategory: 'vinyl-stickers',
-          quantity: item.quantity,
-          unitPrice: item.price,
-          totalPrice: item.price * item.quantity,
-          calculatorSelections: {
-            size: { displayValue: item.size || 'Custom' },
-            material: { displayValue: item.material || 'Premium Vinyl' }
-          },
-          customFiles: item.image ? [item.image] : [],
-          customerNotes: ''
-        }))
-      };
-      setSelectedOrderForInvoice(transformedOrder);
-    }
-    
-    // Switch to order details view instead of opening modal  
-    // Small delay to prevent flashing
-    setTimeout(() => {
-      setCurrentView('order-details');
-    }, 50);
+    // Set the selected order and switch to order details view
+    setSelectedOrderForInvoice(order);
+    setCurrentView('order-details');
   };
 
   const handleProofAction = async (action: 'approve' | 'request_changes', orderId: string, proofId: string) => {
@@ -1877,6 +1964,138 @@ function Dashboard() {
     }
   };
 
+  // Function to get tracking URL based on carrier and tracking number
+  const getTrackingUrl = (trackingNumber: string, carrier?: string) => {
+    if (!trackingNumber) return null;
+    
+    // Extract carrier from tracking number format if not provided
+    const carrierGuess = carrier || guessCarrierFromTrackingNumber(trackingNumber);
+    
+    switch (carrierGuess?.toUpperCase()) {
+      case 'UPS':
+      case 'UPSDAP':
+        return `https://www.ups.com/track?tracknum=${trackingNumber}`;
+      case 'FEDEX':
+      case 'FEDEXDEFAULT':
+        return `https://www.fedex.com/fedextrack/?trknbr=${trackingNumber}`;
+      case 'USPS':
+        return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${trackingNumber}`;
+      default:
+        // Default to UPS if carrier unknown
+        return `https://www.ups.com/track?tracknum=${trackingNumber}`;
+    }
+  };
+
+  // Helper function to guess carrier from tracking number format
+  const guessCarrierFromTrackingNumber = (trackingNumber: string) => {
+    if (!trackingNumber) return null;
+    
+    const cleanTracking = trackingNumber.replace(/\s/g, '').toUpperCase();
+    
+    // UPS tracking patterns
+    if (/^1Z[0-9A-Z]{16}$/.test(cleanTracking) || 
+        /^[0-9]{18}$/.test(cleanTracking) ||
+        /^T[0-9A-Z]{10}$/.test(cleanTracking)) {
+      return 'UPS';
+    }
+    
+    // FedEx tracking patterns
+    if (/^[0-9]{12}$/.test(cleanTracking) ||
+        /^[0-9]{14}$/.test(cleanTracking) ||
+        /^[0-9]{15}$/.test(cleanTracking) ||
+        /^[0-9]{20}$/.test(cleanTracking)) {
+      return 'FEDEX';
+    }
+    
+    // USPS tracking patterns
+    if (/^[0-9]{20}$/.test(cleanTracking) ||
+        /^[0-9]{13}$/.test(cleanTracking) ||
+        /^[A-Z]{2}[0-9]{9}[A-Z]{2}$/.test(cleanTracking) ||
+        /^[0-9A-Z]{13}$/.test(cleanTracking)) {
+      return 'USPS';
+    }
+    
+    return null;
+  };
+
+  // Function to handle track order click
+  const handleTrackOrder = (order: Order) => {
+    // Try multiple tracking number fields
+    const trackingNumber = order.trackingNumber || 
+                          order._fullOrderData?.tracking_number || 
+                          order._fullOrderData?.tracking_code;
+    
+    if (!trackingNumber) {
+      console.log('⚠️ No tracking number found in any field');
+      return;
+    }
+    
+    console.log('🚚 Found tracking number:', trackingNumber);
+    
+    // Check if this is a test tracking number (EasyPost test numbers often start with EZ)
+    if (trackingNumber.startsWith('EZ') || trackingNumber.includes('test')) {
+      console.log('🧪 Test tracking number detected, opening UPS demo for testing');
+      // For test tracking numbers, open UPS demo
+      window.open('https://www.ups.com/track?tracknum=1Z12345E0291980793', '_blank', 'noopener,noreferrer');
+      return;
+    }
+    
+    // Get the tracking URL from order data or generate it
+    let trackingUrl = null;
+    
+    // Try to get carrier info from full order data
+    const carrier = order._fullOrderData?.carrier || order._fullOrderData?.selected_rate?.carrier;
+    
+    trackingUrl = getTrackingUrl(trackingNumber, carrier);
+    
+    if (trackingUrl) {
+      // Open tracking page in new tab
+      window.open(trackingUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  // Function to check if order is shipped and has tracking
+  const isOrderShippedWithTracking = (order: Order) => {
+    const shippedStatuses = ['Shipped', 'Out for Delivery', 'Delivered'];
+    const hasTracking = order.trackingNumber;
+    
+    // Enhanced debug logging for test mode tracking
+    console.log('🚚 Tracking Debug:', {
+      orderId: order.id,
+      status: order.status,
+      trackingNumber: order.trackingNumber,
+      isShippedStatus: shippedStatuses.includes(order.status),
+      hasTracking: !!hasTracking,
+      shouldShowButton: shippedStatuses.includes(order.status) && hasTracking,
+      // Check all possible tracking fields
+      allTrackingFields: {
+        trackingNumber: order.trackingNumber,
+        tracking_number: order._fullOrderData?.tracking_number,
+        trackingCode: order._fullOrderData?.tracking_code,
+        trackingCompany: order._fullOrderData?.trackingCompany,
+        trackingUrl: order._fullOrderData?.trackingUrl,
+        // Check if any tracking exists anywhere
+        hasAnyTracking: !!(order.trackingNumber || 
+                          order._fullOrderData?.tracking_number || 
+                          order._fullOrderData?.tracking_code)
+      }
+    });
+    
+    // For test purposes, let's check multiple possible tracking fields
+    const hasAnyTracking = !!(order.trackingNumber || 
+                             order._fullOrderData?.tracking_number || 
+                             order._fullOrderData?.tracking_code);
+    
+    return shippedStatuses.includes(order.status) && hasAnyTracking;
+  };
+
+  // Order rating handlers
+
+
+
+
+
+
   // Order progress tracker function
   const getOrderProgress = (status: string) => {
     const steps = [
@@ -1927,7 +2146,7 @@ function Dashboard() {
         icon: (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0M15 17a2 2 0 104 0" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
           </svg>
         ),
         statuses: ['Out for Delivery']
@@ -1958,6 +2177,15 @@ function Dashboard() {
 
   const renderOrderProgressTracker = (order: any) => {
     const { steps, currentStepIndex } = getOrderProgress(order.status);
+    
+    // Check if this is a reorder
+    const isReorder = order.items?.some((item: any) => 
+      item._fullOrderData?.calculatorSelections?.isReorder === true ||
+      item._fullOrderData?.isReorder === true
+    ) || order._fullOrderData?.items?.some((item: any) => 
+      item.calculatorSelections?.isReorder === true ||
+      item.isReorder === true
+    );
     
     return (
       <div className="px-6 pt-6 pb-4" style={{ 
@@ -2035,9 +2263,23 @@ function Dashboard() {
             );
           })}
         </div>
+        
+        {/* Reorder Message */}
+        {isReorder && (
+          <div className="mt-4 pt-3 border-t border-white/10">
+            <div className="flex items-center justify-center gap-2 text-amber-300 text-sm">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+              </svg>
+              <span className="font-medium">This is a re-order and proofs are skipped and sent straight to production.</span>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
+
+
 
   const renderMainContent = () => {
     switch (currentView) {
@@ -2069,8 +2311,8 @@ function Dashboard() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6 2C4.9 2 4 2.9 4 4v16c0 .6.4 1 1 1 .2 0 .5-.1.7-.3L9 18l3.3 2.7c.4.4 1 .4 1.4 0L17 18l3.3 2.7c.2.2.5.3.7.3.6 0 1-.4 1-1V4c0-1.1-.9-2-2-2H6zm2 5h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h4c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1z"/>
             </svg>
             Orders
           </h2>
@@ -2112,25 +2354,25 @@ function Dashboard() {
           </div>
         </div>
         
-        {/* Order List - Excel-Style Table */}
+        {/* Orders List - Matching Active Orders Layout */}
         <div 
-          className="container-style overflow-hidden"
+          className="rounded-2xl overflow-hidden"
           style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.08)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255, 255, 255, 0.15)'
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(12px)'
           }}
         >
-          {/* Table Header */}
-          <div className="px-6 py-3 border-b border-white/10 bg-white/5">
-            <div className="grid grid-cols-20 gap-4 text-xs font-semibold text-gray-300 uppercase tracking-wider">
-              <div className="col-span-2">Preview</div>
-              <div className="col-span-3">Order</div>
+          {/* Table Header - Desktop Only */}
+          <div className="hidden md:block px-6 py-3 border-b border-white/10 bg-white/5">
+            <div className="grid grid-cols-16 gap-4 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+              <div className="col-span-3">Preview</div>
+              <div className="col-span-2">ORDER #</div>
               <div className="col-span-4">Items</div>
-              <div className="col-span-3">Status</div>
               <div className="col-span-2">Date</div>
               <div className="col-span-2">Total</div>
-              <div className="col-span-4">Actions</div>
+              <div className="col-span-3">Actions</div>
             </div>
           </div>
           
@@ -2147,10 +2389,10 @@ function Dashboard() {
                 <div key={order.id}>
                   <div className="px-6 py-4 hover:bg-white/5 transition-colors duration-200">
                     {/* Desktop Row Layout */}
-                    <div className="hidden md:grid grid-cols-20 gap-4 items-center">
+                    <div className="hidden md:grid grid-cols-16 gap-4 items-center">
                       
                       {/* Preview Column - Side by Side Images */}
-                      <div className="col-span-2">
+                      <div className="col-span-3">
                         <div className="flex gap-2">
                           {order.items.slice(0, 2).map((item, index) => {
                             // Get the full item data with images
@@ -2224,7 +2466,7 @@ function Dashboard() {
                       </div>
                       
                       {/* Order Column */}
-                      <div className="col-span-3">
+                      <div className="col-span-2">
                         <div className="font-semibold text-white text-sm">
                           {getOrderDisplayNumber(order)}
                         </div>
@@ -2270,23 +2512,6 @@ function Dashboard() {
                         </div>
                       </div>
                       
-                      {/* Status Column */}
-                      <div className="col-span-3">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${getStatusColor(order.status)}`}>
-                            <div className="w-full h-full rounded-full animate-pulse"></div>
-                          </div>
-                          <span className="text-xs text-gray-300 font-medium">
-                            {getStatusDisplayText(order.status)}
-                          </span>
-                        </div>
-                        {order.trackingNumber && (
-                          <div className="text-xs text-purple-300 mt-1">
-                            📦 {order.trackingNumber}
-                          </div>
-                        )}
-                      </div>
-                      
                       {/* Date Column */}
                       <div className="col-span-2">
                         <div className="text-xs text-gray-400">
@@ -2305,14 +2530,16 @@ function Dashboard() {
                       </div>
                       
                       {/* Actions Column */}
-                      <div className="col-span-4">
-                        <div className="flex flex-col md:flex-row gap-1 md:gap-2">
+                      <div className="col-span-3">
+                        <div className="flex flex-col gap-2">
                           <button
                             onClick={() => handleViewOrderDetails(order)}
-                            className="px-2 md:px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1 flex-1 whitespace-nowrap cursor-pointer"
+                            className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
                             style={{
-                              backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                              border: '1px solid rgba(59, 130, 246, 0.3)',
+                              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(59, 130, 246, 0.4)',
+                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
                               color: 'white'
                             }}
                           >
@@ -2323,10 +2550,12 @@ function Dashboard() {
                           </button>
                           <button
                             onClick={() => handleReorder(order.id)}
-                            className="px-2 md:px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1 flex-1 cursor-pointer"
+                            className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
                             style={{
-                              backgroundColor: 'rgba(245, 158, 11, 0.2)',
-                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(245, 158, 11, 0.4)',
+                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
                               color: 'white'
                             }}
                           >
@@ -2335,6 +2564,39 @@ function Dashboard() {
                             </svg>
                             Reorder
                           </button>
+                        
+                        {order.status === 'Proof Review Needed' && (
+                          <button
+                            onClick={() => setCurrentView('proofs')}
+                            className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105"
+                            style={{
+                              backgroundColor: 'rgba(249, 115, 22, 0.2)',
+                              border: '1px solid rgba(249, 115, 22, 0.3)',
+                              color: 'white'
+                            }}
+                          >
+                            Review Proof
+                          </button>
+                        )}
+                        {isOrderShippedWithTracking(order) && (
+                          <button
+                            onClick={() => handleTrackOrder(order)}
+                            className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(34, 197, 94, 0.4)',
+                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                              color: 'white'
+                            }}
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                            </svg>
+                            Track Order
+                          </button>
+                        )}
                         </div>
                       </div>
                       
@@ -2389,7 +2651,7 @@ function Dashboard() {
                           )}
                         </div>
 
-                        {/* Items and Status Row */}
+                        {/* Items and Date Row - Removed Status */}
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <div className="text-xs text-gray-400 mb-1">Items</div>
@@ -2430,20 +2692,14 @@ function Dashboard() {
                           </div>
                           
                           <div>
-                            <div className="text-xs text-gray-400 mb-1">Status</div>
-                            <div className="flex items-center gap-2">
-                              <div className={`w-2 h-2 rounded-full ${getStatusColor(order.status)}`}>
-                                <div className="w-full h-full rounded-full animate-pulse"></div>
-                              </div>
-                              <span className="text-xs text-gray-300 font-medium">
-                                {getStatusDisplayText(order.status)}
-                              </span>
+                            <div className="text-xs text-gray-400 mb-1">Date</div>
+                            <div className="text-xs text-white">
+                              {new Date(order.date).toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric',
+                                year: 'numeric'
+                              })}
                             </div>
-                            {order.trackingNumber && (
-                              <div className="text-xs text-purple-300 mt-1">
-                                📦 {order.trackingNumber}
-                              </div>
-                            )}
                           </div>
                         </div>
 
@@ -2462,8 +2718,10 @@ function Dashboard() {
                             onClick={() => handleViewOrderDetails(order)}
                             className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
                             style={{
-                              backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                              border: '1px solid rgba(59, 130, 246, 0.3)',
+                              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(59, 130, 246, 0.4)',
+                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
                               color: 'white'
                             }}
                           >
@@ -2476,8 +2734,10 @@ function Dashboard() {
                             onClick={() => handleReorder(order.id)}
                             className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
                             style={{
-                              backgroundColor: 'rgba(245, 158, 11, 0.2)',
-                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(245, 158, 11, 0.4)',
+                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
                               color: 'white'
                             }}
                           >
@@ -2486,33 +2746,32 @@ function Dashboard() {
                             </svg>
                             Reorder
                           </button>
+                          {isOrderShippedWithTracking(order) && (
+                            <button
+                              onClick={() => handleTrackOrder(order)}
+                              className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
+                              style={{
+                                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                                backdropFilter: 'blur(25px) saturate(180%)',
+                                border: '1px solid rgba(34, 197, 94, 0.4)',
+                                boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                                color: 'white'
+                              }}
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                              </svg>
+                              Track Order
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Order Status Messages - Keep proof messages as requested */}
-                  {order.status === 'Proof Review Needed' && (
-                    <div className="px-6 pb-4">
-                      <div className="p-4 rounded-lg border-2 border-orange-500/30 bg-orange-500/10">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-3 h-3 rounded-full bg-orange-500 animate-pulse"></div>
-                          <span className="text-orange-300 font-semibold text-sm">⚠️ Proof Review Required</span>
-                          </div>
-                        <p className="text-orange-200 text-sm">
-                          Your design proof is ready for review. Please approve or request changes.
-                        </p>
-                          </div>
-                        </div>
-                  )}
-                  
-                  {order.status !== 'Delivered' && order.status !== 'Proof Review Needed' && (
-                    <div className="px-6 pb-4">
-                      <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
-                        <p className="text-orange-300 text-sm">📝 We're currently working on your proof. You'll get an e-mail notification when it's ready.</p>
-                      </div>
-                    </div>
-                  )}
+                  {/* Progress Tracker Subrow */}
+                  {renderOrderProgressTracker(order)}
                               </div>
                             );
                           })}
@@ -2564,8 +2823,10 @@ function Dashboard() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl md:text-2xl font-bold text-white flex items-center gap-2">
-            <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <rect x="3" y="12" width="4" height="9" rx="2"/>
+              <rect x="10" y="6" width="4" height="15" rx="2"/>
+              <rect x="17" y="9" width="4" height="12" rx="2"/>
             </svg>
             Finances
           </h2>
@@ -2577,32 +2838,55 @@ function Dashboard() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="rounded-xl p-4 text-center"
-                            style={{
-                 backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                 border: '1px solid rgba(59, 130, 246, 0.3)'
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="p-4 text-center"
+               style={{
+                 background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.5) 0%, rgba(250, 204, 21, 0.35) 50%, rgba(255, 193, 7, 0.2) 100%)',
+                 backdropFilter: 'blur(25px) saturate(200%)',
+                 border: '1px solid rgba(255, 215, 0, 0.6)',
+                 boxShadow: 'rgba(250, 204, 21, 0.3) 0px 4px 16px, rgba(255, 255, 255, 0.4) 0px 1px 0px inset',
+                 borderRadius: '16px'
+               }}>
+            <h3 className="text-yellow-300 text-sm font-medium flex items-center justify-center gap-2">
+              <span>🎉</span>
+              <span>Store Credit</span>
+            </h3>
+            <p className="text-white text-2xl font-bold">${creditBalance.toFixed(2)}</p>
+          </div>
+          <div className="p-4 text-center"
+               style={{
+                 background: 'rgba(255, 255, 255, 0.05)',
+                 border: '1px solid rgba(255, 255, 255, 0.1)',
+                 boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                 backdropFilter: 'blur(12px)',
+                 borderRadius: '16px'
                }}>
             <h3 className="text-blue-300 text-sm font-medium">Invested</h3>
             <p className="text-white text-2xl font-bold">${totalSpent.toFixed(2)}</p>
-                      </div>
-          <div className="rounded-xl p-4 text-center"
+          </div>
+          <div className="p-4 text-center"
                style={{
-                 backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                 border: '1px solid rgba(16, 185, 129, 0.3)'
+                 background: 'rgba(255, 255, 255, 0.05)',
+                 border: '1px solid rgba(255, 255, 255, 0.1)',
+                 boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                 backdropFilter: 'blur(12px)',
+                 borderRadius: '16px'
                }}>
             <h3 className="text-green-300 text-sm font-medium">Average Order</h3>
             <p className="text-white text-2xl font-bold">${avgOrderValue.toFixed(2)}</p>
           </div>
-          <div className="rounded-xl p-4 text-center"
+          <div className="p-4 text-center"
                style={{
-                 backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                 border: '1px solid rgba(139, 92, 246, 0.3)'
+                 background: 'rgba(255, 255, 255, 0.05)',
+                 border: '1px solid rgba(255, 255, 255, 0.1)',
+                 boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                 backdropFilter: 'blur(12px)',
+                 borderRadius: '16px'
                }}>
             <h3 className="text-purple-300 text-sm font-medium">Total Orders</h3>
             <p className="text-white text-2xl font-bold">{orders.length}</p>
-                    </div>
-                  </div>
+          </div>
+        </div>
 
         {/* Monthly Spending Bar Chart */}
         <div className="container-style p-6">
@@ -2713,10 +2997,12 @@ function Dashboard() {
                 return (
                   <div>
                     {/* Recent Order Display */}
-                    <div className="rounded-lg border mb-6"
+                    <div className="rounded-2xl mb-6"
                          style={{
-                           backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                           borderColor: 'rgba(255, 255, 255, 0.15)'
+                           background: 'rgba(255, 255, 255, 0.05)',
+                           border: '1px solid rgba(255, 255, 255, 0.1)',
+                           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                           backdropFilter: 'blur(12px)'
                          }}>
                       <div className="p-4">
                         <div className="flex items-start gap-4">
@@ -2872,68 +3158,12 @@ function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Overall Summary */}
-                    <div className="mt-6 p-4 rounded-lg" style={{
-                      backgroundColor: 'rgba(168, 85, 247, 0.1)',
-                      border: '1px solid rgba(168, 85, 247, 0.3)'
-                    }}>
-                      <h4 className="text-purple-300 font-semibold mb-2">All-Time Summary</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-400">Total Investment</p>
-                          <p className="text-white font-bold">${totalSpent.toFixed(2)}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Total Orders</p>
-                          <p className="text-white font-bold">{orders.length}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Total Stickers</p>
-                          <p className="text-white font-bold">
-                            {orders.reduce((sum, order) => 
-                              sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0
-                            )}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-400">Avg Order Value</p>
-                          <p className="text-white font-bold">${(totalSpent / orders.length).toFixed(2)}</p>
-                        </div>
-                      </div>
-                    </div>
+
                   </div>
                 );
               })()}
 
-              {/* Profitability Tips */}
-              <div className="rounded-lg p-4"
-                   style={{
-                     backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                     border: '1px solid rgba(34, 197, 94, 0.3)'
-                   }}>
-                <h4 className="text-green-300 font-semibold mb-2 flex items-center gap-2">
-                  <i className="fas fa-lightbulb"></i>
-                  Profitability Tips
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-gray-300">
-                      • <strong>Volume discounts:</strong> Order 200+ units to reduce cost per unit
-                    </p>
-                    <p className="text-gray-300">
-                      • <strong>Bundle pricing:</strong> Sell in packs to increase perceived value
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-300">
-                      • <strong>Premium materials:</strong> Matte finish commands 20-30% higher prices
-                    </p>
-                    <p className="text-gray-300">
-                      • <strong>Custom shapes:</strong> Unique cuts can justify 2-4x markup
-                    </p>
-                  </div>
-                </div>
-              </div>
+
             </div>
           ) : (
             <div className="text-center py-8">
@@ -2942,6 +3172,146 @@ function Dashboard() {
               <p className="text-gray-500 text-sm">Place your first order to see profitability insights</p>
             </div>
           )}
+        </div>
+
+        {/* Points Earned Per Order */}
+        <div className="container-style p-6">
+          <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+            <i className="fas fa-coins text-yellow-400"></i>
+            Points Earned
+          </h3>
+          
+          {(() => {
+            // Filter earned credits from transactions (those with 'add' type and order-related reasons)
+            const earnedCredits = (user as any)?.creditHistory?.transactions?.filter((transaction: any) => 
+              transaction.transactionType === 'add' && 
+              transaction.reason?.includes('earned from your recent order')
+            ) || [];
+
+            if (earnedCredits.length > 0) {
+              // Group by order and calculate totals
+              const earnedByOrder = earnedCredits.reduce((acc: any, transaction: any) => {
+                const orderId = transaction.orderId || 'no-order-id';
+                console.log('🔍 Processing transaction for grouping:', {
+                  transaction,
+                  orderId,
+                  hasOrderId: !!transaction.orderId
+                });
+                
+                if (!acc[orderId]) {
+                  acc[orderId] = {
+                    orderId,
+                    orderNumber: transaction.orderNumber,
+                    totalEarned: 0,
+                    transactions: [],
+                    latestDate: transaction.createdAt
+                  };
+                }
+                acc[orderId].totalEarned += transaction.amount;
+                acc[orderId].transactions.push(transaction);
+                return acc;
+              }, {});
+
+              const sortedOrders = Object.values(earnedByOrder).sort((a: any, b: any) => 
+                new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime()
+              );
+
+              const totalEarned = earnedCredits.reduce((sum: number, transaction: any) => sum + transaction.amount, 0);
+
+              return (
+                <div className="space-y-4">
+                  {/* Summary Stats */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="text-center p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                      <p className="text-xs text-yellow-300 mb-1">Total Earned</p>
+                      <p className="text-white font-bold text-2xl">${totalEarned.toFixed(2)}</p>
+                    </div>
+                    <div className="text-center p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                      <p className="text-xs text-green-300 mb-1">Orders with Points</p>
+                      <p className="text-white font-bold text-2xl">{sortedOrders.length}</p>
+                    </div>
+                    <div className="text-center p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                      <p className="text-xs text-blue-300 mb-1">Avg Per Order</p>
+                      <p className="text-white font-bold text-2xl">${(totalEarned / sortedOrders.length).toFixed(2)}</p>
+                    </div>
+                  </div>
+
+                  {/* Individual Orders */}
+                  <div className="space-y-3">
+                    {sortedOrders.slice(0, 10).map((orderData: any) => (
+                      <div key={orderData.orderId} 
+                           className="p-4 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-all duration-300">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                            <span className="text-white font-medium">
+                              {(() => {
+                                // Handle case where order ID is missing
+                                if (orderData.orderId === 'no-order-id' || orderData.orderId === 'unknown') {
+                                  return 'Recent Order';
+                                }
+                                
+                                // Try to match with actual orders to get order number
+                                if (orderData.orderNumber) {
+                                  return `Order ${orderData.orderNumber}`;
+                                }
+                                
+                                // Try to find matching order from orders list
+                                const matchingOrder = orders.find(order => order.id === orderData.orderId);
+                                if (matchingOrder?.orderNumber) {
+                                  return `Order ${matchingOrder.orderNumber}`;
+                                }
+                                
+                                // Use the mission number format from dashboard's getOrderDisplayNumber
+                                if (matchingOrder) {
+                                  const orderIndex = orders.findIndex(order => order.id === orderData.orderId);
+                                  if (orderIndex !== -1) {
+                                    return `Mission ${orders.length - orderIndex}`;
+                                  }
+                                }
+                                
+                                // Last resort fallback
+                                return `Order #${orderData.orderId.slice(-6)}`;
+                              })()}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-yellow-400 font-bold text-lg">
+                              +${orderData.totalEarned.toFixed(2)}
+                            </span>
+                            <i className="fas fa-coins text-yellow-400"></i>
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          Earned on {new Date(orderData.latestDate).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {sortedOrders.length > 10 && (
+                    <div className="text-center pt-4">
+                      <p className="text-gray-400 text-sm">
+                        Showing 10 of {sortedOrders.length} orders with earned points
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            } else {
+              return (
+                <div className="text-center py-8">
+                  <i className="fas fa-coins text-gray-500 text-4xl mb-4"></i>
+                  <p className="text-gray-400">No points earned yet</p>
+                  <p className="text-gray-500 text-sm">Start earning 5% cashback on every order!</p>
+                </div>
+              );
+            }
+          })()}
         </div>
 
         <style jsx>{`
@@ -3124,8 +3494,8 @@ function Dashboard() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 18a4.6 4.4 0 0 1 0 -9h0a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-12" />
+            <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/>
             </svg>
             Designs
           </h2>
@@ -3352,9 +3722,8 @@ function Dashboard() {
               {/* Left - Proof Image */}
               <div className="lg:col-span-1">
                 <div 
-                  className="rounded-lg overflow-hidden cursor-pointer hover:scale-[1.02] transition-all duration-200 hover:bg-white hover:shadow-lg"
+                  className="rounded-lg overflow-hidden cursor-pointer hover:scale-[1.02] transition-all duration-200 hover:shadow-lg relative bg-white"
                   style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.03)',
                     border: '1px solid rgba(255, 255, 255, 0.08)',
                     aspectRatio: '1'
                   }}
@@ -3363,8 +3732,41 @@ function Dashboard() {
                   <img
                     src={proof.proofUrl}
                     alt={proof.proofTitle}
-                    className="w-full h-full object-contain p-2 transition-all duration-200"
+                    className="w-full h-full object-contain p-4 transition-all duration-200 bg-white"
                   />
+                  {/* Size Overlay - PDF Cut Contour Dimensions */}
+                  {(() => {
+                    // Get PDF dimensions from proof adminNotes if available
+                    const getPDFDimensions = () => {
+                      if (proof.adminNotes && proof.adminNotes.includes('PDF_DIMENSIONS:')) {
+                        const dimensionMatch = proof.adminNotes.match(/PDF_DIMENSIONS:([0-9.]+)x([0-9.]+)/);
+                        if (dimensionMatch) {
+                          const width = parseFloat(dimensionMatch[1]);
+                          const height = parseFloat(dimensionMatch[2]);
+                          
+                          // Round down to nearest whole number if decimal is 0.03 or less
+                          const formatDimension = (value: number) => {
+                            const decimal = value % 1;
+                            if (decimal <= 0.03) {
+                              return Math.floor(value).toFixed(2);
+                            }
+                            return value.toFixed(2);
+                          };
+                          
+                          return `${formatDimension(width)}" × ${formatDimension(height)}"`;
+                        }
+                      }
+                      return null;
+                    };
+                    
+                    const pdfDimensions = getPDFDimensions();
+                    
+                    return pdfDimensions ? (
+                      <div className="absolute top-2 right-2 bg-black/75 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-md border border-white/20">
+                        {pdfDimensions}
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
                 <div className="mt-3 text-center">
                   {/* Cut Line Message Above Status Pill */}
@@ -3433,34 +3835,53 @@ function Dashboard() {
                       <span className="text-gray-400">Product:</span>
                       <span className="text-white">{order.items[0]?.name}</span>
                     </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-400">Quantity:</span>
-                      <span className="text-white">{order.items.reduce((sum: number, item: any) => sum + item.quantity, 0)}</span>
-                    </div>
                     {(() => {
                       const firstItem = order.items[0];
                       const selections = firstItem?._fullOrderData?.calculatorSelections || {};
                       const size = selections.size || selections.sizePreset || {};
                       
+                      // Enhanced size detection
+                      const getSizeDisplay = () => {
+                        if (size.width && size.height) return `${size.width}" × ${size.height}"`;
+                        if (size.displayValue) return size.displayValue;
+                        if (selections.width && selections.height) return `${selections.width}" × ${selections.height}"`;
+                        if (firstItem?.size) return firstItem.size;
+                        return null;
+                      };
+                      
+                      // Enhanced material detection
+                      const getMaterialDisplay = () => {
+                        if (selections.material?.displayValue) return selections.material.displayValue;
+                        if (selections.material?.label) return selections.material.label;
+                        if (selections.material?.value) return selections.material.value;
+                        if (firstItem?.material) return firstItem.material;
+                        return null;
+                      };
+                      
+                      const sizeDisplay = getSizeDisplay();
+                      const materialDisplay = getMaterialDisplay();
+                      
                       return (
                         <>
-                          {((size.width && size.height) || size.displayValue) && (
-                            <div className="flex justify-between text-xs">
-                              <span className="text-gray-400">Size:</span>
-                              <span className="text-white">
-                                {size.width && size.height ? `${size.width}" × ${size.height}"` : size.displayValue}
-                              </span>
-                            </div>
-                          )}
-                          {selections.material?.displayValue && (
+                          {materialDisplay && (
                             <div className="flex justify-between text-xs">
                               <span className="text-gray-400">Material:</span>
-                              <span className="text-white">{selections.material.displayValue}</span>
+                              <span className="text-white">{materialDisplay}</span>
+                            </div>
+                          )}
+                          {sizeDisplay && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-400">Size:</span>
+                              <span className="text-white">{sizeDisplay}</span>
                             </div>
                           )}
                         </>
                       );
                     })()}
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Quantity:</span>
+                      <span className="text-white">{order.items.reduce((sum: number, item: any) => sum + item.quantity, 0)}</span>
+                    </div>
                     <div className="flex justify-between text-xs pt-2 border-t border-white/10">
                       <span className="text-gray-400">Total:</span>
                       <span className="text-green-400 font-semibold">$122.85</span>
@@ -3481,7 +3902,9 @@ function Dashboard() {
                       <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <span className="text-white text-xs">Printed within 48-hrs of Approval</span>
+                      <span className="text-white text-xs">
+                        Printed within {order.items.reduce((sum: number, item: any) => sum + item.quantity, 0) <= 2000 ? '24' : '48'}-hrs of Approval
+                      </span>
                     </div>
                     {(() => {
                       // Get cut line selection from the first item's calculator selections
@@ -3665,7 +4088,28 @@ function Dashboard() {
                         </svg>
                       </div>
                       <p className="text-green-300 text-lg font-medium">Proof Approved!</p>
-                      <p className="text-gray-400 text-sm">Your order is now in production</p>
+                      {isOrderShippedWithTracking(order) ? (
+                        <div className="flex items-center justify-center gap-2 mt-2">
+                          <p className="text-gray-400 text-sm">Your order was printed and shipped!</p>
+                          <button
+                            onClick={() => handleTrackOrder(order)}
+                            className="px-2 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
+                            style={{
+                              backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                              border: '1px solid rgba(34, 197, 94, 0.3)',
+                              color: 'white'
+                            }}
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                            </svg>
+                            Track
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-gray-400 text-sm">Your order is now in production</p>
+                      )}
                     </div>
                   )}
 
@@ -3685,17 +4129,21 @@ function Dashboard() {
                 {/* Admin/Customer Notes */}
                 {(proof.adminNotes || proof.customerNotes) && (
                   <div className="container-style p-4 space-y-3">
-                    {proof.adminNotes && (
-                      <div>
-                        <h5 className="text-sm font-medium text-blue-300 mb-2 flex items-center gap-2">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          Notes from our team
-                        </h5>
-                        <p className="text-sm text-gray-300 bg-blue-500/10 p-3 rounded-lg">{proof.adminNotes}</p>
-                      </div>
-                    )}
+                    {proof.adminNotes && (() => {
+                      // Remove PDF dimensions from customer display - only show custom notes
+                      const customNotes = proof.adminNotes.replace(/\nPDF_DIMENSIONS:[0-9.]+x[0-9.]+/, '').replace(/^PDF_DIMENSIONS:[0-9.]+x[0-9.]+/, '').trim();
+                      return customNotes ? (
+                        <div>
+                          <h5 className="text-sm font-medium text-blue-300 mb-2 flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Notes from our team
+                          </h5>
+                          <p className="text-sm text-gray-300 bg-blue-500/10 p-3 rounded-lg">{customNotes}</p>
+                        </div>
+                      ) : null;
+                    })()}
 
                     {proof.customerNotes && (
                       <div>
@@ -3726,6 +4174,23 @@ function Dashboard() {
       const hasProofs = (order.proofs && order.proofs.length > 0) || order.proofUrl;
       if (!hasProofs) return false;
       
+      // Check individual proof statuses within the proofs array
+      if (order.proofs && order.proofs.length > 0) {
+        // Only exclude order if there are NO proofs that need review (pending/sent)
+        const hasPendingProofs = order.proofs.some(proof => 
+          proof.status === 'pending' || proof.status === 'sent'
+        );
+        // If no proofs need review, exclude this order
+        if (!hasPendingProofs) {
+          return false;
+        }
+      }
+      
+      // Exclude orders that are already approved or have changes requested at order level
+      if (order.proof_status === 'approved' || order.proof_status === 'changes_requested') {
+        return false;
+      }
+      
       // Include orders with these statuses or proof statuses (more inclusive)
       return (
         order.status === 'Proof Review Needed' ||
@@ -3737,24 +4202,43 @@ function Dashboard() {
       );
     });
     
-    const inProduction = orders.filter(order => 
-      (order.status === 'In Production' || order.proof_status === 'approved') && 
-      ((order.proofs && order.proofs.length > 0) || order.proofUrl)
-    );
+    const printingOrders = orders.filter(order => {
+      return (
+        (order.status === 'Printing' || order.proof_status === 'approved') && 
+        order.status !== 'Shipped' && 
+        order.status !== 'Delivered' &&
+        order.orderStatus !== 'Shipped' &&
+        order.orderStatus !== 'Delivered'
+      );
+    });
+    
+    const shippedOrders = orders.filter(order => {
+      const hasProofs = (order.proofs && order.proofs.length > 0) || order.proofUrl;
+      return hasProofs && (
+        order.status === 'Shipped' || 
+        order.orderStatus === 'Shipped' ||
+        order.fulfillmentStatus === 'shipped' ||
+        (order.trackingNumber && order.orderStatus !== 'Delivered')
+      );
+    });
+    
+    const deliveredOrders = orders.filter(order => {
+      const hasProofs = (order.proofs && order.proofs.length > 0) || order.proofUrl;
+      return hasProofs && (
+        order.status === 'Delivered' || 
+        order.orderStatus === 'Delivered' ||
+        order.fulfillmentStatus === 'fulfilled'
+      );
+    });
     
     const requestChanges = orders.filter(order => 
       (order.status === 'request-changes' || order.proof_status === 'changes_requested') && 
       ((order.proofs && order.proofs.length > 0) || order.proofUrl)
     );
-    
-    const pastProofs = orders.filter(order => 
-      (order.proofUrl || (order.proofs && order.proofs.length > 0)) && 
-      (order.status === 'Delivered' || order.status === 'Shipped')
-    );
 
     return (
       <div className="space-y-6">
-                {/* Current Proofs Needing Review */}
+                {/* Current Proofs Needing Review - Only show if there are proofs to review */}
         {proofsToReview.length > 0 && (
           <div className="space-y-6">
             <h3 className="text-xl font-semibold text-white flex items-center gap-2">
@@ -3773,7 +4257,7 @@ function Dashboard() {
                       Order {getOrderDisplayNumber(order)}
                     </h4>
                     <p className="text-sm text-gray-400">
-                      {new Date(order.date).toLocaleDateString()} • $122.85
+                      {new Date(order.date).toLocaleDateString()} • ${order.total}
                     </p>
                   </div>
                 </div>
@@ -3786,191 +4270,468 @@ function Dashboard() {
         )}
 
         {/* In Production Orders */}
-        {inProduction.length > 0 && (
-          <div className="space-y-4">
-            <h3 className="text-xl font-semibold text-white flex items-center gap-2">
-              🏭 In Production
-              <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full">
-                {inProduction.length} printing
-              </span>
-            </h3>
+        {printingOrders.length > 0 && (
+          <div 
+            className="rounded-2xl overflow-hidden"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(12px)'
+            }}
+          >
+            <div className="px-6 py-4 border-b border-white/10">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Printing
+                <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full">
+                  {printingOrders.length} printing
+                </span>
+              </h3>
+            </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {inProduction.map((order) => (
-                <div key={order.id} 
-                     className="rounded-xl p-4 shadow-xl border border-blue-400/30"
-                     style={{
-                       backgroundColor: 'rgba(59, 130, 246, 0.08)',
-                       backdropFilter: 'blur(20px)',
-                       boxShadow: '0 0 8px rgba(59, 130, 246, 0.1)'
-                     }}>
-                  
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-white">Mission {getOrderDisplayNumber(order)}</h4>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-                      <span className="text-xs text-blue-300">Printing</span>
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {printingOrders.map((order) => (
+                  <div key={order.id} 
+                       className="rounded-xl p-4 shadow-xl border border-blue-400/30"
+                       style={{
+                         backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                         backdropFilter: 'blur(20px)',
+                         boxShadow: '0 0 8px rgba(59, 130, 246, 0.1)'
+                       }}>
+                    
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold text-white">Mission {getOrderDisplayNumber(order)}</h4>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                        <span className="text-xs text-blue-300">Printing</span>
+                      </div>
                     </div>
+                    
+                    <div className="rounded-lg overflow-hidden mb-3 bg-white p-2 relative" style={{ aspectRatio: '7/5' }}>
+                      {/* Show grid of all proofs if multiple designs, otherwise single image */}
+                      {(order.proofs && order.proofs.length > 1) ? (
+                        <div className={`w-full h-full grid gap-1 ${
+                          order.proofs.length === 2 ? 'grid-cols-2' :
+                          order.proofs.length === 3 ? 'grid-cols-3' :
+                          order.proofs.length === 4 ? 'grid-cols-2 grid-rows-2' :
+                          order.proofs.length <= 6 ? 'grid-cols-3 grid-rows-2' :
+                          'grid-cols-3 grid-rows-3'
+                        }`}>
+                          {order.proofs.slice(0, 9).map((proof: any, index: number) => (
+                            <div key={index} className="relative bg-gray-100 rounded overflow-hidden">
+                              <img 
+                                src={proof.proofUrl} 
+                                alt={`Design ${index + 1}`}
+                                className="w-full h-full object-contain"
+                              />
+                              {/* Design number badge */}
+                              <div className="absolute top-0.5 left-0.5 bg-black/70 text-white text-xs px-1 py-0.5 rounded text-center leading-none">
+                                {index + 1}
+                              </div>
+                            </div>
+                          ))}
+                          {/* Show "+X more" if there are more than 9 proofs */}
+                          {order.proofs.length > 9 && (
+                            <div className="bg-gray-200 rounded flex items-center justify-center">
+                              <span className="text-gray-600 text-xs font-bold">
+                                +{order.proofs.length - 9}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <img 
+                          src={(order.proofs && order.proofs.length > 0) ? order.proofs[0].proofUrl : order.proofUrl} 
+                          alt="Approved Proof"
+                          className="w-full h-full object-contain"
+                        />
+                      )}
+                      {/* Reorder Badge */}
+                      {(() => {
+                        const isReorder = order.items?.some((item: any) => 
+                          item._fullOrderData?.calculatorSelections?.isReorder === true ||
+                          item._fullOrderData?.isReorder === true
+                        ) || order._fullOrderData?.items?.some((item: any) => 
+                          item.calculatorSelections?.isReorder === true ||
+                          item.isReorder === true
+                        );
+                        return isReorder ? (
+                          <div className="absolute top-2 right-2 bg-amber-500 text-black text-xs px-2 py-1 rounded-full font-bold leading-none z-10">
+                            RE-ORDER
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                    
+                    <p className="text-xs text-gray-400 mb-3">
+                      {new Date(order.date).toLocaleDateString()} • ${order.total}
+                    </p>
+                    
+                    <div className="bg-blue-500/10 border border-blue-400/30 rounded-lg p-3 mb-3">
+                      <p className="text-blue-300 text-xs font-medium">✅ Proof Approved</p>
+                      <p className="text-blue-200 text-xs">Your stickers are being printed!</p>
+                    </div>
+                    
+                    <p className="text-xs text-gray-300 text-center">
+                      There's nothing you need to do right now
+                    </p>
                   </div>
-                  
-                  <div className="rounded-lg overflow-hidden mb-3" style={{ aspectRatio: '7/5' }}>
-                    <img 
-                      src={order.proofUrl} 
-                      alt="Approved Proof"
-                      className="w-full h-full object-cover"
-                    />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Shipped Orders */}
+        {shippedOrders.length > 0 && (
+          <div 
+            className="rounded-2xl overflow-hidden"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(12px)'
+            }}
+          >
+            <div className="px-6 py-4 border-b border-white/10">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                </svg>
+                Shipped
+                <span className="text-xs bg-green-500/20 text-green-300 px-2 py-1 rounded-full">
+                  {shippedOrders.length} shipped
+                </span>
+              </h3>
+            </div>
+            
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {shippedOrders.map((order) => (
+                  <div key={order.id} 
+                       className="rounded-xl p-4 shadow-xl border border-green-400/30"
+                       style={{
+                         backgroundColor: 'rgba(34, 197, 94, 0.08)',
+                         backdropFilter: 'blur(20px)',
+                         boxShadow: '0 0 8px rgba(34, 197, 94, 0.1)'
+                       }}>
+                    
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold text-white">Mission {getOrderDisplayNumber(order)}</h4>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                        <span className="text-xs text-green-300">Shipped</span>
+                      </div>
+                    </div>
+                    
+                    <div className="rounded-lg overflow-hidden mb-3 bg-white p-2 relative" style={{ aspectRatio: '7/5' }}>
+                      {/* Show grid of all proofs if multiple designs, otherwise single image */}
+                      {(order.proofs && order.proofs.length > 1) ? (
+                        <div className={`w-full h-full grid gap-1 ${
+                          order.proofs.length === 2 ? 'grid-cols-2' :
+                          order.proofs.length === 3 ? 'grid-cols-3' :
+                          order.proofs.length === 4 ? 'grid-cols-2 grid-rows-2' :
+                          order.proofs.length <= 6 ? 'grid-cols-3 grid-rows-2' :
+                          'grid-cols-3 grid-rows-3'
+                        }`}>
+                          {order.proofs.slice(0, 9).map((proof: any, index: number) => (
+                            <div key={index} className="relative bg-gray-100 rounded overflow-hidden">
+                              <img 
+                                src={proof.proofUrl} 
+                                alt={`Design ${index + 1}`}
+                                className="w-full h-full object-contain"
+                              />
+                              {/* Design number badge */}
+                              <div className="absolute top-0.5 left-0.5 bg-black/70 text-white text-xs px-1 py-0.5 rounded text-center leading-none">
+                                {index + 1}
+                              </div>
+                            </div>
+                          ))}
+                          {/* Show "+X more" if there are more than 9 proofs */}
+                          {order.proofs.length > 9 && (
+                            <div className="bg-gray-200 rounded flex items-center justify-center">
+                              <span className="text-gray-600 text-xs font-bold">
+                                +{order.proofs.length - 9}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <img 
+                          src={(order.proofs && order.proofs.length > 0) ? order.proofs[0].proofUrl : order.proofUrl} 
+                          alt="Approved Proof"
+                          className="w-full h-full object-contain"
+                        />
+                      )}
+                      {/* Reorder Badge */}
+                      {(() => {
+                        const isReorder = order.items?.some((item: any) => 
+                          item._fullOrderData?.calculatorSelections?.isReorder === true ||
+                          item._fullOrderData?.isReorder === true
+                        ) || order._fullOrderData?.items?.some((item: any) => 
+                          item.calculatorSelections?.isReorder === true ||
+                          item.isReorder === true
+                        );
+                        return isReorder ? (
+                          <div className="absolute top-2 right-2 bg-amber-500 text-black text-xs px-2 py-1 rounded-full font-bold leading-none z-10">
+                            RE-ORDER
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                    
+                    <p className="text-xs text-gray-400 mb-3">
+                      {new Date(order.date).toLocaleDateString()} • ${order.total}
+                    </p>
+                    
+                    <div className="bg-green-500/10 border border-green-400/30 rounded-lg p-3 mb-3">
+                      <p className="text-green-300 text-xs font-medium">
+                        <svg className="w-4 h-4 inline mr-1" fill="white" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                        </svg>
+                        Shipped
+                      </p>
+                      <p className="text-green-200 text-xs">Your stickers have been shipped!</p>
+                    </div>
+                    
+                    <p className="text-xs text-gray-300 text-center">
+                      There's nothing you need to do right now
+                    </p>
                   </div>
-                  
-                  <p className="text-xs text-gray-400 mb-3">
-                    {new Date(order.date).toLocaleDateString()} • ${order.total}
-                  </p>
-                  
-                  <div className="bg-blue-500/10 border border-blue-400/30 rounded-lg p-3 mb-3">
-                    <p className="text-blue-300 text-xs font-medium">✅ Proof Approved</p>
-                    <p className="text-blue-200 text-xs">Your stickers are being printed!</p>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delivered Orders */}
+        {deliveredOrders.length > 0 && (
+          <div 
+            className="rounded-2xl overflow-hidden"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(12px)'
+            }}
+          >
+            <div className="px-6 py-4 border-b border-white/10">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <svg className="w-5 h-5 text-white" fill="white" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Delivered
+                <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-1 rounded-full">
+                  {deliveredOrders.length} delivered
+                </span>
+              </h3>
+            </div>
+            
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {deliveredOrders.map((order) => (
+                  <div key={order.id} 
+                       className="rounded-xl p-4 shadow-xl border border-purple-400/30"
+                       style={{
+                         backgroundColor: 'rgba(168, 85, 247, 0.08)',
+                         backdropFilter: 'blur(20px)',
+                         boxShadow: '0 0 8px rgba(168, 85, 247, 0.1)'
+                       }}>
+                    
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold text-white">Mission {getOrderDisplayNumber(order)}</h4>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></div>
+                        <span className="text-xs text-purple-300">Delivered</span>
+                      </div>
+                    </div>
+                    
+                    <div className="rounded-lg overflow-hidden mb-3 bg-white p-2 relative" style={{ aspectRatio: '7/5' }}>
+                      {/* Show grid of all proofs if multiple designs, otherwise single image */}
+                      {(order.proofs && order.proofs.length > 1) ? (
+                        <div className={`w-full h-full grid gap-1 ${
+                          order.proofs.length === 2 ? 'grid-cols-2' :
+                          order.proofs.length === 3 ? 'grid-cols-3' :
+                          order.proofs.length === 4 ? 'grid-cols-2 grid-rows-2' :
+                          order.proofs.length <= 6 ? 'grid-cols-3 grid-rows-2' :
+                          'grid-cols-3 grid-rows-3'
+                        }`}>
+                          {order.proofs.slice(0, 9).map((proof: any, index: number) => (
+                            <div key={index} className="relative bg-gray-100 rounded overflow-hidden">
+                              <img 
+                                src={proof.proofUrl} 
+                                alt={`Design ${index + 1}`}
+                                className="w-full h-full object-contain"
+                              />
+                              {/* Design number badge */}
+                              <div className="absolute top-0.5 left-0.5 bg-black/70 text-white text-xs px-1 py-0.5 rounded text-center leading-none">
+                                {index + 1}
+                              </div>
+                            </div>
+                          ))}
+                          {/* Show "+X more" if there are more than 9 proofs */}
+                          {order.proofs.length > 9 && (
+                            <div className="bg-gray-200 rounded flex items-center justify-center">
+                              <span className="text-gray-600 text-xs font-bold">
+                                +{order.proofs.length - 9}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <img 
+                          src={(order.proofs && order.proofs.length > 0) ? order.proofs[0].proofUrl : order.proofUrl} 
+                          alt="Approved Proof"
+                          className="w-full h-full object-contain"
+                        />
+                      )}
+                      {/* Reorder Badge */}
+                      {(() => {
+                        const isReorder = order.items?.some((item: any) => 
+                          item._fullOrderData?.calculatorSelections?.isReorder === true ||
+                          item._fullOrderData?.isReorder === true
+                        ) || order._fullOrderData?.items?.some((item: any) => 
+                          item.calculatorSelections?.isReorder === true ||
+                          item.isReorder === true
+                        );
+                        return isReorder ? (
+                          <div className="absolute top-2 right-2 bg-amber-500 text-black text-xs px-2 py-1 rounded-full font-bold leading-none z-10">
+                            RE-ORDER
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                    
+                    <p className="text-xs text-gray-400 mb-3">
+                      {new Date(order.date).toLocaleDateString()} • ${order.total}
+                    </p>
+                    
+                    <div className="bg-purple-500/10 border border-purple-400/30 rounded-lg p-3 mb-3">
+                      <p className="text-purple-300 text-xs font-medium">
+                        <svg className="w-4 h-4 inline mr-1" fill="white" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        Delivered
+                      </p>
+                      <p className="text-purple-200 text-xs">Your stickers have been delivered!</p>
+                    </div>
+                    
+                    <p className="text-xs text-gray-300 text-center">
+                      There's nothing you need to do right now
+                    </p>
                   </div>
-                  
-                  <p className="text-xs text-gray-300 text-center">
-                    There's nothing you need to do right now
-                  </p>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}
 
         {/* Request Changes Orders */}
         {requestChanges.length > 0 && (
-          <div className="space-y-4">
-            <h3 className="text-xl font-semibold text-white flex items-center gap-2">
-              🔄 Changes Being Reviewed
-              <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-1 rounded-full">
-                {requestChanges.length} pending
-              </span>
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {requestChanges.map((order) => (
-                <div key={order.id} 
-                     className="rounded-xl p-4 shadow-xl border border-amber-400/30"
-                     style={{
-                       backgroundColor: 'rgba(245, 158, 11, 0.08)',
-                       backdropFilter: 'blur(20px)',
-                       boxShadow: '0 0 8px rgba(245, 158, 11, 0.1)'
-                     }}>
-                  
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-white">Mission {getOrderDisplayNumber(order)}</h4>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
-                      <span className="text-xs text-amber-300">Under Review</span>
-                    </div>
-                  </div>
-                  
-                  <div className="rounded-lg overflow-hidden mb-3" style={{ aspectRatio: '7/5' }}>
-                    <img 
-                      src={order.proofUrl} 
-                      alt="Original Proof"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  
-                  <p className="text-xs text-gray-400 mb-3">
-                    {new Date(order.date).toLocaleDateString()} • ${order.total}
-                  </p>
-                  
-                  <div className="bg-amber-500/10 border border-amber-400/30 rounded-lg p-3 mb-3">
-                    <p className="text-amber-300 text-xs font-medium">🔄 Changes Requested</p>
-                    <p className="text-amber-200 text-xs">Your changes are being reviewed</p>
-                  </div>
-                  
-                  <p className="text-xs text-gray-300 text-center">
-                    There's nothing you need to do right now
-                  </p>
-                </div>
-              ))}
+          <div 
+            className="rounded-2xl overflow-hidden"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(12px)'
+            }}
+          >
+            <div className="px-6 py-4 border-b border-white/10">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                🔄 Changes Being Reviewed
+                <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-1 rounded-full">
+                  {requestChanges.length} pending
+                </span>
+              </h3>
             </div>
-          </div>
-        )}
-
-        {/* Past Proofs */}
-        {pastProofs.length > 0 && (
-          <div className="space-y-4">
-            <h3 className="text-xl font-semibold text-white flex items-center gap-2">
-              📋 Past Proofs
-              <span className="text-xs bg-gray-500/20 text-gray-300 px-2 py-1 rounded-full">
-                {pastProofs.length} completed
-              </span>
-            </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {pastProofs.map((order) => (
-                <div key={order.id} 
-                     className="rounded-xl p-4 shadow-xl"
-                     style={{
-                       backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                       backdropFilter: 'blur(20px)',
-                       border: '1px solid rgba(255, 255, 255, 0.15)'
-                     }}>
-                  
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-white">Mission {getOrderDisplayNumber(order)}</h4>
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${getStatusColor(order.status)}`}></div>
-                      <span className="text-xs text-gray-300">{getStatusDisplayText(order.status)}</span>
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {requestChanges.map((order) => (
+                  <div key={order.id} 
+                       className="rounded-xl p-4 shadow-xl border border-amber-400/30"
+                       style={{
+                         backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                         backdropFilter: 'blur(20px)',
+                         boxShadow: '0 0 8px rgba(245, 158, 11, 0.1)'
+                       }}>
+                    
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold text-white">Mission {getOrderDisplayNumber(order)}</h4>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
+                        <span className="text-xs text-amber-300">Under Review</span>
+                      </div>
                     </div>
+                    
+                    <div className="rounded-lg overflow-hidden mb-3 bg-white p-2" style={{ aspectRatio: '7/5' }}>
+                      <img 
+                        src={(order.proofs && order.proofs.length > 0) ? order.proofs[0].proofUrl : order.proofUrl} 
+                        alt="Original Proof"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    
+                    <p className="text-xs text-gray-400 mb-3">
+                      {new Date(order.date).toLocaleDateString()} • ${order.total}
+                    </p>
+                    
+                    <div className="bg-amber-500/10 border border-amber-400/30 rounded-lg p-3 mb-3">
+                      <p className="text-amber-300 text-xs font-medium">🔄 Changes Requested</p>
+                      <p className="text-amber-200 text-xs">Your changes are being reviewed</p>
+                    </div>
+                    
+                    <p className="text-xs text-gray-300 text-center">
+                      There's nothing you need to do right now
+                    </p>
                   </div>
-                  
-                                     <div className="rounded-lg overflow-hidden mb-3" style={{ aspectRatio: '7/5' }}>
-                     <img 
-                       src={order.proofUrl} 
-                       alt="Past Proof"
-                       className="w-full h-full object-cover"
-                     />
-                   </div>
-                  
-                  <p className="text-xs text-gray-400 mb-2">
-                    {new Date(order.date).toLocaleDateString()} • ${order.total}
-                  </p>
-                  
-                  <button className="w-full py-2 px-3 rounded-lg text-xs font-medium text-white transition-all duration-300 hover:scale-105 backdrop-blur-md border"
-                          style={{
-                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                            borderColor: 'rgba(255, 255, 255, 0.2)'
-                          }}>
-                    📥 Download Proof
-                  </button>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}
 
         {/* Empty State */}
-        {proofsToReview.length === 0 && inProduction.length === 0 && requestChanges.length === 0 && pastProofs.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">🔍</div>
-            <h3 className="text-xl font-semibold text-white mb-2">No Proofs Available</h3>
-            <p className="text-gray-400 mb-6">
-              When you place an order, design proofs will appear here for your review.
-            </p>
-            <Link 
-              href="/products"
-              className="inline-block px-6 py-3 rounded-lg font-bold transition-all duration-200 transform hover:scale-105"
-              style={{
-                background: 'linear-gradient(135deg, #8b5cf6, #a78bfa)',
-                color: 'white'
-              }}
-            >
-              🚀 Start New Mission
-            </Link>
-          </div>
-        )}
-
-        {/* Show orders with proofs but not matching review criteria */}
-        {proofsToReview.length === 0 && orders.some(o => (o.proofs && o.proofs.length > 0) || o.proofUrl) && (
-          <div className="mt-6 p-4 bg-blue-900/20 border border-blue-400/30 rounded-lg">
-
+        {proofsToReview.length === 0 && printingOrders.length === 0 && shippedOrders.length === 0 && deliveredOrders.length === 0 && requestChanges.length === 0 && (
+          <div 
+            className="rounded-2xl overflow-hidden"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(12px)'
+            }}
+          >
+            <div className="text-center py-12">
+              <svg className="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              <h3 className="text-xl font-semibold text-white mb-2">No Proofs Available</h3>
+              <p className="text-gray-400 mb-6">
+                When you place an order, design proofs will appear here for your review.
+              </p>
+              <Link 
+                href="/products"
+                className="inline-block px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(180%)',
+                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                  boxShadow: 'rgba(59, 130, 246, 0.15) 0px 4px 16px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                }}
+              >
+                <svg className="w-4 h-4 inline mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                </svg>
+                Start New Mission
+              </Link>
+            </div>
           </div>
         )}
       </div>
@@ -3997,47 +4758,96 @@ function Dashboard() {
       );
     }
 
+    // Enhanced status display functions
+    const getEnhancedStatusIcon = (status: string) => {
+      switch (status?.toLowerCase()) {
+        case 'delivered':
+          return (
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+          );
+        case 'shipped':
+        case 'out for delivery':
+        case 'out_for_delivery':
+        case 'in_transit':
+          return (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+            </svg>
+          );
+        case 'processing':
+        case 'in production':
+          return (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+            </svg>
+          );
+        case 'proof review needed':
+          return (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          );
+        default:
+          return (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          );
+      }
+    };
+
     // Prepare invoice data
     const invoiceData: InvoiceData = {
-      orderNumber: selectedOrderForInvoice.shopifyOrderNumber || selectedOrderForInvoice.id,
-      orderDate: selectedOrderForInvoice.orderCreatedAt,
-      orderStatus: selectedOrderForInvoice.orderStatus,
-      totalPrice: selectedOrderForInvoice.totalPrice,
+      orderNumber: selectedOrderForInvoice.orderNumber || selectedOrderForInvoice.id,
+      orderDate: selectedOrderForInvoice.orderCreatedAt || selectedOrderForInvoice.date,
+      orderStatus: selectedOrderForInvoice.orderStatus || selectedOrderForInvoice.status,
+      totalPrice: selectedOrderForInvoice.totalPrice || selectedOrderForInvoice.total,
       currency: selectedOrderForInvoice.currency || 'USD',
-      subtotal: selectedOrderForInvoice.subtotal || selectedOrderForInvoice.totalPrice,
+      subtotal: selectedOrderForInvoice.subtotal || selectedOrderForInvoice.totalPrice || selectedOrderForInvoice.total,
       tax: selectedOrderForInvoice.tax || 0,
       shipping: selectedOrderForInvoice.shipping || 0,
       items: selectedOrderForInvoice.items.map((item: any) => ({
         id: item.id,
-        productName: item.productName,
+        productName: item.productName || item.name,
         quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        totalPrice: item.totalPrice,
+        unitPrice: item.unitPrice || (item.price / item.quantity),
+        totalPrice: item.totalPrice || item.price,
         customFiles: item.customFiles,
-        calculatorSelections: item.calculatorSelections,
+        calculatorSelections: item.calculatorSelections || item._fullOrderData,
         customerNotes: item.customerNotes
       })),
       trackingNumber: selectedOrderForInvoice.trackingNumber,
       trackingCompany: selectedOrderForInvoice.trackingCompany,
       customerEmail: selectedOrderForInvoice.customerEmail || (user as any)?.email,
-      // Use Shopify billing address if available
-      billingAddress: selectedOrderForInvoice.billingAddress || selectedOrderForInvoice.billing_address,
+      // Use billing address if available
+      billingAddress: selectedOrderForInvoice.billingAddress || selectedOrderForInvoice.billing_address || selectedOrderForInvoice.shippingAddress,
       customerInfo: {
         name: (user as any)?.user_metadata?.full_name || (user as any)?.email?.split('@')[0] || 'Customer',
         email: (user as any)?.email,
-        // Add more customer info if available from order data
       }
     };
 
-    const { generatePrintPDF, generateDownloadPDF } = useInvoiceGenerator(invoiceData);
+    // Only set invoice data when generating PDFs, not on every render
+    // setInvoiceData(invoiceData); // Removed to prevent infinite loop
 
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white">📋 Order Details</h2>
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <svg className="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            Order Details
+          </h2>
           <div className="flex items-center gap-4">
             <button
-              onClick={generatePrintPDF}
+              onClick={() => {
+                setInvoiceData(invoiceData);
+                setTimeout(generatePrintPDF, 100); // Small delay to ensure state is updated
+              }}
               className="px-6 md:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 flex items-center gap-2"
               style={{
                 backgroundColor: 'rgba(16, 185, 129, 0.2)',
@@ -4052,7 +4862,10 @@ function Dashboard() {
               Print Invoice
             </button>
             <button
-              onClick={generateDownloadPDF}
+              onClick={() => {
+                setInvoiceData(invoiceData);
+                setTimeout(generateDownloadPDF, 100); // Small delay to ensure state is updated
+              }}
               className="px-6 md:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 flex items-center gap-2"
               style={{
                 backgroundColor: 'rgba(139, 92, 246, 0.2)',
@@ -4079,208 +4892,334 @@ function Dashboard() {
         </div>
 
         <div className="container-style p-8">
-          {/* Order Header */}
-          <div className="border-b border-white/10 pb-6 mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h1 className="text-3xl font-bold text-white mb-2">
-                  Order #{selectedOrderForInvoice.shopifyOrderNumber || selectedOrderForInvoice.id}
-                </h1>
+          {/* Shipping Address if available */}
+          {selectedOrderForInvoice.shippingAddress && (
+            <div className="mb-6 p-4 bg-white/5 rounded-lg border border-white/10">
+              <h4 className="text-sm font-semibold text-gray-400 mb-2 flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Shipping Address
+              </h4>
+              <div className="text-white">
+                <p>{selectedOrderForInvoice.shippingAddress.name}</p>
                 <p className="text-gray-300">
-                  Placed on {new Date(selectedOrderForInvoice.orderCreatedAt).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
+                  {selectedOrderForInvoice.shippingAddress.street1}
+                  {selectedOrderForInvoice.shippingAddress.street2 && <>, {selectedOrderForInvoice.shippingAddress.street2}</>}
                 </p>
-              </div>
-              <div className="text-right">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className={`w-3 h-3 rounded-full ${getStatusColor(selectedOrderForInvoice.orderStatus)}`}></div>
-                  <span className="text-lg font-semibold text-white">
-                    {getStatusDisplayText(selectedOrderForInvoice.orderStatus)}
-                  </span>
-                </div>
-                <p className="text-2xl font-bold text-white">
-                  ${selectedOrderForInvoice.totalPrice.toFixed(2)}
+                <p className="text-gray-300">
+                  {selectedOrderForInvoice.shippingAddress.city}, {selectedOrderForInvoice.shippingAddress.state} {selectedOrderForInvoice.shippingAddress.zip}
                 </p>
-              </div>
-            </div>
-
-            {/* Tracking Information */}
-            {selectedOrderForInvoice.trackingNumber && (
-              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
-                <h3 className="font-semibold text-green-400 mb-2">📦 Tracking Information</h3>
-                <p className="text-white">
-                  <span className="text-gray-300">Tracking Number:</span> {selectedOrderForInvoice.trackingNumber}
-                </p>
-                {selectedOrderForInvoice.trackingCompany && (
-                  <p className="text-white">
-                    <span className="text-gray-300">Carrier:</span> {selectedOrderForInvoice.trackingCompany}
-                  </p>
+                {selectedOrderForInvoice.shippingAddress.country && (
+                  <p className="text-gray-300">{selectedOrderForInvoice.shippingAddress.country}</p>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Order Items */}
+          {/* Order Items - Enhanced Version */}
           <div className="space-y-6">
-            <h3 className="text-xl font-bold text-white">Order Items</h3>
             
-            {selectedOrderForInvoice.items.map((item: any, index: number) => (
-              <div 
-                key={item.id || index} 
-                className="rounded-xl p-6 transition-all duration-300 hover:scale-[1.02] transform overflow-hidden"
-                style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                }}
-              >
-                <div className="flex gap-6">
-                  {/* Item Image - Keep same as before */}
-                  <div className="flex-shrink-0">
-                    {item.customFiles && item.customFiles.length > 0 ? (
-                      <div className="w-24 h-24 rounded-lg bg-white/10 border border-white/20 p-2 flex items-center justify-center">
-                        <img 
-                          src={item.customFiles[0]} 
-                          alt={item.productName}
-                          className="max-w-full max-h-full object-contain rounded"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-24 h-24 rounded-lg bg-gray-600 flex items-center justify-center text-gray-400 border border-white/20">
-                        📄
+            {selectedOrderForInvoice.items.map((item: any, index: number) => {
+              // Get calculator selections from the correct location
+              const itemData = item._fullItemData || item;
+              const calculatorSelections = itemData.calculatorSelections || itemData.calculator_selections || item._fullOrderData;
+              const customFiles = itemData.customFiles || itemData.custom_files || item.customFiles;
+              const firstImage = Array.isArray(customFiles) && customFiles.length > 0 ? customFiles[0] : null;
+              
+              console.log('Order item debug:', {
+                itemId: item.id,
+                hasFullItemData: !!item._fullItemData,
+                calculatorSelections,
+                customFiles,
+                firstImage
+              });
+              
+              return (
+                <div 
+                  key={item.id || index} 
+                  className="bg-white/5 rounded-lg p-6 border border-white/10"
+                >
+                  <div className="flex items-start gap-6">
+                    {/* Product Image */}
+                    {firstImage && (
+                      <div className="flex-shrink-0">
+                        <div className="w-24 h-24 rounded-lg overflow-hidden border border-white/20 bg-black/20">
+                          <img 
+                            src={firstImage} 
+                            alt={item.productName || item.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        {customFiles && customFiles.length > 1 && (
+                          <p className="text-xs text-gray-400 mt-1 text-center">
+                            +{customFiles.length - 1} more file{customFiles.length > 2 ? 's' : ''}
+                          </p>
+                        )}
                       </div>
                     )}
-                  </div>
 
-                  {/* Item Details */}
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h4 className="text-lg font-semibold text-white mb-2">{item.productName}</h4>
-                        <Link 
-                          href={`/products/${item.productName.toLowerCase().replace(/\s+/g, '-')}`}
-                          className="text-sm text-purple-400 hover:text-purple-300 transition-colors duration-200 flex items-center gap-1"
-                        >
-                          View product page →
-                        </Link>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-white mb-1">
-                          ${item.totalPrice.toFixed(2)}
+                    {/* Product Details */}
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-lg font-semibold text-white">{item.productName || item.name}</h4>
+                            <p className="text-gray-400 text-sm ml-4">
+                              Placed on {new Date(selectedOrderForInvoice.orderCreatedAt || selectedOrderForInvoice.date).toLocaleDateString('en-US', {
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                          <p className="text-gray-400 text-sm mb-1">
+                            Order #{selectedOrderForInvoice.orderNumber || selectedOrderForInvoice.id}
+                          </p>
+                          <p className="text-gray-300">Quantity: {item.quantity}</p>
                         </div>
-                        <div className="text-sm text-gray-300">
-                          ${item.unitPrice.toFixed(2)} × {item.quantity}
+                        <div className="text-right">
+                          <p className="text-white font-semibold">${(item.totalPrice || item.price).toFixed(2)}</p>
+                          <p className="text-gray-400 text-sm">${(item.unitPrice || (item.price / item.quantity)).toFixed(2)} each</p>
                         </div>
                       </div>
-                    </div>
-                    
-                    {/* Configuration Features - Home Page Style */}
-                    <div className="mb-4">
-                      <div className="flex flex-wrap gap-2">
-                        {/* Quantity Badge */}
-                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">
-                          📦 Quantity: {item.quantity}
-                        </span>
+                      {/* Calculator Selections - Detailed View */}
+                      {calculatorSelections && (
+                        <div className="bg-black/20 rounded-lg p-4 border border-white/5 mb-4">
+                          <h5 className="text-sm font-semibold text-purple-400 mb-3">Product Specifications</h5>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {Object.entries(calculatorSelections).map(([key, value]: [string, any]) => {
+                              if (!value || key === 'total' || key === 'quantity' || key === 'uploadedFiles' || key === 'designFiles') return null;
+                              
+                              const formatKey = (key: string) => {
+                                const keyMap: { [key: string]: string } = {
+                                  'size': 'Size',
+                                  'material': 'Material',
+                                  'finish': 'Finish',
+                                  'turnaround': 'Turnaround Time',
+                                  'proofOption': 'Proof Option',
+                                  'cutToShape': 'Cut to Shape',
+                                  'weatherproofLaminate': 'Weatherproof Laminate',
+                                  'grommets': 'Grommets',
+                                  'poleHem': 'Pole Hem'
+                                };
+                                return keyMap[key] || key.split(/(?=[A-Z])/).join(' ').replace(/^\w/, c => c.toUpperCase());
+                              };
+
+                              const formatValue = (value: any) => {
+                                if (typeof value === 'object' && value !== null) {
+                                  if (value.displayValue) return value.displayValue;
+                                  if (value.label) return value.label;
+                                  if (value.width && value.height) return `${value.width}" × ${value.height}"`;
+                                  if (value.value) return value.value;
+                                }
+                                if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+                                return String(value);
+                              };
+
+                              return (
+                                <div key={key} className="border-l-2 border-purple-400/30 pl-3">
+                                  <p className="text-xs text-gray-400 uppercase tracking-wide">{formatKey(key)}</p>
+                                  <p className="text-white font-medium">{formatValue(value)}</p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Customer Notes */}
+                      {(itemData.customerNotes || selectedOrderForInvoice.customerNotes) && (
+                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-4">
+                          <p className="text-blue-400 text-sm font-medium mb-1">Customer Notes</p>
+                          <p className="text-white text-sm">{itemData.customerNotes || selectedOrderForInvoice.customerNotes}</p>
+                        </div>
+                      )}
+
+                      {/* Tracking Information - Moved inside item */}
+                      {selectedOrderForInvoice.trackingNumber && (
+                        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mb-4">
+                          <h4 className="font-semibold text-green-400 mb-3 flex items-center gap-2">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                            Tracking Information
+                          </h4>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-gray-300 text-sm">Tracking Number</p>
+                                <p className="text-white font-mono">{selectedOrderForInvoice.trackingNumber}</p>
+                              </div>
+                              {selectedOrderForInvoice.trackingCompany && (
+                                <div className="text-right">
+                                  <p className="text-gray-300 text-sm">Carrier</p>
+                                  <p className="text-white">{selectedOrderForInvoice.trackingCompany}</p>
+                                </div>
+                              )}
+                            </div>
+                            <div className="pt-3 border-t border-white/10">
+                              <div className="flex gap-2">
+                                <button 
+                                  onClick={() => handleTrackOrder(selectedOrderForInvoice)}
+                                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 hover:scale-105"
+                                  style={{
+                                    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                                    color: 'white'
+                                  }}
+                                >
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                                  </svg>
+                                  Track Order
+                                </button>
+                                <button 
+                                  onClick={() => handleReorder(selectedOrderForInvoice.id)}
+                                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 hover:scale-105"
+                                  style={{
+                                    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                                    color: 'white'
+                                  }}
+                                >
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                    <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                                  </svg>
+                                  Reorder
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Order Timeline - Moved inside item */}
+                      <div className="bg-black/20 rounded-lg p-4 border border-white/5">
+                        <h5 className="text-sm font-semibold text-gray-400 mb-3">Order Timeline</h5>
                         
-                        {/* Configuration Options as Feature Badges */}
-                        {item.calculatorSelections && Object.entries(item.calculatorSelections)
-                          .filter(([key, value]: [string, any]) => value && (value.displayValue || value.value))
-                          .map(([key, value]: [string, any]) => {
-                            // Helper function to get emoji and color for option type
-                            const getOptionStyle = (type: string) => {
-                              switch (type.toLowerCase()) {
-                                case 'shape':
-                                case 'cut':
-                                  return { emoji: "✂️", color: "green" };
-                                case 'finish':
-                                case 'material':
-                                  return { emoji: "🧻", color: "purple" };
-                                case 'size':
-                                case 'sizepreset':
-                                  return { emoji: "📏", color: "yellow" };
-                                case 'whitebase':
-                                case 'whiteoption':
-                                  return { emoji: "⚪", color: "gray" };
-                                default:
-                                  return { emoji: "⚙️", color: "blue" };
-                              }
-                            };
+                        <div className="relative">
+                          {/* Timeline Line */}
+                          <div className="absolute left-1 top-2 bottom-2 w-0.5 bg-white/10"></div>
+                          
+                          <div className="space-y-3">
+                            {/* Order Placed */}
+                            <div className="flex items-start gap-3">
+                              <div className="w-2 h-2 rounded-full bg-green-400 mt-1.5 flex-shrink-0 relative z-10"></div>
+                              <div className="flex-1">
+                                <p className="text-white font-medium text-sm">Order Placed</p>
+                                <p className="text-gray-400 text-xs">
+                                  {new Date(selectedOrderForInvoice.orderCreatedAt || selectedOrderForInvoice.date).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </p>
+                              </div>
+                            </div>
 
-                            // Format option name
-                            const formatOptionName = (type: string) => {
-                              switch (type.toLowerCase()) {
-                                case 'sizepreset':
-                                  return 'Size';
-                                case 'whiteoption':
-                                  return 'White Base';
-                                case 'whitebase':
-                                  return 'White Base';
-                                default:
-                                  return type.charAt(0).toUpperCase() + type.slice(1).replace(/([A-Z])/g, ' $1').trim();
-                              }
-                            };
+                            {/* Proof Activities */}
+                            {selectedOrderForInvoice.proofs && selectedOrderForInvoice.proofs.length > 0 && (
+                              <>
+                                <div className="flex items-start gap-3">
+                                  <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 flex-shrink-0 relative z-10"></div>
+                                  <div className="flex-1">
+                                    <p className="text-white font-medium text-sm">Design proofs created</p>
+                                    <p className="text-gray-400 text-xs">Your custom design has been prepared for review</p>
+                                  </div>
+                                </div>
+                                
+                                {selectedOrderForInvoice.proof_sent_at && (
+                                  <div className="flex items-start gap-3">
+                                    <div className="w-2 h-2 rounded-full bg-purple-400 mt-1.5 flex-shrink-0 relative z-10"></div>
+                                    <div className="flex-1">
+                                      <p className="text-white font-medium text-sm">Proofs sent for approval</p>
+                                      <p className="text-gray-400 text-xs">
+                                        {new Date(selectedOrderForInvoice.proof_sent_at).toLocaleDateString('en-US', {
+                                          month: 'short',
+                                          day: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })}
+                                      </p>
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            )}
 
-                            const style = getOptionStyle(key);
-                            const colorClasses = {
-                              green: "bg-green-500/20 text-green-200 border-green-400/50",
-                              purple: "bg-purple-500/20 text-purple-200 border-purple-400/50",
-                              yellow: "bg-yellow-500/20 text-yellow-200 border-yellow-400/50",
-                              gray: "bg-gray-500/20 text-gray-200 border-gray-400/50",
-                              blue: "bg-blue-500/20 text-blue-200 border-blue-400/50"
-                            };
+                            {/* Production Status */}
+                            {(selectedOrderForInvoice.orderStatus === 'in production' || selectedOrderForInvoice.orderStatus === 'processing') && (
+                              <div className="flex items-start gap-3">
+                                <div className="w-2 h-2 rounded-full bg-yellow-400 mt-1.5 flex-shrink-0 relative z-10"></div>
+                                <div className="flex-1">
+                                  <p className="text-white font-medium text-sm">In production</p>
+                                  <p className="text-gray-400 text-xs">Your order is being manufactured</p>
+                                </div>
+                              </div>
+                            )}
 
-                            return (
-                              <span 
-                                key={key} 
-                                className={`px-3 py-1 text-xs rounded-full border ${colorClasses[style.color as keyof typeof colorClasses]}`}
-                              >
-                                {style.emoji} {formatOptionName(key)}: {value.displayValue || value.value || 'N/A'}
-                              </span>
-                            );
-                          })}
-                      </div>
-                    </div>
+                            {/* Shipped */}
+                            {selectedOrderForInvoice.trackingNumber && (
+                              <div className="flex items-start gap-3">
+                                <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 flex-shrink-0 relative z-10"></div>
+                                <div className="flex-1">
+                                  <p className="text-white font-medium text-sm">Shipping label created</p>
+                                  <p className="text-gray-400 text-xs">Tracking: {selectedOrderForInvoice.trackingNumber}</p>
+                                  <p className="text-gray-400 text-xs">Ready for carrier pickup</p>
+                                </div>
+                              </div>
+                            )}
 
-                    {/* Customer Notes */}
-                    {item.customerNotes && (
-                      <div className="mt-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                        <div className="flex items-start gap-2">
-                          <span className="text-blue-300 text-sm">📝</span>
-                          <div>
-                            <p className="text-sm text-blue-300 font-medium mb-1">Customer Notes:</p>
-                            <p className="text-blue-200 text-sm">{item.customerNotes}</p>
+                            {/* In Transit */}
+                            {(selectedOrderForInvoice.orderStatus === 'in_transit' || selectedOrderForInvoice.orderStatus === 'shipped') && selectedOrderForInvoice.trackingNumber && (
+                              <div className="flex items-start gap-3">
+                                <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 flex-shrink-0 relative z-10"></div>
+                                <div className="flex-1">
+                                  <p className="text-white font-medium text-sm">Package in transit</p>
+                                  <p className="text-gray-400 text-xs">Your package is on its way to you</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Out for Delivery */}
+                            {(selectedOrderForInvoice.orderStatus === 'out_for_delivery' || selectedOrderForInvoice.orderStatus === 'out for delivery') && (
+                              <div className="flex items-start gap-3">
+                                <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse mt-1.5 flex-shrink-0 relative z-10"></div>
+                                <div className="flex-1">
+                                  <p className="text-white font-medium text-sm">Out for delivery</p>
+                                  <p className="text-gray-400 text-xs">Your package will be delivered today</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Delivered */}
+                            {selectedOrderForInvoice.orderStatus === 'delivered' && (
+                              <div className="flex items-start gap-3">
+                                <div className="w-2 h-2 rounded-full bg-green-400 mt-1.5 flex-shrink-0 relative z-10"></div>
+                                <div className="flex-1">
+                                  <p className="text-white font-medium text-sm">Order delivered</p>
+                                  <p className="text-gray-400 text-xs">Your order has been successfully delivered</p>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          {/* Order Summary */}
-          <div className="border-t border-white/10 pt-6 mt-8">
-            <div className="flex justify-between items-center">
-              <div className="text-gray-300">
-                <p className="mb-1">Items: {selectedOrderForInvoice.items.length}</p>
-                <p>Total Quantity: {selectedOrderForInvoice.items.reduce((sum: number, item: any) => sum + item.quantity, 0)}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-white">
-                  Total: ${selectedOrderForInvoice.totalPrice.toFixed(2)}
-                </p>
-                <p className="text-sm text-gray-300">{selectedOrderForInvoice.currency}</p>
-              </div>
-            </div>
-          </div>
+
         </div>
       </div>
     );
@@ -4305,7 +5244,9 @@ function Dashboard() {
     return (
       <div className="container-style rounded-2xl p-6 md:p-8">
         <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-          <span className="text-3xl">🛟</span>
+          <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12l6 4v-18c0-1.1-.9-2-2-2z"/>
+          </svg>
           Get Support
         </h2>
         
@@ -4540,27 +5481,557 @@ function Dashboard() {
   };
 
   const renderSettingsView = () => {
+    const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { name, value } = e.target;
+      setSettingsData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleUpdateProfile = async () => {
+      if (!user) return;
+      
+      setIsUpdatingProfile(true);
+      try {
+        const supabase = await getSupabase();
+        
+        // Update user_profiles table
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .upsert({
+            user_id: (user as any).id,
+            first_name: settingsData.firstName,
+            last_name: settingsData.lastName,
+            display_name: `${settingsData.firstName} ${settingsData.lastName}`.trim(),
+            company_name: settingsData.companyName,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id'
+          });
+
+        if (profileError) {
+          throw profileError;
+        }
+
+        // Update user metadata (first name, last name) and email if changed
+        const updates: any = {};
+        
+        // Check if email changed
+        if (settingsData.email !== (user as any).email) {
+          updates.email = settingsData.email;
+        }
+        
+        // Always update user metadata with names
+        updates.data = {
+          first_name: settingsData.firstName,
+          last_name: settingsData.lastName
+        };
+        
+        // Only call updateUser if there are updates
+        if (Object.keys(updates).length > 0) {
+          const { error: updateError } = await supabase.auth.updateUser(updates);
+          
+          if (updateError) {
+            throw updateError;
+          }
+        }
+
+        // Update local profile state
+        setProfile((prev: any) => ({
+          ...prev,
+          first_name: settingsData.firstName,
+          last_name: settingsData.lastName,
+          display_name: `${settingsData.firstName} ${settingsData.lastName}`.trim(),
+          company_name: settingsData.companyName
+        }));
+
+        setSettingsNotification({
+          message: 'Profile updated successfully!',
+          type: 'success'
+        });
+        
+      } catch (error: any) {
+        console.error('Error updating profile:', error);
+        setSettingsNotification({
+          message: error.message || 'Failed to update profile',
+          type: 'error'
+        });
+      } finally {
+        setIsUpdatingProfile(false);
+        setTimeout(() => setSettingsNotification(null), 5000);
+      }
+    };
+
+    const handleUpdatePassword = async () => {
+      // Validate passwords
+      if (!settingsData.currentPassword || !settingsData.newPassword) {
+        setSettingsNotification({
+          message: 'Please fill in all password fields',
+          type: 'error'
+        });
+        setTimeout(() => setSettingsNotification(null), 3000);
+        return;
+      }
+
+      if (settingsData.newPassword !== settingsData.confirmPassword) {
+        setSettingsNotification({
+          message: 'New passwords do not match',
+          type: 'error'
+        });
+        setTimeout(() => setSettingsNotification(null), 3000);
+        return;
+      }
+
+      if (settingsData.newPassword.length < 6) {
+        setSettingsNotification({
+          message: 'Password must be at least 6 characters',
+          type: 'error'
+        });
+        setTimeout(() => setSettingsNotification(null), 3000);
+        return;
+      }
+
+      setIsUpdatingPassword(true);
+      try {
+        const supabase = await getSupabase();
+        
+        // First verify current password by attempting to sign in
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: (user as any).email,
+          password: settingsData.currentPassword
+        });
+
+        if (signInError) {
+          throw new Error('Current password is incorrect');
+        }
+
+        // Update password
+        const { error: updateError } = await supabase.auth.updateUser({
+          password: settingsData.newPassword
+        });
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        // Clear password fields
+        setSettingsData(prev => ({
+          ...prev,
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        }));
+
+        setSettingsNotification({
+          message: 'Password updated successfully!',
+          type: 'success'
+        });
+        
+      } catch (error: any) {
+        console.error('Error updating password:', error);
+        setSettingsNotification({
+          message: error.message || 'Failed to update password',
+          type: 'error'
+        });
+      } finally {
+        setIsUpdatingPassword(false);
+        setTimeout(() => setSettingsNotification(null), 5000);
+      }
+    };
+
     return (
-      <div className="container-style rounded-2xl p-6 md:p-8">
-        <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-          <span className="text-3xl">⚙️</span>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+            </svg>
           Settings
         </h2>
+          <button 
+            onClick={() => setCurrentView('default')}
+            className="text-purple-400 hover:text-purple-300 font-medium transition-colors duration-200 text-sm"
+          >
+            ← Back to Dashboard
+          </button>
+        </div>
+
+        {/* Notification Banner */}
+        {settingsNotification && (
+          <div 
+            className={`p-4 rounded-lg flex items-center justify-between ${
+              settingsNotification.type === 'success' ? 'bg-green-500/20 border border-green-500/30' :
+              settingsNotification.type === 'error' ? 'bg-red-500/20 border border-red-500/30' :
+              'bg-blue-500/20 border border-blue-500/30'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {settingsNotification.type === 'success' && (
+                <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              )}
+              <span className={`${
+                settingsNotification.type === 'success' ? 'text-green-300' :
+                settingsNotification.type === 'error' ? 'text-red-300' :
+                'text-blue-300'
+              }`}>
+                {settingsNotification.message}
+              </span>
+            </div>
+            <button
+              onClick={() => setSettingsNotification(null)}
+              className="text-gray-400 hover:text-white transition-colors"
+              title="Close notification"
+              aria-label="Close notification"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        )}
+        
+        {/* Profile Settings Section */}
+        <div className="container-style p-6">
+          <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+            <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            Profile Settings
+          </h3>
         
         <div className="space-y-6">
+            {/* Profile Photo */}
           <div>
-            <h3 className="text-lg font-semibold text-white mb-4">Profile Settings</h3>
-            <p className="text-gray-300">Profile settings coming soon...</p>
+              <label className="block text-sm font-medium text-gray-300 mb-3">Profile Photo</label>
+              <div className="flex items-center gap-6">
+                <div 
+                  className="w-24 h-24 rounded-full cursor-pointer transition-all duration-200 transform hover:scale-105 flex items-center justify-center relative group"
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(10px)',
+                    border: '2px solid rgba(255, 255, 255, 0.2)'
+                  }}
+                  onClick={handleProfilePictureClick}
+                  title="Click to change profile photo"
+                >
+                  {uploadingProfilePhoto ? (
+                    <div className="flex flex-col items-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mb-1"></div>
+                      <span className="text-xs text-white">Uploading...</span>
+          </div>
+                  ) : profile?.profile_photo_url ? (
+                    <>
+                      <img 
+                        src={profile.profile_photo_url} 
+                        alt="Profile" 
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                      {/* Hover overlay */}
+                      <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                        <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-white text-2xl font-bold">
+                      {getUserDisplayName().charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <button
+                    onClick={handleProfilePictureClick}
+                    className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium transition-colors"
+                  >
+                    Change Photo
+                  </button>
+                  {profile?.profile_photo_url && (
+                    <button
+                      onClick={async () => {
+                        if (!user || !confirm('Are you sure you want to remove your profile photo?')) return;
+                        
+                        setUploadingProfilePhoto(true);
+                        try {
+                          const supabase = await getSupabase();
+                          const { error } = await supabase
+                            .from('user_profiles')
+                            .update({
+                              profile_photo_url: null,
+                              profile_photo_public_id: null,
+                              updated_at: new Date().toISOString()
+                            })
+                            .eq('user_id', (user as any).id);
+
+                          if (error) throw error;
+
+                          setProfile((prev: any) => ({
+                            ...prev,
+                            profile_photo_url: null,
+                            profile_photo_public_id: null
+                          }));
+                          
+                          setSettingsNotification({
+                            message: 'Profile photo removed',
+                            type: 'success'
+                          });
+                          setTimeout(() => setSettingsNotification(null), 3000);
+                        } catch (error) {
+                          console.error('Error removing profile photo:', error);
+                          setSettingsNotification({
+                            message: 'Failed to remove profile photo',
+                            type: 'error'
+                          });
+                          setTimeout(() => setSettingsNotification(null), 3000);
+                        } finally {
+                          setUploadingProfilePhoto(false);
+                        }
+                      }}
+                      className="ml-2 px-4 py-2 rounded-lg border border-red-500/30 hover:bg-red-500/10 text-red-400 text-sm font-medium transition-colors"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* First and Last Name */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+                <label htmlFor="firstName" className="block text-sm font-medium text-gray-300 mb-2">
+                  First Name
+                </label>
+                <input
+                  type="text"
+                  id="firstName"
+                  name="firstName"
+                  value={settingsData.firstName}
+                  onChange={handleSettingsChange}
+                  placeholder="Enter your first name"
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)'
+                  }}
+                />
           </div>
           
           <div>
-            <h3 className="text-lg font-semibold text-white mb-4">Notification Preferences</h3>
-            <p className="text-gray-300">Notification preferences coming soon...</p>
+                <label htmlFor="lastName" className="block text-sm font-medium text-gray-300 mb-2">
+                  Last Name
+                </label>
+                <input
+                  type="text"
+                  id="lastName"
+                  name="lastName"
+                  value={settingsData.lastName}
+                  onChange={handleSettingsChange}
+                  placeholder="Enter your last name"
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Company Name */}
+            <div>
+              <label htmlFor="companyName" className="block text-sm font-medium text-gray-300 mb-2">
+                Company Name (Optional)
+              </label>
+              <input
+                type="text"
+                id="companyName"
+                name="companyName"
+                value={settingsData.companyName}
+                onChange={handleSettingsChange}
+                placeholder="Enter your company name"
+                className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}
+              />
+            </div>
+
+            {/* Email */}
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+                Email Address
+              </label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={settingsData.email}
+                onChange={handleSettingsChange}
+                placeholder="Enter your email"
+                className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Changing your email will require verification
+              </p>
+            </div>
+
+            {/* Update Profile Button */}
+            <button
+              onClick={handleUpdateProfile}
+              disabled={isUpdatingProfile}
+              className="px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              style={{
+                background: isUpdatingProfile ? '#666' : 'linear-gradient(135deg, #3b82f6, #60a5fa)',
+                boxShadow: isUpdatingProfile ? 'none' : '0 4px 12px rgba(59, 130, 246, 0.3)'
+              }}
+            >
+              {isUpdatingProfile ? (
+                <>
+                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Update Profile
+                </>
+              )}
+            </button>
           </div>
+        </div>
+        
+        {/* Account Security Section */}
+        <div className="container-style p-6">
+          <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+            <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            Account Security
+          </h3>
           
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-4">Account Security</h3>
-            <p className="text-gray-300">Security settings coming soon...</p>
+          <div className="space-y-4">
+            {/* Current Password */}
+            <div>
+              <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-300 mb-2">
+                Current Password
+              </label>
+              <input
+                type="password"
+                id="currentPassword"
+                name="currentPassword"
+                value={settingsData.currentPassword}
+                onChange={handleSettingsChange}
+                placeholder="Enter current password"
+                className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}
+              />
+            </div>
+
+            {/* New Password */}
+            <div>
+              <label htmlFor="newPassword" className="block text-sm font-medium text-gray-300 mb-2">
+                New Password
+              </label>
+              <input
+                type="password"
+                id="newPassword"
+                name="newPassword"
+                value={settingsData.newPassword}
+                onChange={handleSettingsChange}
+                placeholder="Enter new password"
+                className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}
+              />
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
+                Confirm New Password
+              </label>
+              <input
+                type="password"
+                id="confirmPassword"
+                name="confirmPassword"
+                value={settingsData.confirmPassword}
+                onChange={handleSettingsChange}
+                placeholder="Confirm new password"
+                className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}
+              />
+            </div>
+
+            {/* Update Password Button */}
+            <button
+              onClick={handleUpdatePassword}
+              disabled={isUpdatingPassword}
+              className="px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              style={{
+                background: isUpdatingPassword ? '#666' : 'linear-gradient(135deg, #ef4444, #f87171)',
+                boxShadow: isUpdatingPassword ? 'none' : '0 4px 12px rgba(239, 68, 68, 0.3)'
+              }}
+            >
+              {isUpdatingPassword ? (
+                <>
+                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                  </svg>
+                  Update Password
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+        
+        {/* Account Management Section */}
+        <div className="container-style p-6">
+          <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+            <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            Account Management
+          </h3>
+          
+          <div className="space-y-4">
+            <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+              <p className="text-orange-300 text-sm mb-3">
+                Need to delete your account? Contact our support team for assistance.
+              </p>
+              <button
+                onClick={() => setCurrentView('support')}
+                className="px-4 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium transition-colors"
+              >
+                Contact Support
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -4593,8 +6064,93 @@ function Dashboard() {
           </div>
         </div>
       )}
+      
+      {/* Animated Credit Counter */}
+      {showAnimatedCounter && creditNotifications.length > 0 && (
+        <AnimatedCreditCounter
+          previousBalance={previousCreditBalance}
+          newBalance={creditBalance}
+          amountAdded={creditNotifications.reduce((sum, n) => sum + n.amount, 0)}
+          reason={creditNotifications.length === 1 ? creditNotifications[0].reason : undefined}
+          onAnimationComplete={handleAnimatedCounterComplete}
+        />
+      )}
+      
+      {/* Credit Notification (fallback for when animation isn't triggered) */}
+      {showCreditNotification && creditNotifications.length > 0 && (
+        <div className="mb-6 p-4 rounded-xl animate-pulse" style={{
+          background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.5) 0%, rgba(250, 204, 21, 0.35) 50%, rgba(255, 193, 7, 0.2) 100%)',
+          backdropFilter: 'blur(25px) saturate(200%)',
+          border: '2px solid rgba(255, 215, 0, 0.6)',
+          boxShadow: 'rgba(250, 204, 21, 0.3) 0px 4px 16px, rgba(255, 255, 255, 0.4) 0px 1px 0px inset'
+        }}>
+          <div className="flex items-center gap-3">
+            <span className="text-xl">🎉</span>
+            <div className="flex-1">
+              <h3 className="text-yellow-300 font-bold text-lg">Store Credit Added!</h3>
+              <p className="text-yellow-200 text-sm">
+                You've received <span className="font-bold">${creditNotifications.reduce((sum, n) => sum + n.amount, 0).toFixed(2)}</span> in store credit!
+              </p>
+              {creditNotifications.length === 1 && creditNotifications[0].reason && (
+                <p className="text-yellow-200 text-xs mt-1">
+                  Reason: {creditNotifications[0].reason}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={handleDismissCreditNotification}
+              className="text-yellow-300 hover:text-yellow-100 transition-colors"
+              title="Close notification"
+              aria-label="Close credit notification"
+            >
+              <i className="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+      )}
 
-
+      {/* Store Credit Display - Compact */}
+      {creditBalance > 0 && (
+        <div 
+          className="rounded-2xl overflow-hidden mb-6"
+          style={{
+            background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.6) 0%, rgba(255, 215, 0, 0.4) 25%, rgba(250, 204, 21, 0.25) 50%, rgba(255, 193, 7, 0.15) 75%, rgba(250, 204, 21, 0.1) 100%)',
+            backdropFilter: 'blur(25px) saturate(200%)',
+            border: '1px solid rgba(255, 215, 0, 0.5)',
+            boxShadow: 'rgba(250, 204, 21, 0.25) 0px 4px 20px, rgba(255, 255, 255, 0.3) 0px 1px 0px inset'
+          }}
+        >
+          <div className="px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🎉</span>
+                <div>
+                  <h3 className="text-lg font-bold text-white">
+                    ${creditBalance.toFixed(2)} Store Credit
+                  </h3>
+                  <p className="text-yellow-300 text-sm">Available to use</p>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => window.location.href = '/products'}
+                className="px-3 md:px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.5) 0%, rgba(250, 204, 21, 0.35) 50%, rgba(255, 193, 7, 0.2) 100%)',
+                  backdropFilter: 'blur(25px) saturate(200%)',
+                  border: '1px solid rgba(255, 215, 0, 0.6)',
+                  boxShadow: 'rgba(250, 204, 21, 0.3) 0px 4px 16px, rgba(255, 255, 255, 0.4) 0px 1px 0px inset'
+                }}
+              >
+                <svg className="w-3 md:w-4 h-3 md:h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+                <span className="text-xs md:text-sm">Use Credits</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Current Deals - Mobile: Swipeable, Desktop: Grid */}
       <div className="mt-3 lg:mt-0">
@@ -4858,7 +6414,7 @@ function Dashboard() {
       })()}
 
       {/* Active Orders - Excel-Style Table */}
-      {orders.filter(order => order.status !== 'Delivered' && order.status !== 'Cancelled').length > 0 && (
+      {orders.filter(order => order.status !== 'Delivered' && order.status !== 'Cancelled').length > 0 ? (
         <div 
           className="rounded-2xl overflow-hidden mb-6"
           style={{
@@ -4888,8 +6444,8 @@ function Dashboard() {
           {/* Table Header - Desktop Only */}
           <div className="hidden md:block px-6 py-3 border-b border-white/10 bg-white/5">
             <div className="grid grid-cols-16 gap-4 text-xs font-semibold text-gray-300 uppercase tracking-wider">
-              <div className="col-span-2">Preview</div>
-              <div className="col-span-3">ORDER #</div>
+              <div className="col-span-3">Preview</div>
+              <div className="col-span-2">ORDER #</div>
               <div className="col-span-4">Items</div>
               <div className="col-span-2">Date</div>
               <div className="col-span-2">Total</div>
@@ -4931,69 +6487,87 @@ function Dashboard() {
                   <div className="px-6 py-4 hover:bg-white/5 transition-colors duration-200">
                     {/* Desktop Row Layout */}
                     <div className="hidden md:grid grid-cols-16 gap-4 items-center">
-                    
-                    {/* Preview Column - Side by Side Images */}
-                      <div className="col-span-2">
+                      
+                      {/* Preview Column - Side by Side Images */}
+                      <div className="col-span-3">
                         <div className="flex gap-2">
                           {order.items.slice(0, 2).map((item, index) => {
-                          // Get the full item data with images
-                          const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
-                          
-                          // Try to get product image from various sources
-                          let productImage = null;
-                          if (itemData.customFiles?.[0]) {
-                            productImage = itemData.customFiles[0];
-                          } else if (itemData.image) {
-                            productImage = itemData.image;
-                          } else if (item.customFiles?.[0]) {
-                            productImage = item.customFiles[0];
-                          } else if (item.image) {
-                            productImage = item.image;
-                          }
-                          
-                          const name = itemData.name || item.name || 'Custom Sticker';
-                          
+                            // Get the full item data with images
+                            const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+                            
+                            // Try to get product image from various sources
+                            let productImage = null;
+                            if (itemData.customFiles?.[0]) {
+                              productImage = itemData.customFiles[0];
+                            } else if (itemData.image) {
+                              productImage = itemData.image;
+                            } else if (item.customFiles?.[0]) {
+                              productImage = item.customFiles[0];
+                            } else if (item.image) {
+                              productImage = item.image;
+                            }
+                            
+                            const name = itemData.name || item.name || 'Custom Sticker';
+                            
                             return (
-                            <div key={`preview-${item.id}-${index}`} className="flex-shrink-0">
-                              {productImage ? (
-                                <div 
-                                  className="w-12 h-12 rounded-lg bg-white/10 border border-white/20 p-1 flex items-center justify-center cursor-pointer hover:border-blue-400/60 transition-all duration-200 hover:scale-105"
-                                  onClick={() => {
-                                    // Set the selected image for highlighting in design vault
-                                    setSelectedDesignImage(productImage);
-                                    setCurrentView('design-vault');
-                                  }}
-                                  title={`Click to view ${name} in Design Vault`}
-                                >
-                                  <img 
-                                    src={productImage} 
-                                    alt={name}
-                                    className="max-w-full max-h-full object-contain rounded"
-                                    onError={(e) => {
-                                      const parent = e.currentTarget.parentElement;
-                                      if (parent) {
-                                        parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-gray-400 text-lg">📄</div>';
-                                      }
+                              <div key={`preview-${item.id}-${index}`} className="flex-shrink-0">
+                                {productImage ? (
+                                  <div 
+                                    className="w-12 h-12 rounded-lg bg-white/10 border border-white/20 p-1 flex items-center justify-center cursor-pointer hover:border-blue-400/60 transition-all duration-200 hover:scale-105 relative"
+                                    onClick={() => {
+                                      // Set the selected image for highlighting in design vault
+                                      setSelectedDesignImage(productImage);
+                                      setCurrentView('design-vault');
                                     }}
-                                  />
-                                </div>
-                              ) : (
-                                <div className="w-12 h-12 rounded-lg bg-gray-600 flex items-center justify-center text-gray-400 border border-white/20 text-lg">
-                                  📄
-                                </div>
-                              )}
+                                    title={`Click to view ${name} in Design Vault`}
+                                  >
+                                    <img 
+                                      src={productImage} 
+                                      alt={name}
+                                      className="max-w-full max-h-full object-contain rounded"
+                                      onError={(e) => {
+                                        const parent = e.currentTarget.parentElement;
+                                        if (parent) {
+                                          parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-gray-400 text-lg">📄</div>';
+                                        }
+                                      }}
+                                    />
+                                    {/* Re-Order Pill */}
+                                    {itemData.isReorder && (
+                                      <div className="absolute -top-1 -right-1 bg-amber-500 text-black text-xs px-1 py-0.5 rounded-full text-[8px] font-bold leading-none">
+                                        RE
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="w-12 h-12 rounded-lg bg-gray-600 flex items-center justify-center text-gray-400 border border-white/20 text-lg relative">
+                                    📄
+                                    {/* Re-Order Pill */}
+                                    {itemData.isReorder && (
+                                      <div className="absolute -top-1 -right-1 bg-amber-500 text-black text-xs px-1 py-0.5 rounded-full text-[8px] font-bold leading-none">
+                                        RE
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
+                          {/* Only show additional count if there are more than 2 items */}
+                          {order.items.length > 2 && (
+                            <div className="w-12 h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 text-xs font-medium">
+                              +{order.items.length - 2}
+                            </div>
+                          )}
                         </div>
                       </div>
                       
-                                        {/* Order Column */}
-                    <div className="col-span-3">
-                      <div className="font-semibold text-white text-sm">
-                        {getOrderDisplayNumber(order)}
+                      {/* Order Column */}
+                      <div className="col-span-2">
+                        <div className="font-semibold text-white text-sm">
+                          {getOrderDisplayNumber(order)}
+                        </div>
                       </div>
-                    </div>
 
                       {/* Items Column - Product Types with Quantities */}
                       <div className="col-span-4">
@@ -5059,8 +6633,10 @@ function Dashboard() {
                             onClick={() => handleViewOrderDetails(order)}
                           className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
                             style={{
-                              backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                              border: '1px solid rgba(59, 130, 246, 0.3)',
+                              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(59, 130, 246, 0.4)',
+                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
                               color: 'white'
                             }}
                           >
@@ -5073,8 +6649,10 @@ function Dashboard() {
                             onClick={() => handleReorder(order.id)}
                           className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
                             style={{
-                              backgroundColor: 'rgba(245, 158, 11, 0.2)',
-                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(245, 158, 11, 0.4)',
+                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
                               color: 'white'
                             }}
                           >
@@ -5095,6 +6673,25 @@ function Dashboard() {
                             }}
                           >
                             Review Proof
+                          </button>
+                        )}
+                        {isOrderShippedWithTracking(order) && (
+                          <button
+                            onClick={() => handleTrackOrder(order)}
+                            className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(34, 197, 94, 0.4)',
+                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                              color: 'white'
+                            }}
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                            </svg>
+                            Track Order
                           </button>
                         )}
                         </div>
@@ -5209,8 +6806,10 @@ function Dashboard() {
                             onClick={() => handleViewOrderDetails(order)}
                             className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
                             style={{
-                              backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                              border: '1px solid rgba(59, 130, 246, 0.3)',
+                              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(59, 130, 246, 0.4)',
+                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
                               color: 'white'
                             }}
                           >
@@ -5223,8 +6822,10 @@ function Dashboard() {
                             onClick={() => handleReorder(order.id)}
                             className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
                             style={{
-                              backgroundColor: 'rgba(245, 158, 11, 0.2)',
-                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(245, 158, 11, 0.4)',
+                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
                               color: 'white'
                             }}
                           >
@@ -5248,6 +6849,25 @@ function Dashboard() {
                             Review Proof
                           </button>
                         )}
+                        {isOrderShippedWithTracking(order) && (
+                          <button
+                            onClick={() => handleTrackOrder(order)}
+                            className="w-full px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(34, 197, 94, 0.4)',
+                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                              color: 'white'
+                            }}
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                            </svg>
+                            Track Order
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -5257,6 +6877,48 @@ function Dashboard() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      ) : (
+        /* Empty State for No Active Orders */
+        <div 
+          className="rounded-2xl overflow-hidden mb-6"
+          style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(12px)'
+          }}
+        >
+          <div className="px-6 py-4 border-b border-white/10">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                🔥 Active Orders
+                <span className="text-xs bg-orange-500/20 text-orange-300 px-2 py-1 rounded-full">
+                  0
+                </span>
+              </h2>
+            </div>
+          </div>
+          
+          <div className="px-6 py-8 text-center">
+            <h3 className="text-white text-lg font-semibold mb-2">There are no active orders</h3>
+            <p className="text-gray-400 text-sm mb-6">Ready to create something amazing? Start your first order!</p>
+            <button
+              onClick={() => window.location.href = '/products'}
+              className="px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
+              style={{
+                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                backdropFilter: 'blur(25px) saturate(180%)',
+                border: '1px solid rgba(59, 130, 246, 0.4)',
+                                  boxShadow: 'rgba(59, 130, 246, 0.15) 0px 4px 16px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+              }}
+            >
+              <svg className="w-4 h-4 inline mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
+              Get Started
+            </button>
           </div>
         </div>
       )}
@@ -5584,10 +7246,10 @@ function Dashboard() {
           {/* Header Section */}
           <div className="pt-6 pb-6">
             <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto max-w-sm sm:max-w-md md:max-w-full">
-              {/* Header - Mission Control */}
+              {/* Header - Banner with Profile */}
               <div 
                 className={`relative rounded-xl p-4 md:p-6 shadow-xl mb-6 overflow-hidden cursor-pointer group banner-gradient ${
-                  profile?.banner_template_id === 1 ? 'stellar-void-animation' : ''
+                  profile?.banner_template_id === 1 || !profile?.banner_template ? 'stellar-void-animation' : ''
                 }`}
                 style={
                   profile?.banner_image_url 
@@ -5607,12 +7269,19 @@ function Dashboard() {
                             : 'stellar-drift 10s ease-in-out infinite'
                         }
                       : {
-                          background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 25%, #ec4899 50%, #a855f7 75%, #ec4899 100%)',
-                          backgroundSize: '400% 400%',
-                          backgroundPosition: '0% 50%',
-                          backgroundRepeat: 'no-repeat',
+                          background: 'linear-gradient(135deg, #0a0a2e 0%, #1a1a4a 25%, #2d1b6b 50%, #4c1d95 75%, #7c3aed 100%)',
+                          backgroundImage: `
+                            radial-gradient(ellipse at 25% 30%, rgba(139, 92, 246, 0.5) 0%, transparent 60%),
+                            radial-gradient(ellipse at 75% 70%, rgba(124, 58, 237, 0.4) 0%, transparent 50%),
+                            radial-gradient(ellipse at 50% 20%, rgba(147, 51, 234, 0.3) 0%, transparent 40%),
+                            radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15) 1px, transparent 1px),
+                            radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+                            radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.18) 1px, transparent 1px)
+                          `,
+                          backgroundSize: '200% 200%, 200% 200%, 200% 200%, 100px 100px, 150px 150px, 80px 80px',
+                          backgroundPosition: '0% 0%, 20% 20%, 40% 60%, 60% 40%, 80% 80%, 10% 30%',
                           border: '1px solid rgba(255, 255, 255, 0.15)',
-                          animation: 'liquid-flow 8s ease-in-out infinite'
+                          animation: 'stellar-drift 8s ease-in-out infinite'
                         }
                 }
                 onClick={handleBannerClick}
@@ -5622,7 +7291,7 @@ function Dashboard() {
                 {/* Grain texture overlay for default gradient */}
                 {!profile?.banner_image_url && (
                   <div 
-                    className={`absolute inset-0 ${profile?.banner_template_id === 1 ? 'opacity-40 bg-noise' : 'opacity-30'}`}
+                    className={`absolute inset-0 ${profile?.banner_template_id === 1 || !profile?.banner_template ? 'opacity-40 bg-noise' : 'opacity-30'}`}
                     style={{
                       backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='7' cy='7' r='1'/%3E%3Ccircle cx='27' cy='7' r='1'/%3E%3Ccircle cx='47' cy='7' r='1'/%3E%3Ccircle cx='17' cy='17' r='1'/%3E%3Ccircle cx='37' cy='17' r='1'/%3E%3Ccircle cx='7' cy='27' r='1'/%3E%3Ccircle cx='27' cy='27' r='1'/%3E%3Ccircle cx='47' cy='27' r='1'/%3E%3Ccircle cx='17' cy='37' r='1'/%3E%3Ccircle cx='37' cy='37' r='1'/%3E%3Ccircle cx='7' cy='47' r='1'/%3E%3Ccircle cx='27' cy='47' r='1'/%3E%3Ccircle cx='47' cy='47' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
                       backgroundSize: '60px 60px'
@@ -5631,7 +7300,7 @@ function Dashboard() {
                 )}
                 
                 {/* Additional animated stars layer for Stellar Void */}
-                {profile?.banner_template_id === 1 && !profile?.banner_image_url && (
+                {(profile?.banner_template_id === 1 || !profile?.banner_template) && !profile?.banner_image_url && (
                   <div className="absolute inset-0 pointer-events-none">
                     <div 
                       className="absolute w-1 h-1 bg-white rounded-full opacity-50"
@@ -5792,7 +7461,8 @@ function Dashboard() {
                     )}
                   </div>
                 </div>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10 pointer-events-none">
+                {/* Profile and Greeting Content - High Z-Index */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-30 pointer-events-none">
                   <div className="flex items-center gap-4">
                     {/* Profile Picture Circle */}
                     <div 
@@ -5842,7 +7512,6 @@ function Dashboard() {
                       </p>
                     </div>
                   </div>
-
                 </div>
               </div>
 
@@ -5889,7 +7558,7 @@ function Dashboard() {
                     className="block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden container-style"
                     style={{
                       background: 'linear-gradient(135deg, #1e3a8a, #3b82f6)',
-                      boxShadow: '0 8px 32px rgba(30, 58, 138, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                      boxShadow: '0 4px 16px rgba(30, 58, 138, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
                       border: '1px solid rgba(59, 130, 246, 0.4)',
                       backdropFilter: 'blur(12px)'
                     }}
@@ -5917,7 +7586,7 @@ function Dashboard() {
                         background: 'linear-gradient(135deg, rgba(100, 116, 139, 0.3) 0%, rgba(100, 116, 139, 0.2) 50%, rgba(100, 116, 139, 0.1) 100%)',
                         backdropFilter: 'blur(25px) saturate(180%)',
                         border: '1px solid rgba(100, 116, 139, 0.4)',
-                        boxShadow: '0 8px 32px rgba(100, 116, 139, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                        boxShadow: '0 4px 16px rgba(100, 116, 139, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
                       } : {}}
                   >
                     <div className="flex items-center gap-3">
@@ -5926,8 +7595,11 @@ function Dashboard() {
                              background: 'linear-gradient(135deg, #8b5cf6, #a78bfa)',
                              boxShadow: '0 4px 12px rgba(139, 92, 246, 0.15)'
                            }}>
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <rect x="3" y="3" width="8" height="5" rx="2"/>
+                          <rect x="13" y="3" width="8" height="11" rx="2"/>
+                          <rect x="3" y="10" width="8" height="11" rx="2"/>
+                          <rect x="13" y="16" width="8" height="5" rx="2"/>
                         </svg>
                       </div>
                       <div>
@@ -5948,7 +7620,7 @@ function Dashboard() {
                         background: 'linear-gradient(135deg, rgba(75, 85, 99, 0.3) 0%, rgba(75, 85, 99, 0.2) 50%, rgba(75, 85, 99, 0.1) 100%)',
                         backdropFilter: 'blur(25px) saturate(180%)',
                         border: '1px solid rgba(75, 85, 99, 0.4)',
-                        boxShadow: '0 8px 32px rgba(75, 85, 99, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                        boxShadow: '0 4px 16px rgba(75, 85, 99, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
                       } : {}}>
                       <div className="flex items-center gap-2 lg:gap-3">
                         <div className="p-1.5 lg:p-2 rounded-lg"
@@ -5956,8 +7628,8 @@ function Dashboard() {
                                background: 'linear-gradient(135deg, #10b981, #34d399)',
                                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)'
                              }}>
-                          <svg className="w-4 lg:w-5 h-4 lg:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                          <svg className="w-4 lg:w-5 h-4 lg:h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M6 2C4.9 2 4 2.9 4 4v16c0 .6.4 1 1 1 .2 0 .5-.1.7-.3L9 18l3.3 2.7c.4.4 1 .4 1.4 0L17 18l3.3 2.7c.2.2.5.3.7.3.6 0 1-.4 1-1V4c0-1.1-.9-2-2-2H6zm2 5h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h4c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1z"/>
                           </svg>
                         </div>
                         <div className="min-w-0">
@@ -5978,7 +7650,7 @@ function Dashboard() {
                         background: 'linear-gradient(135deg, rgba(71, 85, 105, 0.3) 0%, rgba(71, 85, 105, 0.2) 50%, rgba(71, 85, 105, 0.1) 100%)',
                         backdropFilter: 'blur(25px) saturate(180%)',
                         border: '1px solid rgba(71, 85, 105, 0.4)',
-                        boxShadow: '0 8px 32px rgba(71, 85, 105, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                        boxShadow: '0 4px 16px rgba(71, 85, 105, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
                       } : {}}>
                       <div className="flex items-center gap-2 lg:gap-3">
                         <div className="p-1.5 lg:p-2 rounded-lg"
@@ -5986,8 +7658,10 @@ function Dashboard() {
                                background: 'linear-gradient(135deg, #3b82f6, #60a5fa)',
                                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.15)'
                              }}>
-                          <svg className="w-4 lg:w-5 h-4 lg:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          <svg className="w-4 lg:w-5 h-4 lg:h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                            <rect x="3" y="12" width="4" height="9" rx="2"/>
+                            <rect x="10" y="6" width="4" height="15" rx="2"/>
+                            <rect x="17" y="9" width="4" height="12" rx="2"/>
                           </svg>
                         </div>
                         <div className="min-w-0">
@@ -6019,8 +7693,8 @@ function Dashboard() {
                                background: 'linear-gradient(135deg, #ec4899, #f472b6)',
                                boxShadow: '0 4px 12px rgba(236, 72, 153, 0.15)'
                              }}>
-                          <svg className="w-4 lg:w-5 h-4 lg:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                          <svg className="w-4 lg:w-5 h-4 lg:h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/>
                           </svg>
                         </div>
                         <div className="min-w-0">
@@ -6038,7 +7712,7 @@ function Dashboard() {
                         background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.4) 0%, rgba(249, 115, 22, 0.25) 50%, rgba(249, 115, 22, 0.1) 100%)',
                         backdropFilter: 'blur(25px) saturate(180%)',
                         border: '1px solid rgba(249, 115, 22, 0.4)',
-                        boxShadow: '0 8px 32px rgba(249, 115, 22, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                        boxShadow: '0 4px 16px rgba(249, 115, 22, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
                       } : {}}
                     >
                             <div className="flex items-center gap-2">
@@ -6047,9 +7721,8 @@ function Dashboard() {
                                background: 'linear-gradient(135deg, #f97316, #fb923c)',
                                boxShadow: '0 4px 12px rgba(249, 115, 22, 0.15)'
                              }}>
-                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 4.5C7.5 4.5 3.73 7.61 2.46 12c1.27 4.39 5.04 7.5 9.54 7.5s8.27-3.11 9.54-7.5c-1.27-4.39-5.04-7.5-9.54-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
                           </svg>
                               </div>
                         <div className="min-w-0">
@@ -6076,7 +7749,7 @@ function Dashboard() {
                         background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.4) 0%, rgba(249, 115, 22, 0.25) 50%, rgba(249, 115, 22, 0.1) 100%)',
                         backdropFilter: 'blur(25px) saturate(180%)',
                         border: '1px solid rgba(249, 115, 22, 0.4)',
-                        boxShadow: '0 8px 32px rgba(249, 115, 22, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                        boxShadow: '0 4px 16px rgba(249, 115, 22, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
                       } : {}}
                     >
                       <div className="flex items-center gap-3">
@@ -6085,9 +7758,8 @@ function Dashboard() {
                                background: 'linear-gradient(135deg, #f97316, #fb923c)',
                                boxShadow: '0 4px 12px rgba(249, 115, 22, 0.15)'
                              }}>
-                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 4.5C7.5 4.5 3.73 7.61 2.46 12c1.27 4.39 5.04 7.5 9.54 7.5s8.27-3.11 9.54-7.5c-1.27-4.39-5.04-7.5-9.54-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
                           </svg>
                         </div>
                         <div>
@@ -6112,8 +7784,8 @@ function Dashboard() {
                                  background: 'linear-gradient(135deg, #ef4444, #f87171)',
                                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
                                }}>
-                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12l6 4v-18c0-1.1-.9-2-2-2z"/>
                             </svg>
                         </div>
                           <div>
@@ -6130,12 +7802,11 @@ function Dashboard() {
                         <div className="flex items-center gap-3">
                           <div className="p-2 rounded-lg"
                                style={{
-                                 background: 'linear-gradient(135deg, #9333ea, #a855f7)',
-                                 boxShadow: '0 4px 12px rgba(147, 51, 234, 0.15)'
+                                 background: 'linear-gradient(135deg, #374151, #4b5563)',
+                                 boxShadow: '0 4px 12px rgba(55, 65, 81, 0.15)'
                                }}>
-                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
                             </svg>
                           </div>
                           <div>
@@ -6191,8 +7862,8 @@ function Dashboard() {
                                background: 'linear-gradient(135deg, #ef4444, #f87171)',
                                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
                              }}>
-                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12l6 4v-18c0-1.1-.9-2-2-2z"/>
                           </svg>
                         </div>
                         <div>
@@ -6209,12 +7880,11 @@ function Dashboard() {
                       <div className="flex items-center gap-3">
                         <div className="p-2 rounded-lg"
                              style={{
-                               background: 'linear-gradient(135deg, #9333ea, #a855f7)',
-                               boxShadow: '0 4px 12px rgba(147, 51, 234, 0.15)'
+                               background: 'linear-gradient(135deg, #374151, #4b5563)',
+                               boxShadow: '0 4px 12px rgba(55, 65, 81, 0.15)'
                              }}>
-                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
                           </svg>
                         </div>
                         <div>
@@ -6584,92 +8254,125 @@ function Dashboard() {
                             {itemData.productName || item.name}
                           </div>
                           
-                          {/* Quantity Controls - Main Focus */}
-                          <div className="bg-white/10 rounded-lg p-3 mb-2">
-                            <label className="block text-xs text-gray-300 mb-2">Quantity:</label>
-                            <div className="flex items-center gap-3">
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => {
-                                    const newQty = Math.max(50, currentQty - 50);
-                                    handleQuantityUpdate(index, newQty);
-                                  }}
-                                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
-                                >
-                                  -
-                                </button>
-                                <div className="min-w-[80px] px-3 py-2 bg-white/5 border border-white/20 rounded text-center text-white font-mono">
-                                  {currentQty.toLocaleString()}
-                                </div>
-                                <button
-                                  onClick={() => {
-                                    const newQty = currentQty + 50;
-                                    handleQuantityUpdate(index, newQty);
-                                  }}
-                                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
-                                >
-                                  +
-                                </button>
-                              </div>
-                              <div className="text-xs text-gray-400">
-                                Min: 50
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="text-green-400 text-sm font-semibold">
-                            ${(() => {
-                              // Use updated price if available, otherwise calculate or use original
-                              if (updatedPrices[index]) {
-                                return updatedPrices[index].total.toFixed(2);
+                          {/* Product Specifications - Simplified */}
+                          <div className="space-y-2 mb-3">
+                            {(() => {
+                              const selections = itemData.calculatorSelections || {};
+                              const specs = [];
+                              
+                              // Get size
+                              if (selections.sizePreset?.displayValue || selections.size?.displayValue || item.size) {
+                                specs.push(`📏 ${selections.sizePreset?.displayValue || selections.size?.displayValue || item.size}`);
                               }
-                              const totalPrice = item.totalPrice || ((item.unitPrice || 0) * currentQty);
-                              return isNaN(totalPrice) ? '0.00' : totalPrice.toFixed(2);
+                              
+                              // Get material
+                              if (selections.material?.displayValue || item.material) {
+                                specs.push(`🎨 ${selections.material?.displayValue || item.material}`);
+                              }
+                              
+                              // Get cut/shape
+                              if (selections.cut?.displayValue || selections.shape?.displayValue) {
+                                specs.push(`✂️ ${selections.cut?.displayValue || selections.shape?.displayValue}`);
+                              }
+                              
+                              // Get proof option
+                              if (selections.proof?.value !== false) {
+                                specs.push(`✅ Send Proof`);
+                              }
+                              
+                              // Get rush status (only if not removed)
+                              if (selections.rush?.value === true && !removedRushItems.has(index)) {
+                                specs.push(
+                                  <div key="rush" className="flex items-center justify-between">
+                                    <span>🚀 Rush Order</span>
+                                    <button
+                                      onClick={() => handleRemoveRushOrder(index)}
+                                      className="ml-2 w-4 h-4 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-colors duration-200"
+                                      title="Remove rush order (-40%)"
+                                    >
+                                      <svg className="w-2.5 h-2.5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                );
+                              }
+                              
+                              return specs.map((spec, idx) => (
+                                <div key={idx} className="text-xs text-gray-300 bg-white/5 rounded px-2 py-1">
+                                  {spec}
+                                </div>
+                              ));
+                            })()}
+                            
+                            {/* Show rush order removal notice */}
+                            {(() => {
+                              const selections = itemData.calculatorSelections || {};
+                              const hadRushOrder = selections.rush?.value === true;
+                              const rushOrderRemoved = removedRushItems.has(index);
+                              
+                              if (hadRushOrder && rushOrderRemoved) {
+                                return (
+                                  <div className="text-xs text-green-400 bg-green-500/10 border border-green-500/20 rounded px-2 py-1 flex items-center gap-1">
+                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                    </svg>
+                                    Rush order removed (-40% savings)
+                                  </div>
+                                );
+                              }
+                              return null;
                             })()}
                           </div>
-                        </div>
-                      </div>
 
-                      {/* Collapsed Item Details */}
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        {(() => {
-                          const selections = itemData.calculatorSelections || {};
-                          const details = [];
-                          
-                          // Add size
-                          if (selections.sizePreset?.displayValue || selections.size?.displayValue || item.size) {
-                            details.push({
-                              label: 'Size',
-                              value: selections.sizePreset?.displayValue || selections.size?.displayValue || item.size,
-                              color: 'text-yellow-300'
-                            });
-                          }
-                          
-                          // Add material
-                          if (selections.material?.displayValue || item.material) {
-                            details.push({
-                              label: 'Material',
-                              value: selections.material?.displayValue || item.material,
-                              color: 'text-purple-300'
-                            });
-                          }
-                          
-                          // Add cut/shape (limit to first 4 details)
-                          if (details.length < 4 && (selections.cut?.displayValue || selections.shape?.displayValue)) {
-                            details.push({
-                              label: 'Cut',
-                              value: selections.cut?.displayValue || selections.shape?.displayValue,
-                              color: 'text-green-300'
-                            });
-                          }
-                          
-                          return details.slice(0, 4).map((detail, idx) => (
-                            <div key={idx} className="flex justify-between items-center">
-                              <span className="text-gray-400">{detail.label}:</span>
-                              <span className={detail.color}>{detail.value}</span>
+                          {/* Quantity Controls - Compact */}
+                          <div className="flex items-center justify-between bg-white/5 rounded-lg p-2 mb-2">
+                            <div className="text-xs text-gray-400">Quantity:</div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  const newQty = Math.max(50, currentQty - 50);
+                                  handleQuantityUpdate(index, newQty);
+                                }}
+                                className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-sm font-bold transition-all duration-200 transform hover:scale-105"
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.4) 0%, rgba(14, 165, 233, 0.25) 50%, rgba(14, 165, 233, 0.1) 100%)',
+                                  backdropFilter: 'blur(25px) saturate(180%)',
+                                  border: '1px solid rgba(14, 165, 233, 0.4)',
+                                  boxShadow: 'rgba(14, 165, 233, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                }}
+                              >
+                                −
+                              </button>
+                              <div 
+                                className="min-w-[60px] px-2 py-1 rounded text-center text-white text-sm font-mono"
+                                style={{
+                                  background: 'rgba(255, 255, 255, 0.05)',
+                                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                                  boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                                  backdropFilter: 'blur(12px)'
+                                }}
+                              >
+                                {currentQty.toLocaleString()}
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const newQty = currentQty + 50;
+                                  handleQuantityUpdate(index, newQty);
+                                }}
+                                className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-sm font-bold transition-all duration-200 transform hover:scale-105"
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.4) 0%, rgba(14, 165, 233, 0.25) 50%, rgba(14, 165, 233, 0.1) 100%)',
+                                  backdropFilter: 'blur(25px) saturate(180%)',
+                                  border: '1px solid rgba(14, 165, 233, 0.4)',
+                                  boxShadow: 'rgba(14, 165, 233, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                }}
+                              >
+                                +
+                              </button>
                             </div>
-                          ));
-                        })()}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );
@@ -6695,23 +8398,48 @@ function Dashboard() {
                       // Skip removed items
                       if (removedItems.has(index)) return;
                       
-                      // Use updated price if available, otherwise use original
+                      // Use updated price if available, otherwise calculate with rush removal consideration
                       if (updatedPrices[index]) {
                         calculatedTotal += updatedPrices[index].total;
                       } else {
                         const originalQty = item.quantity || 1;
                         const currentQty = updatedQuantities[index] ?? originalQty;
-                        const unitPrice = item.unitPrice || item.totalPrice / originalQty || 0;
-                        calculatedTotal += unitPrice * currentQty;
+                        
+                        // Check if rush order was removed and recalculate if needed
+                        const itemData = reorderOrderData._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+                        const hadRushOrder = itemData.calculatorSelections?.rush?.value === true;
+                        const rushOrderRemoved = removedRushItems.has(index);
+                        
+                        if (hadRushOrder && rushOrderRemoved) {
+                          // Calculate price without rush order - use direct calculation
+                          const originalUnitPrice = item.unitPrice || item.totalPrice / originalQty || 0;
+                          const originalTotalForQty = originalUnitPrice * currentQty;
+                          // Remove 40% rush fee by dividing by 1.4
+                          const priceWithoutRush = originalTotalForQty / 1.4;
+                          calculatedTotal += priceWithoutRush;
+                        } else {
+                          // Use original calculation
+                          const unitPrice = item.unitPrice || item.totalPrice / originalQty || 0;
+                          calculatedTotal += unitPrice * currentQty;
+                        }
                       }
                     });
                     
                     const discountedTotal = calculatedTotal * 0.9; // 10% off
-                    return isNaN(discountedTotal) ? '0.00' : discountedTotal.toFixed(2);
+                    const formatTotal = isNaN(discountedTotal) ? '0.00' : discountedTotal.toFixed(2);
+                    
+                    return formatTotal;
                   })()}</span>
                 </div>
-              <div className="text-xs text-green-400 text-right">
-                (10% reorder discount applied)
+              <div className="text-xs text-right space-y-1">
+                <div className="text-green-400">
+                  (10% reorder discount applied)
+                </div>
+                {rushSavingsAmount > 0 && (
+                  <div className="text-blue-400">
+                    (Rush removal saved: ${rushSavingsAmount.toFixed(2)})
+                  </div>
+                )}
               </div>
             </div>
 
@@ -6781,7 +8509,7 @@ function Dashboard() {
                 </button>
               </div>
               
-              <p className="text-gray-300 text-center mb-6">Select a template or close to keep current banner</p>
+
               
               {/* Template Categories */}
               <div className="space-y-8">
@@ -6834,12 +8562,21 @@ function Dashboard() {
                           className="h-24 w-full relative"
                           style={template.style}
                         >
-                          {/* Show sample emojis for business templates */}
+                          {/* Show sample icons for business templates */}
                           {template.emojis && (
                             <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="flex gap-1 text-lg opacity-60">
+                              <div className="flex gap-2 text-2xl opacity-70 filter drop-shadow-sm">
                                 {template.emojis.slice(0, 3).map((emoji, index) => (
-                                  <span key={index}>{emoji}</span>
+                                  <span 
+                                    key={index}
+                                    className="transform hover:scale-110 transition-transform duration-200"
+                                    style={{
+                                      textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+                                      filter: 'contrast(1.1) saturate(1.2)'
+                                    }}
+                                  >
+                                    {emoji}
+                                  </span>
                                 ))}
                               </div>
                             </div>

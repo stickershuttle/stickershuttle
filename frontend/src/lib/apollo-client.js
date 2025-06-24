@@ -85,12 +85,7 @@ const client = new ApolloClient({
       CustomerOrder: {
         // Force cache refresh for order data
         fields: {
-          shopifyOrderNumber: {
-            merge: false // Don't merge cached data
-          },
-          shopifyOrderId: {
-            merge: false // Don't merge cached data
-          }
+
         }
       }
     }
@@ -102,7 +97,7 @@ const client = new ApolloClient({
     },
     query: {
       errorPolicy: 'all',
-      fetchPolicy: 'cache-and-network', // Balanced approach: check cache first, then network
+      fetchPolicy: 'network-only', // Use network-only for client.query() calls
     },
   },
 });

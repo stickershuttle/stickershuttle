@@ -9,9 +9,47 @@ const nextConfig = {
           aggregateTimeout: 300,
         }
       }
+      
+      // Ignore date-fns locale imports to prevent './en' module errors
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        // Ignore date-fns locale imports
+        'date-fns/locale': false,
+      };
+      
+      // Add fallback for date-fns locale modules
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        'date-fns/locale': false,
+      };
+      
       return config
     }
   }),
+  
+  // Add webpack configuration for production builds too
+  webpack: (config, { dev, isServer }) => {
+    if (dev) {
+      config.watchOptions = {
+        poll: 1000,
+        aggregateTimeout: 300,
+      }
+    }
+    
+    // Ignore date-fns locale imports to prevent './en' module errors
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'date-fns/locale': false,
+    };
+    
+    // Add fallback for date-fns locale modules
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      'date-fns/locale': false,
+    };
+    
+    return config
+  },
   
   // Add image remote patterns configuration (updated from deprecated domains)
   images: {

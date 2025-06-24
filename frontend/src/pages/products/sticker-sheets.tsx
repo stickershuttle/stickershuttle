@@ -3,6 +3,8 @@ import StickerSheetsCalculator from "@/components/sticker-sheets-calculator";
 import FloatingChatWidget from "@/components/FloatingChatWidget";
 import { useState, useEffect } from "react";
 import { loadRealPricingData, BasePriceRow, QuantityDiscountRow } from "@/utils/real-pricing";
+import Link from "next/link";
+import { getSupabase } from "@/lib/supabase";
 
 export default function StickerSheets() {
   const [realPricingData, setRealPricingData] = useState<{
@@ -10,6 +12,8 @@ export default function StickerSheets() {
     quantityDiscounts: QuantityDiscountRow[];
   } | null>(null);
   const [pricingError, setPricingError] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   // Load real CSV pricing data on component mount
   useEffect(() => {
@@ -40,7 +44,22 @@ export default function StickerSheets() {
     };
 
     loadPricing();
+    checkUser();
   }, []);
+
+  const checkUser = async () => {
+    try {
+      if (typeof window !== 'undefined') {
+        const supabase = await getSupabase();
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user || null);
+      }
+    } catch (error) {
+      console.error('Error checking user:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Legacy base pricing for backward compatibility (if needed)
   const basePricing = [
@@ -59,6 +78,15 @@ export default function StickerSheets() {
           box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
           backdrop-filter: blur(12px);
           border-radius: 16px;
+        }
+        .rocket-shake {
+          animation: rocketShake 2s ease-in-out infinite;
+        }
+        @keyframes rocketShake {
+          0%, 100% { transform: translateX(0) translateY(0); }
+          25% { transform: translateX(-1px) translateY(-1px); }
+          50% { transform: translateX(1px) translateY(1px); }
+          75% { transform: translateX(-1px) translateY(1px); }
         }
       `}</style>
       {/* Hero Section with Banner Background */}
@@ -253,7 +281,7 @@ export default function StickerSheets() {
       </section>
 
       {/* Calculator Section */}
-      <section className="pt-7 pb-2 md:py-4">
+      <section className="py-8">
         <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
           {pricingError && (
             <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg text-yellow-200 text-sm">
@@ -275,60 +303,44 @@ export default function StickerSheets() {
       </section>
 
       {/* Three-Column Benefits Section */}
-      <section className="pt-7 pb-8">
+      <section className="py-8">
         <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
-            {/* Multiple Designs */}
+            {/* Free Proof Included */}
             <div className="container-style p-4 lg:p-6 transition-colors duration-200">
               <div className="flex items-center">
-                <div 
-                  className="text-4xl mr-4"
-                  style={{
-                    filter: 'drop-shadow(0 0 10px rgba(168, 242, 106, 0.5)) drop-shadow(0 0 20px rgba(168, 242, 106, 0.3))'
-                  }}
-                >
-                  🎨
+                <div className="text-4xl mr-4">
+                  ✅
                 </div>
                 <h3 className="font-semibold">
-                  <span className="text-white">Multiple Designs</span>
-                  <span className="text-gray-300">, one convenient sheet.</span>
+                  <span className="text-white">Free Proof Included</span>
                 </h3>
               </div>
             </div>
 
-            {/* Premium Vinyl Sheets */}
+            {/* Printed in 24-48 hours */}
             <div className="container-style p-4 lg:p-6 transition-colors duration-200">
               <div className="flex items-center">
                 <div 
-                  className="text-4xl mr-4"
-                  style={{
-                    filter: 'drop-shadow(0 0 10px rgba(168, 242, 106, 0.5)) drop-shadow(0 0 20px rgba(168, 242, 106, 0.3))'
-                  }}
+                  className="text-4xl mr-4 rocket-shake"
                 >
-                  📄
+                  🚀
                 </div>
                 <h3 className="font-semibold">
-                  <span className="text-white">Premium Vinyl Sheets</span>
-                  <span className="text-gray-300">, efficient & organized.</span>
+                  <span className="text-white">Printed in 24-48 hours</span>
                 </h3>
               </div>
             </div>
 
-            {/* Custom Layouts */}
+            {/* Free Shipping, always */}
             <div className="container-style p-4 lg:p-6 transition-colors duration-200">
               <div className="flex items-center">
-                <div 
-                  className="text-4xl mr-4"
-                  style={{
-                    filter: 'drop-shadow(0 0 10px rgba(168, 242, 106, 0.5)) drop-shadow(0 0 20px rgba(168, 242, 106, 0.3))'
-                  }}
-                >
-                  📏
+                <div className="text-4xl mr-4">
+                  📦
                 </div>
                 <h3 className="font-semibold">
-                  <span className="text-white">Custom Layouts</span>
-                  <span className="text-gray-300">, perfectly organized designs.</span>
+                  <span className="text-white">Free Shipping, always.</span>
                 </h3>
               </div>
             </div>
@@ -405,6 +417,69 @@ export default function StickerSheets() {
           </div>
         </div>
       </section>
+
+      {/* Login/Signup Section - Only show when user is logged out */}
+      {!loading && !user && (
+        <section className="py-8">
+          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
+            <div 
+              className="text-center p-8 md:p-12 rounded-2xl relative overflow-hidden"
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(12px)'
+              }}
+            >
+              {/* Background decorative elements */}
+              <div className="absolute inset-0 overflow-hidden">
+                {/* Floating shapes */}
+                <div className="absolute top-8 left-8 w-3 h-3 bg-yellow-400 rounded-full opacity-60"></div>
+                <div className="absolute bottom-8 right-8 w-2 h-2 bg-purple-400 rounded-full opacity-60"></div>
+                <div className="absolute top-16 right-16 w-4 h-4 bg-blue-400 rounded-full opacity-40"></div>
+                <div className="absolute bottom-16 left-16 w-2 h-2 bg-green-400 rounded-full opacity-60"></div>
+                
+                {/* Corner stars */}
+                <div className="absolute top-12 left-1/2 text-green-400 text-xs">⭐</div>
+                <div className="absolute bottom-12 left-1/2 text-pink-400 text-sm">✨</div>
+              </div>
+
+              <div className="relative z-10">
+                <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+                  Already a customer?
+                </h2>
+                <p className="text-gray-300 text-lg mb-6 max-w-2xl mx-auto">
+                  Quick login to track your orders, reorder favorites, and access exclusive customer perks.
+                </p>
+                
+                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                  <Link href="/login">
+                    <button 
+                      className="px-8 py-3 font-semibold text-lg transition-all duration-300 transform hover:scale-105 rounded-lg"
+                      style={{
+                        backgroundColor: '#ffd713',
+                        color: '#030140',
+                        boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
+                        border: 'solid',
+                        borderWidth: '0.03125rem',
+                        borderColor: '#8d9912'
+                      }}
+                    >
+                      Login
+                    </button>
+                  </Link>
+                  
+                  <Link href="/signup">
+                    <button className="px-8 py-3 font-semibold text-lg text-white hover:text-gray-200 transition-all duration-300 hover:scale-105 rounded-lg border border-gray-400 hover:border-gray-300">
+                      New Customer? <span className="text-yellow-400">Sign Up</span>
+                    </button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Floating Chat Widget */}
       <FloatingChatWidget />

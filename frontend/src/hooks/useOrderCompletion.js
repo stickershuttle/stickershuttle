@@ -89,7 +89,7 @@ export const useOrderCompletion = () => {
             if (newPaidOrder) {
               console.log('✅ New paid order detected:', {
                 id: newPaidOrder.id,
-                shopifyOrderNumber: newPaidOrder.shopifyOrderNumber,
+                orderNumber: newPaidOrder.orderNumber,
                 orderStatus: newPaidOrder.orderStatus,
                 financialStatus: newPaidOrder.financialStatus,
                 totalPrice: newPaidOrder.totalPrice
@@ -103,7 +103,7 @@ export const useOrderCompletion = () => {
                 detail: {
                   order: newPaidOrder,
                   orderCount: currentOrderCount,
-                  message: `Order ${newPaidOrder.shopifyOrderNumber} completed successfully!`
+                  message: `Order ${newPaidOrder.orderNumber} completed successfully!`
                 }
               });
               

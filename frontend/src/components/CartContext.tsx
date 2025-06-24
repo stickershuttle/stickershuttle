@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { CartItem } from "@/types/product";
 
 interface CartContextType {
@@ -32,17 +32,21 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem("cart", JSON.stringify(cart));
   }, [cart]);
 
-  const addToCart = (item: CartItem) => {
+  const addToCart = useCallback((item: CartItem) => {
     setCart((prev) => [...prev, item]);
-  };
+  }, []);
 
-  const removeFromCart = (id: string) => {
+  const removeFromCart = useCallback((id: string) => {
     setCart((prev) => prev.filter((item) => item.id !== id));
-  };
+  }, []);
 
-  const clearCart = () => setCart([]);
+  const clearCart = useCallback(() => {
+    setCart([]);
+    // Explicitly clear localStorage to ensure cart is completely cleared
+    localStorage.removeItem("cart");
+  }, []);
 
-  const updateCartItemQuantity = (id: string, quantity: number, unitPrice: number, totalPrice: number) => {
+  const updateCartItemQuantity = useCallback((id: string, quantity: number, unitPrice: number, totalPrice: number) => {
     setCart((prev) => 
       prev.map((item) => 
         item.id === id 
@@ -50,9 +54,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
           : item
       )
     );
-  };
+  }, []);
 
-  const updateCartItemCustomization = (id: string, updatedItem: CartItem) => {
+  const updateCartItemCustomization = useCallback((id: string, updatedItem: CartItem) => {
     setCart((prev) => 
       prev.map((item) => 
         item.id === id 
@@ -60,7 +64,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
           : item
       )
     );
-  };
+  }, []);
 
   return (
     <CartContext.Provider value={{ cart, addToCart, removeFromCart, clearCart, updateCartItemQuantity, updateCartItemCustomization }}>

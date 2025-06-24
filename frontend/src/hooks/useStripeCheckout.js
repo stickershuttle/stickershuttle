@@ -10,7 +10,7 @@ export const useStripeCheckout = () => {
   
   const [processStripeCartOrder] = useMutation(PROCESS_STRIPE_CART_ORDER);
 
-  const processCheckout = async (cartItems, customerInfo, shippingAddress, billingAddress = null, orderNote = '') => {
+  const processCheckout = async (cartItems, customerInfo, shippingAddress, billingAddress = null, orderNote = '', discountCode = null, discountAmount = 0, creditsToApply = 0) => {
     setLoading(true);
     setError(null);
 
@@ -32,6 +32,8 @@ export const useStripeCheckout = () => {
 
       // Step 2: Process order through API
       console.log('📝 Processing order with Stripe...');
+      console.log('🛒 Cart items being processed:', cartItems.length, 'items');
+      console.log('📦 Cart items details:', cartItems);
 
       const { data: orderData } = await processStripeCartOrder({
         variables: {
@@ -60,7 +62,10 @@ export const useStripeCheckout = () => {
             },
             shippingAddress,
             billingAddress: billingAddress || shippingAddress,
-            orderNote
+            orderNote,
+            discountCode,
+            discountAmount,
+            creditsToApply
           }
         }
       });
@@ -70,7 +75,14 @@ export const useStripeCheckout = () => {
 
       if (!result.success) {
         console.error('❌ Order processing failed with errors:', result.errors);
-        throw new Error(result.message || 'Order processing failed');
+        console.error('❌ Full result object:', JSON.stringify(result, null, 2));
+        console.error('❌ Backend error message:', result.message);
+        console.error('❌ Backend error details:', result.errors);
+        
+        // Try to provide more specific error info
+        const errorMessage = result.message || 'Order processing failed';
+        const errorDetails = result.errors ? ` Details: ${JSON.stringify(result.errors)}` : '';
+        throw new Error(`${errorMessage}${errorDetails}`);
       }
 
       // Step 3: Get Stripe instance

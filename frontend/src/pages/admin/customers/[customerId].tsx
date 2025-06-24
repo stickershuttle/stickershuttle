@@ -152,20 +152,38 @@ export default function CustomerDetail() {
     });
   }, [allOrdersData, customerEmail]);
 
-  // Calculate customer stats
+  // Calculate customer stats (paid orders only)
   const customerStats = React.useMemo(() => {
     if (!customerOrders.length) return null;
     
-    const totalSpent = customerOrders.reduce((sum: number, order: Order) => sum + (order.totalPrice || 0), 0);
-    const averageOrderValue = totalSpent / customerOrders.length;
-    const firstOrder = customerOrders[customerOrders.length - 1];
-    const lastOrder = customerOrders[0];
+    // Filter to only include paid orders for stats calculation
+    const paidOrders = customerOrders.filter((order: Order) => order.financialStatus === 'paid');
+    
+    if (!paidOrders.length) {
+      // If no paid orders, show basic info from any order
+      const anyOrder = customerOrders[0];
+      return {
+        firstName: anyOrder.customerFirstName,
+        lastName: anyOrder.customerLastName,
+        email: customerEmail,
+        totalOrders: 0,
+        totalSpent: 0,
+        averageOrderValue: 0,
+        firstOrderDate: null,
+        lastOrderDate: null
+      };
+    }
+    
+    const totalSpent = paidOrders.reduce((sum: number, order: Order) => sum + (order.totalPrice || 0), 0);
+    const averageOrderValue = totalSpent / paidOrders.length;
+    const firstOrder = paidOrders[paidOrders.length - 1];
+    const lastOrder = paidOrders[0];
     
     return {
       firstName: lastOrder.customerFirstName,
       lastName: lastOrder.customerLastName,
       email: customerEmail,
-      totalOrders: customerOrders.length,
+      totalOrders: paidOrders.length,
       totalSpent,
       averageOrderValue,
       firstOrderDate: firstOrder.orderCreatedAt || firstOrder.createdAt,
@@ -295,52 +313,52 @@ export default function CustomerDetail() {
       `}</style>
       <div className="min-h-screen" style={{ backgroundColor: '#030140' }}>
         {/* Main Content */}
-        <div className="w-full pt-8 pb-8">
-          <div className="w-full px-6">
+        <div className="w-full pt-4 sm:pt-6 xl:pt-8 pb-8">
+          <div className="w-full px-4 sm:px-6 xl:px-8">
             {/* Header */}
-            <div className="flex items-center gap-4 mb-8">
+            <div className="flex items-center gap-3 xl:gap-4 mb-6 xl:mb-8">
               <button
                 onClick={() => router.push('/admin/customers')}
                 className="text-gray-400 hover:text-white transition-colors"
                 aria-label="Back to customers"
               >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-5 w-5 xl:h-6 xl:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <div>
-                <h1 className="text-3xl font-bold text-white">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl sm:text-2xl xl:text-3xl font-bold text-white truncate">
                   {customerStats?.firstName} {customerStats?.lastName}
                 </h1>
-                <p className="text-sm text-gray-400">{customerEmail}</p>
+                <p className="text-xs sm:text-sm text-gray-400 truncate">{customerEmail}</p>
               </div>
             </div>
 
             {/* Customer Stats */}
             {customerStats && (
-              <div className="grid grid-cols-4 gap-4 mb-8">
-                <div className="stat-card p-6">
-                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">Total Orders</div>
-                  <div className="text-2xl font-bold text-white">{customerStats.totalOrders}</div>
+              <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 xl:gap-4 mb-6 xl:mb-8">
+                <div className="stat-card p-4 xl:p-6">
+                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-1 xl:mb-2">Total Orders</div>
+                  <div className="text-xl xl:text-2xl font-bold text-white">{customerStats.totalOrders}</div>
                 </div>
                 
-                <div className="stat-card p-6">
-                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">Total Spent</div>
-                  <div className="text-2xl font-bold" style={{ color: '#86efac' }}>
+                <div className="stat-card p-4 xl:p-6">
+                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-1 xl:mb-2">Total Spent</div>
+                  <div className="text-lg xl:text-2xl font-bold" style={{ color: '#86efac' }}>
                     {formatCurrency(customerStats.totalSpent)}
                   </div>
                 </div>
                 
-                <div className="stat-card p-6">
-                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">Average Order</div>
-                  <div className="text-2xl font-bold text-white">
+                <div className="stat-card p-4 xl:p-6">
+                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-1 xl:mb-2">Avg Order</div>
+                  <div className="text-lg xl:text-2xl font-bold text-white">
                     {formatCurrency(customerStats.averageOrderValue)}
                   </div>
                 </div>
                 
-                <div className="stat-card p-6">
-                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">Customer Since</div>
-                  <div className="text-lg font-medium text-white">
+                <div className="stat-card p-4 xl:p-6">
+                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-1 xl:mb-2">Since</div>
+                  <div className="text-sm xl:text-lg font-medium text-white">
                     {new Date(customerStats.firstOrderDate).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'short',
@@ -351,13 +369,78 @@ export default function CustomerDetail() {
               </div>
             )}
 
-            {/* Orders Table */}
+            {/* Orders Section */}
             <div className="glass-container overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-700">
-                <h2 className="text-lg font-semibold text-white">Order History</h2>
+              <div className="px-4 xl:px-6 py-3 xl:py-4 border-b border-gray-700">
+                <h2 className="text-base xl:text-lg font-semibold text-white">Order History</h2>
               </div>
               
-              <div className="overflow-x-auto">
+              {/* Mobile Order List */}
+              <div className="xl:hidden">
+                {customerOrders.length > 0 ? (
+                  <div className="divide-y divide-gray-700">
+                    {customerOrders.map((order: Order) => {
+                      const totalItems = order.items?.reduce((sum: number, item: OrderItem) => sum + item.quantity, 0) || 0;
+                      
+                      return (
+                        <div
+                          key={order.id}
+                          className="p-4 transition-all duration-200 active:scale-[0.98]"
+                          onClick={() => router.push(`/admin/orders/${order.orderNumber || order.id}`)}
+                        >
+                          {/* Order Header */}
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <div className="text-sm font-semibold text-white">
+                                #{order.orderNumber || order.id.split('-')[0].toUpperCase()}
+                              </div>
+                              <div className="text-xs text-gray-400 mt-1">
+                                {formatDate(order.orderCreatedAt)}
+                              </div>
+                            </div>
+                            <div className="text-base font-semibold" style={{ color: '#86efac' }}>
+                              {formatCurrency(order.totalPrice)}
+                            </div>
+                          </div>
+
+                          {/* Order Details */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={`rounded-full ${getProofStatusColor(getProofStatus(order))}`}
+                                style={{
+                                  width: '6px',
+                                  height: '6px',
+                                  minWidth: '6px',
+                                  minHeight: '6px',
+                                  boxShadow: '0 0 8px currentColor'
+                                }}
+                              ></div>
+                              <span className="text-xs text-gray-300">{getProofStatus(order)}</span>
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {totalItems} item{totalItems !== 1 ? 's' : ''}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="text-gray-400">
+                      <svg className="mx-auto h-12 w-12 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                      </svg>
+                      <h3 className="text-lg font-medium text-white mb-1">No orders found</h3>
+                      <p className="text-sm">This customer hasn't placed any orders yet</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Desktop Table */}
+              <div className="hidden xl:block overflow-x-auto">
                 <table className="min-w-full">
                   <thead className="border-b border-gray-700">
                     <tr>

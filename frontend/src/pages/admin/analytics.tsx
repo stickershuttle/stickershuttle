@@ -190,11 +190,29 @@ export default function AdminAnalytics() {
         .recharts-area-area {
           filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.3));
         }
+        
+        .glass-container {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(12px);
+          border-radius: 16px;
+        }
+        
+        @media (max-width: 768px) {
+          .recharts-wrapper {
+            font-size: 0.75rem;
+          }
+          
+          .recharts-pie-label-text {
+            font-size: 0.625rem;
+          }
+        }
       `}</style>
-      <div className="min-h-screen flex" style={{ backgroundColor: '#030140' }}>
-        {/* Sidebar */}
+      <div className="min-h-screen flex overflow-x-hidden" style={{ backgroundColor: '#030140' }}>
+        {/* Sidebar - Hidden on mobile */}
         <div
-          className="w-56 fixed left-0 h-screen pt-8 pr-4"
+          className="hidden xl:block w-56 fixed left-0 h-screen pt-8 pr-4"
           style={{
             backgroundColor: 'transparent',
             top: '104px',
@@ -464,21 +482,27 @@ export default function AdminAnalytics() {
                 <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750290446/Github-desktop-logo-symbol.svg_hb06pq.png" alt="GitHub" className="w-5 h-5 mr-3 object-contain" />
                 GitHub
               </a>
+
+              <a href="https://app.posthog.com" target="_blank" rel="noopener noreferrer" className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all" style={{ borderLeft: '3px solid transparent' }}>
+                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750695141/9ca51ebe-fb09-4440-a9a4-a3fdb37ae3ad.png" alt="PostHog" className="w-5 h-5 mr-3 object-contain" />
+                PostHog
+              </a>
             </nav>
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 ml-56 pt-8 pb-8">
-          <div className="w-full px-6">
+        <div className="flex-1 xl:ml-56 pt-8 pb-8">
+          <div className="w-full px-4 md:px-6">
             {/* Header with Time Range Selector */}
-            <div className="flex justify-end items-center mb-6">
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-2xl md:text-3xl font-bold text-white xl:hidden">Analytics</h1>
               <div className="flex items-center gap-3">
                 <select
                   aria-label="Select time range"
                   value={timeRange}
                   onChange={(e) => setTimeRange(e.target.value)}
-                  className="bg-transparent border border-white/20 rounded-lg px-4 py-2 text-white text-sm font-medium focus:outline-none focus:border-purple-400 transition-all cursor-pointer hover:scale-105"
+                  className="bg-transparent border border-white/20 rounded-lg px-3 md:px-4 py-2 text-white text-xs md:text-sm font-medium focus:outline-none focus:border-purple-400 transition-all cursor-pointer hover:scale-105"
                   style={{
                     backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
                     backgroundRepeat: 'no-repeat',
@@ -501,20 +525,15 @@ export default function AdminAnalytics() {
               </div>
             ) : (
               <>
-                {/* Summary Cards */}
-                <div className="grid grid-cols-4 gap-4 mb-6">
-                  <div className="rounded-2xl p-6 transition-all duration-200 hover:scale-[1.02]" style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(12px)'
-                  }}>
+                {/* Summary Cards - Mobile responsive grid */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+                  <div className="glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02]">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs text-gray-400 uppercase tracking-wider">Total Revenue</span>
                     </div>
                     <div className="flex items-end justify-between">
                       <div>
-                        <p className="text-2xl font-bold transition-all duration-200 hover:scale-105" style={{ color: '#86efac' }}>
+                        <p className="text-lg md:text-2xl font-bold transition-all duration-200 hover:scale-105" style={{ color: '#86efac' }}>
                           {formatCurrency(data?.summary?.totalRevenue || 0)}
                         </p>
                         <p className={`text-xs mt-1 ${data?.summary?.revenueGrowth > 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -524,18 +543,13 @@ export default function AdminAnalytics() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl p-6 transition-all duration-200 hover:scale-[1.02]" style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(12px)'
-                  }}>
+                  <div className="glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02]">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs text-gray-400 uppercase tracking-wider">Total Orders</span>
                     </div>
                     <div className="flex items-end justify-between">
                       <div>
-                        <p className="text-2xl font-bold text-white transition-all duration-200 hover:scale-105">{data?.summary?.totalOrders || 0}</p>
+                        <p className="text-lg md:text-2xl font-bold text-white transition-all duration-200 hover:scale-105">{data?.summary?.totalOrders || 0}</p>
                         <p className="text-xs mt-1" style={{ color: '#c084fc' }}>
                           {formatCurrency(data?.summary?.averageOrderValue || 0)} AOV
                         </p>
@@ -543,223 +557,202 @@ export default function AdminAnalytics() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl p-6 transition-all duration-200 hover:scale-[1.02]" style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(12px)'
-                  }}>
+                  <div className="glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02]">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs text-gray-400 uppercase tracking-wider">Proof Turnaround</span>
+                      <span className="text-xs text-gray-400 uppercase tracking-wider">Proof Time</span>
                     </div>
                     <div className="flex items-end justify-between">
                       <div>
-                        <p className="text-2xl font-bold text-white transition-all duration-200 hover:scale-105">
+                        <p className="text-lg md:text-2xl font-bold text-white transition-all duration-200 hover:scale-105">
                           {formatHours(data?.proofMetrics?.avgProofSendTime || 0)}
                         </p>
                         <p className="text-xs mt-1" style={{ color: '#c084fc' }}>
-                          Avg time to send proofs
+                          Avg send time
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-2xl p-6 transition-all duration-200 hover:scale-[1.02]" style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(12px)'
-                  }}>
+                  <div className="glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02]">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs text-gray-400 uppercase tracking-wider">Proof Approval Rate</span>
+                      <span className="text-xs text-gray-400 uppercase tracking-wider">Approval Rate</span>
                     </div>
                     <div className="flex items-end justify-between">
                       <div>
-                        <p className="text-2xl font-bold text-white transition-all duration-200 hover:scale-105">
+                        <p className="text-lg md:text-2xl font-bold text-white transition-all duration-200 hover:scale-105">
                           {formatPercentage(data?.proofMetrics?.proofApprovalRate || 0)}
                         </p>
                         <p className="text-xs mt-1" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-                          {data?.proofMetrics?.proofsApproved || 0} of {data?.proofMetrics?.totalProofs || 0} proofs
+                          {data?.proofMetrics?.proofsApproved || 0} of {data?.proofMetrics?.totalProofs || 0}
                         </p>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Charts Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                {/* Charts Grid - Stack on mobile */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6">
                   {/* Daily Sales Chart */}
-                  <div className="rounded-2xl p-6 transition-all duration-200" style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(12px)'
-                  }}>
-                    <h3 className="text-lg font-semibold text-white mb-4">Daily Revenue</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <AreaChart data={data?.dailySales || []}>
-                        <defs>
-                          <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid 
-                          strokeDasharray="0" 
-                          stroke={CHART_COLORS.grid} 
-                          vertical={false}
-                        />
-                        <XAxis 
-                          dataKey="date" 
-                          stroke={CHART_COLORS.axis}
-                          tickFormatter={formatChartDate}
-                          style={{ fontSize: '11px' }}
-                          tick={{ fill: CHART_COLORS.text }}
-                          axisLine={{ stroke: CHART_COLORS.grid }}
-                          tickLine={false}
-                        />
-                        <YAxis 
-                          stroke={CHART_COLORS.axis}
-                          tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                          style={{ fontSize: '11px' }}
-                          tick={{ fill: CHART_COLORS.text }}
-                          axisLine={{ stroke: CHART_COLORS.grid }}
-                          tickLine={false}
-                        />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: CHART_COLORS.tooltip.background,
-                            border: `1px solid ${CHART_COLORS.tooltip.border}`,
-                            borderRadius: '12px',
-                            backdropFilter: 'blur(12px)',
-                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
-                          }}
-                          labelStyle={{ color: CHART_COLORS.text, marginBottom: '4px' }}
-                          itemStyle={{ color: '#fff' }}
-                          labelFormatter={(label) => formatChartDate(label)}
-                          formatter={(value: number) => [formatCurrency(value), 'Revenue']}
-                        />
-                        <Area 
-                          type="monotone" 
-                          dataKey="revenue" 
-                          stroke={CHART_COLORS.primary}
-                          strokeWidth={3}
-                          fillOpacity={1} 
-                          fill="url(#colorRevenue)"
-                          animationDuration={1500}
-                          animationEasing="ease-out"
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                  <div className="glass-container p-4 md:p-6 transition-all duration-200">
+                    <h3 className="text-base md:text-lg font-semibold text-white mb-4">Daily Revenue</h3>
+                    <div className="h-64 md:h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={data?.dailySales || []}>
+                          <defs>
+                            <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.3}/>
+                              <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid 
+                            strokeDasharray="0" 
+                            stroke={CHART_COLORS.grid} 
+                            vertical={false}
+                          />
+                          <XAxis 
+                            dataKey="date" 
+                            stroke={CHART_COLORS.axis}
+                            tickFormatter={formatChartDate}
+                            style={{ fontSize: '11px' }}
+                            tick={{ fill: CHART_COLORS.text }}
+                            axisLine={{ stroke: CHART_COLORS.grid }}
+                            tickLine={false}
+                          />
+                          <YAxis 
+                            stroke={CHART_COLORS.axis}
+                            tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                            style={{ fontSize: '11px' }}
+                            tick={{ fill: CHART_COLORS.text }}
+                            axisLine={{ stroke: CHART_COLORS.grid }}
+                            tickLine={false}
+                          />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: CHART_COLORS.tooltip.background,
+                              border: `1px solid ${CHART_COLORS.tooltip.border}`,
+                              borderRadius: '12px',
+                              backdropFilter: 'blur(12px)',
+                              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
+                            }}
+                            labelStyle={{ color: CHART_COLORS.text, marginBottom: '4px' }}
+                            itemStyle={{ color: '#fff' }}
+                            labelFormatter={(label) => formatChartDate(label)}
+                            formatter={(value: number) => [formatCurrency(value), 'Revenue']}
+                          />
+                          <Area 
+                            type="monotone" 
+                            dataKey="revenue" 
+                            stroke={CHART_COLORS.primary}
+                            strokeWidth={3}
+                            fillOpacity={1} 
+                            fill="url(#colorRevenue)"
+                            animationDuration={1500}
+                            animationEasing="ease-out"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
 
                   {/* Average Order Value Chart */}
-                  <div className="rounded-2xl p-6 transition-all duration-200" style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(12px)'
-                  }}>
-                    <h3 className="text-lg font-semibold text-white mb-4">Average Order Value</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={data?.dailySales || []}>
-                        <CartesianGrid 
-                          strokeDasharray="0" 
-                          stroke={CHART_COLORS.grid} 
-                          vertical={false}
-                        />
-                        <XAxis 
-                          dataKey="date" 
-                          stroke={CHART_COLORS.axis}
-                          tickFormatter={formatChartDate}
-                          style={{ fontSize: '11px' }}
-                          tick={{ fill: CHART_COLORS.text }}
-                          axisLine={{ stroke: CHART_COLORS.grid }}
-                          tickLine={false}
-                        />
-                        <YAxis 
-                          stroke={CHART_COLORS.axis}
-                          tickFormatter={(value) => `$${value}`}
-                          style={{ fontSize: '11px' }}
-                          tick={{ fill: CHART_COLORS.text }}
-                          axisLine={{ stroke: CHART_COLORS.grid }}
-                          tickLine={false}
-                        />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: CHART_COLORS.tooltip.background,
-                            border: `1px solid ${CHART_COLORS.tooltip.border}`,
-                            borderRadius: '12px',
-                            backdropFilter: 'blur(12px)',
-                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
-                          }}
-                          labelStyle={{ color: CHART_COLORS.text, marginBottom: '4px' }}
-                          itemStyle={{ color: '#fff' }}
-                          labelFormatter={(label) => formatChartDate(label)}
-                          formatter={(value: number) => [formatCurrency(value), 'AOV']}
-                        />
-                        <Line 
-                          type="monotone" 
-                          dataKey="averageOrderValue" 
-                          stroke={CHART_COLORS.secondary}
-                          strokeWidth={3}
-                          dot={{ fill: CHART_COLORS.secondary, strokeWidth: 2, r: 4 }}
-                          activeDot={{ r: 6, strokeWidth: 0 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
+                  <div className="glass-container p-4 md:p-6 transition-all duration-200">
+                    <h3 className="text-base md:text-lg font-semibold text-white mb-4">Average Order Value</h3>
+                    <div className="h-64 md:h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={data?.dailySales || []}>
+                          <CartesianGrid 
+                            strokeDasharray="0" 
+                            stroke={CHART_COLORS.grid} 
+                            vertical={false}
+                          />
+                          <XAxis 
+                            dataKey="date" 
+                            stroke={CHART_COLORS.axis}
+                            tickFormatter={formatChartDate}
+                            style={{ fontSize: '11px' }}
+                            tick={{ fill: CHART_COLORS.text }}
+                            axisLine={{ stroke: CHART_COLORS.grid }}
+                            tickLine={false}
+                          />
+                          <YAxis 
+                            stroke={CHART_COLORS.axis}
+                            tickFormatter={(value) => `$${value}`}
+                            style={{ fontSize: '11px' }}
+                            tick={{ fill: CHART_COLORS.text }}
+                            axisLine={{ stroke: CHART_COLORS.grid }}
+                            tickLine={false}
+                          />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: CHART_COLORS.tooltip.background,
+                              border: `1px solid ${CHART_COLORS.tooltip.border}`,
+                              borderRadius: '12px',
+                              backdropFilter: 'blur(12px)',
+                              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
+                            }}
+                            labelStyle={{ color: CHART_COLORS.text, marginBottom: '4px' }}
+                            itemStyle={{ color: '#fff' }}
+                            labelFormatter={(label) => formatChartDate(label)}
+                            formatter={(value: number) => [formatCurrency(value), 'AOV']}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="averageOrderValue" 
+                            stroke={CHART_COLORS.secondary}
+                            strokeWidth={3}
+                            dot={{ fill: CHART_COLORS.secondary, strokeWidth: 2, r: 4 }}
+                            activeDot={{ r: 6, strokeWidth: 0 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
 
                   {/* Proof Metrics */}
-                  <div className="rounded-2xl p-6 transition-all duration-200" style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(12px)'
-                  }}>
-                    <h3 className="text-lg font-semibold text-white mb-4">Proof Management</h3>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center p-4 rounded-xl transition-all duration-200 hover:scale-[1.02]" style={{ 
+                  <div className="glass-container p-4 md:p-6 transition-all duration-200">
+                    <h3 className="text-base md:text-lg font-semibold text-white mb-4">Proof Management</h3>
+                    <div className="space-y-3 md:space-y-4">
+                      <div className="flex justify-between items-center p-3 md:p-4 rounded-xl transition-all duration-200 hover:scale-[1.02]" style={{ 
                         backgroundColor: 'rgba(255, 255, 255, 0.05)',
                         border: '1px solid rgba(255, 255, 255, 0.08)'
                       }}>
                         <div>
-                          <p className="text-sm text-gray-400">Avg Response Time</p>
-                          <p className="text-2xl font-bold text-white mt-1">
+                          <p className="text-xs md:text-sm text-gray-400">Avg Response Time</p>
+                          <p className="text-lg md:text-2xl font-bold text-white mt-1">
                             {formatHours(data?.proofMetrics?.avgProofAcceptTime || 0)}
                           </p>
                         </div>
-                        <svg className="w-12 h-12 transition-all duration-200 hover:scale-110" style={{ color: '#c084fc' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-10 h-10 md:w-12 md:h-12 transition-all duration-200 hover:scale-110" style={{ color: '#c084fc' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
                       
-                      <div className="flex justify-between items-center p-4 rounded-xl transition-all duration-200 hover:scale-[1.02]" style={{ 
+                      <div className="flex justify-between items-center p-3 md:p-4 rounded-xl transition-all duration-200 hover:scale-[1.02]" style={{ 
                         backgroundColor: 'rgba(255, 255, 255, 0.05)',
                         border: '1px solid rgba(255, 255, 255, 0.08)'
                       }}>
                         <div>
-                          <p className="text-sm text-gray-400">Proofs Approved</p>
-                          <p className="text-2xl font-bold text-white mt-1">
+                          <p className="text-xs md:text-sm text-gray-400">Proofs Approved</p>
+                          <p className="text-lg md:text-2xl font-bold text-white mt-1">
                             {data?.proofMetrics?.proofsApproved || 0}
                           </p>
                         </div>
-                        <svg className="w-12 h-12 transition-all duration-200 hover:scale-110" style={{ color: '#86efac' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-10 h-10 md:w-12 md:h-12 transition-all duration-200 hover:scale-110" style={{ color: '#86efac' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
                       
-                      <div className="flex justify-between items-center p-4 rounded-xl transition-all duration-200 hover:scale-[1.02]" style={{ 
+                      <div className="flex justify-between items-center p-3 md:p-4 rounded-xl transition-all duration-200 hover:scale-[1.02]" style={{ 
                         backgroundColor: 'rgba(255, 255, 255, 0.05)',
                         border: '1px solid rgba(255, 255, 255, 0.08)'
                       }}>
                         <div>
-                          <p className="text-sm text-gray-400">Changes Requested</p>
-                          <p className="text-2xl font-bold text-white mt-1">
+                          <p className="text-xs md:text-sm text-gray-400">Changes Requested</p>
+                          <p className="text-lg md:text-2xl font-bold text-white mt-1">
                             {formatPercentage(data?.proofMetrics?.proofChangesRate || 0)}
                           </p>
                         </div>
-                        <svg className="w-12 h-12 transition-all duration-200 hover:scale-110" style={{ color: '#fbbf24' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-10 h-10 md:w-12 md:h-12 transition-all duration-200 hover:scale-110" style={{ color: '#fbbf24' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </div>
@@ -767,45 +760,42 @@ export default function AdminAnalytics() {
                   </div>
 
                   {/* Top Products by Revenue */}
-                  <div className="rounded-2xl p-6 transition-all duration-200" style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(12px)'
-                  }}>
-                    <h3 className="text-lg font-semibold text-white mb-4">Top Products by Revenue</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={data?.productPerformance?.topProductsByRevenue || []}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={(entry) => `${entry.name}: ${formatCurrency(entry.revenue)}`}
-                          outerRadius={100}
-                          fill="#8884d8"
-                          dataKey="revenue"
-                          animationBegin={0}
-                          animationDuration={1000}
-                        >
-                          {(data?.productPerformance?.topProductsByRevenue || []).map((entry: any, index: number) => (
-                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: CHART_COLORS.tooltip.background,
-                            border: `1px solid ${CHART_COLORS.tooltip.border}`,
-                            borderRadius: '12px',
-                            backdropFilter: 'blur(12px)',
-                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
-                          }}
-                          labelStyle={{ color: CHART_COLORS.text, marginBottom: '4px' }}
-                          itemStyle={{ color: '#fff' }}
-                          formatter={(value: number) => formatCurrency(value)}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
+                  <div className="glass-container p-4 md:p-6 transition-all duration-200">
+                    <h3 className="text-base md:text-lg font-semibold text-white mb-4">Top Products by Revenue</h3>
+                    <div className="h-64 md:h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={data?.productPerformance?.topProductsByRevenue || []}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={(entry) => `${entry.name}: ${formatCurrency(entry.revenue)}`}
+                            outerRadius="80%"
+                            fill="#8884d8"
+                            dataKey="revenue"
+                            animationBegin={0}
+                            animationDuration={1000}
+                          >
+                            {(data?.productPerformance?.topProductsByRevenue || []).map((entry: any, index: number) => (
+                              <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: CHART_COLORS.tooltip.background,
+                              border: `1px solid ${CHART_COLORS.tooltip.border}`,
+                              borderRadius: '12px',
+                              backdropFilter: 'blur(12px)',
+                              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
+                            }}
+                            labelStyle={{ color: CHART_COLORS.text, marginBottom: '4px' }}
+                            itemStyle={{ color: '#fff' }}
+                            formatter={(value: number) => formatCurrency(value)}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
                 </div>
               </>

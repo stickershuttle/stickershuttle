@@ -34,33 +34,59 @@ class StripeClient {
     }
 
     try {
+      // Calculate discount proportionally across all line items
+      const originalTotal = orderData.lineItems.reduce((sum, item) => sum + item.totalPrice, 0);
+      const discountAmount = orderData.cartMetadata?.discountAmount ? parseFloat(orderData.cartMetadata.discountAmount) : 0;
+      const discountRatio = discountAmount > 0 ? discountAmount / originalTotal : 0;
+
+      console.log('💰 Discount calculation:', {
+        originalTotal,
+        discountAmount,
+        discountRatio,
+        finalTotal: originalTotal - discountAmount
+      });
+
       const session = await this.stripe.checkout.sessions.create({
         payment_method_types: ['card'],
-        line_items: orderData.lineItems.map(item => ({
-          price_data: {
-            currency: orderData.currency || 'usd',
-            product_data: {
-              name: item.name || item.title,
-              description: item.description || `${item.name} - Custom Stickers (${item.quantity} pieces)`,
-              metadata: {
-                productId: item.productId,
-                sku: item.sku,
-                // Store only essential selections in product metadata (500 char limit)
-                // Full selections will be in orderNote in session metadata
-                size: item.calculatorSelections?.size?.displayValue || '',
-                material: item.calculatorSelections?.material?.displayValue || '',
-                cut: item.calculatorSelections?.cut?.displayValue || '',
-                // Add essential product info
-                category: item.category || 'custom-stickers',
-                actualQuantity: item.quantity.toString() // Store actual quantity in metadata
-              }
+        line_items: orderData.lineItems.map(item => {
+          // Apply discount proportionally to each item
+          const itemDiscountAmount = item.totalPrice * discountRatio;
+          const discountedItemPrice = item.totalPrice - itemDiscountAmount;
+          
+          console.log(`📦 Item pricing: ${item.name}`, {
+            originalPrice: item.totalPrice,
+            itemDiscountAmount,
+            discountedPrice: discountedItemPrice
+          });
+
+          return {
+            price_data: {
+              currency: orderData.currency || 'usd',
+              product_data: {
+                name: item.name || item.title,
+                description: item.description || `${item.name} - Custom Stickers (${item.quantity} pieces)${discountAmount > 0 ? ` (${orderData.cartMetadata.discountCode} discount applied)` : ''}`,
+                metadata: {
+                  productId: item.productId,
+                  sku: item.sku,
+                  // Store only essential selections in product metadata (500 char limit)
+                  // Full selections will be in orderNote in session metadata
+                  size: item.calculatorSelections?.size?.displayValue || '',
+                  material: item.calculatorSelections?.material?.displayValue || '',
+                  cut: item.calculatorSelections?.cut?.displayValue || '',
+                  // Add essential product info
+                  category: item.category || 'custom-stickers',
+                  actualQuantity: item.quantity.toString(), // Store actual quantity in metadata
+                  discountApplied: discountAmount > 0 ? 'true' : 'false',
+                  originalPrice: item.totalPrice.toFixed(2),
+                  discountAmount: itemDiscountAmount.toFixed(2)
+                }
+              },
+              // Use discounted price for Stripe checkout
+              unit_amount: Math.round(discountedItemPrice * 100), // Discounted price in cents
             },
-            // Fix: Use total price directly to avoid rounding issues
-            // Set quantity to 1 and use total price as unit amount
-            unit_amount: Math.round(item.totalPrice * 100), // Total price in cents
-          },
-          quantity: 1, // Always 1, actual quantity is in product description and metadata
-        })),
+            quantity: 1, // Always 1, actual quantity is in product description and metadata
+          };
+        }),
         mode: 'payment',
         success_url: `${orderData.successUrl}?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: orderData.cancelUrl,
@@ -69,8 +95,12 @@ class StripeClient {
           orderId: orderData.orderId,
           userId: orderData.userId || 'guest',
           customerOrderId: orderData.customerOrderId || '',
-          orderNote: orderData.orderNote || '',
-          cartMetadata: JSON.stringify(orderData.cartMetadata || {})
+          orderSummary: orderData.orderNote || '',
+          itemCount: orderData.cartMetadata?.itemCount?.toString() || '0',
+          originalTotalAmount: orderData.cartMetadata?.subtotalAmount || '0.00',
+          discountCode: orderData.cartMetadata?.discountCode || '',
+          discountAmount: orderData.cartMetadata?.discountAmount || '0.00',
+          totalAmount: orderData.cartMetadata?.totalAmount || '0.00'
         },
         shipping_address_collection: {
           allowed_countries: ['US', 'CA'], // Add more countries as needed
@@ -83,15 +113,15 @@ class StripeClient {
                 amount: 0, // Free shipping - adjust as needed
                 currency: 'usd',
               },
-              display_name: 'Standard Shipping',
+              display_name: 'UPS Ground (2-3 business days)',
               delivery_estimate: {
                 minimum: {
                   unit: 'business_day',
-                  value: 5,
+                  value: 2,
                 },
                 maximum: {
                   unit: 'business_day',
-                  value: 7,
+                  value: 3,
                 },
               },
             },
@@ -103,15 +133,15 @@ class StripeClient {
                 amount: 1500, // $15.00
                 currency: 'usd',
               },
-              display_name: 'Express Shipping',
+              display_name: 'UPS Next Day Air (1 business day)',
               delivery_estimate: {
                 minimum: {
                   unit: 'business_day',
-                  value: 2,
+                  value: 1,
                 },
                 maximum: {
                   unit: 'business_day',
-                  value: 3,
+                  value: 1,
                 },
               },
             },

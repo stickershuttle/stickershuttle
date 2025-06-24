@@ -81,6 +81,7 @@ const EasyPostShipping: React.FC<EasyPostShippingProps> = ({ order, onClose, onL
         variables: {
           shipmentId: shipment.id,
           rateId: selectedRate.id,
+          orderId: order.id,
           insurance: insurance || null
         }
       });

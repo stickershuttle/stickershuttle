@@ -599,19 +599,28 @@ const VinylBannerCalculator: React.FC = () => {
               </div>
             )}
             
-            <div className="mt-4 flex items-center bg-purple-500/20 backdrop-blur-md p-3 rounded-lg border border-purple-400/50">
-              <input
-                type="checkbox"
-                id="uploadLater"
-                checked={uploadLater}
-                onChange={() => setUploadLater(!uploadLater)}
-                className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
-                disabled={!!uploadedFile}
-              />
-              <label htmlFor="uploadLater" className={`ml-2 text-sm font-medium ${uploadedFile ? 'text-white/50' : 'text-white'}`}>
-                Upload Artwork Later
-              </label>
-            </div>
+                          <div className="mt-4 flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+                   style={{
+                     background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                     border: '1px solid rgba(147, 51, 234, 0.4)',
+                     backdropFilter: 'blur(12px)'
+                   }}>
+                <button
+                  onClick={() => setUploadLater(!uploadLater)}
+                  disabled={!!uploadedFile}
+                  title={uploadLater ? "Disable upload later" : "Enable upload later"}
+                  className={`w-12 h-6 rounded-full transition-colors ${
+                    uploadLater ? 'bg-purple-500' : 'bg-white/20'
+                  } ${uploadedFile ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                    uploadLater ? 'translate-x-7' : 'translate-x-1'
+                  }`} />
+                </button>
+                <label className={`text-sm font-medium ${uploadedFile ? 'text-white/50' : 'text-purple-200'}`}>
+                  Upload Artwork Later
+                </label>
+              </div>
             {uploadLater && !uploadedFile && (
               <div className="mt-2 text-white/80 text-sm italic flex items-center">
                 <span role="img" aria-label="caution" className="mr-1">⚠️</span>
@@ -736,6 +745,18 @@ const VinylBannerCalculator: React.FC = () => {
                   </div>
                   <div className="text-right text-gray-300 text-sm">
                     ${pricing.perUnit.toFixed(2)} per banner
+                  </div>
+                  {/* Store Credit Notification */}
+                  <div className="mt-3 px-3 py-1.5 rounded-lg text-xs font-medium text-left"
+                       style={{
+                         background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.15) 50%, rgba(255, 215, 0, 0.05) 100%)',
+                         border: '1px solid rgba(255, 215, 0, 0.4)',
+                         backdropFilter: 'blur(12px)'
+                       }}>
+                    <span className="flex items-center justify-start gap-1.5 text-yellow-200">
+                      <i className="fas fa-coins text-yellow-300"></i>
+                      You'll earn ${(pricing.total * 0.05).toFixed(2)} in store credit on this order!
+                    </span>
                   </div>
                 </div>
               </div>

@@ -150,6 +150,12 @@ export interface ProductCustomization {
   notes?: string;
   instagramOptIn?: boolean; // Permission to post content to Instagram
   isReorder?: boolean; // Flag to indicate this is a reordered item
+  isDeal?: boolean; // Flag to indicate this is a deal item
+  dealPrice?: number; // Fixed deal price
+  additionalInfo?: { // Additional information from calculators
+    instagramHandle?: string;
+    uploadLater?: boolean;
+  };
 }
 
 // Cart item with full customization

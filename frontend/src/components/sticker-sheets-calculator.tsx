@@ -882,20 +882,30 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                           <div className="flex items-center gap-2">
                             {area > 0 && amount !== "Custom" && (
                               <span
-                                className={`px-2 py-1 text-xs font-medium rounded-full border backdrop-blur-md relative
+                                className={`px-2 py-1 text-xs font-medium rounded-lg border relative
                                 ${
                                   (selectedQuantity === numericAmount.toString()) ||
                                   (selectedQuantity === "Custom" && amount === "Custom")
-                                    ? "bg-green-500/30 text-white border-green-400/50"
-                                    : "bg-green-500/20 text-green-200 border-green-400/30"
+                                    ? "text-white"
+                                    : "text-green-200"
                                 }`}
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(34, 197, 94, 0.15) 50%, rgba(34, 197, 94, 0.05) 100%)',
+                                  border: '1px solid rgba(34, 197, 94, 0.4)',
+                                  backdropFilter: 'blur(12px)'
+                                }}
                               >
                                 ${calculatePrice(numericAmount, area, false).total.toFixed(2)}
                               </span>
                             )}
                             {pricePerEach && amount !== "Custom" && (
                               <span
-                                className="px-2 py-1 text-xs font-medium rounded-full border backdrop-blur-md bg-purple-500/20 text-purple-200 border-purple-400/50 relative"
+                                className="px-2 py-1 text-xs font-medium rounded-lg border text-purple-200 relative"
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                                  border: '1px solid rgba(147, 51, 234, 0.4)',
+                                  backdropFilter: 'blur(12px)'
+                                }}
                               >
                                 {pricePerEach}
                               </span>
@@ -1041,6 +1051,20 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                       })()}
                     </div>
                   </div>
+                  {/* Store Credit Notification */}
+                  {totalPrice && !customSizeError && (
+                    <div className="mt-2 px-3 py-1.5 rounded-lg text-xs font-medium text-left"
+                         style={{
+                           background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.15) 50%, rgba(255, 215, 0, 0.05) 100%)',
+                           border: '1px solid rgba(255, 215, 0, 0.4)',
+                           backdropFilter: 'blur(12px)'
+                         }}>
+                      <span className="flex items-center justify-start gap-1.5 text-yellow-200">
+                        <i className="fas fa-coins text-yellow-300"></i>
+                        You'll earn ${(parseFloat(totalPrice.replace('$', '')) * 0.05).toFixed(2)} in store credit on this order!
+                      </span>
+                    </div>
+                  )}
                   {/* Reserve space for rush order fee text to prevent layout shift */}
                   <div className="h-4">
                     {rushOrder && (
@@ -1256,16 +1280,25 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                 </div>
               )}
               
-              <div className="mt-4 flex items-center bg-purple-500/20 backdrop-blur-md p-3 rounded-lg border border-purple-400/50">
-                <input
-                  type="checkbox"
-                  id="uploadLater"
-                  checked={uploadLater}
-                  onChange={() => setUploadLater(!uploadLater)}
-                  className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
+              <div className="mt-4 flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+                   style={{
+                     background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                     border: '1px solid rgba(147, 51, 234, 0.4)',
+                     backdropFilter: 'blur(12px)'
+                   }}>
+                <button
+                  onClick={() => setUploadLater(!uploadLater)}
                   disabled={!!uploadedFile}
-                />
-                <label htmlFor="uploadLater" className={`ml-2 text-sm font-medium ${uploadedFile ? 'text-white/50' : 'text-white'}`}>
+                  title={uploadLater ? "Disable upload later" : "Enable upload later"}
+                  className={`w-12 h-6 rounded-full transition-colors ${
+                    uploadLater ? 'bg-purple-500' : 'bg-white/20'
+                  } ${uploadedFile ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                    uploadLater ? 'translate-x-7' : 'translate-x-1'
+                  }`} />
+                </button>
+                <label className={`text-sm font-medium ${uploadedFile ? 'text-white/50' : 'text-purple-200'}`}>
                   Upload Artwork Later
                 </label>
               </div>
@@ -1357,15 +1390,24 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
 
               {/* Instagram Post Option */}
               <div className="mt-4 space-y-2">
-                <div className="flex items-center bg-purple-500/20 backdrop-blur-md p-3 rounded-lg border border-purple-400/50">
-                  <input
-                    type="checkbox"
-                    id="postToInstagram"
-                    checked={postToInstagram}
-                    onChange={() => setPostToInstagram(!postToInstagram)}
-                    className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
-                  />
-                  <label htmlFor="postToInstagram" className="ml-2 text-sm font-medium text-white">
+                <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+                     style={{
+                       background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                       border: '1px solid rgba(147, 51, 234, 0.4)',
+                       backdropFilter: 'blur(12px)'
+                     }}>
+                  <button
+                    onClick={() => setPostToInstagram(!postToInstagram)}
+                    title={postToInstagram ? "Disable Instagram posting" : "Enable Instagram posting"}
+                    className={`w-12 h-6 rounded-full transition-colors ${
+                      postToInstagram ? 'bg-purple-500' : 'bg-white/20'
+                    }`}
+                  >
+                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                      postToInstagram ? 'translate-x-7' : 'translate-x-1'
+                    }`} />
+                  </button>
+                  <label className="text-sm font-medium text-purple-200">
                     Post my order to Instagram
                   </label>
                 </div>

@@ -54,8 +54,8 @@ export const CREATE_EASYPOST_SHIPMENT = gql`
 `;
 
 export const BUY_EASYPOST_LABEL = gql`
-  mutation BuyEasyPostLabel($shipmentId: String!, $rateId: String!, $insurance: String) {
-    buyEasyPostLabel(shipmentId: $shipmentId, rateId: $rateId, insurance: $insurance) {
+  mutation BuyEasyPostLabel($shipmentId: String!, $rateId: String!, $orderId: String!, $insurance: String) {
+    buyEasyPostLabel(shipmentId: $shipmentId, rateId: $rateId, orderId: $orderId, insurance: $insurance) {
       success
       error
       shipment {

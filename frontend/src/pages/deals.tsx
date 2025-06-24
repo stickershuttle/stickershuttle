@@ -1,7 +1,190 @@
 import Layout from "@/components/Layout";
 import Link from "next/link";
+import { useState, useCallback, useEffect } from "react";
+import { uploadToCloudinary, validateFile, CloudinaryUploadResult, UploadProgress } from "@/utils/cloudinary";
+import { useCart } from "@/components/CartContext";
+import { useRouter } from "next/router";
+
+interface Deal {
+  id: string;
+  name: string;
+  headline: string;
+  buttonText: string;
+  pills: string[];
+  isActive: boolean;
+  orderDetails: {
+    material: string;
+    size: string;
+    quantity: number;
+    price: number;
+  };
+}
 
 export default function Deals() {
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<CloudinaryUploadResult | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadLater, setUploadLater] = useState(false);
+  const [activeDeal, setActiveDeal] = useState<Deal | null>(null);
+  const { addToCart } = useCart();
+  const router = useRouter();
+
+  // Load active deal from localStorage
+  useEffect(() => {
+    const savedDeals = localStorage.getItem('sticker-shuttle-deals');
+    if (savedDeals) {
+      const deals = JSON.parse(savedDeals);
+      const active = deals.find((deal: Deal) => deal.isActive);
+      if (active) {
+        setActiveDeal(active);
+      }
+    }
+  }, []);
+
+  const handleFileUpload = async (file: File) => {
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      setUploadError(validation.error || 'Invalid file');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+    setUploadProgress(null);
+
+    try {
+      const result = await uploadToCloudinary(
+        file,
+        {
+          selectedCut: "Custom Shape",
+          selectedMaterial: "Matte",
+          selectedSize: "3\" Max Width",
+          selectedQuantity: "100",
+          totalPrice: "$29.00",
+          costPerSticker: "$0.29/ea."
+        },
+        (progress) => setUploadProgress(progress),
+        'deals-orders'
+      );
+
+      setUploadedFile(result);
+      console.log('✅ File uploaded successfully:', result);
+    } catch (error) {
+      console.error('💥 Upload failed:', error);
+      setUploadError(error instanceof Error ? error.message : 'Upload failed');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(null);
+    }
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const file = event.dataTransfer.files[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+  };
+
+  const removeUploadedFile = () => {
+    setUploadedFile(null);
+    setUploadError(null);
+  };
+
+  const handleAddToCart = () => {
+    const dealDetails = activeDeal?.orderDetails || {
+      material: 'Matte',
+      size: '3"',
+      quantity: 100,
+      price: 29
+    };
+
+    const product = {
+      id: activeDeal ? `deals-${activeDeal.id}` : "deals-vinyl-stickers-100",
+      sku: activeDeal ? `SS-VS-${activeDeal.id.toUpperCase()}` : "SS-VS-DEAL100",
+      name: activeDeal?.name || "100 Custom Stickers - Special Deal",
+      description: activeDeal ? `${activeDeal.name} - ${activeDeal.headline.replace('\n', ' ')}` : "Limited time deal: 100 custom vinyl stickers for just $29",
+      shortDescription: activeDeal?.name || "100 Custom Stickers Deal",
+      category: "vinyl-stickers" as const,
+      basePrice: dealDetails.price / dealDetails.quantity,
+      pricingModel: "flat-rate" as const,
+      images: [uploadedFile?.secure_url || "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591677/Alien_USA_Map_y6wkf4.png"],
+      defaultImage: uploadedFile?.secure_url || "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591677/Alien_USA_Map_y6wkf4.png",
+      features: activeDeal ? activeDeal.pills.map(pill => pill.replace(/[^\w\s]/g, '').trim()) : ["Matte Vinyl", "3\" Max Width", "Ships Next Day", "Custom Shape"],
+      customizable: true,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      calculatorConfig: {
+        showPreview: true,
+        allowFileUpload: true,
+        requireProof: false,
+        hasCustomSize: false
+      }
+    };
+
+    const customization = {
+      productId: product.id,
+      selections: {
+        cut: {
+          type: "shape" as const,
+          value: "custom-shape",
+          displayValue: "Custom Shape",
+          priceImpact: 0
+        },
+        material: {
+          type: "finish" as const,
+          value: dealDetails.material.toLowerCase(),
+          displayValue: dealDetails.material,
+          priceImpact: 0
+        },
+        size: {
+          type: "size-preset" as const,
+          value: dealDetails.size.replace(/['"]/g, ''),
+          displayValue: `${dealDetails.size} Max Width`,
+          priceImpact: 0
+        },
+        quantity: {
+          type: "quantity" as const,
+          value: dealDetails.quantity,
+          displayValue: dealDetails.quantity.toString(),
+          priceImpact: 0
+        }
+      },
+      totalPrice: dealDetails.price,
+      customFiles: uploadedFile ? [uploadedFile.secure_url] : undefined,
+      notes: uploadLater ? "Artwork to be uploaded later" : undefined,
+      isDeal: true,
+      dealPrice: dealDetails.price
+    };
+
+    const cartItem = {
+      id: `deals-${dealDetails.quantity}-stickers-${Date.now()}`,
+      product: product,
+      customization: customization,
+      quantity: dealDetails.quantity,
+      unitPrice: dealDetails.price / dealDetails.quantity,
+      totalPrice: dealDetails.price,
+      addedAt: new Date().toISOString()
+    };
+
+    addToCart(cartItem);
+    router.push('/cart');
+  };
+
   return (
     <Layout title="100 Custom Stickers for $29 - Sticker Shuttle Deals">
         {/* Hero Section */}
@@ -50,78 +233,280 @@ export default function Deals() {
                   ></div>
                 </div>
                 
+                {!showUpload ? (
+                  // Original promotional content
+                  <>
+                    <p className="text-lg text-orange-400 mb-4 mt-1 font-bold" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
+                      🔥 Limited Time Deal
+                    </p>
+                    
+                    <h1 className="text-5xl sm:text-6xl md:text-7xl mb-4 md:mb-8 leading-none relative" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
+                      {activeDeal ? (
+                        activeDeal.headline.split('\n').map((line, index) => (
+                          <span key={index} className="block">{line}</span>
+                        ))
+                      ) : (
+                        <>
+                          <span className="block">100 custom</span>
+                          <span className="block">stickers for <span className="whitespace-nowrap">$29</span></span>
+                        </>
+                      )}
+                    </h1>
+                    <div className="flex flex-wrap justify-center gap-3 mb-6 md:mb-10">
+                      {activeDeal ? (
+                        activeDeal.pills.map((pill, index) => {
+                          // Determine pill color based on content
+                          let bgColor = 'rgba(255, 255, 255, 0.05)';
+                          let borderColor = 'rgba(255, 255, 255, 0.1)';
+                          let textColor = '#d1d5db';
+                          
+                          if (pill.includes('Matte') || pill.includes('Material')) {
+                            bgColor = 'rgba(168, 242, 106, 0.2)';
+                            borderColor = 'rgba(168, 242, 106, 0.4)';
+                            textColor = 'rgb(168, 242, 106)';
+                          } else if (pill.includes('Size') || pill.includes('"')) {
+                            bgColor = 'rgba(59, 130, 246, 0.2)';
+                            borderColor = 'rgba(59, 130, 246, 0.4)';
+                            textColor = 'rgb(59, 130, 246)';
+                          } else if (pill.includes('Ship') || pill.includes('Fast')) {
+                            bgColor = 'rgba(255, 215, 19, 0.2)';
+                            borderColor = 'rgba(255, 215, 19, 0.4)';
+                            textColor = 'rgb(255, 215, 19)';
+                          }
+                          
+                          return (
+                            <div 
+                              key={index}
+                              className="inline-flex items-center px-6 md:px-4 py-2 rounded-full text-sm font-medium"
+                              style={{
+                                backgroundColor: bgColor,
+                                border: `1px solid ${borderColor}`,
+                                color: textColor,
+                                backdropFilter: 'blur(15px)'
+                              }}
+                            >
+                              {pill}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <>
+                          <div 
+                            className="inline-flex items-center px-6 md:px-4 py-2 rounded-full text-sm font-medium"
+                            style={{
+                              backgroundColor: 'rgba(168, 242, 106, 0.2)',
+                              border: '1px solid rgba(168, 242, 106, 0.4)',
+                              color: 'rgb(168, 242, 106)',
+                              backdropFilter: 'blur(15px)'
+                            }}
+                          >
+                            🏷️ Matte Vinyl Stickers
+                          </div>
+                          <div 
+                            className="inline-flex items-center px-6 md:px-4 py-2 rounded-full text-sm font-medium"
+                            style={{
+                              backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                              border: '1px solid rgba(59, 130, 246, 0.4)',
+                              color: 'rgb(59, 130, 246)',
+                              backdropFilter: 'blur(15px)'
+                            }}
+                          >
+                            📏 3" Max Width
+                          </div>
+                          <div 
+                            className="inline-flex items-center px-6 md:px-4 py-2 rounded-full text-sm font-medium"
+                            style={{
+                              backgroundColor: 'rgba(255, 215, 19, 0.2)',
+                              border: '1px solid rgba(255, 215, 19, 0.4)',
+                              color: 'rgb(255, 215, 19)',
+                              backdropFilter: 'blur(15px)'
+                            }}
+                          >
+                            🚀 Ships Next Day
+                          </div>
+                          <div 
+                            className="inline-flex items-center px-6 md:px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap"
+                            style={{
+                              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                              backdropFilter: 'blur(15px)',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              color: '#d1d5db'
+                            }}
+                          >
+                            👽 Not a conspiracy theory, just great deals.
+                          </div>
+                        </>
+                      )}
+                    </div>
 
-                <p className="text-lg text-orange-400 mb-4 mt-1 font-bold" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
-                  🔥 Limited Time Deal
-                </p>
-                
-                <h1 className="text-5xl sm:text-6xl md:text-7xl mb-4 md:mb-8 leading-none relative" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
-                  <span className="block">100 custom</span>
-                  <span className="block">stickers for <span className="whitespace-nowrap">$29</span></span>
-                </h1>
-                <div className="flex flex-wrap justify-center gap-3 mb-6 md:mb-10">
-                  <div 
-                    className="inline-flex items-center px-6 md:px-4 py-2 rounded-full text-sm font-medium"
-                    style={{
-                      backgroundColor: 'rgba(168, 242, 106, 0.2)',
-                      border: '1px solid rgba(168, 242, 106, 0.4)',
-                      color: 'rgb(168, 242, 106)',
-                      backdropFilter: 'blur(15px)'
-                    }}
-                  >
-                    🏷️ Matte Vinyl Stickers
-                  </div>
-                  <div 
-                    className="inline-flex items-center px-6 md:px-4 py-2 rounded-full text-sm font-medium"
-                    style={{
-                      backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                      border: '1px solid rgba(59, 130, 246, 0.4)',
-                      color: 'rgb(59, 130, 246)',
-                      backdropFilter: 'blur(15px)'
-                    }}
-                  >
-                    📏 3" Max Width
-                  </div>
-                  <div 
-                    className="inline-flex items-center px-6 md:px-4 py-2 rounded-full text-sm font-medium"
-                    style={{
-                      backgroundColor: 'rgba(255, 215, 19, 0.2)',
-                      border: '1px solid rgba(255, 215, 19, 0.4)',
-                      color: 'rgb(255, 215, 19)',
-                      backdropFilter: 'blur(15px)'
-                    }}
-                  >
-                    🚀 Ships Next Day
-                  </div>
-                  <div 
-                    className="inline-flex items-center px-6 md:px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap"
-                    style={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                      backdropFilter: 'blur(15px)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      color: '#d1d5db'
-                    }}
-                  >
-                    👽 Not a conspiracy theory, just great deals.
-                  </div>
-                </div>
+                    <div className="flex flex-col items-center gap-4 mb-4">
+                      <button 
+                        onClick={() => setShowUpload(true)}
+                        className="primaryButton px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-105 rounded-lg"
+                        style={{
+                          transform: 'scale(1.1)'
+                        }}
+                      >
+                        {activeDeal?.buttonText || 'Order Now →'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  // File upload area
+                  <div className="min-h-[600px] flex flex-col justify-center">
+                    <h2 className="text-3xl md:text-4xl font-bold mb-8 text-white" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif' }}>
+                      Upload Your Artwork
+                    </h2>
+                    
+                    {/* Hidden file input */}
+                    <input
+                      id="file-input"
+                      type="file"
+                      accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      aria-label="Upload artwork file"
+                    />
 
-                <div className="flex flex-col items-center gap-4 mb-4">
-                  <button 
-                    className="primaryButton px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-105 rounded-lg"
-                    style={{
-                      transform: 'scale(1.1)'
-                    }}
-                  >
-                    Order Now →
-                  </button>
-                </div>
+                    {/* File Upload Area */}
+                    <div className="max-w-lg mx-auto w-full mb-8">
+                      {!uploadedFile ? (
+                        <div 
+                          className="border-2 border-dashed border-white/30 rounded-xl p-8 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative"
+                          onDrop={handleDrop}
+                          onDragOver={handleDragOver}
+                          onClick={() => document.getElementById('file-input')?.click()}
+                        >
+                          {isUploading ? (
+                            <div className="mb-4">
+                              <div className="text-4xl mb-3">⏳</div>
+                              <p className="text-white font-medium text-base mb-2">Uploading...</p>
+                              {uploadProgress && (
+                                <div className="w-full bg-white/20 rounded-full h-2 mb-2">
+                                  <div 
+                                    className="bg-purple-400 h-2 rounded-full transition-all duration-300"
+                                    style={{ width: `${uploadProgress.percentage}%` }}
+                                  ></div>
+                                </div>
+                              )}
+                              {uploadProgress && (
+                                <p className="text-white/80 text-sm">{uploadProgress.percentage}% complete</p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="mb-4">
+                              <div className="text-4xl mb-3">📁</div>
+                              <p className="text-white font-medium text-base mb-2 hidden md:block">Drag or click to upload your file</p>
+                              <p className="text-white font-medium text-base mb-2 md:hidden">Tap to add file</p>
+                              <p className="text-white/70 text-sm">Supported formats:</p>
+                              <p className="text-white/80 text-sm font-mono">.ai, .svg, .eps, .png, .jpg, .psd</p>
+                              <p className="text-white/60 text-xs mt-2">Max file size: 10MB</p>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="border border-green-400/50 rounded-xl p-4 bg-green-500/10 backdrop-blur-md">
+                          <div className="flex items-center justify-between min-w-0">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative z-10">
+                                <img
+                                  src={uploadedFile.secure_url}
+                                  alt={uploadedFile.original_filename}
+                                  className="w-full h-full object-cover rounded-lg relative z-10"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    target.nextElementSibling!.classList.remove('hidden');
+                                  }}
+                                />
+                                <div className="hidden w-full h-full flex items-center justify-center text-white/60 text-xl relative z-10">
+                                  📄
+                                </div>
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-green-200 font-medium truncate">{uploadedFile.original_filename}</p>
+                                <p className="text-green-300/80 text-sm">
+                                  {(uploadedFile.bytes / 1024 / 1024).toFixed(2)} MB • {uploadedFile.format.toUpperCase()}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <button
+                                onClick={() => document.getElementById('file-input')?.click()}
+                                className="text-blue-300 hover:text-blue-200 p-2 hover:bg-blue-500/20 rounded-lg transition-colors cursor-pointer"
+                                title="Replace file"
+                              >
+                                🔄
+                              </button>
+                              <button
+                                onClick={removeUploadedFile}
+                                className="text-red-300 hover:text-red-200 p-2 hover:bg-red-500/20 rounded-lg transition-colors cursor-pointer"
+                                title="Remove file"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {uploadError && (
+                        <div className="mt-3 p-3 bg-red-500/20 border border-red-400/50 rounded-lg">
+                          <p className="text-red-200 text-sm flex items-center gap-2">
+                            <span>⚠️</span>
+                            {uploadError}
+                          </p>
+                        </div>
+                      )}
+                      
+                      <div className="mt-4 flex items-center bg-purple-500/20 backdrop-blur-md p-3 rounded-lg border border-purple-400/50">
+                        <input
+                          type="checkbox"
+                          id="uploadLater"
+                          checked={uploadLater}
+                          onChange={() => setUploadLater(!uploadLater)}
+                          className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
+                          disabled={!!uploadedFile}
+                        />
+                        <label htmlFor="uploadLater" className={`ml-2 text-sm font-medium ${uploadedFile ? 'text-white/50' : 'text-white'}`}>
+                          Upload Artwork Later
+                        </label>
+                      </div>
+                      {uploadLater && !uploadedFile && (
+                        <div className="mt-2 text-white/80 text-sm italic flex items-center">
+                          <span role="img" aria-label="caution" className="mr-1">
+                            ⚠️
+                          </span>
+                          Note: Please try to have your artwork submitted within 48hrs of placing an order.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
+                      <button
+                        onClick={() => setShowUpload(false)}
+                        className="px-6 py-3 border border-white/30 text-white hover:bg-white/10 rounded-lg transition-colors backdrop-blur-md"
+                      >
+                        ← Back to Deal
+                      </button>
+                      <button 
+                        onClick={handleAddToCart}
+                        disabled={!uploadedFile && !uploadLater} 
+                        className="primaryButton px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-105 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        style={{
+                          transform: !uploadedFile && !uploadLater ? 'scale(1)' : 'scale(1.1)'
+                        }}
+                      >
+                        {!uploadedFile && !uploadLater ? "Please Upload Artwork or Select Upload Later" : `Add to Cart - $${activeDeal?.orderDetails.price || 29} →`}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </section>
-
-
 
         {/* Reviews Section */}
         <section className="py-12">
@@ -539,65 +924,61 @@ export default function Deals() {
           </div>
         </section>
 
+        {/* Styles */}
+        <style jsx>{`
+          @keyframes scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+          }
 
+          .headerButton {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+          }
 
-                    {/* Styles */}
-            <style jsx>{`
-              @keyframes scroll {
-                0% { transform: translateX(0); }
-                100% { transform: translateX(-50%); }
-              }
+          .headerButton:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+          }
 
-              .headerButton {
-                background: rgba(255, 255, 255, 0.1);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                backdrop-filter: blur(10px);
-              }
+          .logo-hover {
+            transition: transform 0.3s ease;
+          }
 
-              .headerButton:hover {
-                background: rgba(255, 255, 255, 0.2);
-                border-color: rgba(255, 255, 255, 0.3);
-              }
+          .logo-hover:hover {
+            transform: scale(1.05);
+          }
 
-              .logo-hover {
-                transition: transform 0.3s ease;
-              }
+          /* Hero Animation Keyframes */
+          @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(12deg); }
+            50% { transform: translateY(-20px) rotate(12deg); }
+          }
+          
+          @keyframes sway {
+            0%, 100% { transform: translateX(0px) rotate(6deg); }
+            50% { transform: translateX(15px) rotate(-6deg); }
+          }
+          
+          @keyframes drift {
+            0% { transform: translateX(0px) translateY(0px); }
+            25% { transform: translateX(20px) translateY(-10px); }
+            50% { transform: translateX(0px) translateY(-20px); }
+            75% { transform: translateX(-20px) translateY(-10px); }
+            100% { transform: translateX(0px) translateY(0px); }
+          }
+          
+          @keyframes bob {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+          }
 
-              .logo-hover:hover {
-                transform: scale(1.05);
-              }
-
-
-
-              /* Hero Animation Keyframes */
-              @keyframes float {
-                0%, 100% { transform: translateY(0px) rotate(12deg); }
-                50% { transform: translateY(-20px) rotate(12deg); }
-              }
-              
-              @keyframes sway {
-                0%, 100% { transform: translateX(0px) rotate(6deg); }
-                50% { transform: translateX(15px) rotate(-6deg); }
-              }
-              
-              @keyframes drift {
-                0% { transform: translateX(0px) translateY(0px); }
-                25% { transform: translateX(20px) translateY(-10px); }
-                50% { transform: translateX(0px) translateY(-20px); }
-                75% { transform: translateX(-20px) translateY(-10px); }
-                100% { transform: translateX(0px) translateY(0px); }
-              }
-              
-              @keyframes bob {
-                0%, 100% { transform: translateY(0px); }
-                50% { transform: translateY(-10px); }
-              }
-
-              /* Hide scrollbar on mobile reviews and product types */
-              .md\\:hidden.overflow-x-auto::-webkit-scrollbar {
-                display: none;
-              }
-            `}</style>
+          /* Hide scrollbar on mobile reviews and product types */
+          .md\\:hidden.overflow-x-auto::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
     </Layout>
   );
 }

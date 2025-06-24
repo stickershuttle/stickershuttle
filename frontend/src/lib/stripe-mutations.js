@@ -16,6 +16,8 @@ export const PROCESS_STRIPE_CART_ORDER = gql`
       }
       message
       errors
+      creditsApplied
+      remainingCredits
     }
   }
 `;

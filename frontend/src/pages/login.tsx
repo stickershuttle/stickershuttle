@@ -67,6 +67,11 @@ export default function Login() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
+          scopes: 'openid email profile',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
           redirectTo: `${window.location.origin}/account/dashboard`
         }
       });
@@ -89,21 +94,6 @@ export default function Login() {
       name: 'Google',
       icon: 'https://fonts.gstatic.com/s/i/productlogos/googleg/v6/24px.svg',
       color: '#4285F4'
-    },
-    {
-      name: 'Amazon',
-      icon: 'https://upload.wikimedia.org/wikipedia/commons/4/4a/Amazon_icon.svg',
-      color: '#FF9900'
-    },
-    {
-      name: 'Apple',
-      icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/814px-Apple_logo_black.svg.png',
-      color: '#000000'
-    },
-    {
-      name: 'Facebook',
-      icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Facebook_Logo_%282019%29.png/1024px-Facebook_Logo_%282019%29.png',
-      color: '#1877F2'
     }
   ];
 
@@ -175,14 +165,14 @@ export default function Login() {
             {/* Third Party Login Options */}
             <div className="mb-4">
               <p className="text-sm text-gray-300 text-center mb-3">Quick log in with:</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="flex justify-center">
                 {thirdPartyProviders.map((provider) => (
                   <button
                     key={provider.name}
                     type="button"
                     onClick={() => handleOAuthLogin(provider.name)}
                     disabled={loading}
-                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-white/20 bg-white/5 hover:bg-white/10 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg border border-white/20 bg-white/5 hover:bg-white/10 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]"
                   >
                     <img 
                       src={provider.icon} 
@@ -196,32 +186,45 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Divider */}
-            <div className="text-center mb-4">
-              <span className="text-gray-400 text-sm">Or log in with</span>
-            </div>
+
 
             {/* Method Toggle */}
-            <div className="flex rounded-lg p-1 mb-4" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
+            <div className="flex gap-2 mb-4">
               <button
                 type="button"
                 onClick={() => setLoginMethod('email')}
-                className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all duration-200 ${
-                  loginMethod === 'email'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'text-gray-300 hover:text-white'
+                className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${
+                  loginMethod === 'email' ? 'text-white' : 'text-gray-300 hover:text-white'
                 }`}
+                style={loginMethod === 'email' ? {
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(180%)',
+                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                  boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                } : {
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
+                }}
               >
                 📧 Email
               </button>
               <button
                 type="button"
                 onClick={() => setLoginMethod('phone')}
-                className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all duration-200 ${
-                  loginMethod === 'phone'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'text-gray-300 hover:text-white'
+                className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${
+                  loginMethod === 'phone' ? 'text-white' : 'text-gray-300 hover:text-white'
                 }`}
+                style={loginMethod === 'phone' ? {
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(180%)',
+                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                  boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                } : {
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
+                }}
               >
                 📱 Phone
               </button>
@@ -334,14 +337,14 @@ export default function Login() {
               
               <div>
                 <p className="text-sm text-gray-300 text-center mb-6">Quick log in with:</p>
-                <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="flex justify-center mb-6">
                   {thirdPartyProviders.map((provider) => (
                     <button
                       key={provider.name}
                       type="button"
                       onClick={() => handleOAuthLogin(provider.name)}
                       disabled={loading}
-                      className="flex items-center justify-center gap-2 px-6 py-4 rounded-lg border border-white/20 bg-white/5 hover:bg-white/10 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center justify-center gap-2 px-8 py-4 rounded-lg border border-white/20 bg-white/5 hover:bg-white/10 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed min-w-[140px]"
                     >
                       <img 
                         src={provider.icon} 
@@ -385,37 +388,45 @@ export default function Login() {
                   border: '1px solid rgba(255, 255, 255, 0.15)'
                 }}
               >
-                {/* Divider */}
-                <div className="relative mb-8">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-600"></div>
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-transparent text-gray-400">Or log in with</span>
-                  </div>
-                </div>
+
 
                 {/* Method Toggle */}
-                <div className="flex rounded-lg p-1 mb-6" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
+                <div className="flex gap-2 mb-6">
                   <button
                     type="button"
                     onClick={() => setLoginMethod('email')}
-                    className={`flex-1 py-2 px-6 md:px-4 rounded-md text-sm font-medium transition-all duration-200 ${
-                      loginMethod === 'email'
-                        ? 'bg-purple-600 text-white shadow-md'
-                        : 'text-gray-300 hover:text-white'
+                    className={`flex-1 py-3 px-6 rounded-xl text-sm font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${
+                      loginMethod === 'email' ? 'text-white' : 'text-gray-300 hover:text-white'
                     }`}
+                    style={loginMethod === 'email' ? {
+                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                      backdropFilter: 'blur(25px) saturate(180%)',
+                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                      boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                    } : {
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      backdropFilter: 'blur(12px)'
+                    }}
                   >
                     📧 Email
                   </button>
                   <button
                     type="button"
                     onClick={() => setLoginMethod('phone')}
-                    className={`flex-1 py-2 px-6 md:px-4 rounded-md text-sm font-medium transition-all duration-200 ${
-                      loginMethod === 'phone'
-                        ? 'bg-purple-600 text-white shadow-md'
-                        : 'text-gray-300 hover:text-white'
+                    className={`flex-1 py-3 px-6 rounded-xl text-sm font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${
+                      loginMethod === 'phone' ? 'text-white' : 'text-gray-300 hover:text-white'
                     }`}
+                    style={loginMethod === 'phone' ? {
+                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                      backdropFilter: 'blur(25px) saturate(180%)',
+                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                      boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                    } : {
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      backdropFilter: 'blur(12px)'
+                    }}
                   >
                     📱 Phone
                   </button>

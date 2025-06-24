@@ -15,6 +15,9 @@ import {
 } from "@/utils/real-pricing";
 import { getSupabase } from "@/lib/supabase";
 import { createPortal } from "react-dom";
+import { GET_USER_CREDIT_BALANCE } from "@/lib/credit-mutations";
+import { useQuery } from "@apollo/client";
+import DiscountCodeInput from "@/components/DiscountCodeInput";
 
 // Available configuration options
 const SHAPE_OPTIONS = ["Custom Shape", "Circle", "Oval", "Rectangle", "Square"];
@@ -74,6 +77,16 @@ const calculateItemPricing = (
   quantity: number, 
   pricingData: { basePricing: BasePriceRow[]; quantityDiscounts: QuantityDiscountRow[] } | null
 ) => {
+  // Check if this is a deal item - if so, use fixed deal pricing
+  if (item.customization.isDeal && item.customization.dealPrice) {
+    return {
+      total: item.customization.dealPrice,
+      perSticker: item.customization.dealPrice / quantity,
+      discountPercentage: 0,
+      area: 9 // Default area for deals
+    };
+  }
+  
   // Debug logging for cart item structure
   if (!item.customization?.selections?.size?.displayValue) {
     console.warn('Cart item missing size data:', {
@@ -352,6 +365,18 @@ export default function CartPage() {
   const dropdownRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
   const [itemNotes, setItemNotes] = useState<{ [itemId: string]: string }>({});
   const [instagramOptIn, setInstagramOptIn] = useState<{ [itemId: string]: boolean }>({});
+  
+  // New state for store credit and discount
+  const [creditToApply, setCreditToApply] = useState(0);
+  const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; amount: number } | null>(null);
+
+  // Query for user credit balance
+  const { data: creditData } = useQuery(GET_USER_CREDIT_BALANCE, {
+    variables: { userId: user?.id || '' },
+    skip: !user?.id,
+  });
+
+  const userCredits = creditData?.getUserCreditBalance?.balance || 0;
 
   // Check user authentication
   useEffect(() => {
@@ -443,6 +468,11 @@ export default function CartPage() {
     setItemNotes(notes);
     setInstagramOptIn(instagram);
   }, [cart, pricingData]);
+
+  // Helper function to get quantity increment
+  const getQuantityIncrement = (currentQuantity: number): number => {
+    return currentQuantity < 750 ? 50 : 250;
+  };
 
   // Handle quantity change
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
@@ -763,7 +793,13 @@ export default function CartPage() {
   // Check if cart contains reorder items and calculate discount
   const hasReorderItems = updatedCart.some(item => item.customization.isReorder);
   const reorderDiscount = hasReorderItems ? subtotal * 0.1 : 0; // 10% discount
-  const finalTotal = subtotal - reorderDiscount;
+  
+  // Calculate discount amount
+  const discountAmount = appliedDiscount ? appliedDiscount.amount : 0;
+  
+  // Calculate final total with all discounts and credits
+  const afterDiscounts = subtotal - reorderDiscount - discountAmount;
+  const finalTotal = Math.max(0, afterDiscounts - creditToApply);
 
   // Calculate rush order breakdown
   const rushOrderBreakdown = updatedCart.reduce((acc, item) => {
@@ -1240,534 +1276,640 @@ export default function CartPage() {
               </div>
             </>
           ) : (
-            <div className="flex flex-col gap-6">
-                             {updatedCart.map((item) => {
-                 const nextTierSavings = calculateNextTierSavings(item, item.quantity, pricingData);
-                 
-                 return (
-                   <div key={item.id} className="container-style p-6">
-                     <div className="flex flex-col md:flex-row gap-6">
-                       {/* Product Image */}
-                       <div className="w-full md:w-1/4">
-                         {item.customization.customFiles?.[0] ? (
-                           <div className="relative aspect-square rounded-xl overflow-hidden border-2 border-white/15 bg-white/5 p-3">
-                             <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-white/10 to-white/5 text-white/50">
-                               {/* Fallback content always present */}
-                               <span className="text-sm font-medium">Preview</span>
-                             </div>
-                             {/* Image with padding so entire image is visible */}
-                             <img
-                               src={item.customization.customFiles[0]}
-                               alt={item.product.name}
-                               className="relative z-10 w-full h-full object-contain transition-opacity duration-300"
-                               onError={(e) => {
-                                 // Hide just the img on error, leaving the fallback visible
-                                 const target = e.target as HTMLImageElement;
-                                 target.style.display = 'none';
-                               }}
-                             />
-                             {/* Reorder Badge */}
-                             {item.customization.isReorder && (
-                               <div className="absolute -top-2 -right-2 bg-amber-500 text-black text-xs px-2 py-1 rounded-full font-bold leading-none">
-                                 RE-ORDER
-                               </div>
-                             )}
-                           </div>
-                         ) : (
-                           <div className="relative aspect-square rounded-xl bg-gradient-to-br from-white/10 to-white/5 border-2 border-white/15 flex items-center justify-center text-white/50">
-                             <div className="text-center">
-                               <div className="text-2xl mb-2">📁</div>
-                               <span className="text-sm font-medium">No image uploaded</span>
-                             </div>
-                             {/* Reorder Badge */}
-                             {item.customization.isReorder && (
-                               <div className="absolute -top-2 -right-2 bg-amber-500 text-black text-xs px-2 py-1 rounded-full font-bold leading-none">
-                                 RE-ORDER
-                               </div>
-                             )}
-                           </div>
-                         )}
-                       </div>
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* Left Column - Products List */}
+              <div className="flex-1 flex flex-col gap-6">
+                {updatedCart.map((item) => {
+                  const nextTierSavings = calculateNextTierSavings(item, item.quantity, pricingData);
+                  
+                  return (
+                    <div key={item.id} className="rounded-xl p-6" style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                      backdropFilter: 'blur(12px)'
+                    }}>
+                      <div className="flex flex-col md:flex-row gap-6">
+                        {/* Product Image */}
+                        <div className="w-full md:w-48 flex-shrink-0">
+                          {item.customization.customFiles?.[0] ? (
+                            <div className="relative aspect-square rounded-xl overflow-hidden bg-gray-800/50 p-4">
+                              <img
+                                src={item.customization.customFiles[0]}
+                                alt={item.product.name}
+                                className="w-full h-full object-contain"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  const fallback = target.parentElement?.querySelector('.fallback-content');
+                                  if (fallback) {
+                                    (fallback as HTMLElement).style.display = 'flex';
+                                  }
+                                }}
+                              />
+                              <div className="fallback-content absolute inset-0 hidden items-center justify-center bg-gray-800/50 text-white/50">
+                                <div className="text-center">
+                                  <div className="text-2xl mb-2">📁</div>
+                                  <span className="text-sm font-medium">Preview</span>
+                                </div>
+                              </div>
+                              {/* Reorder Badge */}
+                              {item.customization.isReorder && (
+                                <div className="absolute -top-2 -right-2 bg-amber-500 text-black text-xs px-2 py-1 rounded-full font-bold leading-none">
+                                  RE-ORDER
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="relative aspect-square rounded-xl bg-gray-800/50 flex items-center justify-center text-white/50">
+                              <div className="text-center">
+                                <div className="text-3xl mb-2">📁</div>
+                                <span className="text-sm font-medium">No image uploaded</span>
+                              </div>
+                              {/* Reorder Badge */}
+                              {item.customization.isReorder && (
+                                <div className="absolute -top-2 -right-2 bg-amber-500 text-black text-xs px-2 py-1 rounded-full font-bold leading-none">
+                                  RE-ORDER
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
 
-                       {/* Product Details */}
-                       <div className="flex-1">
-                         <div className="flex justify-between items-start mb-4">
-                           <div>
-                             <div className="flex items-center gap-3 mb-1">
-                               {item.product.name.toLowerCase().includes('vinyl') && (
-                                 <img 
-                                   src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
-                                   alt="Vinyl Stickers Icon" 
-                                   className="w-8 h-8 object-contain"
-                                 />
-                               )}
-                               <h3 className="text-xl font-bold text-white">{item.product.name}</h3>
-                             </div>
-                           </div>
-                           <div className="flex items-center gap-2">
-                             <button 
-                               onClick={() => toggleWishlist(item.id)}
-                               className={`p-2 rounded-lg transition-colors ${
-                                 wishlistItems.includes(item.id)
-                                   ? 'text-red-400 hover:text-red-300 bg-red-500/20'
-                                   : 'text-gray-400 hover:text-red-400 hover:bg-red-500/20'
-                               }`}
-                               title="Add to wishlist"
-                             >
-                               {wishlistItems.includes(item.id) ? '❤️' : '🤍'}
-                             </button>
-                             <button 
-                               onClick={() => removeFromCart(item.id)} 
-                               className="text-red-400 hover:text-red-300 hover:bg-red-500/20 p-2 rounded-lg transition-colors"
-                             >
-                               🗑️ Remove
-                             </button>
-                           </div>
-                         </div>
+                        {/* Product Details */}
+                        <div className="flex-1">
+                          {/* Header with Product Name and Actions */}
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-3">
+                              {/* Product Icon */}
+                              {item.product.name.toLowerCase().includes('vinyl') && (
+                                <img 
+                                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
+                                  alt="Vinyl Stickers Icon" 
+                                  className="w-8 h-8 object-contain"
+                                />
+                              )}
+                              {item.product.name.toLowerCase().includes('holographic') && (
+                                <img 
+                                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
+                                  alt="Holographic Icon" 
+                                  className="w-8 h-8 object-contain"
+                                />
+                              )}
+                              {item.product.name.toLowerCase().includes('chrome') && (
+                                <img 
+                                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
+                                  alt="Chrome Icon" 
+                                  className="w-8 h-8 object-contain"
+                                />
+                              )}
+                              {item.product.name.toLowerCase().includes('glitter') && (
+                                <img 
+                                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
+                                  alt="Glitter Icon" 
+                                  className="w-8 h-8 object-contain"
+                                />
+                              )}
+                              <h3 className="text-xl font-bold text-white">{item.product.name}</h3>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => toggleWishlist(item.id)}
+                                className={`p-2 rounded-lg transition-colors ${
+                                  wishlistItems.includes(item.id)
+                                    ? 'text-red-400 hover:text-red-300'
+                                    : 'text-gray-400 hover:text-red-400'
+                                }`}
+                                title="Add to wishlist"
+                              >
+                                {wishlistItems.includes(item.id) ? '❤️' : '🤍'}
+                              </button>
+                              <button 
+                                onClick={() => removeFromCart(item.id)} 
+                                className="text-gray-400 hover:text-red-400 p-2 rounded-lg transition-colors"
+                              >
+                                🗑️ Remove
+                              </button>
+                            </div>
+                          </div>
 
-                         {/* Proof Status - Simple Line */}
-                         {(item.customization.selections?.proof?.value === true || item.customization.selections?.proof?.value === false) && (
-                           <div className="mb-4">
-                             <p className="text-white/70 text-sm">
-                               📋 {item.customization.selections?.proof?.value === true 
-                                 ? (
-                                   <>
-                                     Proof requested - expect within 4 hours{" "}
-                                     <button
-                                       onClick={() => handleProofChange(item.id, false)}
-                                       className="text-blue-400 hover:text-blue-300 underline text-sm transition-colors"
-                                     >
-                                       Don't send proof
-                                     </button>
-                                   </>
-                                 )
-                                 : (
-                                   <>
-                                     No proof requested{" "}
-                                     <button
-                                       onClick={() => handleProofChange(item.id, true)}
-                                       className="text-blue-400 hover:text-blue-300 underline text-sm transition-colors"
-                                     >
-                                       Send proof
-                                     </button>
-                                   </>
-                                 )
-                               }
-                             </p>
-                           </div>
-                         )}
+                          {/* Proof Status */}
+                          {(item.customization.selections?.proof?.value === true || item.customization.selections?.proof?.value === false) && (
+                            <div className="mb-6">
+                              <p className="text-gray-400 text-sm">
+                                📋 {item.customization.selections?.proof?.value === true 
+                                  ? (
+                                    <>
+                                      Proof requested - expect within 4 hours{" "}
+                                      <button
+                                        onClick={() => handleProofChange(item.id, false)}
+                                        className="text-blue-400 hover:text-blue-300 underline text-sm transition-colors"
+                                      >
+                                        Don't send proof
+                                      </button>
+                                    </>
+                                  )
+                                  : (
+                                    <>
+                                      No proof requested{" "}
+                                      <button
+                                        onClick={() => handleProofChange(item.id, true)}
+                                        className="text-blue-400 hover:text-blue-300 underline text-sm transition-colors"
+                                      >
+                                        Send proof
+                                      </button>
+                                    </>
+                                  )
+                                }
+                              </p>
+                            </div>
+                          )}
 
-                         {/* Configuration Pills */}
-                         <div className="space-y-4">
-                           <div className="space-y-2">
-                             {/* Show configuration options with swap functionality */}
-                             {Object.entries(item.customization.selections || {})
-                               .filter(([key, sel]) => {
-                                 if (!sel) return false;
-                                 // Skip proof and rush selections here - they'll be handled separately
-                                 if (key === 'proof' || key === 'rush') return false;
-                                 // Skip duplicate size entries - prefer 'size-preset' over 'size'
-                                 if (key === 'size' && item.customization.selections?.['size-preset']) return false;
-                                 return true;
-                               })
-                               .map(([key, sel]) => {
-                               
-                               // Map selection key to option type for dropdowns
-                               const getOptionType = (selectionKey: string) => {
-                                 switch (selectionKey) {
-                                   case 'shape': return 'shape';
-                                   case 'cut': return 'shape'; // Handle cut as shape (from calculators)
-                                   case 'material': return 'material';
-                                   case 'finish': return 'material'; // Handle finish as material
-                                   // Remove size swapping - sizes should not be swappable
-                                   // case 'size-preset': return 'size';
-                                   // case 'size': return 'size'; // Handle both size keys
-                                   default: return null;
-                                 }
-                               };
-                               
-                               const optionType = getOptionType(key);
-                               const canSwap = optionType !== null;
-                               const isDropdownOpen = activeDropdown?.itemId === item.id && activeDropdown?.type === optionType;
-                               
-                               return (
-                                 <div key={key} className="relative">
-                                   <div className="flex items-center gap-2">
-                                     <label className="text-white font-medium text-sm min-w-[70px] flex items-center gap-1">
-                                       <span>{getOptionEmoji(sel.type || '', sel.value)}</span>
-                                       {formatOptionName(sel.type || '')}:
-                                     </label>
-                                     <div className="relative">
-                                       <div className="px-3 py-1.5 rounded-full bg-white/10 border border-white/20 text-sm flex items-center gap-2">
-                                         <span className="text-white">{typeof sel.displayValue === 'string' ? sel.displayValue : 'N/A'}</span>
-                                         {canSwap && (
-                                           <button
-                                             ref={(el) => {
-                                               dropdownRefs.current[`${item.id}-${optionType!}`] = el;
-                                             }}
-                                             onClick={(e) => {
-                                               e.stopPropagation();
-                                               toggleDropdown(item.id, optionType!, e.currentTarget);
-                                             }}
-                                             className="text-white/50 hover:text-white transition-colors"
-                                             title={`Change ${formatOptionName(sel.type || '').toLowerCase()}`}
-                                           >
-                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                                               <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
-                                             </svg>
-                                           </button>
-                                         )}
-                                       </div>
+                          {/* Product Specifications */}
+                          <div className="mb-6">
+                            <h4 className="text-xs font-semibold text-purple-400 uppercase tracking-wider mb-4">Product Specifications</h4>
+                            
+                            <div className="space-y-3">
+                              {/* Show configuration options */}
+                              {Object.entries(item.customization.selections || {})
+                                .filter(([key, sel]) => {
+                                  if (!sel) return false;
+                                  // Skip proof and rush selections here
+                                  if (key === 'proof' || key === 'rush') return false;
+                                  // Skip duplicate size entries
+                                  if (key === 'size' && item.customization.selections?.['size-preset']) return false;
+                                  // For deal items, only allow shape options (no material/finish)
+                                  if (item.customization.isDeal && (key === 'material' || key === 'finish')) return false;
+                                  return true;
+                                })
+                                .map(([key, sel]) => {
+                                
+                                const getOptionType = (selectionKey: string) => {
+                                  switch (selectionKey) {
+                                    case 'shape': return 'shape';
+                                    case 'cut': return 'shape';
+                                    case 'material': return 'material';
+                                    case 'finish': return 'material';
+                                    default: return null;
+                                  }
+                                };
+                                
+                                const optionType = getOptionType(key);
+                                // For deal items, only allow shape swapping
+                                const canSwap = optionType !== null && (!item.customization.isDeal || optionType === 'shape');
+                                const isDropdownOpen = activeDropdown?.itemId === item.id && activeDropdown?.type === optionType;
+                                
+                                return (
+                                  <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-lg">{getOptionEmoji(sel.type || '', sel.value)}</span>
+                                      <span className="text-xs font-medium text-gray-400 uppercase">{formatOptionName(sel.type || '')}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-white font-medium">{typeof sel.displayValue === 'string' ? sel.displayValue : 'N/A'}</span>
+                                      {canSwap && (
+                                        <button
+                                          ref={(el) => {
+                                            dropdownRefs.current[`${item.id}-${optionType!}`] = el;
+                                          }}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleDropdown(item.id, optionType!, e.currentTarget);
+                                          }}
+                                          className="text-gray-400 hover:text-white transition-colors p-1"
+                                          title={`Change ${formatOptionName(sel.type || '').toLowerCase()}`}
+                                        >
+                                          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+                                          </svg>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              
+                              {/* Rush Order */}
+                              {item.customization.selections?.rush?.value === true && (
+                                <div className="flex items-center justify-between p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg">🚀</span>
+                                    <span className="text-xs font-medium text-gray-400 uppercase">Rush Order</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-red-300 font-medium">+40%</span>
+                                    <button
+                                      onClick={() => handleRushOrderToggle(item.id, false)}
+                                      className="text-red-300/60 hover:text-red-300 transition-colors text-sm"
+                                      title="Remove rush order"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
 
-                                     </div>
-                                   </div>
-                                 </div>
-                               );
-                             })}
-                             
-                             {/* Rush Order pill */}
-                             {item.customization.selections?.rush?.value === true && (
-                               <div className="flex items-center gap-2">
-                                 <label className="text-white font-medium text-sm min-w-[70px] flex items-center gap-1">
-                                   <span>🚀</span>
-                                   Rush:
-                                 </label>
-                                 <div className="px-3 py-1.5 rounded-full bg-red-500/20 border border-red-400/30 text-sm flex items-center gap-2">
-                                   <span className="text-red-200 font-medium">+40%</span>
-                                   <button
-                                     onClick={() => handleRushOrderToggle(item.id, false)}
-                                     className="w-4 h-4 rounded-full flex items-center justify-center text-red-200/80 hover:text-red-200 transition-colors text-xs"
-                                     title="Remove rush order"
-                                   >
-                                     ✕
-                                   </button>
-                                 </div>
-                               </div>
-                             )}
-                           </div>
+                          {/* Quantity Section */}
+                          {!item.customization.isDeal && (
+                            <div className="mb-6">
+                              <h4 className="text-xs font-semibold text-green-400 uppercase tracking-wider mb-4">Quantity</h4>
+                              
+                              <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      const increment = getQuantityIncrement(item.quantity);
+                                      const newQty = Math.max(1, item.quantity - increment);
+                                      handleQuantityChange(item.id, newQty);
+                                    }}
+                                    className="w-10 h-10 flex items-center justify-center text-white rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                    style={{
+                                      background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.4) 0%, rgba(14, 165, 233, 0.25) 50%, rgba(14, 165, 233, 0.1) 100%)',
+                                      backdropFilter: 'blur(25px) saturate(180%)',
+                                      border: '1px solid rgba(14, 165, 233, 0.4)',
+                                      boxShadow: 'rgba(14, 165, 233, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                    }}
+                                    disabled={item.quantity <= 1}
+                                    aria-label="Decrease quantity"
+                                  >
+                                    −
+                                  </button>
+                                  <div 
+                                    className="px-4 py-2 rounded-lg min-w-[80px] text-center"
+                                    style={{
+                                      background: 'rgba(255, 255, 255, 0.05)',
+                                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                                      backdropFilter: 'blur(12px)'
+                                    }}
+                                  >
+                                    <input
+                                      id={`quantity-${item.id}`}
+                                      type="number"
+                                      min="1"
+                                      value={item.quantity}
+                                      onChange={(e) => {
+                                        const newQty = parseInt(e.target.value) || 1;
+                                        handleQuantityChange(item.id, newQty);
+                                      }}
+                                      className="w-full text-center bg-transparent text-white text-lg font-semibold no-spinner border-none outline-none"
+                                      aria-label={`Quantity for ${item.product.name}`}
+                                    />
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      const increment = getQuantityIncrement(item.quantity);
+                                      handleQuantityChange(item.id, item.quantity + increment);
+                                    }}
+                                    className="w-10 h-10 flex items-center justify-center text-white rounded-lg transition-all duration-200 transform hover:scale-105"
+                                    style={{
+                                      background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.4) 0%, rgba(14, 165, 233, 0.25) 50%, rgba(14, 165, 233, 0.1) 100%)',
+                                      backdropFilter: 'blur(25px) saturate(180%)',
+                                      border: '1px solid rgba(14, 165, 233, 0.4)',
+                                      boxShadow: 'rgba(14, 165, 233, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                    }}
+                                    aria-label="Increase quantity"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                                
+                                {/* Discount Badge */}
+                                {(() => {
+                                  const pricing = calculateItemPricing(item, item.quantity, pricingData);
+                                  if (pricing.discountPercentage > 0) {
+                                    return (
+                                      <span className="text-green-300 text-sm font-medium">
+                                        {pricing.discountPercentage}% off
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                              </div>
+                            </div>
+                          )}
 
-                           {/* Divider */}
-                           <hr className="border-white/20" />
+                          {/* Quantity Discount Alert - Only for non-deal items */}
+                          {!item.customization.isDeal && nextTierSavings && nextTierSavings.totalSavings > 0 && (
+                            <div 
+                              className="mb-6 px-4 py-3 rounded-lg"
+                              style={{
+                                background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.4) 0%, rgba(14, 165, 233, 0.25) 50%, rgba(14, 165, 233, 0.1) 100%)',
+                                backdropFilter: 'blur(25px) saturate(180%)',
+                                border: '1px solid rgba(14, 165, 233, 0.4)',
+                                boxShadow: 'rgba(14, 165, 233, 0.075) 0px 4px 16px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                              }}
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="text-lg">💡</span>
+                                <span className="text-sky-200 text-sm">
+                                  Add {nextTierSavings.additionalQuantity} more for {nextTierSavings.nextTierDiscount}% off your order - up from {calculateItemPricing(item, item.quantity, pricingData).discountPercentage}%
+                                </span>
+                              </div>
+                            </div>
+                          )}
 
-                           {/* Quantity Control */}
-                           <div className="space-y-2">
-                             {/* Quantity Label - Mobile Only */}
-                             <label htmlFor={`quantity-${item.id}`} className="block sm:hidden text-white font-medium text-sm text-center">Quantity:</label>
-                             
-                             <div className="flex items-center justify-center sm:justify-start gap-2">
-                               {/* Desktop Label */}
-                               <label htmlFor={`quantity-${item.id}`} className="hidden sm:block text-white font-medium text-sm">Quantity:</label>
-                               
-                               <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-6 md:px-4 py-2">
-                                 <button
-                                   onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                                   className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/20 rounded-full transition-colors text-lg"
-                                   disabled={item.quantity <= 1}
-                                   aria-label="Decrease quantity"
-                                 >
-                                   −
-                                 </button>
-                                 <input
-                                   id={`quantity-${item.id}`}
-                                   type="number"
-                                   min="1"
-                                   value={item.quantity}
-                                   onChange={(e) => {
-                                     const newQty = parseInt(e.target.value) || 1;
-                                     handleQuantityChange(item.id, newQty);
-                                   }}
-                                   className="w-20 text-center bg-transparent text-white text-base font-medium no-spinner"
-                                   aria-label={`Quantity for ${item.product.name}`}
-                                 />
-                                 <button
-                                   onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                                   className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/20 rounded-full transition-colors text-lg"
-                                   aria-label="Increase quantity"
-                                 >
-                                   +
-                                 </button>
-                               </div>
-                               
-                               {/* Discount Percentage - Next to Quantity on Desktop */}
-                               {(() => {
-                                 const pricing = calculateItemPricing(item, item.quantity, pricingData);
-                                 if (pricing.discountPercentage > 0) {
-                                   return (
-                                     <span className="hidden sm:inline text-green-300 text-sm font-medium">
-                                       {pricing.discountPercentage}% off
-                                     </span>
-                                   );
-                                 }
-                                 return null;
-                               })()}
-                             </div>
-                             
-                             {/* Discount Percentage - Under Quantity on Mobile */}
-                             {(() => {
-                               const pricing = calculateItemPricing(item, item.quantity, pricingData);
-                               if (pricing.discountPercentage > 0) {
-                                 return (
-                                   <div className="flex justify-center sm:hidden">
-                                     <div className="px-3 py-1.5 rounded-full bg-green-500/20 border border-green-400/30 text-sm">
-                                       <span className="text-green-200 font-medium">
-                                         {pricing.discountPercentage}% off
-                                       </span>
-                                     </div>
-                                   </div>
-                                 );
-                               }
-                               return null;
-                             })()}
-                           </div>
+                          {/* Additional Notes */}
+                          <div>
+                            <h4 className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-3">Additional Notes</h4>
+                            <textarea
+                              value={itemNotes[item.id] || item.customization.notes || ''}
+                              onChange={(e) => handleNotesChange(item.id, e.target.value)}
+                              placeholder="Any special instructions or requests..."
+                              className="w-full px-4 py-3 text-sm rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 resize-none"
+                              rows={3}
+                              style={{
+                                background: 'rgba(255, 255, 255, 0.03)',
+                              }}
+                            />
+                          </div>
 
-                           {/* Quantity Discount Visualizer - Under Quantity Pill */}
-                           {nextTierSavings && nextTierSavings.totalSavings > 0 && (() => {
-                             const currentPricing = calculateItemPricing(item, item.quantity, pricingData);
-                             return (
-                               <div className="px-3 py-2 bg-yellow-400/20 border border-yellow-400/30 rounded-lg text-sm">
-                                 <div className="flex items-center gap-2">
-                                   <span className="text-yellow-300">💰</span>
-                                   <span className="text-yellow-200 font-medium">
-                                     Add {nextTierSavings.additionalQuantity} more for {nextTierSavings.nextTierDiscount}% off your order - up from {currentPricing.discountPercentage}%
-                                   </span>
-                                 </div>
-                               </div>
-                             );
-                           })()}
+                          {/* Instagram Opt-in */}
+                          {(instagramOptIn[item.id] || item.customization.instagramOptIn || item.customization.additionalInfo?.instagramHandle) && (
+                            <div className="mt-4 p-3 bg-pink-500/10 border border-pink-500/20 rounded-lg">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1">
+                                  <p className="text-pink-200 text-sm font-medium mb-1">📸 Instagram Content Permission</p>
+                                  <p className="text-pink-200/80 text-xs mb-2">
+                                    You have opted-in to let us post the making of your stickers as content. We are allowed to tag you at anytime.
+                                  </p>
+                                  {item.customization.additionalInfo?.instagramHandle && (
+                                    <div className="flex items-center gap-2 mt-2">
+                                      <span className="text-pink-300 text-sm font-medium">Instagram Handle:</span>
+                                      <span className="text-pink-200 text-sm">@{item.customization.additionalInfo.instagramHandle}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => handleInstagramOptIn(item.id, false)}
+                                  className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-pink-200/80 hover:text-pink-200 transition-colors text-xs"
+                                  title="Remove Instagram opt-in"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
-                           {/* Divider */}
-                           <hr className="border-white/20" />
+               {/* Right Column - Order Summary & Checkout */}
+               <div className="w-full lg:w-[480px] lg:sticky lg:top-24 lg:self-start">
+                 <div className="rounded-2xl p-6" style={{
+                   background: 'rgba(255, 255, 255, 0.05)',
+                   border: '1px solid rgba(255, 255, 255, 0.1)',
+                   boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                   backdropFilter: 'blur(12px)'
+                 }}>
+                  <h3 className="text-xl font-semibold text-white mb-6">Order Summary</h3>
+                  <div className="space-y-3 mb-6">
+                    <div className="flex justify-between text-gray-300">
+                      <span>Subtotal ({totalQuantity} stickers)</span>
+                      <span>${subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-blue-300">
+                      <span>You're paying</span>
+                      <span>${(subtotal / totalQuantity).toFixed(2)} per sticker</span>
+                    </div>
+                    <div className="flex justify-between text-green-300">
+                      <span>Shipping</span>
+                      <span>FREE</span>
+                    </div>
+                    {rushOrderBreakdown.hasRushItems && (
+                      <div className="flex justify-between text-red-300">
+                        <span>Rush Order (+40%)</span>
+                        <span>+${rushOrderBreakdown.totalRushCost.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {hasReorderItems && (
+                      <div className="flex justify-between text-amber-300">
+                        <span>Reorder Discount (10%)</span>
+                        <span>-${reorderDiscount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {appliedDiscount && (
+                      <div className="flex justify-between text-purple-300">
+                        <span>Discount ({appliedDiscount.code})</span>
+                        <span>-${appliedDiscount.amount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {creditToApply > 0 && (
+                      <div className="flex justify-between text-yellow-300">
+                        <span>Store Credit Applied</span>
+                        <span>-${creditToApply.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <hr className="border-white/20 my-3" />
+                    <div className="flex justify-between text-xl font-bold text-white">
+                      <span>Total</span>
+                      <span>${finalTotal.toFixed(2)}</span>
+                    </div>
+                    
+                    {/* Store Credit Earnings */}
+                    <div className="flex justify-between text-green-400 text-sm font-medium mt-3 pt-3 border-t border-white/10">
+                      <span className="flex items-center gap-2">
+                        <span>💰</span>
+                        Store Credit Earned (5%)
+                      </span>
+                      <span>+${(finalTotal * 0.05).toFixed(2)}</span>
+                    </div>
+                  </div>
 
-                           {/* Additional Notes */}
-                           <div className="space-y-3">
-                             <div>
-                               <label className="text-white font-medium text-sm mb-2 block">📝 Additional Notes:</label>
-                               <textarea
-                                 value={itemNotes[item.id] || item.customization.notes || ''}
-                                 onChange={(e) => handleNotesChange(item.id, e.target.value)}
-                                 placeholder="Any special instructions or requests..."
-                                 className="w-full px-3 py-2 text-sm rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-purple-400 resize-none"
-                                 rows={2}
-                               />
-                             </div>
+                  {/* Store Credit Section */}
+                  {user && userCredits > 0 && (
+                    <div 
+                      className="rounded-2xl overflow-hidden mb-4"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.6) 0%, rgba(255, 215, 0, 0.4) 25%, rgba(250, 204, 21, 0.25) 50%, rgba(255, 193, 7, 0.15) 75%, rgba(250, 204, 21, 0.1) 100%)',
+                        backdropFilter: 'blur(25px) saturate(200%)',
+                        border: '1px solid rgba(255, 215, 0, 0.5)',
+                        boxShadow: 'rgba(250, 204, 21, 0.125) 0px 4px 20px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                      }}
+                    >
+                      <div className="px-6 py-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">🎉</span>
+                            <div>
+                              <h3 className="text-lg font-bold text-white">
+                                ${userCredits.toFixed(2)} Store Credit
+                              </h3>
+                              <p className="text-yellow-300 text-sm">Available to use</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            max={Math.min(userCredits, afterDiscounts)}
+                            value={creditToApply}
+                            onChange={(e) => {
+                              const value = parseFloat(e.target.value) || 0;
+                              setCreditToApply(Math.min(value, userCredits, afterDiscounts));
+                            }}
+                            className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/50 focus:outline-none focus:border-yellow-400 focus:bg-white/10 transition-all store-credit-input"
+                            placeholder="Enter amount"
+                          />
+                          <button
+                            onClick={() => setCreditToApply(Math.min(userCredits, afterDiscounts))}
+                            className="px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.5) 0%, rgba(250, 204, 21, 0.35) 50%, rgba(255, 193, 7, 0.2) 100%)',
+                              backdropFilter: 'blur(25px) saturate(200%)',
+                              border: '1px solid rgba(255, 215, 0, 0.6)',
+                              boxShadow: 'rgba(250, 204, 21, 0.15) 0px 4px 16px, rgba(255, 255, 255, 0.4) 0px 1px 0px inset'
+                            }}
+                          >
+                            Use All
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-                             {/* Instagram Opt-in */}
-                             {(instagramOptIn[item.id] || item.customization.instagramOptIn) && (
-                               <div className="p-3 bg-pink-500/20 border border-pink-400/30 rounded-lg">
-                                 <div className="flex items-start justify-between gap-3">
-                                   <div className="flex-1">
-                                     <p className="text-pink-200 text-sm font-medium mb-1">📸 Instagram Content Permission</p>
-                                     <p className="text-pink-200/80 text-xs">
-                                       You have opted-in to let us post the making of your stickers as content. We are allowed to tag you at anytime.
-                                     </p>
-                                   </div>
-                                   <button
-                                     onClick={() => handleInstagramOptIn(item.id, false)}
-                                     className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-pink-200/80 hover:text-pink-200 transition-colors text-xs"
-                                     title="Remove Instagram opt-in"
-                                   >
-                                     ✕
-                                   </button>
-                                 </div>
-                               </div>
-                             )}
-                           </div>
-                         </div>
-                       </div>
-                     </div>
-                   </div>
-                 );
-               })}
+                  {/* Discount Code Section */}
+                  <div className="mb-6">
+                    <DiscountCodeInput
+                      orderAmount={subtotal - reorderDiscount}
+                      onDiscountApplied={setAppliedDiscount}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Checkout Actions */}
+                  <div className="space-y-4">
+                    {/* Enhanced Checkout Button */}
+                    <button
+                      onClick={() => {
+                        const checkoutButton = document.querySelector('.cart-checkout-button-trigger');
+                        if (checkoutButton) {
+                          (checkoutButton as HTMLButtonElement).click();
+                        }
+                      }}
+                      className="w-full py-4 rounded-xl font-semibold transition-all duration-300 relative overflow-hidden group cursor-pointer hover:scale-105 transform"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(51, 234, 147, 0.4) 0%, rgba(51, 234, 147, 0.25) 50%, rgba(51, 234, 147, 0.1) 100%)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: '1px solid rgba(51, 234, 147, 0.4)',
+                        boxShadow: 'rgba(51, 234, 147, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                      }}
+                    >
+                      <div className="flex flex-col md:flex-row items-center justify-center gap-2 md:gap-3">
+                        <span className="text-3xl md:text-3xl">💳</span>
+                        <div className="text-center md:text-left">
+                          <div className="text-white font-bold text-lg flex items-center justify-center md:justify-start gap-2 mb-1">
+                            Go to Checkout
+                          </div>
+                          {user && (
+                            <div className="text-white/90 text-sm font-normal flex items-center justify-center md:justify-start gap-2">
+                              <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Logged in as {user.email}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Hidden actual checkout button */}
+                    <div className="hidden">
+                      <CartCheckoutButton
+                        cartItems={updatedCart.map(item => ({
+                          ...item,
+                          totalPrice: item.customization.isReorder ? item.totalPrice * 0.9 : item.totalPrice
+                        }))}
+                        className="cart-checkout-button-trigger"
+                        creditsToApply={creditToApply}
+                        discountCode={appliedDiscount?.code}
+                        onCheckoutStart={() => {
+                          console.log('🚀 Starting enhanced cart checkout with user context:', updatedCart.length, 'items');
+                        }}
+                        onCheckoutSuccess={() => {
+                          console.log('✅ Enhanced checkout successful - clearing cart and redirecting to dashboard');
+                          clearCart();
+                          
+                          // Show immediate success feedback
+                          const successMessage = document.createElement('div');
+                          successMessage.innerHTML = `
+                            <div style="position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #10b981, #34d399); color: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 10000; max-width: 300px;">
+                              <div style="font-weight: bold; margin-bottom: 4px;">🎉 Order Complete!</div>
+                              <div style="font-size: 14px; opacity: 0.9;">Redirecting to your dashboard...</div>
+                            </div>
+                          `;
+                          document.body.appendChild(successMessage);
+                          
+                          setTimeout(() => {
+                            document.body.removeChild(successMessage);
+                          }, 5000);
+                        }}
+                        onCheckoutError={(error) => {
+                          console.error('❌ Enhanced checkout error:', error);
+                          
+                          // Show user-friendly error message
+                          const errorMessage = document.createElement('div');
+                          errorMessage.innerHTML = `
+                            <div style="position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #ef4444, #f87171); color: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 10000; max-width: 300px;">
+                              <div style="font-weight: bold; margin-bottom: 4px;">❌ Checkout Error</div>
+                              <div style="font-size: 14px; opacity: 0.9;">${error}</div>
+                            </div>
+                          `;
+                          document.body.appendChild(errorMessage);
+                          
+                          setTimeout(() => {
+                            document.body.removeChild(errorMessage);
+                          }, 7000);
+                        }}
+                      >
+                        Go to Checkout
+                      </CartCheckoutButton>
+                    </div>
 
 
 
-               {/* Two Column Bottom Section */}
-               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                 {/* Left Column: Delivery Only */}
-                 <div className="space-y-6">
-                   {/* Free Shipping Banner - Small */}
-                   <div className="p-3 bg-green-500/20 border border-green-400/30 rounded-lg">
-                     <div className="flex items-center justify-center gap-2 text-sm">
-                       <span className="text-green-300">🚚</span>
-                       <span className="text-green-200 font-medium">
-                         {totalQuantity >= 1000 
-                           ? "FREE Next Day Air Shipping! ⚡" 
-                           : "FREE Standard Shipping!"}
-                       </span>
-                     </div>
-                   </div>
-
-                   {/* Delivery Information */}
-                   <div className="container-style p-4">
-                     <div className="flex items-center gap-2 mb-3">
-                       <span className="text-blue-400">📦</span>
-                       <h4 className="text-base font-medium text-white">Estimated Delivery</h4>
-                     </div>
-                     <div className="space-y-2">
-                       <div className="flex justify-between text-sm">
-                         <span className="text-white/80">Processing</span>
-                         <span className="text-white">
-                           {deliveryInfo.isHighVolume 
-                             ? '3-4 days' 
-                             : `${deliveryInfo.productionDays} day${deliveryInfo.productionDays > 1 ? 's' : ''}`}
-                           {deliveryInfo.isExpedited && ' ⚡'}
-                           {deliveryInfo.isHighVolume && ' 📈'}
-                         </span>
-                       </div>
-                       <div className="flex justify-between text-sm">
-                         <span className="text-white/80">Shipping</span>
-                         <span className="text-white">
-                           {deliveryInfo.shippingDays} day{deliveryInfo.shippingDays > 1 ? 's' : ''}
-                           {deliveryInfo.isExpedited && ' (Next Day Air)'}
-                         </span>
-                       </div>
-                       <hr className="border-white/20" />
-                       <div className="flex justify-between text-sm font-medium">
-                         <span className="text-green-200">Delivery by</span>
-                         <span className="text-green-200">
-                           {deliveryInfo.deliveryDate.toLocaleDateString('en-US', { 
-                             weekday: 'short', 
-                             month: 'short', 
-                             day: 'numeric' 
-                           })}
-                         </span>
-                       </div>
-                       <p className="text-xs text-white/60 mt-2">
-                         * UPS does not deliver on weekends. Weekend delivery dates are automatically moved to the next business day.
-                       </p>
-                     </div>
-                   </div>
-                 </div>
-
-                 {/* Right Column: Order Summary & Checkout */}
-                 <div className="space-y-6">
-                   <div className="container-style p-6">
-                     <h3 className="text-lg font-semibold text-white mb-4">Order Summary</h3>
-                     <div className="space-y-2 mb-6">
-                       {rushOrderBreakdown.hasRushItems ? (
-                         <>
-                           <div className="flex justify-between text-white/80">
-                             <span>Base Subtotal ({totalQuantity} stickers)</span>
-                             <span>${rushOrderBreakdown.baseSubtotal.toFixed(2)}</span>
-                           </div>
-                           <div className="flex justify-between text-red-300">
-                             <span>Rush Order (+40%)</span>
-                             <span>+${rushOrderBreakdown.totalRushCost.toFixed(2)}</span>
-                           </div>
-                           <div className="flex justify-between text-white/80">
-                             <span>Subtotal with Rush</span>
-                             <span>${subtotal.toFixed(2)}</span>
-                           </div>
-                         </>
-                       ) : (
-                         <div className="flex justify-between text-white/80">
-                           <span>Subtotal ({totalQuantity} stickers)</span>
-                           <span>${subtotal.toFixed(2)}</span>
-                         </div>
-                       )}
-                       <div className="flex justify-between text-blue-300">
-                         <span>You're paying</span>
-                         <span>${(subtotal / totalQuantity).toFixed(2)} per sticker</span>
-                       </div>
-                       <div className="flex justify-between text-green-300">
-                         <span>Shipping</span>
-                         <span>FREE {totalQuantity >= 1000 ? '(Next Day Air)' : ''}</span>
-                       </div>
-                       {hasReorderItems && (
-                         <div className="flex justify-between text-amber-300">
-                           <span>Reorder Discount (10%)</span>
-                           <span>-${reorderDiscount.toFixed(2)}</span>
-                         </div>
-                       )}
-                       <hr className="border-white/20" />
-                       <div className="flex justify-between text-lg font-bold text-white">
-                         <span>Total</span>
-                         <span>${finalTotal.toFixed(2)}</span>
-                       </div>
-                     </div>
-
-                     {/* Checkout Actions */}
-                     <div className="space-y-3">
-                       {/* Enhanced Checkout Button - NEW Phase 2 Implementation */}
-                       <CartCheckoutButton
-                         cartItems={updatedCart.map(item => ({
-                           ...item,
-                           totalPrice: item.customization.isReorder ? item.totalPrice * 0.9 : item.totalPrice
-                         }))}
-                         className="w-full px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center gap-2 text-lg checkout-button-yellow"
-                         onCheckoutStart={() => {
-                           console.log('🚀 Starting enhanced cart checkout with user context:', updatedCart.length, 'items');
-                         }}
-                         onCheckoutSuccess={() => {
-                           console.log('✅ Enhanced checkout successful - clearing cart and redirecting to dashboard');
-                           clearCart();
-                           
-                           // Show immediate success feedback
-                           const successMessage = document.createElement('div');
-                           successMessage.innerHTML = `
-                             <div style="position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #10b981, #34d399); color: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 10000; max-width: 300px;">
-                               <div style="font-weight: bold; margin-bottom: 4px;">🎉 Order Complete!</div>
-                               <div style="font-size: 14px; opacity: 0.9;">Redirecting to your dashboard...</div>
-                             </div>
-                           `;
-                           document.body.appendChild(successMessage);
-                           
-                           setTimeout(() => {
-                             document.body.removeChild(successMessage);
-                           }, 5000);
-                         }}
-                         onCheckoutError={(error) => {
-                           console.error('❌ Enhanced checkout error:', error);
-                           
-                           // Show user-friendly error message
-                           const errorMessage = document.createElement('div');
-                           errorMessage.innerHTML = `
-                             <div style="position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #ef4444, #f87171); color: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 10000; max-width: 300px;">
-                               <div style="font-weight: bold; margin-bottom: 4px;">❌ Checkout Error</div>
-                               <div style="font-size: 14px; opacity: 0.9;">${error}</div>
-                             </div>
-                           `;
-                           document.body.appendChild(errorMessage);
-                           
-                           setTimeout(() => {
-                             document.body.removeChild(errorMessage);
-                           }, 7000);
-                         }}
-                       >
-                         Go to Checkout
-                       </CartCheckoutButton>
-                       
-
-                       
-                       <button 
-                         onClick={clearCart} 
-                         className="w-full px-6 md:px-4 py-2 rounded-lg text-white/90 hover:bg-white/20 transition-colors flex items-center justify-center gap-2 backdrop-blur-sm"
-                         style={{
-                           background: 'rgba(255, 255, 255, 0.1)',
-                           border: '1px solid rgba(255, 255, 255, 0.2)'
-                         }}
-                       >
-                         🗑️ Clear Cart
-                       </button>
-                     </div>
-                   </div>
-
-                   {/* Social Proof - Moved Under Order Summary */}
-                   <div className="container-style p-4">
-                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
-                       <div className="flex items-center gap-2">
-                         <span className="text-orange-400">🔥</span>
-                         <span className="text-orange-200">3 customers ordered this in the last hour</span>
-                       </div>
-                       <div className="flex items-center gap-2">
-                         <span className="text-yellow-400">⭐</span>
-                         <span className="text-yellow-200">4.9/5 from 1,200+ reviews</span>
-                       </div>
-                     </div>
-                   </div>
-                 </div>
-               </div>
-              
+                    {/* Delivery Information */}
+                    <div className="space-y-3 pt-4 border-t border-white/10">
+                      <h4 className="text-white font-medium flex items-center gap-2">
+                        <span>📦</span> Estimated Delivery
+                      </h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Processing</span>
+                          <span className="text-white">
+                            {deliveryInfo.isHighVolume ? '3-4' : deliveryInfo.productionDays} days
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Shipping</span>
+                          <span className="text-white">{deliveryInfo.shippingDays} days</span>
+                        </div>
+                        <hr className="border-white/10" />
+                        <div className="flex justify-between font-medium">
+                          <span className="text-gray-300">Delivery by</span>
+                          <span className="text-white">
+                            {deliveryInfo.deliveryDate.toLocaleDateString('en-US', { 
+                              weekday: 'short',
+                              month: 'short', 
+                              day: 'numeric' 
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 pt-2">
+                        * UPS does not deliver on weekends. Weekend delivery dates are automatically moved to the next business day.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -1777,7 +1919,7 @@ export default function CartPage() {
         .container-style {
           background: rgba(255, 255, 255, 0.05);
           border: 1px solid rgba(255, 255, 255, 0.1);
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
           backdrop-filter: blur(12px);
           border-radius: 16px;
         }
@@ -1845,6 +1987,17 @@ export default function CartPage() {
         
         .banner-hover:hover h3 {
           color: rgb(196, 181, 253) !important;
+        }
+
+        /* Store Credit Input Arrow Styling */
+        .store-credit-input::-webkit-outer-spin-button,
+        .store-credit-input::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        
+        .store-credit-input[type=number] {
+          -moz-appearance: textfield;
         }
       `}</style>
 

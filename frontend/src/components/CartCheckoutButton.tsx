@@ -4,29 +4,52 @@ import { getSupabase } from '@/lib/supabase';
 import { useStripeCheckout } from '@/hooks/useStripeCheckout';
 import { useOrderCompletion } from '@/hooks/useOrderCompletion';
 import { useCart } from '@/components/CartContext';
+import { useQuery } from '@apollo/client';
+import { GET_USER_CREDIT_BALANCE } from '@/lib/credit-mutations';
 
 interface CartCheckoutButtonProps {
   cartItems: any[];
   className?: string;
   children?: React.ReactNode;
+  discountCode?: string;
+  discountAmount?: number;
   onCheckoutStart?: () => void;
   onCheckoutError?: (error: string) => void;
   onCheckoutSuccess?: () => void;
+  creditsToApply?: number;
+  onCreditsChange?: (credits: number) => void;
 }
 
 const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
   cartItems,
   className = '',
   children,
+  discountCode,
+  discountAmount,
   onCheckoutStart,
   onCheckoutError,
-  onCheckoutSuccess
+  onCheckoutSuccess,
+  creditsToApply = 0,
+  onCreditsChange
 }) => {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const { processCheckout, loading, error } = useStripeCheckout();
   const { startMonitoring, stopMonitoring, isMonitoring } = useOrderCompletion();
   const { clearCart } = useCart();
+  const [showCreditModal, setShowCreditModal] = useState(false);
+  const [creditAmount, setCreditAmount] = useState(creditsToApply);
+  
+  // Sync local credit amount with prop changes
+  useEffect(() => {
+    setCreditAmount(creditsToApply);
+  }, [creditsToApply]);
+  
+  // Fetch user's credit balance if logged in
+  const { data: creditData } = useQuery(GET_USER_CREDIT_BALANCE, {
+    variables: { userId: user?.id },
+    skip: !user?.id
+  });
 
   // Helper function to capitalize first name
   const capitalizeFirstName = (firstName: string): string => {
@@ -145,7 +168,10 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
         customerInfo,
         shippingAddress,
         null, // billing address
-        'Direct checkout from cart'
+        '', // No automatic order note
+        discountCode,
+        discountAmount,
+        creditsToApply || 0 // Pass credits to apply
       );
 
       if (result.success) {
@@ -177,7 +203,7 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
     background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.4) 0%, rgba(16, 185, 129, 0.25) 50%, rgba(16, 185, 129, 0.1) 100%)',
     backdropFilter: 'blur(25px) saturate(180%)',
     border: '1px solid rgba(16, 185, 129, 0.4)',
-    boxShadow: '0 8px 32px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+    boxShadow: '0 4px 16px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
   };
 
   return (
@@ -209,9 +235,16 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
                 {children || '🚀 Go to Checkout'}
               </h4>
               {user && (
-                <p className="text-xs text-green-200">
-                  Logged in as {capitalizeFirstName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User')}
-                </p>
+                <>
+                  <p className="text-xs text-green-200">
+                    Logged in as {capitalizeFirstName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User')}
+                  </p>
+                  {creditData?.getUserCreditBalance?.balance > 0 && (
+                    <p className="text-xs text-green-300 mt-1">
+                      ${creditData.getUserCreditBalance.balance.toFixed(2)} store credit available
+                    </p>
+                  )}
+                </>
               )}
             </div>
           </div>

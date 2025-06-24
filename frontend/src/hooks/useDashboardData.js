@@ -70,7 +70,7 @@ export const useDashboardData = () => {
               console.error('❌ Network error:', claimError.networkError);
             }
 
-            // No need for Shopify sync anymore - all orders come from Stripe webhooks
+            // All orders come from Stripe webhooks
             console.log('✅ Using Stripe order data - no sync needed');
           }
         }
@@ -187,15 +187,37 @@ export const useDashboardData = () => {
             proof_sent_at: order.proof_sent_at
           });
           
+          // 🚚 TRACKING DEBUG - Let's see what tracking data we have
+          console.log(`🚚 TRACKING DEBUG for order ${order.id}:`, {
+            trackingNumber: order.trackingNumber,
+            trackingCompany: order.trackingCompany,
+            trackingUrl: order.trackingUrl,
+            orderStatus: order.orderStatus,
+            fulfillmentStatus: order.fulfillmentStatus,
+            rawOrderData: {
+              tracking_number: order.tracking_number,
+              tracking_company: order.tracking_company,
+              tracking_url: order.tracking_url
+            }
+          });
+          
           const hasProofs = order.proofs && order.proofs.length > 0;
           const firstProofUrl = hasProofs ? order.proofs[0].proofUrl : null;
           
           // Determine proof status for dashboard
           let proofStatus = 'Building Proof'; // Default status
-          if (order.proof_status === 'awaiting_approval') {
+          if (order.order_status === 'Printing' || order.orderStatus === 'Printing') {
+            proofStatus = 'Printing';
+          } else if (order.proof_status === 'awaiting_approval') {
             proofStatus = 'Proof Review Needed';
           } else if (order.proof_status === 'approved') {
-            proofStatus = 'In Production';
+            proofStatus = 'Printing';
+          } else if (order.proof_status === 'label_printed') {
+            proofStatus = 'Shipped';
+          } else if (order.proof_status === 'shipped') {
+            proofStatus = 'Shipped';
+          } else if (order.proof_status === 'delivered') {
+            proofStatus = 'Delivered';
           } else if (hasProofs && order.proof_sent_at) {
             proofStatus = 'Proof Review Needed';
           } else if (hasProofs) {

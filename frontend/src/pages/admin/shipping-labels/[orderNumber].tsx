@@ -204,7 +204,7 @@ export default function ShippingLabels() {
   };
 
   const handleBuyLabel = async () => {
-    if (!selectedRate || !shipmentData) return;
+    if (!selectedRate || !shipmentData || !order) return;
 
     try {
       setShippingStep('purchasing');
@@ -212,6 +212,7 @@ export default function ShippingLabels() {
         variables: {
           shipmentId: shipmentData.id,
           rateId: selectedRate.id,
+          orderId: order.id,
           insurance: insurance || null
         }
       });
@@ -761,7 +762,7 @@ export default function ShippingLabels() {
                           const isNextDay = service === 'NEXTDAYAIR';
                           
                           // Clean up carrier and service names for display
-                          let displayCarrier = isUPS ? 'UPS' : rate.carrier;
+                          const displayCarrier = isUPS ? 'UPS' : rate.carrier;
                           let displayService = rate.service;
                           if (isUPS) {
                             if (isGround) {

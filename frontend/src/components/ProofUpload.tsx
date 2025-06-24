@@ -102,9 +102,10 @@ interface ProofUploadProps {
   isAdmin?: boolean; // Flag to show admin-only features
   orderItems?: any[]; // Order items to get size information
   hideCutLinesSection?: boolean; // Flag to hide the cut lines section
+  defaultCutLines?: string[]; // Default cut line selection from parent
 }
 
-export default function ProofUpload({ orderId, onProofUploaded, proofStatus, existingProofs = [], isAdmin = false, orderItems = [], hideCutLinesSection = false }: ProofUploadProps) {
+export default function ProofUpload({ orderId, onProofUploaded, proofStatus, existingProofs = [], isAdmin = false, orderItems = [], hideCutLinesSection = false, defaultCutLines = ['green'] }: ProofUploadProps) {
   console.log('🏗️ ProofUpload component mounted with:', {
     orderId,
     proofStatus,
@@ -115,7 +116,7 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
   const [proofFiles, setProofFiles] = useState<ProofFile[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [uploadingProofs, setUploadingProofs] = useState(false);
-  const [selectedCutLines, setSelectedCutLines] = useState<string[]>(['green']); // Default to green selected
+  const [selectedCutLines, setSelectedCutLines] = useState<string[]>(defaultCutLines); // Use default from parent
   const [sendingProofs, setSendingProofs] = useState(false);
   const [proofsSent, setProofsSent] = useState(false);
   const [removingProof, setRemovingProof] = useState<string | null>(null);
@@ -845,7 +846,7 @@ Please try re-uploading or contact support.`);
                                               return (
                           <div className="flex gap-4 mt-4">
                               {/* Admin Notes - Left Side (Much Wider when no PDF analysis) */}
-                              <div className={`${isOrderApproved ? 'w-full' : 'w-2/3'} p-3 rounded-lg`} style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                              <div className={`${(isOrderApproved || !pdfDims) ? 'w-full' : 'w-7/12'} p-3 rounded-lg`} style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
                                 <p className="text-sm text-blue-300 font-medium mb-2">Note from our team:</p>
                                 {isEditing ? (
                                   <div className="space-y-3">
@@ -888,25 +889,49 @@ Please try re-uploading or contact support.`);
                               
                               {/* PDF Analysis - Right Side (Hidden when approved) */}
                               {!isOrderApproved && pdfDims && (
-                                <div className="w-1/3">
+                                <div className="w-5/12">
                                   <div className="mb-2">
                                     <p className="text-sm text-orange-300 font-medium">PDF Analysis:</p>
                                   </div>
-                                  <div className="flex items-center gap-2 flex-nowrap mt-3">
-                                    <span className="px-2.5 py-1 text-xs font-medium bg-orange-500/20 text-orange-300 border border-orange-500/30 rounded-full whitespace-nowrap">
-                                      Official: {pdfDims.width.toFixed(2)}" × {pdfDims.height.toFixed(2)}"
-                                    </span>
-                                    {orderSize && (
-                                      <span className="px-2.5 py-1 text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-full whitespace-nowrap">
-                                        Ordered: {orderSize.display}
+                                  <div className="space-y-2">
+                                    {/* Actual Dimensions from PDF */}
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-gray-400">Actual Dimensions:</span>
+                                      <span className="px-2.5 py-1 text-xs font-medium bg-orange-500/20 text-orange-300 border border-orange-500/30 rounded-full whitespace-nowrap">
+                                        {pdfDims.width.toFixed(2)}" × {pdfDims.height.toFixed(2)}"
                                       </span>
+                                    </div>
+                                    
+                                    {/* Ordered Size */}
+                                    {orderSize && (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-400">Ordered Size:</span>
+                                        <span className="px-2.5 py-1 text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-full whitespace-nowrap">
+                                          {orderSize.display}
+                                        </span>
+                                      </div>
                                     )}
-                                  </div>
-                                  <div className="flex items-center gap-2 mt-2">
-                                    <svg className="w-4 h-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.072 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                                    </svg>
-                                    <span className="text-xs text-yellow-400 whitespace-nowrap">Please confirm sizes before sending proof</span>
+                                    
+                                    {/* Size Match Status */}
+                                    {orderSize && (
+                                      <div className="flex items-center gap-2 mt-2">
+                                        {dimensionsAlign ? (
+                                          <>
+                                            <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            <span className="text-xs text-green-400">Sizes match</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <svg className="w-4 h-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.072 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                            </svg>
+                                            <span className="text-xs text-yellow-400">Size mismatch - verify before sending</span>
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                                                               )}
@@ -1162,7 +1187,7 @@ Please try re-uploading or contact support.`);
                   <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                   </svg>
-                  Send All Proofs
+                  {existingProofs?.some(p => p.replaced) ? 'Re-Send Proofs' : 'Send All Proofs'}
                 </>
               )}
             </button>

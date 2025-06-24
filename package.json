@@ -19,7 +19,9 @@
   },
   "dependencies": {
     "axios": "^1.10.0",
-    "lucide-react": "^0.514.0"
+    "lucide-react": "^0.514.0",
+    "posthog-js": "^1.255.1",
+    "posthog-node": "^5.1.1"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
