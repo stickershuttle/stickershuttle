@@ -118,33 +118,46 @@ router.post('/test-process-session/:sessionId', async (req, res) => {
 
 // Handle successful checkout session
 async function handleCheckoutSessionCompleted(session) {
-  console.log('💰 Checkout session completed:', session.id);
-  console.log('💰 Payment status:', session.payment_status);
+  console.log('💳 Processing checkout session completed:', session.id);
   
-  if (session.payment_status !== 'paid') {
-    console.log('⏭️ Session not paid yet, skipping...');
-    return;
-  }
-
   try {
-    // Get full session details with line items
-    const fullSession = await stripeClient.getCheckoutSession(session.id);
-    
-    // Extract metadata
+    // Get full session details to access metadata and line items
+    const stripe = require('./stripe-client');
+    const fullSession = await stripe.getCheckoutSession(session.id);
     const metadata = fullSession.metadata || {};
-    const cartMetadata = metadata.cartMetadata ? JSON.parse(metadata.cartMetadata) : null;
+    const cartMetadata = fullSession.metadata?.cartData ? JSON.parse(fullSession.metadata.cartData) : {};
     
-    // Get customer information
+    console.log('📋 Full session metadata:', metadata);
+    console.log('🛒 Cart metadata:', cartMetadata);
+    
+    // Get customer info and shipping address
     const customer = fullSession.customer_details || {};
-    const shippingAddress = fullSession.shipping_details?.address || {};
+    const shippingAddress = fullSession.shipping_details?.address || fullSession.customer_details?.address || {};
     
-    // Check if we have an existing order to update
-    const existingOrderId = metadata.customerOrderId;
+    // Look for existing order by Stripe session ID
+    let existingOrderId = null;
     
-    if (existingOrderId && supabaseClient.isReady()) {
-      console.log('📝 Updating existing order:', existingOrderId);
+    if (supabaseClient.isReady()) {
+      const client = supabaseClient.getServiceClient();
       
-      // Update the existing order with payment details
+      const { data: existingOrders, error } = await client
+        .from('orders_main')
+        .select('id')
+        .eq('stripe_session_id', session.id)
+        .limit(1);
+      
+      if (error) {
+        console.error('❌ Error checking for existing orders:', error);
+      } else if (existingOrders && existingOrders.length > 0) {
+        existingOrderId = existingOrders[0].id;
+        console.log('📝 Found existing order:', existingOrderId);
+      }
+    }
+    
+    if (existingOrderId) {
+      // Update existing order with payment info
+      console.log('📝 Updating existing order with payment info...');
+      
       const client = supabaseClient.getServiceClient();
       
       // Check if this is a reorder by looking at line items metadata
@@ -153,32 +166,125 @@ async function handleCheckoutSessionCompleted(session) {
         return itemMetadata.isReorder === 'true';
       }) || false;
       
+      // Determine order status based on proof selections
+      let orderStatus = 'Building Proof'; // Default status
+      let proofStatus = null; // Database proof_status field
+      
+      if (isReorder) {
+        orderStatus = 'Printing';
+        proofStatus = 'approved';
+      } else {
+        // Check proof selections from line items
+        let hasNoProofItems = false;
+        let hasProofItems = false;
+        
+        if (fullSession.line_items?.data) {
+          for (const lineItem of fullSession.line_items.data) {
+            const itemMetadata = lineItem.price.product.metadata || {};
+            
+            // Parse calculator selections to check proof preference
+            let calculatorSelections = {};
+            
+            // First, try to rebuild from simplified metadata fields
+            if (itemMetadata.size || itemMetadata.material || itemMetadata.cut) {
+              if (itemMetadata.size) {
+                calculatorSelections.size = {
+                  type: 'size-preset',
+                  value: itemMetadata.size,
+                  displayValue: itemMetadata.size,
+                  priceImpact: 0
+                };
+              }
+              if (itemMetadata.material) {
+                calculatorSelections.material = {
+                  type: 'finish',
+                  value: itemMetadata.material,
+                  displayValue: itemMetadata.material,
+                  priceImpact: 0
+                };
+              }
+              if (itemMetadata.cut) {
+                calculatorSelections.cut = {
+                  type: 'shape',
+                  value: itemMetadata.cut,
+                  displayValue: itemMetadata.cut,
+                  priceImpact: 0
+                };
+              }
+            }
+            
+            // Parse from orderNote for additional fields including proof selection
+            if (metadata.orderNote) {
+              const orderNoteSelections = parseCalculatorSelectionsFromOrderNote(metadata.orderNote);
+              calculatorSelections = { ...calculatorSelections, ...orderNoteSelections };
+            }
+            
+            // Check proof selection
+            if (calculatorSelections.proof) {
+              if (calculatorSelections.proof.value === false || calculatorSelections.proof.displayValue === 'No Proof') {
+                hasNoProofItems = true;
+              } else {
+                hasProofItems = true;
+              }
+            } else {
+              // Default to requiring proof if not specified
+              hasProofItems = true;
+            }
+          }
+        }
+        
+        // Set status based on proof selections
+        if (hasNoProofItems && !hasProofItems) {
+          // All items don't need proofs - go directly to printing
+          orderStatus = 'Printing';
+          proofStatus = 'approved';
+          console.log('🚀 All items selected "Don\'t Send Proof" - setting order to Printing status');
+        } else if (hasNoProofItems && hasProofItems) {
+          // Mixed - some need proofs, some don't - default to building proof for safety
+          orderStatus = 'Building Proof';
+          proofStatus = null; // Will be set when proofs are sent
+          console.log('📋 Mixed proof preferences - defaulting to Building Proof status');
+        } else {
+          // All items need proofs or default behavior
+          orderStatus = 'Building Proof';
+          proofStatus = null; // Will be set when proofs are sent
+          console.log('📋 Proof requested - setting order to Building Proof status');
+        }
+      }
+      
       // Generate order number (e.g., SS-2024-001234)
       const orderNumber = await generateOrderNumber(client);
       
+      const updateData = {
+        stripe_payment_intent_id: fullSession.payment_intent,
+        stripe_session_id: session.id,
+        order_status: orderStatus,
+        financial_status: 'paid',
+        order_number: orderNumber,
+        subtotal_price: (fullSession.amount_subtotal / 100).toFixed(2),
+        total_tax: ((fullSession.amount_total - fullSession.amount_subtotal) / 100).toFixed(2),
+        total_price: (fullSession.amount_total / 100).toFixed(2),
+        // Update shipping address from Stripe if provided
+        shipping_address: {
+          line1: shippingAddress.line1,
+          line2: shippingAddress.line2,
+          city: shippingAddress.city,
+          state: shippingAddress.state,
+          postal_code: shippingAddress.postal_code,
+          country: shippingAddress.country,
+        },
+        order_updated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      // Add proof_status if determined
+      if (proofStatus) {
+        updateData.proof_status = proofStatus;
+      }
+      
       const { data: updatedOrder, error: updateError } = await client
         .from('orders_main')
-        .update({
-          stripe_payment_intent_id: fullSession.payment_intent,
-          stripe_session_id: session.id,
-          order_status: isReorder ? 'In Production' : 'Creating Proofs',
-          financial_status: 'paid',
-          order_number: orderNumber,
-          subtotal_price: (fullSession.amount_subtotal / 100).toFixed(2),
-          total_tax: ((fullSession.amount_total - fullSession.amount_subtotal) / 100).toFixed(2),
-          total_price: (fullSession.amount_total / 100).toFixed(2),
-          // Update shipping address from Stripe if provided
-          shipping_address: {
-            line1: shippingAddress.line1,
-            line2: shippingAddress.line2,
-            city: shippingAddress.city,
-            state: shippingAddress.state,
-            postal_code: shippingAddress.postal_code,
-            country: shippingAddress.country,
-          },
-          order_updated_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', existingOrderId)
         .select()
         .single();
@@ -247,6 +353,29 @@ async function handleCheckoutSessionCompleted(session) {
         }
       }
       
+      // Award points for purchase (5% cashback)
+      if (metadata.userId && metadata.userId !== 'guest') {
+        try {
+          console.log('💰 Awarding points for purchase...');
+          const creditHandlers = require('./credit-handlers');
+          const orderTotal = parseFloat(fullSession.amount_total / 100); // Convert from cents to dollars
+          
+          const pointsResult = await creditHandlers.earnPointsFromPurchase(
+            metadata.userId,
+            orderTotal,
+            updatedOrder.id
+          );
+          
+          if (pointsResult.success) {
+            console.log('✅ Points awarded successfully:', pointsResult.pointsEarned);
+          } else {
+            console.log('⚠️ Points earning failed:', pointsResult.message);
+          }
+        } catch (pointsError) {
+          console.error('⚠️ Failed to award points (order still processed):', pointsError);
+        }
+      }
+
       // Trigger Discord notification for new order (manual trigger since status wasn't changed)
       try {
         console.log('📱 Triggering Discord notification for new order...');
@@ -329,13 +458,99 @@ async function handleCheckoutSessionCompleted(session) {
       return itemMetadata.isReorder === 'true';
     }) || false;
     
+    // Determine order status based on proof selections
+    let orderStatus = 'Building Proof'; // Default status
+    let proofStatus = null; // Database proof_status field
+    
+    if (isReorder) {
+      orderStatus = 'Printing';
+      proofStatus = 'approved';
+    } else {
+      // Check proof selections from line items
+      let hasNoProofItems = false;
+      let hasProofItems = false;
+      
+      if (fullSession.line_items?.data) {
+        for (const lineItem of fullSession.line_items.data) {
+          const itemMetadata = lineItem.price.product.metadata || {};
+          
+          // Parse calculator selections to check proof preference
+          let calculatorSelections = {};
+          
+          // First, try to rebuild from simplified metadata fields
+          if (itemMetadata.size || itemMetadata.material || itemMetadata.cut) {
+            if (itemMetadata.size) {
+              calculatorSelections.size = {
+                type: 'size-preset',
+                value: itemMetadata.size,
+                displayValue: itemMetadata.size,
+                priceImpact: 0
+              };
+            }
+            if (itemMetadata.material) {
+              calculatorSelections.material = {
+                type: 'finish',
+                value: itemMetadata.material,
+                displayValue: itemMetadata.material,
+                priceImpact: 0
+              };
+            }
+            if (itemMetadata.cut) {
+              calculatorSelections.cut = {
+                type: 'shape',
+                value: itemMetadata.cut,
+                displayValue: itemMetadata.cut,
+                priceImpact: 0
+              };
+            }
+          }
+          
+          // Parse from orderNote for additional fields including proof selection
+          if (metadata.orderNote) {
+            const orderNoteSelections = parseCalculatorSelectionsFromOrderNote(metadata.orderNote);
+            calculatorSelections = { ...calculatorSelections, ...orderNoteSelections };
+          }
+          
+          // Check proof selection
+          if (calculatorSelections.proof) {
+            if (calculatorSelections.proof.value === false || calculatorSelections.proof.displayValue === 'No Proof') {
+              hasNoProofItems = true;
+            } else {
+              hasProofItems = true;
+            }
+          } else {
+            // Default to requiring proof if not specified
+            hasProofItems = true;
+          }
+        }
+      }
+      
+      // Set status based on proof selections
+      if (hasNoProofItems && !hasProofItems) {
+        // All items don't need proofs - go directly to printing
+        orderStatus = 'Printing';
+        proofStatus = 'approved';
+        console.log('🚀 All items selected "Don\'t Send Proof" - setting order to Printing status');
+      } else if (hasNoProofItems && hasProofItems) {
+        // Mixed - some need proofs, some don't - default to building proof for safety
+        orderStatus = 'Building Proof';
+        proofStatus = null; // Will be set when proofs are sent
+        console.log('📋 Mixed proof preferences - defaulting to Building Proof status');
+      } else {
+        // All items need proofs or default behavior
+        orderStatus = 'Building Proof';
+        proofStatus = null; // Will be set when proofs are sent
+        console.log('📋 Proof requested - setting order to Building Proof status');
+      }
+    }
+    
     // Create order data for Supabase
     const orderData = {
       user_id: metadata.userId !== 'guest' ? metadata.userId : null,
       guest_email: metadata.userId === 'guest' ? customer.email : null,
       stripe_payment_intent_id: fullSession.payment_intent,
       stripe_session_id: session.id,
-      order_status: isReorder ? 'In Production' : 'Creating Proofs',
+      order_status: orderStatus,
       financial_status: 'paid',
       fulfillment_status: 'unfulfilled',
       subtotal_price: (fullSession.amount_subtotal / 100).toFixed(2),
@@ -359,6 +574,11 @@ async function handleCheckoutSessionCompleted(session) {
       order_created_at: new Date().toISOString(),
       order_updated_at: new Date().toISOString(),
     };
+    
+    // Add proof_status if determined
+    if (proofStatus) {
+      orderData.proof_status = proofStatus;
+    }
 
     // Save to Supabase
     if (supabaseClient.isReady()) {
@@ -461,6 +681,29 @@ async function handleCheckoutSessionCompleted(session) {
         }
       }
       
+      // Award points for purchase (5% cashback)
+      if (metadata.userId && metadata.userId !== 'guest' && order?.id) {
+        try {
+          console.log('💰 Awarding points for new order purchase...');
+          const creditHandlers = require('./credit-handlers');
+          const orderTotal = parseFloat(fullSession.amount_total / 100); // Convert from cents to dollars
+          
+          const pointsResult = await creditHandlers.earnPointsFromPurchase(
+            metadata.userId,
+            orderTotal,
+            order.id
+          );
+          
+          if (pointsResult.success) {
+            console.log('✅ Points awarded successfully for new order:', pointsResult.pointsEarned);
+          } else {
+            console.log('⚠️ Points earning failed for new order:', pointsResult.message);
+          }
+        } catch (pointsError) {
+          console.error('⚠️ Failed to award points for new order (order still processed):', pointsError);
+        }
+      }
+
       // Trigger Discord notification for new order (manual trigger since status wasn't changed)
       if (order?.id) {
         try {
@@ -670,13 +913,33 @@ function parseCalculatorSelectionsFromOrderNote(orderNote) {
     };
   }
   
-  // Default proof option (not usually in orderNote unless "No Proof")
-  selections.proof = {
-    type: 'finish',
-    value: true,
-    displayValue: 'Send Proof',
-    priceImpact: 0
-  };
+  // Parse proof option (📋 Proof: or ❌ No Proof)
+  const proofMatch = orderNote.match(/📋 Proof: (.+?)(?:\n|$)/);
+  const noProofMatch = orderNote.match(/❌ No Proof/);
+  
+  if (noProofMatch) {
+    selections.proof = {
+      type: 'finish',
+      value: false,
+      displayValue: 'No Proof',
+      priceImpact: 0
+    };
+  } else if (proofMatch) {
+    selections.proof = {
+      type: 'finish',
+      value: true,
+      displayValue: proofMatch[1].trim(),
+      priceImpact: 0
+    };
+  } else {
+    // Default proof option (not usually in orderNote unless "No Proof")
+    selections.proof = {
+      type: 'finish',
+      value: true,
+      displayValue: 'Send Proof',
+      priceImpact: 0
+    };
+  }
   
   return selections;
 }
