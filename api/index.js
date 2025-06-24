@@ -2875,62 +2875,96 @@ const resolvers = {
 
         if (supabaseClient.isReady()) {
           try {
-            console.log('🔍 Creating customer order in Supabase...');
-            
-            // Create order in Supabase with proper credits tracking
-            const orderData = {
-              userId: input.userId,
-              orderStatus: 'Payment Pending',
-              financialStatus: 'pending',
-              totalPrice: cartSubtotal - discountAmount - actualCreditsApplied,
-              subtotalPrice: cartSubtotal,
-              discountAmount: discountAmount,
-              creditsApplied: actualCreditsApplied,
-              customerInfo: input.customerInfo,
-              shippingAddress: input.shippingAddress,
-              cartItems: input.cartItems,
-              orderNote: input.orderNote || '',
-              discountCodes: input.discountCode ? [input.discountCode] : []
+            const customerOrderData = {
+              user_id: input.userId || null,
+              guest_email: input.guestEmail || input.customerInfo.email,
+              order_status: 'Awaiting Payment',
+              fulfillment_status: 'unfulfilled',
+              financial_status: 'pending',
+              subtotal_price: cartSubtotal,
+              total_tax: 0, // Will be updated after Stripe checkout
+              total_price: cartSubtotal - discountAmount - actualCreditsApplied,
+              discount_code: input.discountCode || null,
+              discount_amount: discountAmount || 0,
+              credits_applied: actualCreditsApplied, // Set the actual credits that will be applied
+              currency: 'USD',
+              customer_first_name: input.customerInfo.firstName,
+              customer_last_name: input.customerInfo.lastName,
+              customer_email: input.customerInfo.email,
+              customer_phone: input.customerInfo.phone,
+              shipping_address: input.shippingAddress,
+              billing_address: input.billingAddress || input.shippingAddress,
+              order_tags: generateOrderTags(input.cartItems).split(','),
+              order_note: input.orderNote,
+              order_created_at: new Date().toISOString(),
+              order_updated_at: new Date().toISOString()
             };
 
-            customerOrder = await supabaseClient.createCustomerOrder(orderData);
+            console.log('📝 Order data prepared:', JSON.stringify(customerOrderData, null, 2));
+            console.log('🚀 Calling supabaseClient.createCustomerOrder...');
+            
+            customerOrder = await supabaseClient.createCustomerOrder(customerOrderData);
             console.log('✅ Customer order created:', customerOrder?.id);
+            console.log('📊 Full order response:', JSON.stringify(customerOrder, null, 2));
 
-            // CRITICAL FIX: Actually deduct credits NOW, not in webhook
-            if (actualCreditsApplied > 0 && input.userId && customerOrder?.id) {
-              try {
-                console.log('💳 DEDUCTING credits immediately:', actualCreditsApplied);
-                console.log('💳 Order ID:', customerOrder.id);
-                console.log('💳 User ID:', input.userId);
-                
-                const creditResult = await creditHandlers.applyCreditsToOrder(
-                  customerOrder.id,
-                  actualCreditsApplied,
-                  input.userId
-                );
-                
-                if (creditResult.success) {
-                  console.log('✅ Credits deducted successfully, remaining balance:', creditResult.remainingBalance);
-                  remainingCredits = creditResult.remainingBalance;
-                } else {
-                  console.error('⚠️ Failed to deduct credits immediately:', creditResult.error);
-                  // If credit deduction fails, we should not proceed with checkout
-                  errors.push(`Credit deduction failed: ${creditResult.error}`);
+            // Create order items
+            if (customerOrder) {
+              const orderItems = input.cartItems.map(item => ({
+                order_id: customerOrder.id,
+                product_id: item.productId,
+                product_name: item.productName,
+                product_category: item.productCategory,
+                sku: item.sku,
+                quantity: item.quantity,
+                unit_price: item.unitPrice,
+                total_price: item.totalPrice,
+                calculator_selections: item.calculatorSelections,
+                custom_files: item.customFiles || [],
+                customer_notes: item.customerNotes,
+                instagram_handle: item.instagramHandle,
+                instagram_opt_in: item.instagramOptIn || false,
+                fulfillment_status: 'unfulfilled'
+              }));
+
+              await supabaseClient.createOrderItems(orderItems);
+              console.log('✅ Order items created');
+
+              // CRITICAL FIX: Actually deduct credits NOW, not in webhook
+              if (actualCreditsApplied > 0 && input.userId) {
+                try {
+                  console.log('💳 DEDUCTING credits immediately:', actualCreditsApplied);
+                  console.log('💳 Order ID:', customerOrder.id);
+                  console.log('💳 User ID:', input.userId);
+                  
+                  const creditResult = await creditHandlers.applyCreditsToOrder(
+                    customerOrder.id,
+                    actualCreditsApplied,
+                    input.userId
+                  );
+                  
+                  if (creditResult.success) {
+                    console.log('✅ Credits deducted successfully, remaining balance:', creditResult.remainingBalance);
+                    remainingCredits = creditResult.remainingBalance;
+                  } else {
+                    console.error('⚠️ Failed to deduct credits immediately:', creditResult.error);
+                    // If credit deduction fails, we should not proceed with checkout
+                    errors.push(`Credit deduction failed: ${creditResult.error}`);
+                    actualCreditsApplied = 0; // Reset credits applied
+                  }
+                } catch (creditError) {
+                  console.error('⚠️ Critical error deducting credits:', creditError);
+                  errors.push(`Credit system error: ${creditError.message}`);
                   actualCreditsApplied = 0; // Reset credits applied
                 }
-              } catch (creditError) {
-                console.error('⚠️ Critical error deducting credits:', creditError);
-                errors.push(`Credit system error: ${creditError.message}`);
-                actualCreditsApplied = 0; // Reset credits applied
               }
             }
           } catch (supabaseError) {
             console.error('❌ Supabase order creation failed:', supabaseError);
-            errors.push(`Order creation failed: ${supabaseError.message}`);
+            errors.push(`Order tracking setup failed: ${supabaseError.message}`);
           }
         } else {
           console.error('❌ Supabase client is not ready');
-          errors.push('Database service is not available');
+          errors.push('Order tracking service is not available');
         }
 
         // Step 3: Create Stripe checkout session
