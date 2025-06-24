@@ -26,6 +26,17 @@ export default function Document() {
         <meta name="description" content="Custom stickers, labels, and decals - High quality printing with fast shipping" />
         <meta name="keywords" content="stickers, custom stickers, labels, decals, printing" />
         <meta name="author" content="Sticker Shuttle" />
+        
+        {/* Mobile Web App Meta Tags */}
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+        <meta name="theme-color" content="#030140" id="theme-color-meta" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Sticker Shuttle" />
+        
+        {/* Safari specific meta tags for color matching */}
+        <meta name="msapplication-navbutton-color" content="#030140" />
+        <meta name="apple-touch-fullscreen" content="yes" />
       </Head>
       <body>
         <Main />

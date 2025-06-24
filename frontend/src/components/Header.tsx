@@ -16,6 +16,20 @@ export default function Header() {
     checkUser();
   }, []);
 
+  // Update theme color and body class when mobile menu opens/closes
+  useEffect(() => {
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeColorMeta) {
+      if (isMobileMenuOpen) {
+        themeColorMeta.setAttribute('content', '#030140');
+        document.body.classList.add('mobile-menu-open');
+      } else {
+        themeColorMeta.setAttribute('content', '#030140');
+        document.body.classList.remove('mobile-menu-open');
+      }
+    }
+  }, [isMobileMenuOpen]);
+
   // Animate the dots for "blast off" message on products page
   useEffect(() => {
     if (router.pathname === '/products') {

@@ -133,6 +133,19 @@ h1 {
   }
 }
 
+/* Mobile Safari status bar styling */
+@supports (-webkit-touch-callout: none) {
+  /* iOS Safari */
+  body {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  /* When mobile menu is open, ensure consistent theming */
+  .mobile-menu-open {
+    background-color: #030140 !important;
+  }
+}
+
 /* Flip animation for gold tier message */
 @keyframes flip-in {
   0% {
