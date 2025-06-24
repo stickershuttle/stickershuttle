@@ -39,6 +39,8 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
   const { clearCart } = useCart();
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [creditAmount, setCreditAmount] = useState(creditsToApply);
+  const [showGuestEmailModal, setShowGuestEmailModal] = useState(false);
+  const [guestEmail, setGuestEmail] = useState('');
   
   // Sync local credit amount with prop changes
   useEffect(() => {
@@ -122,17 +124,31 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
     };
   }, [clearCart]);
 
+  const handleGuestEmailSubmit = () => {
+    if (guestEmail && guestEmail.includes('@')) {
+      setShowGuestEmailModal(false);
+      // Now proceed with checkout
+      handleDirectCheckout();
+    }
+  };
+
   const handleDirectCheckout = async () => {
     onCheckoutStart?.();
 
     try {
+      // Check if user is logged in or we have guest email
+      if (!user && !guestEmail) {
+        setShowGuestEmailModal(true);
+        return;
+      }
+
       // Check if Stripe is configured
       if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
         throw new Error('Stripe is not configured. Please set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY in your environment variables.');
       }
       
       console.log('🚀 Phase 2: Direct enhanced checkout...');
-      console.log('👤 User context:', user ? `Logged in as ${capitalizeFirstName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User')}` : 'Guest user');
+      console.log('👤 User context:', user ? `Logged in as ${capitalizeFirstName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User')}` : `Guest user: ${guestEmail}`);
       
       // Set flag to detect return from Stripe
       sessionStorage.setItem('stripe_checkout_initiated', 'true');
@@ -141,7 +157,7 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
       const customerInfo = {
         firstName: user?.user_metadata?.first_name || '',
         lastName: user?.user_metadata?.last_name || '',
-        email: user?.email || '',
+        email: user?.email || guestEmail || '',
         phone: user?.user_metadata?.phone || ''
       };
 
@@ -160,7 +176,7 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
 
       // Start monitoring for order completion before checkout
       if (user) {
-        await startMonitoring();
+        startMonitoring();
       }
 
       const result = await processCheckout(
@@ -207,12 +223,71 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
   };
 
   return (
-    <button
-      onClick={handleDirectCheckout}
-      disabled={loading || cartItems.length === 0}
-      className={className || dashboardTabButtonClass}
-      style={activeTabStyle}
-    >
+    <>
+      {/* Guest Email Modal */}
+      {showGuestEmailModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div 
+            className="rounded-2xl p-6 max-w-md w-full mx-4"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+              backdropFilter: 'blur(12px)'
+            }}
+          >
+            <h3 className="text-xl font-semibold text-white mb-4">Enter Your Email</h3>
+            <p className="text-gray-300 mb-6">We need your email address to process your order and send you updates.</p>
+            
+            <input
+              type="email"
+              value={guestEmail}
+              onChange={(e) => setGuestEmail(e.target.value)}
+              placeholder="your.email@example.com"
+              className="w-full px-4 py-3 rounded-lg text-white mb-4"
+              style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                backdropFilter: 'blur(10px)'
+              }}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleGuestEmailSubmit();
+                }
+              }}
+            />
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowGuestEmailModal(false)}
+                className="flex-1 px-4 py-2 rounded-lg text-white border border-gray-500 hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleGuestEmailSubmit}
+                disabled={!guestEmail || !guestEmail.includes('@')}
+                className="flex-1 px-4 py-2 rounded-lg text-white font-semibold transition-all disabled:opacity-50"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(180%)',
+                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                  boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                }}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <button
+        onClick={handleDirectCheckout}
+        disabled={loading || cartItems.length === 0}
+        className={className || dashboardTabButtonClass}
+        style={activeTabStyle}
+      >
       {loading ? (
         <div className="flex items-center justify-center space-x-2">
           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
@@ -251,6 +326,7 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
         </div>
       )}
     </button>
+    </>
   );
 };
 
