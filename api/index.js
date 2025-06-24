@@ -3,9 +3,12 @@ require('dotenv').config({ path: './.env.local' });
 require('dotenv').config({ path: './.env' });
 require('dotenv').config();
 
-const { ApolloServer, gql, AuthenticationError } = require('apollo-server-express');
+const { ApolloServer, gql } = require('@apollo/server');
+const { expressMiddleware } = require('@apollo/server/express4');
 const express = require('express');
 const cors = require('cors');
+const { json } = require('body-parser');
+const { GraphQLError } = require('graphql');
 const uploadRoutes = require('./upload-routes');
 const supabaseClient = require('./supabase-client');
 const stripeClient = require('./stripe-client');
@@ -1429,8 +1432,12 @@ const resolvers = {
           }
 
           const customer = customerMap.get(email);
-          customer.totalOrders += 1;
-          customer.totalSpent += Number(order.total_price) || 0;
+          
+          // Only include paid orders in customer statistics
+          if (order.financial_status === 'paid') {
+            customer.totalOrders += 1;
+            customer.totalSpent += Number(order.total_price) || 0;
+          }
           
           // Check marketing opt-in from any order item
           if (order.order_items_new) {
@@ -1511,10 +1518,10 @@ const resolvers = {
             startDate.setDate(now.getDate() - 30);
         }
 
-        // Filter orders by date range
+        // Filter orders by date range and paid status only
         const filteredOrders = orders.filter(order => {
           const orderDate = new Date(order.order_created_at || order.created_at);
-          return orderDate >= startDate;
+          return orderDate >= startDate && order.financial_status === 'paid';
         });
 
         // Calculate daily sales data
@@ -1634,7 +1641,7 @@ const resolvers = {
 
         const previousPeriodOrders = orders.filter(order => {
           const orderDate = new Date(order.order_created_at || order.created_at);
-          return orderDate >= previousPeriodStart && orderDate < startDate;
+          return orderDate >= previousPeriodStart && orderDate < startDate && order.financial_status === 'paid';
         });
 
         const previousRevenue = previousPeriodOrders.reduce((sum, order) => sum + (order.total_price || 0), 0);
@@ -4184,42 +4191,50 @@ function formatOptionName(name) {
 // 3. Server setup
 const server = new ApolloServer({ 
   typeDefs, 
-  resolvers,
-  context: async ({ req }) => {
-    // Extract auth token from header
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    
-    let user = null;
-    if (token && supabaseClient.isReady()) {
-      try {
-        const client = supabaseClient.getServiceClient();
-        // Verify the JWT token with Supabase
-        const { data: { user: authUser }, error } = await client.auth.getUser(token);
-        
-        if (!error && authUser) {
-          user = authUser;
-          console.log('✅ Authenticated user:', authUser.email);
-        } else {
-          console.log('⚠️ Invalid auth token');
-        }
-      } catch (error) {
-        console.error('Auth verification error:', error);
-      }
-    }
-    
-    return {
-      supabase: supabaseClient,
-      stripe: stripeClient,
-      user
-    };
-  }
+  resolvers
 });
 
 // 4. Start server with Express + Apollo
 async function startServer() {
   try {
     await server.start();
-    server.applyMiddleware({ app, path: '/graphql' }); // GraphQL at /graphql
+
+    // Apply Apollo middleware with context function
+    app.use(
+      '/graphql',
+      cors(),
+      json(),
+      expressMiddleware(server, {
+        context: async ({ req }) => {
+          // Extract auth token from header
+          const token = req.headers.authorization?.replace('Bearer ', '');
+          
+          let user = null;
+          if (token && supabaseClient.isReady()) {
+            try {
+              const client = supabaseClient.getServiceClient();
+              // Verify the JWT token with Supabase
+              const { data: { user: authUser }, error } = await client.auth.getUser(token);
+              
+              if (!error && authUser) {
+                user = authUser;
+                console.log('✅ Authenticated user:', authUser.email);
+              } else {
+                console.log('⚠️ Invalid auth token');
+              }
+            } catch (error) {
+              console.error('Auth verification error:', error);
+            }
+          }
+          
+          return {
+            supabase: supabaseClient,
+            stripe: stripeClient,
+            user
+          };
+        },
+      })
+    );
 
     const PORT = process.env.PORT || 4000;
     
