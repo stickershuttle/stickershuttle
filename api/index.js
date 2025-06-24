@@ -3,8 +3,9 @@ require('dotenv').config({ path: './.env.local' });
 require('dotenv').config({ path: './.env' });
 require('dotenv').config();
 
-const { ApolloServer, gql } = require('@apollo/server');
+const { ApolloServer } = require('@apollo/server');
 const { expressMiddleware } = require('@apollo/server/express4');
+const gql = require('graphql-tag');
 const express = require('express');
 const cors = require('cors');
 const { json } = require('body-parser');
