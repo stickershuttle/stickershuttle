@@ -67,20 +67,18 @@ router.post('/stripe', async (req, res) => {
   }
 });
 
-// Test endpoint for Discord notifications
+// Test endpoint for Discord notifications (disabled)
 router.post('/test-discord-notification/:orderId', async (req, res) => {
   try {
-    console.log('🧪 Test endpoint: Testing Discord notification for order', req.params.orderId);
-    
-    const result = await notificationHelpers.triggerOrderStatusNotification(req.params.orderId, 'Awaiting Payment');
+    console.log('🧪 Test endpoint: Discord notifications disabled');
     
     res.json({ 
-      success: result.success, 
-      message: result.message || 'Notification test completed',
+      success: true, 
+      message: 'Discord notifications are currently disabled',
       orderId: req.params.orderId
     });
   } catch (error) {
-    console.error('Test Discord notification error:', error);
+    console.error('Test endpoint error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -151,9 +149,10 @@ async function handleCheckoutSessionCompleted(session) {
     if (supabaseClient.isReady()) {
       const client = supabaseClient.getServiceClient();
       
+      console.log('🔍 Searching for existing order with session ID:', session.id);
       const { data: existingOrders, error } = await client
         .from('orders_main')
-        .select('id')
+        .select('id, order_status, user_id, guest_email, created_at')
         .eq('stripe_session_id', session.id)
         .limit(1);
       
@@ -161,10 +160,121 @@ async function handleCheckoutSessionCompleted(session) {
         console.error('❌ Error checking for existing orders:', error);
       } else if (existingOrders && existingOrders.length > 0) {
         existingOrderId = existingOrders[0].id;
-        console.log('📝 Found existing order:', existingOrderId);
+        console.log('📝 Found existing order:', {
+          orderId: existingOrderId,
+          currentStatus: existingOrders[0].order_status,
+          userId: existingOrders[0].user_id,
+          guestEmail: existingOrders[0].guest_email,
+          createdAt: existingOrders[0].created_at
+        });
+      } else {
+        console.log('⚠️ No existing order found with session ID:', session.id);
+        console.log('🔍 This might indicate a session ID update failed during checkout');
+        
+        // Let's also check for orders without session IDs that might match this user/email
+        if (metadata.userId && metadata.userId !== 'guest') {
+          const { data: userOrders } = await client
+            .from('orders_main')
+            .select('id, order_status, stripe_session_id, created_at')
+            .eq('user_id', metadata.userId)
+            .eq('order_status', 'Awaiting Payment')
+            .order('created_at', { ascending: false })
+            .limit(5);
+          
+          console.log('🔍 Recent "Awaiting Payment" orders for user:', userOrders);
+        } else if (customer.email) {
+          const { data: guestOrders } = await client
+            .from('orders_main')
+            .select('id, order_status, stripe_session_id, created_at')
+            .eq('guest_email', customer.email)
+            .eq('order_status', 'Awaiting Payment')
+            .order('created_at', { ascending: false })
+            .limit(5);
+          
+          console.log('🔍 Recent "Awaiting Payment" orders for guest email:', guestOrders);
+        }
       }
     }
     
+    // If no existing order found by session ID, try to find a stuck "Awaiting Payment" order
+    if (!existingOrderId) {
+      console.log('🔄 Attempting to recover stuck "Awaiting Payment" order...');
+      
+      const client = supabaseClient.getServiceClient();
+      let recoveredOrder = null;
+      
+      // Try to find a recent "Awaiting Payment" order for this user/email
+      if (metadata.userId && metadata.userId !== 'guest') {
+        const { data: userOrders } = await client
+          .from('orders_main')
+          .select('id, created_at, total_price, customer_email')
+          .eq('user_id', metadata.userId)
+          .eq('order_status', 'Awaiting Payment')
+          .is('stripe_session_id', null) // No session ID assigned yet
+          .order('created_at', { ascending: false })
+          .limit(1);
+        
+        if (userOrders && userOrders.length > 0) {
+          const order = userOrders[0];
+          const orderAge = Date.now() - new Date(order.created_at).getTime();
+          const orderTotal = parseFloat(order.total_price);
+          const sessionTotal = fullSession.amount_total / 100;
+          
+          // Only recover if order is recent (less than 1 hour old) and total matches
+          if (orderAge < 3600000 && Math.abs(orderTotal - sessionTotal) < 0.01) {
+            console.log('✅ Found matching stuck order for user:', {
+              orderId: order.id,
+              orderTotal,
+              sessionTotal,
+              ageMinutes: Math.round(orderAge / 60000)
+            });
+            recoveredOrder = order;
+          }
+        }
+      } else if (customer.email) {
+        const { data: guestOrders } = await client
+          .from('orders_main')
+          .select('id, created_at, total_price, customer_email')
+          .eq('guest_email', customer.email)
+          .eq('order_status', 'Awaiting Payment')
+          .is('stripe_session_id', null) // No session ID assigned yet
+          .order('created_at', { ascending: false })
+          .limit(1);
+        
+        if (guestOrders && guestOrders.length > 0) {
+          const order = guestOrders[0];
+          const orderAge = Date.now() - new Date(order.created_at).getTime();
+          const orderTotal = parseFloat(order.total_price);
+          const sessionTotal = fullSession.amount_total / 100;
+          
+          // Only recover if order is recent (less than 1 hour old) and total matches
+          if (orderAge < 3600000 && Math.abs(orderTotal - sessionTotal) < 0.01) {
+            console.log('✅ Found matching stuck order for guest:', {
+              orderId: order.id,
+              orderTotal,
+              sessionTotal,
+              ageMinutes: Math.round(orderAge / 60000)
+            });
+            recoveredOrder = order;
+          }
+        }
+      }
+      
+      if (recoveredOrder) {
+        existingOrderId = recoveredOrder.id;
+        console.log('🔄 Recovered stuck order - updating with session ID:', session.id);
+        
+        // Update the recovered order with the session ID before proceeding
+        await client
+          .from('orders_main')
+          .update({ 
+            stripe_session_id: session.id,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingOrderId);
+      }
+    }
+
     if (existingOrderId) {
       // Update existing order with payment info
       console.log('📝 Updating existing order with payment info...');
@@ -306,6 +416,12 @@ async function handleCheckoutSessionCompleted(session) {
       }
       
       console.log('✅ Order updated successfully:', updatedOrder?.id);
+      console.log('🔍 Order status after update:', {
+        orderId: updatedOrder?.id,
+        orderStatus: updatedOrder?.order_status,
+        financialStatus: updatedOrder?.financial_status,
+        orderNumber: updatedOrder?.order_number
+      });
       
       // Credits are now deducted at checkout time, not in webhook
       // Just ensure the order is updated with credits_applied field
@@ -387,13 +503,8 @@ async function handleCheckoutSessionCompleted(session) {
         }
       }
 
-      // Trigger Discord notification for new order (manual trigger since status wasn't changed)
-      try {
-        console.log('📱 Triggering Discord notification for new order...');
-        await notificationHelpers.triggerOrderStatusNotification(updatedOrder.id, 'Awaiting Payment');
-      } catch (notificationError) {
-        console.error('⚠️ Failed to send Discord notification (order still processed):', notificationError);
-      }
+      // All notifications disabled to fix webhook errors
+      console.log('✅ Order processed successfully - notifications disabled');
       
       // Update line items with Stripe line item IDs if needed
       if (fullSession.line_items?.data) {
@@ -715,14 +826,9 @@ async function handleCheckoutSessionCompleted(session) {
         }
       }
 
-      // Trigger Discord notification for new order (manual trigger since status wasn't changed)
+      // Discord notifications temporarily disabled for new orders
       if (order?.id) {
-        try {
-          console.log('📱 Triggering Discord notification for new order...');
-          await notificationHelpers.triggerOrderStatusNotification(order.id, 'Awaiting Payment');
-        } catch (notificationError) {
-          console.error('⚠️ Failed to send Discord notification (order still processed):', notificationError);
-        }
+        console.log('📱 Discord notifications disabled - new order created successfully');
       }
     }
     

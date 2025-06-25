@@ -309,7 +309,7 @@ export default function AdminCustomers() {
       <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#030140' }}>
         {/* Main Content */}
         <div className="pt-8 pb-8">
-          <div className="w-full max-w-full px-4 md:px-6">
+          <div className="w-full px-8">
             {/* Analytics Cards - Hidden on mobile, shown on desktop */}
             <div className="hidden xl:grid grid-cols-4 gap-4 mb-6">
               <div className="rounded-2xl p-6 transition-all duration-200 hover:scale-[1.02] glass-container">
@@ -378,7 +378,7 @@ export default function AdminCustomers() {
             </div>
 
             {/* Mobile Analytics Cards - Compact 2 column layout */}
-            <div className="xl:hidden grid grid-cols-2 gap-3 mb-4 px-4">
+            <div className="xl:hidden grid grid-cols-2 gap-3 mb-4">
               <div className="glass-container p-4">
                 <div className="text-xs text-gray-400 mb-1">Total Customers</div>
                 <div className="text-lg font-bold text-white">{totalStats.customers}</div>
@@ -418,7 +418,7 @@ export default function AdminCustomers() {
             </div>
 
             {/* Mobile/Tablet Filters */}
-            <div className="xl:hidden mb-4 px-4">
+            <div className="xl:hidden mb-4">
               {/* Filter pills */}
               <div className="flex gap-2 overflow-x-auto pb-2 filter-pills-container">
                 <button 

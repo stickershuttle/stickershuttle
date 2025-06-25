@@ -1,20 +1,23 @@
--- Migration: Google OAuth Profile Sync
--- Automatically syncs Google OAuth user data to user_profiles table
+-- Migration: Universal User Profile Sync
+-- Automatically creates user profiles for ALL users (OAuth and email/password signups)
 
--- Function to handle user profile creation/update from OAuth data
-CREATE OR REPLACE FUNCTION handle_google_oauth_user_profile()
+-- Function to handle user profile creation for all signup types
+CREATE OR REPLACE FUNCTION handle_user_profile_creation()
 RETURNS trigger AS $$
 DECLARE
-  google_name TEXT;
   first_name TEXT;
   last_name TEXT;
   full_name TEXT;
+  user_email TEXT;
 BEGIN
-  -- Only process if this is a new user or if user_metadata has name data from Google
+  -- Get user email
+  user_email := NEW.email;
+  
+  -- Extract name data from different sources based on signup type
+  
+  -- Method 1: Check raw_user_meta_data (Google OAuth and other OAuth providers)
   IF NEW.raw_user_meta_data IS NOT NULL THEN
-    
-    -- Extract name data from Google OAuth
-    -- Google usually provides: full_name, given_name, family_name, or name
+    -- Extract from Google OAuth format
     first_name := COALESCE(
       NEW.raw_user_meta_data->>'given_name',
       NEW.raw_user_meta_data->>'first_name'
@@ -41,49 +44,76 @@ BEGIN
         END IF;
       END IF;
     END IF;
+  END IF;
+  
+  -- Method 2: Check user_metadata (email/password signups, including guest checkout)
+  IF (first_name IS NULL OR last_name IS NULL) AND NEW.user_metadata IS NOT NULL THEN
+    first_name := COALESCE(
+      first_name,
+      NEW.user_metadata->>'first_name'
+    );
     
-    -- Create or update user profile if we have name data
-    IF first_name IS NOT NULL OR last_name IS NOT NULL THEN
-      INSERT INTO user_profiles (
-        user_id,
-        first_name,
-        last_name,
-        created_at,
-        updated_at
-      ) VALUES (
-        NEW.id,
-        first_name,
-        last_name,
-        now(),
-        now()
-      )
-      ON CONFLICT (user_id) DO UPDATE SET
-        first_name = COALESCE(EXCLUDED.first_name, user_profiles.first_name),
-        last_name = COALESCE(EXCLUDED.last_name, user_profiles.last_name),
-        updated_at = now()
-      WHERE 
-        -- Only update if we're adding new data (not overwriting existing data with null)
-        (user_profiles.first_name IS NULL AND EXCLUDED.first_name IS NOT NULL) OR
-        (user_profiles.last_name IS NULL AND EXCLUDED.last_name IS NOT NULL) OR
-        (user_profiles.first_name != EXCLUDED.first_name AND EXCLUDED.first_name IS NOT NULL) OR
-        (user_profiles.last_name != EXCLUDED.last_name AND EXCLUDED.last_name IS NOT NULL);
+    last_name := COALESCE(
+      last_name,
+      NEW.user_metadata->>'last_name'
+    );
+    
+    -- If no first/last name, try to split full_name
+    IF first_name IS NULL AND last_name IS NULL THEN
+      full_name := NEW.user_metadata->>'full_name';
+      
+      -- Simple name splitting
+      IF full_name IS NOT NULL AND trim(full_name) != '' THEN
+        first_name := split_part(trim(full_name), ' ', 1);
+        IF position(' ' in trim(full_name)) > 0 THEN
+          last_name := trim(substring(trim(full_name) from position(' ' in trim(full_name)) + 1));
+        END IF;
+      END IF;
     END IF;
   END IF;
+  
+  -- Create user profile (always create, even if no names)
+  INSERT INTO user_profiles (
+    user_id,
+    first_name,
+    last_name,
+    created_at,
+    updated_at
+  ) VALUES (
+    NEW.id,
+    first_name,
+    last_name,
+    now(),
+    now()
+  )
+  ON CONFLICT (user_id) DO UPDATE SET
+    first_name = COALESCE(EXCLUDED.first_name, user_profiles.first_name),
+    last_name = COALESCE(EXCLUDED.last_name, user_profiles.last_name),
+    updated_at = now()
+  WHERE 
+    -- Only update if we're adding new data (not overwriting existing data with null)
+    (user_profiles.first_name IS NULL AND EXCLUDED.first_name IS NOT NULL) OR
+    (user_profiles.last_name IS NULL AND EXCLUDED.last_name IS NOT NULL) OR
+    (user_profiles.first_name != EXCLUDED.first_name AND EXCLUDED.first_name IS NOT NULL) OR
+    (user_profiles.last_name != EXCLUDED.last_name AND EXCLUDED.last_name IS NOT NULL);
   
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Create trigger that fires after user creation or update
+-- Drop any existing triggers
 DROP TRIGGER IF EXISTS sync_google_oauth_profile_trigger ON auth.users;
-CREATE TRIGGER sync_google_oauth_profile_trigger
-  AFTER INSERT OR UPDATE OF raw_user_meta_data ON auth.users
+DROP TRIGGER IF EXISTS universal_user_profile_trigger ON auth.users;
+
+-- Create universal trigger that fires after user creation or update
+CREATE TRIGGER universal_user_profile_trigger
+  AFTER INSERT OR UPDATE OF raw_user_meta_data, user_metadata ON auth.users
   FOR EACH ROW
-  EXECUTE FUNCTION handle_google_oauth_user_profile();
+  EXECUTE FUNCTION handle_user_profile_creation();
 
 -- Grant necessary permissions
-GRANT EXECUTE ON FUNCTION handle_google_oauth_user_profile() TO service_role;
+GRANT EXECUTE ON FUNCTION handle_user_profile_creation() TO service_role;
 
 -- Add comments for documentation
-COMMENT ON FUNCTION handle_google_oauth_user_profile IS 'Automatically creates/updates user profiles from Google OAuth data when users sign up';
-COMMENT ON TRIGGER sync_google_oauth_profile_trigger ON auth.users IS 'Syncs Google OAuth user data to user_profiles table automatically'; 
+COMMENT ON FUNCTION handle_user_profile_creation IS 'Automatically creates user profiles for all users (OAuth and email/password) when they sign up';
+COMMENT ON TRIGGER universal_user_profile_trigger ON auth.users IS 'Creates user profiles for all user signups (OAuth and email/password)'; 

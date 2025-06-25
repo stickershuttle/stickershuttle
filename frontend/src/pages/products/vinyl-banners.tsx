@@ -40,7 +40,7 @@ export default function VinylBanners() {
       `}</style>
               {/* Hero Section with Banner Background */}
         <section className="py-8">
-        <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
           <div 
             className="bg-white bg-opacity-5 backdrop-blur-sm rounded-2xl pt-12 pb-8 px-6 md:px-4 md:p-12 relative overflow-hidden"
             style={{
@@ -231,24 +231,26 @@ export default function VinylBanners() {
 
       {/* Calculator Section */}
       <section className="py-8">
-        <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
           <VinylBannerCalculator />
         </div>
       </section>
 
       {/* Three-Column Benefits Section */}
-      <section className="py-8">
-        <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
+      <section className="pt-4 pb-8">
+        <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
-            {/* Free Proof Included */}
+            {/* Free Online Proof */}
             <div className="container-style p-4 lg:p-6 transition-colors duration-200">
               <div className="flex items-center">
-                <div className="text-4xl mr-4">
-                  ✅
+                <div className="w-10 h-10 mr-4 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
                 </div>
                 <h3 className="font-semibold">
-                  <span className="text-white">Free Proof Included</span>
+                  <span className="text-white">Free Online Proof</span>
                 </h3>
               </div>
             </div>
@@ -256,10 +258,10 @@ export default function VinylBanners() {
             {/* Printed in 24-48 hours */}
             <div className="container-style p-4 lg:p-6 transition-colors duration-200">
               <div className="flex items-center">
-                <div 
-                  className="text-4xl mr-4 rocket-shake"
-                >
-                  🚀
+                <div className="w-10 h-10 mr-4 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                 </div>
                 <h3 className="font-semibold">
                   <span className="text-white">Printed in 24-48 hours</span>
@@ -270,8 +272,10 @@ export default function VinylBanners() {
             {/* Free Shipping, always */}
             <div className="container-style p-4 lg:p-6 transition-colors duration-200">
               <div className="flex items-center">
-                <div className="text-4xl mr-4">
-                  📦
+                <div className="w-10 h-10 mr-4 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
                 </div>
                 <h3 className="font-semibold">
                   <span className="text-white">Free Shipping, always.</span>
@@ -286,7 +290,7 @@ export default function VinylBanners() {
       {/* Login/Signup Section - Only show when user is logged out */}
       {!loading && !user && (
         <section className="py-8">
-          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
+          <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
             <div 
               className="text-center p-8 md:p-12 rounded-2xl relative overflow-hidden"
               style={{

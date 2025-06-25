@@ -30,26 +30,45 @@ export default function OrderSuccess() {
       try {
         const supabase = await getSupabase();
         const { data: { session } } = await supabase.auth.getSession();
+        console.log('🔍 Order success session check:', {
+          hasSession: !!session,
+          hasUser: !!session?.user,
+          userEmail: session?.user?.email
+        });
+        
         setUser(session?.user || null);
 
-        // If no user is logged in, check session params for guest email
+        // If no user is logged in, check session params for guest email and associated user
         if (!session?.user) {
           const urlParams = new URLSearchParams(window.location.search);
           const sessionId = urlParams.get('session_id');
           
           if (sessionId) {
-            console.log('🔍 Checking for guest order with session:', sessionId);
+            console.log('🔍 Checking for order with Stripe session:', sessionId);
             
-            // Try to get guest email from order
+            // Try to get order info and check if it's linked to a user
             const { data: orderData, error: orderError } = await supabase
               .from('orders_main')
-              .select('guest_email')
+              .select('guest_email, user_id, customer_email')
               .eq('stripe_session_id', sessionId)
               .single();
             
-            if (orderData && !orderError && orderData.guest_email) {
-              console.log('✅ Found guest email:', orderData.guest_email);
-              setGuestEmail(orderData.guest_email);
+            if (orderData && !orderError) {
+              console.log('📋 Order data found:', {
+                hasUserId: !!orderData.user_id,
+                guestEmail: orderData.guest_email,
+                customerEmail: orderData.customer_email
+              });
+              
+              // If order has a user_id but no current session, the user might have been logged out during redirect
+              if (orderData.user_id) {
+                console.log('⚠️ Order belongs to user but no active session - user may have been logged out during Stripe redirect');
+                // Set the email for potential re-login
+                setGuestEmail(orderData.customer_email || orderData.guest_email);
+              } else if (orderData.guest_email) {
+                console.log('✅ Found guest email:', orderData.guest_email);
+                setGuestEmail(orderData.guest_email);
+              }
             }
           }
         }
@@ -62,9 +81,8 @@ export default function OrderSuccess() {
 
     checkUserAndGuestInfo();
 
-    // Set countdown based on user status (10 seconds for guests, 5 for logged in users)
-    const initialCountdown = user ? 5 : 10;
-    setCountdown(initialCountdown);
+    // Always use 5 seconds countdown since we always go to dashboard
+    setCountdown(5);
 
     // Start countdown
     const timer = setInterval(() => {
@@ -81,22 +99,11 @@ export default function OrderSuccess() {
     return () => clearInterval(timer);
   }, [clearCart]); // Include clearCart in dependencies
 
-  // Update countdown when user state changes
-  useEffect(() => {
-    if (!loadingGuestInfo) {
-      const newCountdown = user ? 5 : 10;
-      setCountdown(newCountdown);
-    }
-  }, [user, loadingGuestInfo]);
-
   const handleRedirect = () => {
     setIsRedirecting(true);
-    if (user) {
-      router.push('/account/dashboard?orderCompleted=true');
-    } else {
-      // For guests, redirect to login with message
-      router.push('/login?from=order-success&message=Track your order by creating an account');
-    }
+    // Always redirect to dashboard - user should be logged in after checkout
+    console.log('🚀 Redirecting to dashboard after successful order');
+    router.push('/account/dashboard?orderCompleted=true');
   };
 
   const handleManualRedirect = () => {
@@ -144,7 +151,7 @@ export default function OrderSuccess() {
               </p>
             </div>
 
-            {/* Guest Checkout Information */}
+            {/* Guest/Account Information */}
             {!user && guestEmail && (
               <div 
                 className="mb-8 p-6 rounded-xl border-2"
@@ -168,13 +175,25 @@ export default function OrderSuccess() {
                 <div 
                   className="p-4 rounded-lg text-center"
                   style={{
-                    background: 'rgba(34, 197, 94, 0.1)',
-                    border: '1px solid rgba(34, 197, 94, 0.3)'
+                    background: 'rgba(255, 193, 7, 0.1)',
+                    border: '1px solid rgba(255, 193, 7, 0.3)'
                   }}
                 >
-                  <p className="text-green-300 text-sm font-medium mb-2">
-                    ✨ Want to track your order and get exclusive benefits?
+                  <p className="text-yellow-300 text-sm font-medium mb-2">
+                    🔐 Already have an account or just created one?
                   </p>
+                  <Link
+                    href={`/login?email=${encodeURIComponent(guestEmail)}&from=order-success`}
+                    className="inline-block mt-2 px-6 py-2 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 mr-2"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(255, 193, 7, 0.5) 0%, rgba(255, 193, 7, 0.35) 50%, rgba(255, 193, 7, 0.2) 100%)',
+                      backdropFilter: 'blur(25px) saturate(200%)',
+                      border: '1px solid rgba(255, 193, 7, 0.6)',
+                      boxShadow: 'rgba(255, 193, 7, 0.15) 0px 4px 16px, rgba(255, 255, 255, 0.4) 0px 1px 0px inset'
+                    }}
+                  >
+                    Sign In
+                  </Link>
                   <Link
                     href={`/signup?email=${encodeURIComponent(guestEmail)}`}
                     className="inline-block mt-2 px-6 py-2 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105"
@@ -187,7 +206,7 @@ export default function OrderSuccess() {
                   >
                     Create Account
                   </Link>
-                  <div className="mt-4 space-y-1 text-green-200 text-sm">
+                  <div className="mt-4 space-y-1 text-blue-200 text-sm">
                     <p>🎯 Track your order in real-time</p>
                     <p>🔄 Get automatic 10% off on reorders</p>
                     <p>💰 Earn 5% back in store credits</p>
@@ -201,10 +220,7 @@ export default function OrderSuccess() {
             {!isRedirecting ? (
               <div className="mb-6">
                 <p className="text-white/80 mb-4">
-                  {user 
-                    ? 'Redirecting to your dashboard in'
-                    : 'Taking you to create an account in'
-                  }{' '}
+                  Redirecting to your dashboard in{' '}
                   <span className="text-purple-400 font-bold text-2xl">{countdown}</span>{' '}
                   seconds...
                 </p>
@@ -214,7 +230,7 @@ export default function OrderSuccess() {
                 >
                   <div 
                     className="bg-purple-400 h-2 rounded-full transition-all duration-1000 ease-linear"
-                    style={{ width: `${((user ? 5 : 10) - countdown) / (user ? 5 : 10) * 100}%` }}
+                    style={{ width: `${(5 - countdown) / 5 * 100}%` }}
                   />
                 </div>
               </div>
@@ -241,7 +257,7 @@ export default function OrderSuccess() {
                   boxShadow: '0 4px 16px rgba(147, 51, 234, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15)'
                 }}
               >
-                {user ? '🚀 Go to Dashboard Now' : '🔐 Create Account to Track Order'}
+                🚀 Go to Dashboard Now
               </button>
             </div>
 
@@ -258,11 +274,7 @@ export default function OrderSuccess() {
               </p>
               <ul className="text-blue-200 text-sm text-center space-y-1">
                 <li>• You'll receive an order confirmation email</li>
-                {user ? (
-                  <li>• Track your order progress in your dashboard</li>
-                ) : (
-                  <li>• Create an account to track your order</li>
-                )}
+                <li>• Track your order progress in your dashboard</li>
                 <li>• If you requested a proof, we'll send it for approval</li>
                 <li>• Questions? Contact our support team anytime</li>
               </ul>

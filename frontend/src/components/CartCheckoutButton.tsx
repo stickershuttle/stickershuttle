@@ -18,6 +18,11 @@ interface CartCheckoutButtonProps {
   onCheckoutSuccess?: () => void;
   creditsToApply?: number;
   onCreditsChange?: (credits: number) => void;
+  guestCheckoutData?: {
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
 }
 
 const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
@@ -30,7 +35,8 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
   onCheckoutError,
   onCheckoutSuccess,
   creditsToApply = 0,
-  onCreditsChange
+  onCreditsChange,
+  guestCheckoutData
 }) => {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
@@ -136,8 +142,8 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
     onCheckoutStart?.();
 
     try {
-      // Check if user is logged in or we have guest email
-      if (!user && !guestEmail) {
+      // Check if user is logged in or we have guest data
+      if (!user && !guestCheckoutData && !guestEmail) {
         setShowGuestEmailModal(true);
         return;
       }
@@ -148,23 +154,29 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
       }
       
       console.log('🚀 Phase 2: Direct enhanced checkout...');
-      console.log('👤 User context:', user ? `Logged in as ${capitalizeFirstName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User')}` : `Guest user: ${guestEmail}`);
+      const guestInfo = guestCheckoutData || { firstName: '', lastName: '', email: guestEmail || '' };
+      console.log('👤 User context:', user ? `Logged in as ${capitalizeFirstName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User')}` : `Guest user: ${guestInfo.email}`);
       
       // Set flag to detect return from Stripe
       sessionStorage.setItem('stripe_checkout_initiated', 'true');
       
+      // Store guest checkout data for account creation
+      if (!user && guestCheckoutData) {
+        sessionStorage.setItem('guest_checkout_data', JSON.stringify(guestCheckoutData));
+      }
+      
       // Create minimal customer info - Shopify will collect the rest
       const customerInfo = {
-        firstName: user?.user_metadata?.first_name || '',
-        lastName: user?.user_metadata?.last_name || '',
-        email: user?.email || guestEmail || '',
+        firstName: user?.user_metadata?.first_name || guestInfo.firstName || '',
+        lastName: user?.user_metadata?.last_name || guestInfo.lastName || '',
+        email: user?.email || guestInfo.email || '',
         phone: user?.user_metadata?.phone || ''
       };
 
       // Create minimal shipping address - Shopify will collect the full address
       const shippingAddress = {
-        first_name: user?.user_metadata?.first_name || '',
-        last_name: user?.user_metadata?.last_name || '',
+        first_name: user?.user_metadata?.first_name || guestInfo.firstName || '',
+        last_name: user?.user_metadata?.last_name || guestInfo.lastName || '',
         address1: '', // Let Shopify collect this
         address2: '',
         city: '',
@@ -185,8 +197,8 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
         shippingAddress,
         null, // billing address
         '', // No automatic order note
-        discountCode,
-        discountAmount,
+        discountCode || undefined,
+        discountAmount || undefined,
         creditsToApply || 0 // Pass credits to apply
       );
 

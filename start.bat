@@ -9,8 +9,9 @@ echo.
 echo Starting all services...
 echo.
 echo [1] Stripe CLI Webhook Forwarding (Port 4000)
-echo [2] API Server (Port 4000)  
-echo [3] Frontend Server (Port 3000)
+echo [2] Supabase CLI Local Development
+echo [3] API Server (Port 4000)  
+echo [4] Frontend Server (Port 3000)
 echo.
 echo ============================================================
 echo.
@@ -42,6 +43,13 @@ echo [STRIPE] Starting Stripe CLI webhook forwarding...
 start "Stripe CLI" cmd /k "echo STRIPE CLI - Webhook Forwarding to localhost:4000 && echo ============================================ && echo. && stripe listen --forward-to localhost:4000/webhooks/stripe || echo. && echo ERROR: Stripe CLI not installed or not in PATH && echo Install from: https://stripe.com/docs/stripe-cli && pause"
 
 :: Wait a bit for Stripe to start
+timeout /t 2 /nobreak > nul
+
+:: Start Supabase CLI in a new window
+echo [SUPABASE] Starting Supabase local development...
+start "Supabase CLI" cmd /k "echo SUPABASE CLI - Local Development Environment && echo ============================================ && echo. && npx supabase start || echo. && echo ERROR: Supabase CLI not installed or failed to start && echo Install with: npm install -g supabase && pause"
+
+:: Wait a bit for Supabase to start
 timeout /t 3 /nobreak > nul
 
 :: Start API server in a new window
@@ -63,8 +71,10 @@ echo.
 echo Frontend:  http://localhost:3000
 echo API:       http://localhost:4000
 echo GraphQL:   http://localhost:4000/graphql
+echo Supabase:  http://localhost:54323 (Studio)
 echo.
 echo Stripe webhooks are being forwarded to your local API.
+echo Supabase local development environment is starting.
 echo.
 echo To stop all services, close each window or press Ctrl+C.
 echo.

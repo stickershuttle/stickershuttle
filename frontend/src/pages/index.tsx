@@ -70,7 +70,7 @@ export default function Home() {
     <Layout title="Sticker Shuttle - Custom Stickers & Vinyl Signs">
         {/* Hero Section with Banner Background */}
         <section className="relative pt-[20px]">
-          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4 pb-4">
+                      <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4 pb-4">
             <div 
               className="rounded-2xl p-12 relative overflow-hidden min-h-[400px]"
               style={{
@@ -100,11 +100,11 @@ export default function Home() {
                     Start Here →
                   </a>
                   <a 
-                    href="#" 
+                    href="/products/sample-packs" 
                     className="text-white hover:text-purple-200 transition"
                   >
                     Order Sample Pack →
-          </a>
+                  </a>
         </div>
                 <div className="flex justify-center px-4">
                   <div 
@@ -126,7 +126,7 @@ export default function Home() {
 
         {/* Brands Section - Infinite Scroll */}
         <section className="py-4">
-          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4">
+          <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
             <div className="flex justify-center mb-4">
               <div 
                 className="px-4 py-1.5 rounded-full text-center text-sm text-gray-300"
@@ -185,14 +185,14 @@ export default function Home() {
 
         {/* Product Types Section - With Click to Show Features */}
         <section className="py-4">
-          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4 relative">
+          <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4 relative">
             
             {/* Desktop/Tablet Grid */}
             <div className="hidden sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 group/container">
               {/* Vinyl Stickers */}
               <Link href="/products/vinyl-stickers">
                 <div 
-                  className="vinyl-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  className="vinyl-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-300 ease-out hover:scale-105 transform overflow-hidden"
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -212,24 +212,14 @@ export default function Home() {
                   </div>
                   <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Vinyl Stickers →</h3>
                   
-                  {/* Hover to show features on desktop */}
-                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4 hidden lg:block">
-                    <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                      <div className="flex flex-wrap gap-2 justify-center">
-                        <span className="px-3 py-1 text-xs rounded-full bg-green-500/20 text-green-200 border border-green-400/50">💧 Waterproof & UV Resistant</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-green-500/20 text-green-200 border border-green-400/50">🛡️ Laminated with 5+ yr protection</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-green-500/20 text-green-200 border border-green-400/50">🏠 Dishwasher Safe</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-green-500/20 text-green-200 border border-green-400/50">✂️ Custom Shapes Available</span>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Features hidden - just show on click */}
                 </div>
               </Link>
 
               {/* Holographic Stickers */}
               <Link href="/products/holographic-stickers">
                 <div 
-                  className="holographic-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  className="holographic-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-300 ease-out hover:scale-105 transform overflow-hidden"
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -249,24 +239,14 @@ export default function Home() {
                   </div>
                   <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Holographic Stickers →</h3>
                   
-                  {/* Hover to show features on desktop */}
-                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4 hidden lg:block">
-                    <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                      <div className="flex flex-wrap gap-2 justify-center">
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">💧 Waterproof & UV Resistant</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🛡️ Laminated with 5+ yr protection</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">💪 Durable & Resistant</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">👁️ Eye Catching Design</span>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Features hidden - just show on click */}
                 </div>
               </Link>
 
               {/* Glitter Stickers */}
               <Link href="/products/glitter-stickers">
                 <div 
-                  className="glitter-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  className="glitter-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-300 ease-out hover:scale-105 transform overflow-hidden"
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -286,24 +266,14 @@ export default function Home() {
                   </div>
                   <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Glitter Stickers →</h3>
                   
-                  {/* Hover to show features on desktop */}
-                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4 hidden lg:block">
-                    <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                      <div className="flex flex-wrap gap-2 justify-center">
-                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">💧 Waterproof & UV Resistant</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">🛡️ Laminated with 5+ yr protection</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">🤍 White Ink Capable</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/50">💎 Rare Sticker Type</span>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Features hidden - just show on click */}
                 </div>
               </Link>
 
               {/* Chrome Stickers */}
               <Link href="/products/chrome-stickers">
                 <div 
-                  className="chrome-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  className="chrome-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-300 ease-out hover:scale-105 transform overflow-hidden"
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -323,24 +293,14 @@ export default function Home() {
                   </div>
                   <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Chrome Stickers →</h3>
                   
-                  {/* Hover to show features on desktop */}
-                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4 hidden lg:block">
-                    <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                      <div className="flex flex-wrap gap-2 justify-center">
-                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">💧 Waterproof & UV Resistant</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🛡️ Laminated with 5+ yr protection</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🤍 White Ink Capable</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-gray-500/20 text-gray-200 border border-gray-400/50">🪞 Matte or Gloss</span>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Features hidden - just show on click */}
                 </div>
               </Link>
 
               {/* Clear Stickers - Mobile & Tablet Only */}
               <Link href="/products/clear-stickers" className="lg:hidden">
                 <div 
-                  className="clear-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  className="clear-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-300 ease-out hover:scale-105 transform overflow-hidden"
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -360,24 +320,14 @@ export default function Home() {
                   </div>
                   <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Clear Stickers →</h3>
                   
-                  {/* Hover to show features on desktop */}
-                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4 hidden lg:block">
-                    <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                      <div className="flex flex-wrap gap-2 justify-center">
-                        <span className="px-3 py-1 text-xs rounded-full bg-teal-500/20 text-teal-200 border border-teal-400/50">💧 Waterproof & UV Resistant</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-teal-500/20 text-teal-200 border border-teal-400/50">🛡️ Laminated with 5+ yr protection</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-teal-500/20 text-teal-200 border border-teal-400/50">🔍 Crystal Clear</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-teal-500/20 text-teal-200 border border-teal-400/50">💎 Transparent</span>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Features hidden - just show on click */}
                 </div>
               </Link>
 
               {/* Sticker Sheets */}
               <Link href="/products/sticker-sheets">
                 <div 
-                  className="banner-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  className="banner-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-300 ease-out hover:scale-105 transform overflow-hidden"
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -397,17 +347,7 @@ export default function Home() {
                   </div>
                   <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Sticker Sheets →</h3>
                   
-                  {/* Hover to show features on desktop */}
-                  <div className="max-h-0 group-hover/container:max-h-64 overflow-hidden transition-all duration-600 ease-out mt-4 hidden lg:block">
-                    <div className="pt-4 opacity-0 group-hover/container:opacity-100 transition-opacity duration-400 delay-200 ease-out" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                      <div className="flex flex-wrap gap-2 justify-center">
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">💧 Waterproof & UV Resistant</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">🛡️ Laminated with 5+ yr protection</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">📄 Multiple Stickers Per Sheet</span>
-                        <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/50">✂️ Kiss-Cut for Easy Peeling</span>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Features hidden - just show on click */}
                 </div>
               </Link>
             </div>
@@ -573,7 +513,7 @@ export default function Home() {
 
         {/* Benefits Section */}
         <section className="py-4">
-          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4">
+          <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
             <div className="flex flex-col space-y-4 md:grid md:grid-cols-3 md:gap-4 md:space-y-0">
               {/* Free Shipping */}
               <div 
@@ -658,7 +598,7 @@ export default function Home() {
 
         {/* Video Section */}
         <section className="py-4">
-          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4">
+          <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
             <div className="flex flex-col space-y-6 lg:grid lg:grid-cols-2 lg:gap-8 lg:space-y-0 lg:items-stretch">
               {/* Video */}
               <div className="relative rounded-xl overflow-hidden cursor-pointer" onClick={toggleVideo}>
@@ -743,7 +683,7 @@ export default function Home() {
 
         {/* Testimonials Section */}
         <section className="py-8">
-          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4">
+          <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
             {/* Header */}
             <div className="text-center mb-6 mt-4">
               <div className="flex justify-center mb-4">
@@ -1053,7 +993,7 @@ export default function Home() {
         {/* Quick Login Banner - Only show when not logged in */}
         {!user && !loading && (
           <section className="py-4">
-            <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4">
+            <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
               <div 
                 className="rounded-2xl p-8 text-center relative overflow-hidden"
                 style={{
@@ -1290,53 +1230,15 @@ export default function Home() {
             animation: fadeIn 0.3s ease-out;
           }
           
-          /* Sticker type hover glow effects */
-          .vinyl-hover:hover {
-            border-color: rgba(168, 242, 106, 0.8) !important;
-            box-shadow: 0 0 20px rgba(168, 242, 106, 0.4), 0 0 40px rgba(168, 242, 106, 0.2) !important;
-          }
-          
-          .vinyl-hover:hover h3 {
-            color: rgb(168, 242, 106) !important;
-          }
-          
-          .holographic-hover:hover {
-            border-color: rgba(168, 85, 247, 0.8) !important;
-            box-shadow: 0 0 20px rgba(168, 85, 247, 0.4), 0 0 40px rgba(168, 85, 247, 0.2) !important;
-          }
-          
-          .holographic-hover:hover h3 {
-            color: rgb(168, 85, 247) !important;
-          }
-          
-          .chrome-hover:hover {
-            border-color: rgba(220, 220, 220, 0.8) !important;
-            box-shadow: 0 0 20px rgba(220, 220, 220, 0.4), 0 0 40px rgba(180, 180, 180, 0.2) !important;
-          }
-          
-          .chrome-hover:hover h3 {
-            background: linear-gradient(45deg, #dcdcdc, #ffffff, #c0c0c0);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-          }
-          
-          .glitter-hover:hover {
-            border-color: rgba(59, 130, 246, 0.8) !important;
-            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4), 0 0 40px rgba(59, 130, 246, 0.2) !important;
-          }
-          
-          .glitter-hover:hover h3 {
-            color: rgb(59, 130, 246) !important;
-          }
-          
+          /* Sticker type hover effects - simple lightening */
+          .vinyl-hover:hover,
+          .holographic-hover:hover,
+          .chrome-hover:hover,
+          .glitter-hover:hover,
+          .clear-hover:hover,
           .banner-hover:hover {
-            border-color: rgba(196, 181, 253, 0.8) !important;
-            box-shadow: 0 0 20px rgba(196, 181, 253, 0.4), 0 0 40px rgba(196, 181, 253, 0.2) !important;
-          }
-          
-          .banner-hover:hover h3 {
-            color: rgb(196, 181, 253) !important;
+            background: rgba(255, 255, 255, 0.08) !important;
+            border-color: rgba(255, 255, 255, 0.15) !important;
           }
           
           /* Logo hover animations */

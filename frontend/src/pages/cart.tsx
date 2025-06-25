@@ -18,6 +18,8 @@ import { createPortal } from "react-dom";
 import { GET_USER_CREDIT_BALANCE } from "@/lib/credit-mutations";
 import { useQuery } from "@apollo/client";
 import DiscountCodeInput from "@/components/DiscountCodeInput";
+import { UPDATE_USER_PROFILE_NAMES, CREATE_USER_PROFILE } from "@/lib/profile-mutations";
+import { useMutation } from "@apollo/client";
 
 // Available configuration options
 const SHAPE_OPTIONS = ["Custom Shape", "Circle", "Oval", "Rectangle", "Square"];
@@ -84,6 +86,16 @@ const calculateItemPricing = (
       perSticker: item.customization.dealPrice / quantity,
       discountPercentage: 0,
       area: 9 // Default area for deals
+    };
+  }
+  
+  // Check if this is a sample pack - use fixed $9 pricing
+  if (item.product.name === 'Sample Pack by Sticker Shuttle') {
+    return {
+      total: 9.00 * quantity,
+      perSticker: 9.00,
+      discountPercentage: 0,
+      area: 9 // Default area for sample pack
     };
   }
   
@@ -369,12 +381,28 @@ export default function CartPage() {
   // New state for store credit and discount
   const [creditToApply, setCreditToApply] = useState(0);
   const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; amount: number } | null>(null);
+  
+  // Guest checkout form state
+  const [guestCheckoutData, setGuestCheckoutData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: ''
+  });
+  const [isOtpMode, setIsOtpMode] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
   // Query for user credit balance
   const { data: creditData } = useQuery(GET_USER_CREDIT_BALANCE, {
     variables: { userId: user?.id || '' },
     skip: !user?.id,
   });
+
+  // Mutations for user profile
+  const [updateUserProfileNames] = useMutation(UPDATE_USER_PROFILE_NAMES);
+  const [createUserProfile] = useMutation(CREATE_USER_PROFILE);
 
   const userCredits = creditData?.getUserCreditBalance?.balance || 0;
 
@@ -834,7 +862,7 @@ export default function CartPage() {
   return (
     <Layout title="Your Cart - Sticker Shuttle">
       <section className="pt-7 pb-8">
-        <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
           {/* Login Recommendation - Mobile Banner */}
           {showLoginBanner && (
             <div className="mb-6 p-4 rounded-lg backdrop-blur-md md:hidden" style={{
@@ -962,10 +990,28 @@ export default function CartPage() {
           
           {updatedCart.length === 0 ? (
             <>
-              <div className="container-style p-6 text-center text-gray-300">
-                Your cart is empty.<br />
-                <Link href="/products" className="text-purple-400 hover:text-purple-300 underline transition-colors">
-                  Continue Shopping
+              <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                <div className="mb-8">
+                  <svg className="w-16 h-16 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-4">Your Cart is Empty</h2>
+                <p className="text-gray-400 mb-8 max-w-md">
+                  Add some awesome stickers to your cart to get started on your next mission.
+                </p>
+                <Link href="/products">
+                  <button 
+                    className="px-8 py-3 text-white font-semibold rounded-lg transition-all duration-200 hover:scale-105"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                      backdropFilter: 'blur(25px) saturate(180%)',
+                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                      boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                    }}
+                  >
+                    + Start New Mission
+                  </button>
                 </Link>
               </div>
 
@@ -1292,10 +1338,10 @@ export default function CartPage() {
                       <div className="flex flex-col md:flex-row gap-6">
                         {/* Product Image */}
                         <div className="w-full md:w-48 flex-shrink-0">
-                          {item.customization.customFiles?.[0] ? (
+                          {item.customization.customFiles?.[0] || item.product.name === 'Sample Pack by Sticker Shuttle' ? (
                             <div className="relative aspect-square rounded-xl overflow-hidden bg-gray-800/50 p-4">
                               <img
-                                src={item.customization.customFiles[0]}
+                                src={item.customization.customFiles?.[0] || (item.product.name === 'Sample Pack by Sticker Shuttle' ? 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750890354/Sample-Pack_jsy2yf.png' : '')}
                                 alt={item.product.name}
                                 className="w-full h-full object-contain"
                                 onError={(e) => {
@@ -1508,6 +1554,93 @@ export default function CartPage() {
                                   </div>
                                 </div>
                               )}
+                              
+                              {/* Sample Pack Sticker Types */}
+                              {item.product.name === 'Sample Pack by Sticker Shuttle' && (
+                                <div className="mt-4">
+                                  <div className="text-xs font-medium text-gray-400 uppercase mb-3">Included Sticker Types</div>
+                                  <div className="grid grid-cols-3 gap-2">
+                                    <div className="flex flex-col items-center p-2 rounded-lg" style={{
+                                      background: 'rgba(59, 130, 246, 0.1)',
+                                      border: '1px solid rgba(59, 130, 246, 0.2)',
+                                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                                      backdropFilter: 'blur(12px)'
+                                    }}>
+                                      <img 
+                                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
+                                        alt="Premium Matte" 
+                                        className="w-6 h-6 object-contain mb-1"
+                                      />
+                                      <span className="text-xs text-blue-200 text-center">Matte</span>
+                                    </div>
+                                    <div className="flex flex-col items-center p-2 rounded-lg" style={{
+                                      background: 'rgba(59, 130, 246, 0.1)',
+                                      border: '1px solid rgba(59, 130, 246, 0.2)',
+                                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                                      backdropFilter: 'blur(12px)'
+                                    }}>
+                                      <img 
+                                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
+                                        alt="Holographic" 
+                                        className="w-6 h-6 object-contain mb-1"
+                                      />
+                                      <span className="text-xs text-blue-200 text-center">Holo</span>
+                                    </div>
+                                    <div className="flex flex-col items-center p-2 rounded-lg" style={{
+                                      background: 'rgba(59, 130, 246, 0.1)',
+                                      border: '1px solid rgba(59, 130, 246, 0.2)',
+                                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                                      backdropFilter: 'blur(12px)'
+                                    }}>
+                                      <img 
+                                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
+                                        alt="Glitter" 
+                                        className="w-6 h-6 object-contain mb-1"
+                                      />
+                                      <span className="text-xs text-blue-200 text-center">Glitter</span>
+                                    </div>
+                                    <div className="flex flex-col items-center p-2 rounded-lg" style={{
+                                      background: 'rgba(59, 130, 246, 0.1)',
+                                      border: '1px solid rgba(59, 130, 246, 0.2)',
+                                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                                      backdropFilter: 'blur(12px)'
+                                    }}>
+                                      <img 
+                                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749849590/StickerShuttle_ClearIcon_zxjnqc.svg" 
+                                        alt="Clear" 
+                                        className="w-6 h-6 object-contain mb-1"
+                                      />
+                                      <span className="text-xs text-blue-200 text-center">Clear</span>
+                                    </div>
+                                    <div className="flex flex-col items-center p-2 rounded-lg" style={{
+                                      background: 'rgba(59, 130, 246, 0.1)',
+                                      border: '1px solid rgba(59, 130, 246, 0.2)',
+                                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                                      backdropFilter: 'blur(12px)'
+                                    }}>
+                                      <img 
+                                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
+                                        alt="Chrome" 
+                                        className="w-6 h-6 object-contain mb-1"
+                                      />
+                                      <span className="text-xs text-blue-200 text-center">Chrome</span>
+                                    </div>
+                                    <div className="flex flex-col items-center p-2 rounded-lg" style={{
+                                      background: 'rgba(59, 130, 246, 0.1)',
+                                      border: '1px solid rgba(59, 130, 246, 0.2)',
+                                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                                      backdropFilter: 'blur(12px)'
+                                    }}>
+                                      <img 
+                                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
+                                        alt="Premium Gloss" 
+                                        className="w-6 h-6 object-contain mb-1"
+                                      />
+                                      <span className="text-xs text-blue-200 text-center">Gloss</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -1524,12 +1657,12 @@ export default function CartPage() {
                                       const newQty = Math.max(1, item.quantity - increment);
                                       handleQuantityChange(item.id, newQty);
                                     }}
-                                    className="w-10 h-10 flex items-center justify-center text-white rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                    className="w-10 h-10 flex items-center justify-center text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     style={{
-                                      background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.4) 0%, rgba(14, 165, 233, 0.25) 50%, rgba(14, 165, 233, 0.1) 100%)',
-                                      backdropFilter: 'blur(25px) saturate(180%)',
-                                      border: '1px solid rgba(14, 165, 233, 0.4)',
-                                      boxShadow: 'rgba(14, 165, 233, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                      background: 'rgba(255, 255, 255, 0.05)',
+                                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                                      backdropFilter: 'blur(12px)'
                                     }}
                                     disabled={item.quantity <= 1}
                                     aria-label="Decrease quantity"
@@ -1563,12 +1696,12 @@ export default function CartPage() {
                                       const increment = getQuantityIncrement(item.quantity);
                                       handleQuantityChange(item.id, item.quantity + increment);
                                     }}
-                                    className="w-10 h-10 flex items-center justify-center text-white rounded-lg transition-all duration-200 transform hover:scale-105"
+                                    className="w-10 h-10 flex items-center justify-center text-white rounded-lg transition-colors"
                                     style={{
-                                      background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.4) 0%, rgba(14, 165, 233, 0.25) 50%, rgba(14, 165, 233, 0.1) 100%)',
-                                      backdropFilter: 'blur(25px) saturate(180%)',
-                                      border: '1px solid rgba(14, 165, 233, 0.4)',
-                                      boxShadow: 'rgba(14, 165, 233, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                      background: 'rgba(255, 255, 255, 0.05)',
+                                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                                      backdropFilter: 'blur(12px)'
                                     }}
                                     aria-label="Increase quantity"
                                   >
@@ -1784,14 +1917,268 @@ export default function CartPage() {
                     />
                   </div>
 
+                  {/* Guest Checkout Form */}
+                  {!user && (
+                    <div className="space-y-3 mb-4">
+                      {!isOtpMode ? (
+                        <>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-400 mb-1">
+                                First Name *
+                              </label>
+                              <input
+                                type="text"
+                                value={guestCheckoutData.firstName}
+                                onChange={(e) => setGuestCheckoutData(prev => ({
+                                  ...prev,
+                                  firstName: e.target.value
+                                }))}
+                                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 focus:bg-white/10 transition-all"
+                                placeholder="John"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-400 mb-1">
+                                Last Name *
+                              </label>
+                              <input
+                                type="text"
+                                value={guestCheckoutData.lastName}
+                                onChange={(e) => setGuestCheckoutData(prev => ({
+                                  ...prev,
+                                  lastName: e.target.value
+                                }))}
+                                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 focus:bg-white/10 transition-all"
+                                placeholder="Doe"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-1">
+                              Email Address *
+                            </label>
+                            <input
+                              type="email"
+                              value={guestCheckoutData.email}
+                              onChange={(e) => setGuestCheckoutData(prev => ({
+                                ...prev,
+                                email: e.target.value
+                              }))}
+                              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 focus:bg-white/10 transition-all"
+                              placeholder="john@example.com"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-1">
+                              Password *
+                            </label>
+                            <input
+                              type="password"
+                              value={guestCheckoutData.password}
+                              onChange={(e) => setGuestCheckoutData(prev => ({
+                                ...prev,
+                                password: e.target.value
+                              }))}
+                              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 focus:bg-white/10 transition-all"
+                              placeholder="Create a password"
+                              required
+                            />
+                          </div>
+                          <div className="text-xs text-gray-400 mt-2">
+                            <p>We'll create an account for you automatically to track your order and future purchases.</p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-center">
+                            <div className="mb-4">
+                              <span className="text-3xl">📧</span>
+                              <h3 className="text-lg font-semibold text-white mt-2">Verify Your Email</h3>
+                              <p className="text-sm text-gray-400 mt-1">
+                                We've sent a 6-digit code to <span className="text-white">{guestCheckoutData.email}</span>
+                              </p>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-400 mb-2">
+                                Enter 6-digit verification code
+                              </label>
+                              <input
+                                type="text"
+                                value={otpCode}
+                                onChange={(e) => {
+                                  const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                  setOtpCode(value);
+                                }}
+                                className="w-full px-4 py-3 text-center text-2xl font-mono tracking-widest rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 focus:bg-white/10 transition-all"
+                                placeholder="000000"
+                                maxLength={6}
+                                autoFocus
+                              />
+                            </div>
+                            <button
+                              onClick={() => {
+                                setIsOtpMode(false);
+                                setOtpCode('');
+                              }}
+                              className="text-purple-400 hover:text-purple-300 text-sm underline mt-3"
+                            >
+                              ← Back to edit details
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
                   {/* Checkout Actions */}
                   <div className="space-y-4">
                     {/* Enhanced Checkout Button */}
                     <button
-                      onClick={() => {
-                        const checkoutButton = document.querySelector('.cart-checkout-button-trigger');
-                        if (checkoutButton) {
-                          (checkoutButton as HTMLButtonElement).click();
+                      onClick={async () => {
+                        // Validate guest checkout form if user is not logged in
+                        if (!user) {
+                          if (!isOtpMode) {
+                            // Validate sign up form
+                            if (!guestCheckoutData.firstName.trim() || !guestCheckoutData.lastName.trim() || !guestCheckoutData.email.trim() || !guestCheckoutData.password.trim()) {
+                              alert('Please fill in all required fields (First Name, Last Name, Email, Password)');
+                              return;
+                            }
+                            
+                            // Basic email validation
+                            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                            if (!emailRegex.test(guestCheckoutData.email)) {
+                              alert('Please enter a valid email address');
+                              return;
+                            }
+                            
+                            // Basic password validation (at least 6 characters)
+                            if (guestCheckoutData.password.length < 6) {
+                              alert('Password must be at least 6 characters long');
+                              return;
+                            }
+                            
+                            // Send OTP via Supabase (use same flow as signup page)
+                            setIsSendingOtp(true);
+                            try {
+                              const supabase = await getSupabase();
+                              
+                              // Sign up with Supabase to trigger OTP (same as signup page)
+                              const { data, error: authError } = await supabase.auth.signUp({
+                                email: guestCheckoutData.email,
+                                password: guestCheckoutData.password,
+                                options: {
+                                  data: {
+                                    first_name: guestCheckoutData.firstName,
+                                    last_name: guestCheckoutData.lastName,
+                                    full_name: `${guestCheckoutData.firstName} ${guestCheckoutData.lastName}`,
+                                    created_via_guest_checkout: true
+                                  }
+                                }
+                              });
+                              
+                              if (authError) {
+                                alert(`Error sending verification code: ${authError.message}`);
+                                setIsSendingOtp(false);
+                                return;
+                              }
+                              
+                              // Switch to OTP mode
+                              setIsOtpMode(true);
+                            } catch (error: any) {
+                              console.error('Error sending OTP:', error);
+                              alert('Failed to send verification code. Please try again.');
+                            } finally {
+                              setIsSendingOtp(false);
+                            }
+                            return;
+                          } else {
+                            // Validate OTP
+                            if (otpCode.length !== 6) {
+                              alert('Please enter the complete 6-digit verification code');
+                              return;
+                            }
+                            
+                            // Verify OTP with Supabase (use same flow as signup page)
+                            setIsVerifyingOtp(true);
+                            try {
+                              const supabase = await getSupabase();
+                              
+                              // Verify the OTP (same as signup page, using 'signup' type)
+                              const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+                                email: guestCheckoutData.email,
+                                token: otpCode,
+                                type: 'signup'
+                              });
+                              
+                              if (verifyError) {
+                                // Try alternative verification types if signup fails
+                                const { data: emailVerifyData, error: emailVerifyError } = await supabase.auth.verifyOtp({
+                                  email: guestCheckoutData.email,
+                                  token: otpCode,
+                                  type: 'email'
+                                });
+                                
+                                if (emailVerifyError) {
+                                  alert(`Invalid verification code: ${emailVerifyError.message}`);
+                                  setIsVerifyingOtp(false);
+                                  return;
+                                }
+                              }
+                              
+                              // User should be automatically logged in after successful verification
+                              // Update the user state
+                              const { data: { session } } = await supabase.auth.getSession();
+                              if (session?.user) {
+                                setUser(session.user);
+                                
+                                // Create user profile with names from guest checkout data
+                                try {
+                                  await createUserProfile({
+                                    variables: {
+                                      userId: session.user.id,
+                                      firstName: guestCheckoutData.firstName,
+                                      lastName: guestCheckoutData.lastName
+                                    }
+                                  });
+                                  console.log('✅ User profile created after signup');
+                                } catch (profileError) {
+                                  console.error('⚠️ Failed to create profile:', profileError);
+                                  // Don't block checkout for profile creation errors
+                                }
+                                
+                                // Wait for React state to update before proceeding with checkout
+                                setTimeout(() => {
+                                  const checkoutButton = document.querySelector('.cart-checkout-button-trigger');
+                                  if (checkoutButton) {
+                                    (checkoutButton as HTMLButtonElement).click();
+                                  }
+                                }, 100); // Small delay to allow state update
+                                
+                                setIsVerifyingOtp(false);
+                                return;
+                              }
+                              
+                              // Proceed with checkout
+                              setIsVerifyingOtp(false);
+                            } catch (error: any) {
+                              console.error('Error verifying OTP:', error);
+                              alert('Failed to verify code. Please try again.');
+                              setIsVerifyingOtp(false);
+                              return;
+                            }
+                          }
+                        }
+                        
+                        // Only trigger checkout if user is not in OTP verification process
+                        if (!isOtpMode) {
+                          const checkoutButton = document.querySelector('.cart-checkout-button-trigger');
+                          if (checkoutButton) {
+                            (checkoutButton as HTMLButtonElement).click();
+                          }
                         }
                       }}
                       className="w-full py-4 rounded-xl font-semibold transition-all duration-300 relative overflow-hidden group cursor-pointer hover:scale-105 transform"
@@ -1801,19 +2188,24 @@ export default function CartPage() {
                         border: '1px solid rgba(51, 234, 147, 0.4)',
                         boxShadow: 'rgba(51, 234, 147, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                       }}
+                      disabled={isSendingOtp || isVerifyingOtp}
                     >
                       <div className="flex flex-col md:flex-row items-center justify-center gap-2 md:gap-3">
-                        <span className="text-3xl md:text-3xl">💳</span>
+                        <span className="text-3xl md:text-3xl">{!user && isOtpMode ? '🔐' : '💳'}</span>
                         <div className="text-center md:text-left">
                           <div className="text-white font-bold text-lg flex items-center justify-center md:justify-start gap-2 mb-1">
-                            Go to Checkout
+                            {isSendingOtp ? 'Sending Code...' : isVerifyingOtp ? 'Verifying...' : (!user && isOtpMode ? 'Verify & Checkout' : 'Go to Checkout')}
                           </div>
-                          {user && (
+                          {user ? (
                             <div className="text-white/90 text-sm font-normal flex items-center justify-center md:justify-start gap-2">
                               <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                               </svg>
                               Logged in as {user.email}
+                            </div>
+                          ) : (
+                            <div className="text-white/90 text-sm font-normal">
+                              {isOtpMode ? 'Enter code to complete sign up' : 'Account will be created automatically'}
                             </div>
                           )}
                         </div>
@@ -1823,6 +2215,7 @@ export default function CartPage() {
                     {/* Hidden actual checkout button */}
                     <div className="hidden">
                       <CartCheckoutButton
+                        key={`checkout-${user?.id || 'guest'}`} // Force re-render when user changes
                         cartItems={updatedCart.map(item => ({
                           ...item,
                           totalPrice: item.customization.isReorder ? item.totalPrice * 0.9 : item.totalPrice
@@ -1830,8 +2223,11 @@ export default function CartPage() {
                         className="cart-checkout-button-trigger"
                         creditsToApply={creditToApply}
                         discountCode={appliedDiscount?.code}
+                        guestCheckoutData={!user ? { firstName: guestCheckoutData.firstName, lastName: guestCheckoutData.lastName, email: guestCheckoutData.email } : undefined}
                         onCheckoutStart={() => {
                           console.log('🚀 Starting enhanced cart checkout with user context:', updatedCart.length, 'items');
+                          console.log('👤 User state at checkout:', user ? `Logged in as ${user.email} (ID: ${user.id})` : 'Guest user');
+                          console.log('📧 Guest checkout data:', !user ? guestCheckoutData : 'None (user is logged in)');
                         }}
                         onCheckoutSuccess={() => {
                           console.log('✅ Enhanced checkout successful - clearing cart and redirecting to dashboard');
@@ -1903,6 +2299,26 @@ export default function CartPage() {
                           </span>
                         </div>
                       </div>
+                      
+                      {/* Sample Pack Shipping Note */}
+                      {updatedCart.some(item => item.product.name === 'Sample Pack by Sticker Shuttle') && (
+                        <div className="flex items-center gap-2 p-3 rounded-lg mt-3" style={{
+                          background: 'rgba(59, 130, 246, 0.1)',
+                          border: '1px solid rgba(59, 130, 246, 0.2)',
+                          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                          backdropFilter: 'blur(12px)'
+                        }}>
+                          <img 
+                            src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750366914/USPS-Logo_lnyobe.png" 
+                            alt="USPS Logo" 
+                            className="w-6 h-6 object-contain"
+                          />
+                          <p className="text-blue-200 text-xs">
+                            Sample packs are sent without tracking via USPS.
+                          </p>
+                        </div>
+                      )}
+                      
                       <p className="text-xs text-gray-500 pt-2">
                         * UPS does not deliver on weekends. Weekend delivery dates are automatically moved to the next business day.
                       </p>

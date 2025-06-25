@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -10,11 +10,23 @@ export default function Login() {
   const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('email');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     phone: '',
     password: '',
   });
+
+  // Check for URL parameters (messages or errors)
+  useEffect(() => {
+    const { message: urlMessage, error: urlError } = router.query;
+    if (urlMessage) {
+      setMessage(decodeURIComponent(urlMessage as string));
+    }
+    if (urlError) {
+      setError(decodeURIComponent(urlError as string));
+    }
+  }, [router.query]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -298,6 +310,13 @@ export default function Login() {
                 </div>
               )}
 
+              {/* Success Message Display */}
+              {message && (
+                <div className="p-3 rounded-lg bg-green-500/20 border border-green-500/30 text-green-300 text-sm">
+                  {message}
+                </div>
+              )}
+
               {/* Login Button */}
               <button
                 type="submit"
@@ -497,6 +516,13 @@ export default function Login() {
                   {error && (
                     <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
                       {error}
+                    </div>
+                  )}
+
+                  {/* Success Message Display */}
+                  {message && (
+                    <div className="p-3 rounded-lg bg-green-500/20 border border-green-500/30 text-green-300 text-sm">
+                      {message}
                     </div>
                   )}
 

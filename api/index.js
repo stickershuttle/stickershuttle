@@ -198,6 +198,7 @@ const typeDefs = gql`
     
     # User queries
     getAllUsers: [User!]!
+    getUserProfile(userId: ID!): UserProfile
   }
 
   type Mutation {
@@ -257,6 +258,14 @@ const typeDefs = gql`
     addUserCredits(input: AddUserCreditsInput!): AddUserCreditsResult!
     addCreditsToAllUsers(amount: Float!, reason: String!): AddCreditsToAllUsersResult!
     applyCreditsToOrder(orderId: String!, amount: Float!): ApplyCreditsResult!
+    
+    # User Profile mutations
+    updateUserProfileNames(userId: ID!, firstName: String!, lastName: String!): UserProfileResult!
+    createUserProfile(userId: ID!, firstName: String, lastName: String): UserProfileResult!
+    updateUserProfilePhoto(userId: ID!, photoUrl: String!, photoPublicId: String): UserProfileResult!
+    updateUserProfileBanner(userId: ID!, bannerUrl: String, bannerPublicId: String, bannerTemplate: String, bannerTemplateId: Int): UserProfileResult!
+    updateUserProfileCompany(userId: ID!, companyName: String!): UserProfileResult!
+    updateUserProfileComprehensive(userId: ID!, input: UserProfileInput!): UserProfileResult!
   }
 
   type Customer {
@@ -284,6 +293,40 @@ const typeDefs = gql`
     company: String
     createdAt: String!
     lastSignIn: String
+  }
+
+  type UserProfile {
+    id: ID!
+    userId: ID!
+    firstName: String
+    lastName: String
+    displayName: String
+    bio: String
+    profilePhotoUrl: String
+    bannerImageUrl: String
+    profilePhotoPublicId: String
+    bannerImagePublicId: String
+    bannerTemplate: String
+    bannerTemplateId: Int
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  type UserProfileResult {
+    success: Boolean!
+    message: String
+    userProfile: UserProfile
+  }
+
+  input UserProfileInput {
+    firstName: String
+    lastName: String
+    companyName: String
+    profilePhotoUrl: String
+    profilePhotoPublicId: String
+    bannerImageUrl: String
+    bannerImagePublicId: String
+    bio: String
   }
 
   type Address {
@@ -2056,6 +2099,55 @@ const resolvers = {
         console.error('❌ Error fetching all users:', error);
         throw new Error('Failed to fetch users');
       }
+    },
+
+    getUserProfile: async (_, { userId }) => {
+      try {
+        console.log('👤 Fetching user profile for:', userId);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Profile service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Fetch user profile
+        const { data: profile, error } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        if (error) {
+          if (error.code === 'PGRST116') {
+            // No profile found - this is normal for new users
+            console.log('⚠️ No profile found for user:', userId);
+            return null;
+          }
+          console.error('❌ Error fetching user profile:', error);
+          throw new Error(`Failed to fetch profile: ${error.message}`);
+        }
+
+        console.log('✅ Successfully fetched user profile');
+        
+        return {
+          id: profile.id,
+          userId: profile.user_id,
+          firstName: profile.first_name,
+          lastName: profile.last_name,
+          displayName: profile.display_name,
+          bio: profile.bio,
+          profilePhotoUrl: profile.profile_photo_url,
+          bannerImageUrl: profile.banner_image_url,
+          profilePhotoPublicId: profile.profile_photo_public_id,
+          bannerImagePublicId: profile.banner_image_public_id,
+          createdAt: profile.created_at,
+          updatedAt: profile.updated_at
+        };
+      } catch (error) {
+        console.error('❌ Error in getUserProfile:', error);
+        throw new Error(error.message);
+      }
     }
   },
 
@@ -3028,14 +3120,28 @@ const resolvers = {
               
               // Update order with Stripe session ID
               if (customerOrder && supabaseClient.isReady()) {
-                const client = supabaseClient.getServiceClient();
-                await client
-                  .from('orders_main')
-                  .update({ 
-                    stripe_session_id: sessionResult.sessionId,
-                    updated_at: new Date().toISOString()
-                  })
-                  .eq('id', customerOrder.id);
+                try {
+                  const client = supabaseClient.getServiceClient();
+                  const { error: updateError } = await client
+                    .from('orders_main')
+                    .update({ 
+                      stripe_session_id: sessionResult.sessionId,
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('id', customerOrder.id);
+                  
+                  if (updateError) {
+                    console.error('❌ Failed to update order with Stripe session ID:', updateError);
+                    console.error('Order ID:', customerOrder.id);
+                    console.error('Session ID:', sessionResult.sessionId);
+                    errors.push('Failed to link payment session with order');
+                  } else {
+                    console.log('✅ Order updated with Stripe session ID:', sessionResult.sessionId);
+                  }
+                } catch (sessionUpdateError) {
+                  console.error('❌ Critical error updating order with session ID:', sessionUpdateError);
+                  errors.push('Failed to link payment session with order');
+                }
               }
             } else {
               console.error('❌ Stripe session creation failed:', sessionResult);
@@ -4081,6 +4187,400 @@ const resolvers = {
       } catch (error) {
         console.error('❌ Error applying credits to order:', error);
         throw new Error('Failed to apply credits');
+      }
+    },
+
+    // User Profile mutations
+    updateUserProfileNames: async (_, { userId, firstName, lastName }) => {
+      try {
+        console.log('📝 Updating user profile names:', { userId, firstName, lastName });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Profile service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Call the database function we created
+        const { data, error } = await client.rpc('update_user_profile_names', {
+          p_user_id: userId,
+          p_first_name: firstName,
+          p_last_name: lastName
+        });
+
+        if (error) {
+          console.error('❌ Error updating user profile names:', error);
+          throw new Error(`Failed to update profile: ${error.message}`);
+        }
+
+        // Fetch the updated profile
+        const { data: profile, error: fetchError } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        if (fetchError) {
+          console.error('❌ Error fetching updated profile:', fetchError);
+          throw new Error('Profile updated but failed to fetch result');
+        }
+
+        console.log('✅ Successfully updated user profile names');
+        
+        return {
+          success: true,
+          message: 'Profile names updated successfully',
+          userProfile: {
+            id: profile.id,
+            userId: profile.user_id,
+            firstName: profile.first_name,
+            lastName: profile.last_name,
+            displayName: profile.display_name,
+            bio: profile.bio,
+            profilePhotoUrl: profile.profile_photo_url,
+            bannerImageUrl: profile.banner_image_url,
+            profilePhotoPublicId: profile.profile_photo_public_id,
+            bannerImagePublicId: profile.banner_image_public_id,
+            createdAt: profile.created_at,
+            updatedAt: profile.updated_at
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in updateUserProfileNames:', error);
+        return {
+          success: false,
+          message: error.message,
+          userProfile: null
+        };
+      }
+    },
+
+    createUserProfile: async (_, { userId, firstName, lastName }) => {
+      try {
+        console.log('👤 Creating user profile:', { userId, firstName, lastName });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Profile service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Call the database function we created
+        const { data, error } = await client.rpc('create_user_profile', {
+          p_user_id: userId,
+          p_first_name: firstName,
+          p_last_name: lastName
+        });
+
+        if (error) {
+          console.error('❌ Error creating user profile:', error);
+          throw new Error(`Failed to create profile: ${error.message}`);
+        }
+
+        // Fetch the created profile
+        const { data: profile, error: fetchError } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        if (fetchError) {
+          console.error('❌ Error fetching created profile:', fetchError);
+          throw new Error('Profile created but failed to fetch result');
+        }
+
+        console.log('✅ Successfully created user profile');
+        
+        return {
+          success: true,
+          message: 'Profile created successfully',
+          userProfile: {
+            id: profile.id,
+            userId: profile.user_id,
+            firstName: profile.first_name,
+            lastName: profile.last_name,
+            displayName: profile.display_name,
+            bio: profile.bio,
+            profilePhotoUrl: profile.profile_photo_url,
+            bannerImageUrl: profile.banner_image_url,
+            profilePhotoPublicId: profile.profile_photo_public_id,
+            bannerImagePublicId: profile.banner_image_public_id,
+            createdAt: profile.created_at,
+            updatedAt: profile.updated_at
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in createUserProfile:', error);
+        return {
+          success: false,
+          message: error.message,
+          userProfile: null
+        };
+      }
+    },
+
+    updateUserProfilePhoto: async (_, { userId, photoUrl, photoPublicId }) => {
+      try {
+        console.log('📸 Updating user profile photo:', { userId, photoUrl });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Profile service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Call the database function
+        const { data, error } = await client.rpc('update_user_profile_photo', {
+          p_user_id: userId,
+          p_photo_url: photoUrl,
+          p_photo_public_id: photoPublicId
+        });
+
+        if (error) {
+          console.error('❌ Error updating profile photo:', error);
+          throw new Error(`Failed to update profile photo: ${error.message}`);
+        }
+
+        // Fetch the updated profile
+        const { data: profile, error: fetchError } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        if (fetchError) {
+          console.error('❌ Error fetching updated profile:', fetchError);
+          throw new Error('Profile photo updated but failed to fetch result');
+        }
+
+        console.log('✅ Successfully updated profile photo');
+        
+        return {
+          success: true,
+          message: 'Profile photo updated successfully',
+          userProfile: {
+            id: profile.id,
+            userId: profile.user_id,
+            firstName: profile.first_name,
+            lastName: profile.last_name,
+            displayName: profile.display_name,
+            bio: profile.bio,
+            profilePhotoUrl: profile.profile_photo_url,
+            bannerImageUrl: profile.banner_image_url,
+            profilePhotoPublicId: profile.profile_photo_public_id,
+            bannerImagePublicId: profile.banner_image_public_id,
+            createdAt: profile.created_at,
+            updatedAt: profile.updated_at
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in updateUserProfilePhoto:', error);
+        return {
+          success: false,
+          message: error.message,
+          userProfile: null
+        };
+      }
+    },
+
+    updateUserProfileBanner: async (_, { userId, bannerUrl, bannerPublicId, bannerTemplate, bannerTemplateId }) => {
+      try {
+        console.log('🖼️ Updating user profile banner:', { userId, bannerUrl, bannerTemplate, bannerTemplateId });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Profile service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Use the enhanced function that supports templates
+        const { data, error } = await client.rpc('update_user_banner_image', {
+          p_user_id: userId,
+          p_banner_image_url: bannerUrl,
+          p_banner_image_public_id: bannerPublicId,
+          p_banner_template: bannerTemplate,
+          p_banner_template_id: bannerTemplateId
+        });
+
+        if (error) {
+          console.error('❌ Error updating profile banner:', error);
+          throw new Error(`Failed to update profile banner: ${error.message}`);
+        }
+
+        // Fetch the updated profile
+        const { data: profile, error: fetchError } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        if (fetchError) {
+          console.error('❌ Error fetching updated profile:', fetchError);
+          throw new Error('Profile banner updated but failed to fetch result');
+        }
+
+        console.log('✅ Successfully updated profile banner');
+        
+        return {
+          success: true,
+          message: 'Profile banner updated successfully',
+          userProfile: {
+            id: profile.id,
+            userId: profile.user_id,
+            firstName: profile.first_name,
+            lastName: profile.last_name,
+            displayName: profile.display_name,
+            bio: profile.bio,
+            profilePhotoUrl: profile.profile_photo_url,
+            bannerImageUrl: profile.banner_image_url,
+            profilePhotoPublicId: profile.profile_photo_public_id,
+            bannerImagePublicId: profile.banner_image_public_id,
+            bannerTemplate: profile.banner_template,
+            bannerTemplateId: profile.banner_template_id,
+            createdAt: profile.created_at,
+            updatedAt: profile.updated_at
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in updateUserProfileBanner:', error);
+        return {
+          success: false,
+          message: error.message,
+          userProfile: null
+        };
+      }
+    },
+
+    updateUserProfileCompany: async (_, { userId, companyName }) => {
+      try {
+        console.log('🏢 Updating user profile company:', { userId, companyName });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Profile service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Call the database function
+        const { data, error } = await client.rpc('update_user_profile_company', {
+          p_user_id: userId,
+          p_company_name: companyName
+        });
+
+        if (error) {
+          console.error('❌ Error updating profile company:', error);
+          throw new Error(`Failed to update company name: ${error.message}`);
+        }
+
+        // Fetch the updated profile
+        const { data: profile, error: fetchError } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        if (fetchError) {
+          console.error('❌ Error fetching updated profile:', fetchError);
+          throw new Error('Company name updated but failed to fetch result');
+        }
+
+        console.log('✅ Successfully updated company name');
+        
+        return {
+          success: true,
+          message: 'Company name updated successfully',
+          userProfile: {
+            id: profile.id,
+            userId: profile.user_id,
+            firstName: profile.first_name,
+            lastName: profile.last_name,
+            displayName: profile.display_name,
+            bio: profile.bio,
+            profilePhotoUrl: profile.profile_photo_url,
+            bannerImageUrl: profile.banner_image_url,
+            profilePhotoPublicId: profile.profile_photo_public_id,
+            bannerImagePublicId: profile.banner_image_public_id,
+            createdAt: profile.created_at,
+            updatedAt: profile.updated_at
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in updateUserProfileCompany:', error);
+        return {
+          success: false,
+          message: error.message,
+          userProfile: null
+        };
+      }
+    },
+
+    updateUserProfileComprehensive: async (_, { userId, input }) => {
+      try {
+        console.log('🔄 Updating user profile comprehensively:', { userId, input });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Profile service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Call the database function
+        const { data, error } = await client.rpc('update_user_profile_comprehensive', {
+          p_user_id: userId,
+          p_first_name: input.firstName,
+          p_last_name: input.lastName,
+          p_company_name: input.companyName,
+          p_profile_photo_url: input.profilePhotoUrl,
+          p_profile_photo_public_id: input.profilePhotoPublicId,
+          p_banner_image_url: input.bannerImageUrl,
+          p_banner_image_public_id: input.bannerImagePublicId,
+          p_bio: input.bio
+        });
+
+        if (error) {
+          console.error('❌ Error updating profile comprehensively:', error);
+          throw new Error(`Failed to update profile: ${error.message}`);
+        }
+
+        // Fetch the updated profile
+        const { data: profile, error: fetchError } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        if (fetchError) {
+          console.error('❌ Error fetching updated profile:', fetchError);
+          throw new Error('Profile updated but failed to fetch result');
+        }
+
+        console.log('✅ Successfully updated profile comprehensively');
+        
+        return {
+          success: true,
+          message: 'Profile updated successfully',
+          userProfile: {
+            id: profile.id,
+            userId: profile.user_id,
+            firstName: profile.first_name,
+            lastName: profile.last_name,
+            displayName: profile.display_name,
+            bio: profile.bio,
+            profilePhotoUrl: profile.profile_photo_url,
+            bannerImageUrl: profile.banner_image_url,
+            profilePhotoPublicId: profile.profile_photo_public_id,
+            bannerImagePublicId: profile.banner_image_public_id,
+            createdAt: profile.created_at,
+            updatedAt: profile.updated_at
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in updateUserProfileComprehensive:', error);
+        return {
+          success: false,
+          message: error.message,
+          userProfile: null
+        };
       }
     }
   }

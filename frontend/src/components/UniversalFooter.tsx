@@ -33,7 +33,7 @@ export default function UniversalFooter() {
   return (
     <>
       <footer className="py-12 mt-8" style={{ backgroundColor: '#030140', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-        <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {/* Quick Links */}
             <div>
@@ -43,10 +43,10 @@ export default function UniversalFooter() {
               </h3>
               <ul className="space-y-3">
                 <li>
-                  <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
+                  <Link href="/shipping-process" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
                     <span className="mr-2">🚚</span>
                     Shipping Process
-                  </a>
+                  </Link>
                 </li>
                 <li>
                   <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">

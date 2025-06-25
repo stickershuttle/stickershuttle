@@ -37,10 +37,10 @@ BEGIN
     now()
   )
   ON CONFLICT (user_id) DO UPDATE SET
-    banner_image_url = COALESCE(EXCLUDED.banner_image_url, user_profiles.banner_image_url),
-    banner_image_public_id = COALESCE(EXCLUDED.banner_image_public_id, user_profiles.banner_image_public_id),
-    banner_template = COALESCE(EXCLUDED.banner_template, user_profiles.banner_template),
-    banner_template_id = COALESCE(EXCLUDED.banner_template_id, user_profiles.banner_template_id),
+    banner_image_url = EXCLUDED.banner_image_url,
+    banner_image_public_id = EXCLUDED.banner_image_public_id,
+    banner_template = EXCLUDED.banner_template,
+    banner_template_id = EXCLUDED.banner_template_id,
     updated_at = now();
   
   RETURN TRUE;

@@ -69,6 +69,22 @@ body:not(.admin-page) {
   }
 }
 
+/* MacBook optimized widths - better space utilization */
+@media (min-width: 1280px) {
+  /* XL screens (MacBook Air, MacBook Pro) - 90% width */
+  .xl\:w-\[90\%\] {
+    width: 90% !important;
+  }
+}
+
+/* Large desktop screens */
+@media (min-width: 1536px) {
+  /* 2XL screens - Maintain readable content width on very large screens */
+  .\32xl\:w-\[75\%\] {
+    width: 75% !important;
+  }
+}
+
 /* Glassmorphism styles with #1a144a tint */
 .glassmorphism {
   background: linear-gradient(135deg, rgba(26, 20, 74, 0.4) 0%, rgba(26, 20, 74, 0.2) 100%);

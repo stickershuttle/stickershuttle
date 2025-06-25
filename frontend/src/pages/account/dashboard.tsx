@@ -13,6 +13,7 @@ import {
   MARK_CREDIT_NOTIFICATIONS_READ,
   GET_USER_EARNED_CREDITS_BY_ORDER
 } from '../../lib/credit-mutations';
+import { UPDATE_USER_PROFILE_PHOTO, UPDATE_USER_PROFILE_BANNER } from '../../lib/profile-mutations';
 
 
 // Mutation to update proof status (same as proofs page)
@@ -190,6 +191,11 @@ function Dashboard() {
   const [updatedQuantities, setUpdatedQuantities] = useState<{ [index: number]: number }>({});
   const [updatedPrices, setUpdatedPrices] = useState<{ [index: number]: { total: number; perSticker: number } }>({});
   const [pricingData, setPricingData] = useState<any>(null);
+  // Terminal loading animation state
+  const [showTerminalLoader, setShowTerminalLoader] = useState(true);
+  const [terminalLoadingDots, setTerminalLoadingDots] = useState('');
+  const [terminalOrderText, setTerminalOrderText] = useState('');
+  const [isTerminalTyping, setIsTerminalTyping] = useState(false);
   // Calculate rush savings using useMemo to avoid infinite re-renders
   const rushSavingsAmount = useMemo(() => {
     if (!reorderOrderData || !showReorderPopup) return 0;
@@ -259,8 +265,10 @@ function Dashboard() {
   const [creditBalance, setCreditBalance] = useState<number>(0);
   const [previousCreditBalance, setPreviousCreditBalance] = useState<number>(0);
   const [creditNotifications, setCreditNotifications] = useState<any[]>([]);
+  const [lifetimeCredits, setLifetimeCredits] = useState<number>(0);
   const [showCreditNotification, setShowCreditNotification] = useState(false);
   const [showAnimatedCounter, setShowAnimatedCounter] = useState(false);
+  const [expandedPillButton, setExpandedPillButton] = useState<string | null>(null);
 
   // Add invoice data state and hook at top level
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
@@ -379,6 +387,29 @@ function Dashboard() {
         75% { transform: translate(-1px, -1px); }
         100% { transform: translate(0, 0); }
       }
+      
+      @keyframes float-1 {
+        0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+        33% { transform: translateY(-10px) rotate(15deg) scale(1.05); }
+        66% { transform: translateY(-5px) rotate(-10deg) scale(0.95); }
+      }
+      
+      @keyframes float-2 {
+        0%, 100% { transform: translateY(0) translateX(0) rotate(0deg); }
+        25% { transform: translateY(-8px) translateX(4px) rotate(10deg); }
+        50% { transform: translateY(-12px) translateX(-2px) rotate(20deg); }
+        75% { transform: translateY(-8px) translateX(6px) rotate(15deg); }
+      }
+      
+      @keyframes float-3 {
+        0%, 100% { transform: translateY(0) translateZ(0) rotate(0deg); }
+        50% { transform: translateY(-8px) translateZ(20px) rotate(25deg); }
+      }
+      
+      @keyframes depth-blur {
+        0%, 100% { filter: blur(2px); opacity: 0.4; }
+        50% { filter: blur(0px); opacity: 0.8; }
+      }
 
       .container-style {
         background: rgba(255, 255, 255, 0.05);
@@ -453,6 +484,233 @@ function Dashboard() {
       }, 10000);
     }
   }, [router]);
+
+  // Terminal loading animation
+  useEffect(() => {
+    // Show terminal for all views
+    if (showTerminalLoader) {
+      // Reset terminal text when view changes
+      setTerminalLoadingDots('');
+      setTerminalOrderText('');
+      setIsTerminalTyping(false);
+      
+      // Animate dots
+      const dotsInterval = setInterval(() => {
+        setTerminalLoadingDots(prev => {
+          if (prev.length >= 3) return '';
+          return prev + '.';
+        });
+      }, 500);
+
+      // After 2 seconds, start typing the appropriate message
+      const typingTimeout = setTimeout(() => {
+        clearInterval(dotsInterval);
+        setIsTerminalTyping(true);
+        
+        let orderText = '';
+        
+        // Dynamic messages based on currentView
+        switch (currentView) {
+          case 'default':
+            // Get most recent order for default view
+            const mostRecentOrder = orders.length > 0 ? orders[0] : null;
+            
+            if (mostRecentOrder && mostRecentOrder.status) {
+              // Map status to display text
+              const statusMap: { [key: string]: string } = {
+                'paid': 'PAYMENT RECEIVED',
+                'unpaid': 'AWAITING PAYMENT',
+                'pending': 'PROCESSING',
+                'processing': 'IN PRODUCTION',
+                'shipped': 'SHIPPED',
+                'delivered': 'DELIVERED',
+                'cancelled': 'CANCELLED',
+                'refunded': 'REFUNDED',
+                'on_hold': 'ON HOLD',
+                'failed': 'FAILED',
+                'Proof Review Needed': 'PROOF REVIEW NEEDED',
+                'Reviewing Changes': 'REVIEWING CHANGES',
+                'Proof Approved': 'PROOF APPROVED',
+                'Pre-production': 'PRE-PRODUCTION',
+                'Ready to Ship': 'READY TO SHIP',
+                'Out for Delivery': 'OUT FOR DELIVERY'
+              };
+              
+              const displayStatus = statusMap[mostRecentOrder.status] || (mostRecentOrder.status ? mostRecentOrder.status.toUpperCase() : 'UNKNOWN');
+              
+              const orderNum = mostRecentOrder.orderNumber || mostRecentOrder.id || 'N/A';
+              const trackingStatus = mostRecentOrder.trackingNumber ? 'AVAILABLE' : 'PENDING';
+              
+              // Ensure no undefined values in the string - extra safety
+              const safeOrderNum = orderNum === undefined || orderNum === null ? 'N/A' : String(orderNum);
+              const safeDisplayStatus = displayStatus === undefined || displayStatus === null ? 'UNKNOWN' : String(displayStatus);
+              const safeTrackingStatus = trackingStatus === undefined || trackingStatus === null ? 'PENDING' : String(trackingStatus);
+              
+              orderText = `> ORDER #${safeOrderNum}\n> STATUS: ${safeDisplayStatus}\n> TRACKING: ${safeTrackingStatus}`;
+            } else {
+              orderText = '> NO MISSIONS DETECTED\n> CLICK THE START NEW MISSION BUTTON BELOW';
+            }
+            break;
+            
+          case 'all-orders':
+            orderText = '> LOADING ORDERS...';
+            // After typing LOADING ORDERS..., show order list with typing effect
+            setTimeout(() => {
+              let ordersDisplay = '';
+              if (orders.length > 0) {
+                // Show last 3 orders
+                const recentOrders = orders.slice(0, 3);
+                recentOrders.forEach((order, index) => {
+                  const orderNum = order.orderNumber || order.id || 'N/A';
+                  ordersDisplay += `\n> ORDER #${orderNum}`;
+                });
+                
+                // Show +X more if there are more than 3
+                if (orders.length > 3) {
+                  ordersDisplay += `\n> +${orders.length - 3} MORE`;
+                }
+              } else {
+                ordersDisplay = '\n> NO ORDERS FOUND';
+              }
+              typeText(ordersDisplay, '> LOADING ORDERS...');
+            }, 1500);
+            break;
+            
+          case 'financial':
+            orderText = '> LOADING FINANCES...';
+            // After typing LOADING FINANCES..., show financial info with typing effect
+            setTimeout(() => {
+              // Calculate total stickers from all orders
+              let totalStickers = 0;
+              let totalInvested = 0;
+              orders.forEach(order => {
+                order.items?.forEach(item => {
+                  totalStickers += item.quantity || 0;
+                });
+                totalInvested += order.total || 0;
+              });
+              
+              const financialDisplay = `\n> $${creditBalance.toFixed(2)} STORE CREDIT\n> $${totalInvested.toFixed(2)} TOTAL INVESTED\n> ${totalStickers} STICKERS PRINTED`;
+              typeText(financialDisplay, '> LOADING FINANCES...');
+            }, 1500);
+            break;
+            
+          case 'design-vault':
+            orderText = '> DESIGNS LOADING...';
+            // After typing DESIGNS LOADING..., show design count with typing effect
+            setTimeout(() => {
+              // Count unique designs from orders (same logic as design vault view)
+              const uniqueDesigns = new Set();
+              orders.forEach(order => {
+                order.items?.forEach(item => {
+                  if (item.name && item.image) {
+                    uniqueDesigns.add(item.name);
+                  }
+                });
+              });
+              
+              const designCount = uniqueDesigns.size;
+              const designWord = designCount === 1 ? 'DESIGN' : 'DESIGNS';
+              const designDisplay = `\n> ${designCount} ${designWord} IN THE CLOUD`;
+              typeText(designDisplay, '> DESIGNS LOADING...');
+            }, 1500);
+            break;
+            
+          case 'proofs':
+            // Check if there are proofs to review
+            const proofsToReview = orders.filter(order => 
+              order.status === 'Proof Review Needed' || order.status === 'Reviewing Changes'
+            );
+            
+            if (proofsToReview.length > 0) {
+              orderText = '> MISSION ALERT: YOU HAVE PROOF(S) TO APPROVE. ACT NOW!';
+            } else {
+              // Check if all proofs are approved
+              const hasApprovedProofs = orders.some(order => 
+                order.status === 'Proof Approved' || order.proof_status === 'approved'
+              );
+              
+              if (hasApprovedProofs) {
+                orderText = '> VINNY: ALL SYSTEMS CLEAR, READY TO LAUNCH.\n> COMMAND: LAUNCHING';
+                // Add cycling dots for LAUNCHING after typing
+                setTimeout(() => {
+                  let dots = '';
+                  const launchInterval = setInterval(() => {
+                    dots = dots.length >= 3 ? '.' : dots + '.';
+                    setTerminalOrderText(`> VINNY: ALL SYSTEMS CLEAR, READY TO LAUNCH.\n> COMMAND: LAUNCHING${dots}`);
+                  }, 500);
+                  
+                  // Store interval to clear later
+                  (window as any).launchInterval = launchInterval;
+                }, 3000); // Give time for typing to complete
+              } else {
+                orderText = '> NO MISSIONS AVAILABLE.';
+              }
+            }
+            break;
+            
+          case 'support':
+            orderText = '> COMMAND: HELP! REQUESTING BACKUP!\n> VINNY: WE\'RE COMING IN, COMMAND, HANG TIGHT.';
+            break;
+            
+          case 'settings':
+            orderText = '> ADJUSTING PANELS';
+            // Add cycling dots and second message after typing
+            setTimeout(() => {
+              let dots = '';
+              const adjustInterval = setInterval(() => {
+                dots = dots.length >= 3 ? '.' : dots + '.';
+                setTerminalOrderText(`> ADJUSTING PANELS${dots}\n> TWEAKING FLIGHT PATTERNS...`);
+              }, 500);
+              
+              // Store interval to clear later
+              (window as any).adjustInterval = adjustInterval;
+            }, 2000); // Give time for typing to complete
+            break;
+            
+          default:
+            orderText = '> SYSTEM READY';
+        }
+        
+        // Helper function to type out text character by character
+        const typeText = (text: string, startingText: string = '') => {
+          setTerminalOrderText(startingText);
+          let charIndex = 0;
+          const typeInterval = setInterval(() => {
+            if (charIndex < text.length) {
+              const currentChar = text[charIndex];
+              if (currentChar !== undefined) {
+                setTerminalOrderText(prev => prev + currentChar);
+              }
+              charIndex++;
+            } else {
+              clearInterval(typeInterval);
+            }
+          }, 30);
+          return typeInterval;
+        };
+
+        // Type out the initial message character by character
+        const mainTypeInterval = typeText(orderText);
+
+        return () => clearInterval(mainTypeInterval);
+      }, currentView === 'default' ? 2000 : 500); // Faster for non-default views
+
+      return () => {
+        clearInterval(dotsInterval);
+        clearTimeout(typingTimeout);
+        // Clear any running intervals
+        if ((window as any).launchInterval) {
+          clearInterval((window as any).launchInterval);
+          delete (window as any).launchInterval;
+        }
+        if ((window as any).adjustInterval) {
+          clearInterval((window as any).adjustInterval);
+          delete (window as any).adjustInterval;
+        }
+      };
+    }
+  }, [currentView, orders, creditBalance, lifetimeCredits]);
 
   // Handle URL query parameters for view navigation
   useEffect(() => {
@@ -622,6 +880,19 @@ function Dashboard() {
       if (creditHistoryData?.getUserCreditHistory) {
         // Store credit history on user object for access in financial view
         (user as any).creditHistory = creditHistoryData.getUserCreditHistory;
+        
+        // Calculate lifetime credits earned - ensure it's an array first
+        if (Array.isArray(creditHistoryData.getUserCreditHistory)) {
+          const lifetimeTotal = creditHistoryData.getUserCreditHistory.reduce((sum: number, credit: any) => {
+            if (credit.transaction_type === 'earned') {
+              return sum + Math.abs(credit.amount);
+            }
+            return sum;
+          }, 0);
+          setLifetimeCredits(lifetimeTotal);
+        } else {
+          setLifetimeCredits(0);
+        }
       }
     } catch (error: any) {
       console.error('Error fetching credit data:', error);
@@ -744,7 +1015,10 @@ function Dashboard() {
   const [showBannerTemplates, setShowBannerTemplates] = useState(false);
 
 
-  const handleProfilePictureClick = () => {
+  const handleProfilePictureClick = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation(); // Prevent click from bubbling to banner
+    }
     if (uploadingProfilePhoto) return;
     
     const input = document.createElement('input');
@@ -792,22 +1066,19 @@ function Dashboard() {
       const { uploadToCloudinary } = await import('../../utils/cloudinary');
       const result = await uploadToCloudinary(file, undefined, undefined, 'profile-photos');
 
-      // Update Supabase profile
-      const supabase = await getSupabase();
-      const { error } = await supabase
-        .from('user_profiles')
-        .upsert({
-          user_id: (user as any).id,
-          profile_photo_url: result.secure_url,
-          profile_photo_public_id: result.public_id,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id'
-        });
+      // Update profile using GraphQL mutation
+      const { data, errors } = await client.mutate({
+        mutation: UPDATE_USER_PROFILE_PHOTO,
+        variables: {
+          userId: (user as any).id,
+          photoUrl: result.secure_url,
+          photoPublicId: result.public_id
+        }
+      });
 
-      if (error) {
-        console.error('Error updating profile:', error);
-        alert('Failed to update profile photo');
+      if (errors || !data?.updateUserProfilePhoto?.success) {
+        console.error('GraphQL error updating profile photo:', errors);
+        alert(data?.updateUserProfilePhoto?.message || 'Failed to update profile photo');
         return;
       }
 
@@ -846,30 +1117,32 @@ function Dashboard() {
       const { uploadToCloudinary } = await import('../../utils/cloudinary');
       const result = await uploadToCloudinary(file, undefined, undefined, 'profile-banners');
 
-      // Update Supabase profile
-      const supabase = await getSupabase();
-      const { error } = await supabase
-        .from('user_profiles')
-        .upsert({
-          user_id: (user as any).id,
-          banner_image_url: result.secure_url,
-          banner_image_public_id: result.public_id,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id'
-        });
+      // Update profile using GraphQL mutation
+      const { data, errors } = await client.mutate({
+        mutation: UPDATE_USER_PROFILE_BANNER,
+        variables: {
+          userId: (user as any).id,
+          bannerUrl: result.secure_url,
+          bannerPublicId: result.public_id,
+          bannerTemplate: null, // Clear template when uploading custom image
+          bannerTemplateId: null
+        }
+      });
 
-      if (error) {
-        console.error('Error updating banner:', error);
-        alert('Failed to update banner image');
+      if (errors || !data?.updateUserProfileBanner?.success) {
+        console.error('GraphQL error updating banner:', errors);
+        alert(data?.updateUserProfileBanner?.message || 'Failed to update banner image');
         return;
       }
 
-      // Update local profile state
+      // Update local profile state with the response data
+      const updatedProfile = data.updateUserProfileBanner.userProfile;
       setProfile((prev: any) => ({
         ...prev,
-        banner_image_url: result.secure_url,
-        banner_image_public_id: result.public_id
+        banner_image_url: updatedProfile.bannerImageUrl,
+        banner_image_public_id: updatedProfile.bannerImagePublicId,
+        banner_template: updatedProfile.bannerTemplate,
+        banner_template_id: updatedProfile.bannerTemplateId
       }));
 
       console.log('✅ Banner image updated successfully');
@@ -891,39 +1164,37 @@ function Dashboard() {
       return;
     }
     
-    setUploadingBanner(true);
-    
     try {
-      // Update profile in Supabase to remove banner
-      const supabase = await getSupabase();
-      const { error } = await supabase
-        .from('user_profiles')
-        .upsert({
-          user_id: (user as any).id,
-          banner_image_url: null,
-          banner_image_public_id: null,
-          banner_template: null,
-          banner_template_id: null,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id'
-        });
+      setUploadingBanner(true);
       
-      if (error) {
-        console.error('Error removing banner:', error);
-        alert(`Failed to remove banner: ${error.message}`);
+      // Use GraphQL mutation to remove banner
+      const { data, errors } = await client.mutate({
+        mutation: UPDATE_USER_PROFILE_BANNER,
+        variables: {
+          userId: (user as any).id,
+          bannerUrl: null,
+          bannerPublicId: null,
+          bannerTemplate: null,
+          bannerTemplateId: null
+        }
+      });
+
+      if (errors || !data?.updateUserProfileBanner?.success) {
+        console.error('GraphQL error removing banner:', errors);
+        alert(data?.updateUserProfileBanner?.message || 'Failed to remove banner');
         return;
       }
-      
-      // Update local profile state
+
+      // Update local profile state with the response data
+      const updatedProfile = data.updateUserProfileBanner.userProfile;
       setProfile((prev: any) => ({
         ...prev,
-        banner_image_url: null,
-        banner_image_public_id: null,
-        banner_template: null,
-        banner_template_id: null
+        banner_image_url: updatedProfile.bannerImageUrl,
+        banner_image_public_id: updatedProfile.bannerImagePublicId,
+        banner_template: updatedProfile.bannerTemplate,
+        banner_template_id: updatedProfile.bannerTemplateId
       }));
-      
+
       console.log('✅ Banner removed successfully');
       
     } catch (error) {
@@ -1042,9 +1313,114 @@ function Dashboard() {
 
 
 
-    // Additional Business Templates  
+    // Space/NASA Templates
     {
       id: 11,
+      name: 'ISS Space Station View',
+      category: 'cosmic',
+      style: {
+        backgroundImage: 'url(https://images-assets.nasa.gov/image/iss073e0204297/iss073e0204297~orig.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }
+    },
+    {
+      id: 12,
+      name: 'Earth from Space',
+      category: 'cosmic',
+      style: {
+        backgroundImage: 'url(https://images-assets.nasa.gov/image/a-sky-view-of-earth-from-suomi-npp_16611703184_o/a-sky-view-of-earth-from-suomi-npp_16611703184_o~orig.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }
+    },
+    {
+      id: 13,
+      name: 'Orbital Station',
+      category: 'cosmic',
+      style: {
+        backgroundImage: 'url(https://images-assets.nasa.gov/image/iss040e080833/iss040e080833~orig.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }
+    },
+    {
+      id: 18,
+      name: 'Cosmic Nebula',
+      category: 'cosmic',
+      style: {
+        backgroundImage: 'url(https://images-assets.nasa.gov/image/GSFC_20171208_Archive_e001863/GSFC_20171208_Archive_e001863~orig.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }
+    },
+    {
+      id: 19,
+      name: 'Deep Space Field',
+      category: 'cosmic',
+      style: {
+        backgroundImage: 'url(https://images-assets.nasa.gov/image/GSFC_20171208_Archive_e001283/GSFC_20171208_Archive_e001283~orig.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }
+    },
+    {
+      id: 28,
+      name: 'Stellar Portal',
+      category: 'cosmic',
+      style: {
+        backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750882296/14ed8220-f009-4393-95c4-30d05aabb2ef.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        animation: 'none'
+      }
+    },
+    {
+      id: 27,
+      name: 'Home Sweet Home',
+      category: 'cosmic',
+      style: {
+        backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750047799/ffa6f149-a6c6-4656-b721-3384d1f5b61a.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        animation: 'none'
+      }
+    },
+    {
+      id: 29,
+      name: 'Galactic Vista',
+      category: 'cosmic',
+      style: {
+        backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750883615/261355a9-3a2b-48d8-ad79-08ce1407d61b.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        animation: 'none'
+      }
+    },
+    {
+      id: 30,
+      name: 'Cosmic Horizon',
+      category: 'cosmic',
+      style: {
+        backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750883812/23405df7-ea7d-47b6-81b2-c16dbb950f31.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        animation: 'none'
+      }
+    },
+
+    // Additional Business Templates  
+    {
+      id: 14,
       name: 'Music Studio',
       category: 'business',
       style: {
@@ -1053,7 +1429,7 @@ function Dashboard() {
       emojis: ['🎵', '🎤', '🎸', '🥁', '🎹', '🎧']
     },
     {
-      id: 12,
+      id: 15,
       name: 'Restaurant',
       category: 'business',
       style: {
@@ -1062,7 +1438,7 @@ function Dashboard() {
       emojis: ['🍕', '🍔', '🍜', '🥗', '🍷', '👨‍🍳']
     },
     {
-      id: 13,
+      id: 16,
       name: 'Spa & Wellness',
       category: 'business',
       style: {
@@ -1071,7 +1447,7 @@ function Dashboard() {
       emojis: ['🧘‍♀️', '💆‍♀️', '🌿', '🕯️', '🛁', '✨']
     },
     {
-      id: 14,
+      id: 17,
       name: 'Auto Repair',
       category: 'business',
       style: {
@@ -1219,34 +1595,32 @@ function Dashboard() {
       // Create a CSS string for the template
       const templateCSS = JSON.stringify(template.style);
       
-      // Update profile in Supabase with template data
-      const supabase = await getSupabase();
-      const { error } = await supabase
-        .from('user_profiles')
-        .upsert({
-          user_id: (user as any).id,
-          banner_image_url: null, // Clear custom image
-          banner_image_public_id: null,
-          banner_template: templateCSS,
-          banner_template_id: template.id,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id'
-        });
-      
-      if (error) {
-        console.error('Error updating banner template:', error);
-        alert('Failed to apply template');
+      // Update profile using GraphQL mutation
+      const { data, errors } = await client.mutate({
+        mutation: UPDATE_USER_PROFILE_BANNER,
+        variables: {
+          userId: (user as any).id,
+          bannerUrl: null, // Clear custom image for template
+          bannerPublicId: null,
+          bannerTemplate: templateCSS,
+          bannerTemplateId: template.id
+        }
+      });
+
+      if (errors || !data?.updateUserProfileBanner?.success) {
+        console.error('GraphQL error updating banner template:', errors);
+        alert(data?.updateUserProfileBanner?.message || 'Failed to apply template');
         return;
       }
       
-      // Update local profile state
+      // Update local profile state with the response data
+      const updatedProfile = data.updateUserProfileBanner.userProfile;
       setProfile((prev: any) => ({
         ...prev,
-        banner_image_url: null,
-        banner_image_public_id: null,
-        banner_template: templateCSS,
-        banner_template_id: template.id
+        banner_image_url: updatedProfile.bannerImageUrl,
+        banner_image_public_id: updatedProfile.bannerImagePublicId,
+        banner_template: updatedProfile.bannerTemplate,
+        banner_template_id: updatedProfile.bannerTemplateId
       }));
       
       console.log('✅ Banner template applied successfully');
@@ -2096,9 +2470,90 @@ function Dashboard() {
 
 
 
+    // Helper function to check if order contains sample packs
+  const isSamplePackOrder = (order: any) => {
+    return order.items?.some((item: any) => 
+      item.productId === 'sample-pack' || 
+      item.sku === 'SP-001' ||
+      item.name?.toLowerCase().includes('sample pack') ||
+      item.product?.id === 'sample-pack'
+    ) || order._fullOrderData?.items?.some((item: any) => 
+      item.productId === 'sample-pack' || 
+      item.sku === 'SP-001' ||
+      item.name?.toLowerCase().includes('sample pack') ||
+      item.product?.id === 'sample-pack'
+    );
+  };
+
+  // Helper function to check if an item is a sample pack
+  const isSamplePackItem = (item: any, itemData?: any) => {
+    const data = itemData || item;
+    return data.productId === 'sample-pack' || 
+           data.sku === 'SP-001' ||
+           data.name?.toLowerCase().includes('sample pack') ||
+           data.product?.id === 'sample-pack' ||
+           data.product?.name?.toLowerCase().includes('sample pack');
+  };
+
+  // Helper function to get product image with sample pack support
+  const getProductImage = (item: any, itemData?: any) => {
+    const data = itemData || item;
+    
+    // Check if this is a sample pack first
+    if (isSamplePackItem(item, data)) {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750890354/Sample-Pack_jsy2yf.png';
+    }
+    
+    // Try to get product image from various sources
+    if (data.customFiles?.[0]) {
+      return data.customFiles[0];
+    } else if (data.image) {
+      return data.image;
+    } else if (item.customFiles?.[0]) {
+      return item.customFiles[0];
+    } else if (item.image) {
+      return item.image;
+    }
+    
+    return null;
+  };
+
   // Order progress tracker function
-  const getOrderProgress = (status: string) => {
-    const steps = [
+  const getOrderProgress = (status: string, order?: any) => {
+    const isSamplePack = order ? isSamplePackOrder(order) : false;
+    
+    const steps = isSamplePack ? [
+      { 
+        id: 'printing', 
+        label: 'Printing', 
+        icon: (
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" />
+          </svg>
+        ),
+        statuses: ['Processing', 'Order Received', 'In Production', 'Printing']
+      },
+      { 
+        id: 'packaging', 
+        label: 'Packaging', 
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          </svg>
+        ),
+        statuses: ['Packaging', 'Ready to Ship']
+      },
+      { 
+        id: 'shipped', 
+        label: 'Shipped', 
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          </svg>
+        ),
+        statuses: ['Shipped', 'In Transit', 'Assume Delivered']
+      }
+    ] : [
       { 
         id: 'building-proof', 
         label: 'Building Proof', 
@@ -2113,12 +2568,11 @@ function Dashboard() {
         id: 'review-proof', 
         label: 'Review Proof', 
         icon: (
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-            <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         ),
-        statuses: ['Proof Review Needed', 'Reviewing Changes']
+        statuses: ['Proof Sent', 'Awaiting Approval']
       },
       { 
         id: 'printing', 
@@ -2166,7 +2620,7 @@ function Dashboard() {
     let currentStepIndex = 0;
     
     // Find current step based on status
-    steps.forEach((step, index) => {
+    steps.forEach((step: any, index: number) => {
       if (step.statuses.includes(status)) {
         currentStepIndex = index;
       }
@@ -2176,7 +2630,7 @@ function Dashboard() {
   };
 
   const renderOrderProgressTracker = (order: any) => {
-    const { steps, currentStepIndex } = getOrderProgress(order.status);
+    const { steps, currentStepIndex } = getOrderProgress(order.status, order);
     
     // Check if this is a reorder
     const isReorder = order.items?.some((item: any) => 
@@ -2218,7 +2672,7 @@ function Dashboard() {
             }}
           ></div>
           
-          {steps.map((step, index) => {
+          {steps.map((step: any, index: number) => {
             const isActive = index <= currentStepIndex;
             const isCurrent = index === currentStepIndex;
             
@@ -2398,17 +2852,8 @@ function Dashboard() {
                             // Get the full item data with images
                             const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
                             
-                            // Try to get product image from various sources
-                            let productImage = null;
-                            if (itemData.customFiles?.[0]) {
-                              productImage = itemData.customFiles[0];
-                            } else if (itemData.image) {
-                              productImage = itemData.image;
-                            } else if (item.customFiles?.[0]) {
-                              productImage = item.customFiles[0];
-                            } else if (item.image) {
-                              productImage = item.image;
-                            }
+                            // Get product image with sample pack support
+                            const productImage = getProductImage(item, itemData);
                             
                             const name = itemData.name || item.name || 'Custom Sticker';
                             
@@ -2592,7 +3037,7 @@ function Dashboard() {
                           >
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 010 2h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
                             </svg>
                             Track Order
                           </button>
@@ -2760,7 +3205,7 @@ function Dashboard() {
                             >
                               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 010 2h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
                               </svg>
                               Track Order
                             </button>
@@ -4193,8 +4638,8 @@ function Dashboard() {
       
       // Include orders with these statuses or proof statuses (more inclusive)
       return (
-        order.status === 'Proof Review Needed' ||
-        order.proof_status === 'awaiting_approval' ||
+        order.status === 'Printing' ||
+        order.proof_status === 'approved' ||
         order.proof_status === 'sent' ||
         (hasProofs && order.proof_sent_at && order.proof_status !== 'approved') ||
         // Include orders with pending proofs that need customer action
@@ -5239,15 +5684,13 @@ function Dashboard() {
       { value: 'other', label: 'Other' }
     ];
 
-
-
     return (
       <div className="container-style rounded-2xl p-6 md:p-8">
         <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
           <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">
             <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12l6 4v-18c0-1.1-.9-2-2-2z"/>
           </svg>
-          Get Support
+          Support
         </h2>
         
         <form onSubmit={handleContactSubmit} className="space-y-6">
@@ -5429,9 +5872,11 @@ function Dashboard() {
               disabled={isSubmittingContact}
               className="flex-1 py-3 px-6 md:px-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
-                backgroundColor: '#ffd713',
-                color: '#030140',
-                boxShadow: '0 0 20px rgba(255, 215, 19, 0.3)'
+                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                backdropFilter: 'blur(25px) saturate(180%)',
+                border: '1px solid rgba(59, 130, 246, 0.4)',
+                boxShadow: 'rgba(59, 130, 246, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                color: 'white'
               }}
             >
               {isSubmittingContact ? (
@@ -5711,9 +6156,9 @@ function Dashboard() {
                     backdropFilter: 'blur(10px)',
                     border: '2px solid rgba(255, 255, 255, 0.2)'
                   }}
-                  onClick={handleProfilePictureClick}
-                  title="Click to change profile photo"
-                >
+                                  onClick={(e) => handleProfilePictureClick(e)}
+                title="Click to change profile photo"
+              >
                   {uploadingProfilePhoto ? (
                     <div className="flex flex-col items-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mb-1"></div>
@@ -5742,8 +6187,14 @@ function Dashboard() {
                 </div>
                 <div>
                   <button
-                    onClick={handleProfilePictureClick}
-                    className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium transition-colors"
+                    onClick={(e) => handleProfilePictureClick(e)}
+                    className="px-4 py-2 rounded-lg text-white text-sm font-medium transition-all duration-200 transform hover:scale-105"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                      backdropFilter: 'blur(25px) saturate(180%)',
+                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                      boxShadow: 'rgba(59, 130, 246, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                    }}
                   >
                     Change Photo
                   </button>
@@ -5788,7 +6239,13 @@ function Dashboard() {
                           setUploadingProfilePhoto(false);
                         }
                       }}
-                      className="ml-2 px-4 py-2 rounded-lg border border-red-500/30 hover:bg-red-500/10 text-red-400 text-sm font-medium transition-colors"
+                      className="ml-2 px-4 py-2 rounded-lg text-red-400 text-sm font-medium transition-all duration-200 transform hover:scale-105"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        boxShadow: 'rgba(239, 68, 68, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                      }}
                     >
                       Remove
                     </button>
@@ -5812,8 +6269,10 @@ function Dashboard() {
                   placeholder="Enter your first name"
                   className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)'
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                    backdropFilter: 'blur(12px)'
                   }}
                 />
           </div>
@@ -5831,8 +6290,10 @@ function Dashboard() {
                   placeholder="Enter your last name"
                   className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)'
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                    backdropFilter: 'blur(12px)'
                   }}
                 />
               </div>
@@ -5852,8 +6313,10 @@ function Dashboard() {
                 placeholder="Enter your company name"
                 className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                  backdropFilter: 'blur(12px)'
                 }}
               />
             </div>
@@ -5872,8 +6335,10 @@ function Dashboard() {
                 placeholder="Enter your email"
                 className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                  backdropFilter: 'blur(12px)'
                 }}
               />
               <p className="text-xs text-gray-400 mt-1">
@@ -5887,8 +6352,14 @@ function Dashboard() {
               disabled={isUpdatingProfile}
               className="px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               style={{
-                background: isUpdatingProfile ? '#666' : 'linear-gradient(135deg, #3b82f6, #60a5fa)',
-                boxShadow: isUpdatingProfile ? 'none' : '0 4px 12px rgba(59, 130, 246, 0.3)'
+                background: isUpdatingProfile 
+                  ? 'rgba(102, 102, 102, 0.5)' 
+                  : 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                backdropFilter: 'blur(25px) saturate(180%)',
+                border: '1px solid rgba(59, 130, 246, 0.4)',
+                boxShadow: isUpdatingProfile 
+                  ? 'none' 
+                  : 'rgba(59, 130, 246, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
               }}
             >
               {isUpdatingProfile ? (
@@ -5935,8 +6406,10 @@ function Dashboard() {
                 placeholder="Enter current password"
                 className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                  backdropFilter: 'blur(12px)'
                 }}
               />
             </div>
@@ -5955,8 +6428,10 @@ function Dashboard() {
                 placeholder="Enter new password"
                 className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                  backdropFilter: 'blur(12px)'
                 }}
               />
             </div>
@@ -5975,8 +6450,10 @@ function Dashboard() {
                 placeholder="Confirm new password"
                 className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                  backdropFilter: 'blur(12px)'
                 }}
               />
             </div>
@@ -5987,8 +6464,14 @@ function Dashboard() {
               disabled={isUpdatingPassword}
               className="px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               style={{
-                background: isUpdatingPassword ? '#666' : 'linear-gradient(135deg, #ef4444, #f87171)',
-                boxShadow: isUpdatingPassword ? 'none' : '0 4px 12px rgba(239, 68, 68, 0.3)'
+                background: isUpdatingPassword 
+                  ? 'rgba(102, 102, 102, 0.5)' 
+                  : 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
+                backdropFilter: 'blur(25px) saturate(180%)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                boxShadow: isUpdatingPassword 
+                  ? 'none' 
+                  : 'rgba(239, 68, 68, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
               }}
             >
               {isUpdatingPassword ? (
@@ -6027,7 +6510,13 @@ function Dashboard() {
               </p>
               <button
                 onClick={() => setCurrentView('support')}
-                className="px-4 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium transition-colors"
+                className="px-4 py-2 rounded-lg text-white text-sm font-medium transition-all duration-200 transform hover:scale-105"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.4) 0%, rgba(249, 115, 22, 0.25) 50%, rgba(249, 115, 22, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(180%)',
+                  border: '1px solid rgba(249, 115, 22, 0.4)',
+                  boxShadow: 'rgba(249, 115, 22, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                }}
               >
                 Contact Support
               </button>
@@ -6194,7 +6683,12 @@ function Dashboard() {
                     10% OFF
                   </div>
                   <div className="flex-1 text-left">
-                    <p className="text-sm font-semibold text-white">🔄 Reorder Special</p>
+                    <p className="text-sm font-semibold text-white flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" style={{ color: '#fbbf24' }}>
+                        <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                      </svg>
+                      Reorder Special
+                    </p>
                     <p className="text-xs text-gray-300">10% off any repeat order</p>
                   </div>
                 </div>
@@ -6215,7 +6709,13 @@ function Dashboard() {
                       FREE
                     </div>
                     <div className="flex-1 text-left">
-                      <p className="text-sm font-semibold text-white">🚀 Next-Day Shipping</p>
+                      <p className="text-sm font-semibold text-white flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: '#10b981' }}>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                        </svg>
+                        Next-Day Shipping
+                      </p>
                       <p className="text-xs text-gray-300">1,000+ stickers</p>
                     </div>
                   </div>
@@ -6264,7 +6764,12 @@ function Dashboard() {
                   10% OFF
                 </div>
                 <div className="flex-1 text-left">
-                  <p className="text-sm font-semibold text-white">🔄 Reorder Special</p>
+                  <p className="text-sm font-semibold text-white flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" style={{ color: '#fbbf24' }}>
+                      <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                    </svg>
+                    Reorder Special
+                  </p>
                   <p className="text-xs text-gray-300">10% off any repeat order</p>
                 </div>
               </div>
@@ -6285,7 +6790,13 @@ function Dashboard() {
                     FREE
                   </div>
                   <div className="flex-1 text-left">
-                    <p className="text-sm font-semibold text-white">🚀 Next-Day Shipping</p>
+                    <p className="text-sm font-semibold text-white flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: '#10b981' }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                      </svg>
+                      Next-Day Shipping
+                    </p>
                     <p className="text-xs text-gray-300">1,000+ stickers</p>
                   </div>
                 </div>
@@ -6333,7 +6844,12 @@ function Dashboard() {
           >
             <div className="px-6 py-4 border-b border-white/10">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-white">🔄 Quick Reorder</h2>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" style={{ color: '#fbbf24' }}>
+                    <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                  </svg>
+                  Quick Reorder
+                </h2>
                 <div className="text-xs font-bold px-3 py-1 rounded-full"
                      style={{
                        background: 'linear-gradient(135deg, #ffd713, #ffed4e)',
@@ -6495,17 +7011,8 @@ function Dashboard() {
                             // Get the full item data with images
                             const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
                             
-                            // Try to get product image from various sources
-                            let productImage = null;
-                            if (itemData.customFiles?.[0]) {
-                              productImage = itemData.customFiles[0];
-                            } else if (itemData.image) {
-                              productImage = itemData.image;
-                            } else if (item.customFiles?.[0]) {
-                              productImage = item.customFiles[0];
-                            } else if (item.image) {
-                              productImage = item.image;
-                            }
+                                                      // Get product image with sample pack support
+                          const productImage = getProductImage(item, itemData);
                             
                             const name = itemData.name || item.name || 'Custom Sticker';
                             
@@ -6662,19 +7169,6 @@ function Dashboard() {
                             Reorder
                           </button>
                         
-                        {order.status === 'Proof Review Needed' && (
-                          <button
-                            onClick={() => setCurrentView('proofs')}
-                            className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105"
-                            style={{
-                              backgroundColor: 'rgba(249, 115, 22, 0.2)',
-                              border: '1px solid rgba(249, 115, 22, 0.3)',
-                              color: 'white'
-                            }}
-                          >
-                            Review Proof
-                          </button>
-                        )}
                         {isOrderShippedWithTracking(order) && (
                           <button
                             onClick={() => handleTrackOrder(order)}
@@ -6689,7 +7183,7 @@ function Dashboard() {
                           >
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 010 2h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
                             </svg>
                             Track Order
                           </button>
@@ -6716,16 +7210,7 @@ function Dashboard() {
                         <div className="flex gap-2">
                           {order.items.slice(0, 3).map((item, index) => {
                             const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
-                            let productImage = null;
-                            if (itemData.customFiles?.[0]) {
-                              productImage = itemData.customFiles[0];
-                            } else if (itemData.image) {
-                              productImage = itemData.image;
-                            } else if (item.customFiles?.[0]) {
-                              productImage = item.customFiles[0];
-                            } else if (item.image) {
-                              productImage = item.image;
-                            }
+                            const productImage = getProductImage(item, itemData);
 
                             return (
                               <div key={index} className="w-16 h-16 rounded-lg overflow-hidden border border-white/10 bg-black/20">
@@ -6836,19 +7321,6 @@ function Dashboard() {
                           </button>
                         </div>
 
-                        {order.status === 'Proof Review Needed' && (
-                          <button
-                            onClick={() => setCurrentView('proofs')}
-                            className="w-full px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105"
-                            style={{
-                              backgroundColor: 'rgba(249, 115, 22, 0.2)',
-                              border: '1px solid rgba(249, 115, 22, 0.3)',
-                              color: 'white'
-                            }}
-                          >
-                            Review Proof
-                          </button>
-                        )}
                         {isOrderShippedWithTracking(order) && (
                           <button
                             onClick={() => handleTrackOrder(order)}
@@ -6863,7 +7335,7 @@ function Dashboard() {
                           >
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 010 2h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
                             </svg>
                             Track Order
                           </button>
@@ -7236,7 +7708,7 @@ function Dashboard() {
              position: 'relative'
            }}>
         
-        <div className="w-full relative z-10">
+        <div className="w-full relative z-10 pb-24 lg:pb-0">
           {/* Recording Mode Indicator */}
           {recordingMode && (
             <div className="fixed top-4 right-4 z-50 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
@@ -7245,18 +7717,23 @@ function Dashboard() {
           )}
           {/* Header Section */}
           <div className="pt-6 pb-6">
-            <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto max-w-sm sm:max-w-md md:max-w-full">
+            <div className="w-[90%] sm:w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto">
               {/* Header - Banner with Profile */}
               <div 
                 className={`relative rounded-xl p-4 md:p-6 shadow-xl mb-6 overflow-hidden cursor-pointer group banner-gradient ${
                   profile?.banner_template_id === 1 || !profile?.banner_template ? 'stellar-void-animation' : ''
                 }`}
-                style={
-                  profile?.banner_image_url 
+                style={{
+                  aspectRatio: '5.2/1', // Increased height by 15% (6/1.15 ≈ 5.2/1)
+                  minHeight: '207px', // Increased by 15% (180 * 1.15 = 207)
+                  width: '100%', // Ensure banner stays within container
+                  maxWidth: '100%', // Prevent overflow
+                  boxSizing: 'border-box', // Include padding in width calculation
+                  ...(profile?.banner_image_url 
                     ? {
                         backgroundImage: `url(${profile.banner_image_url})`,
-                        backgroundSize: '120%',
-                        backgroundPosition: 'right 10%',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
                         backgroundRepeat: 'no-repeat',
                         border: '1px solid rgba(255, 255, 255, 0.15)'
                       }
@@ -7264,9 +7741,12 @@ function Dashboard() {
                       ? {
                           ...JSON.parse(profile.banner_template),
                           border: '1px solid rgba(255, 255, 255, 0.15)',
-                          animation: profile?.banner_template_id === 1 
-                            ? 'stellar-drift 8s ease-in-out infinite' 
-                            : 'stellar-drift 10s ease-in-out infinite'
+                          // Only add animation for specific templates (not NASA images or new static templates)
+                          ...(profile?.banner_template_id === 1 
+                            ? { animation: 'stellar-drift 8s ease-in-out infinite' }
+                            : profile?.banner_template_id && ![11, 12, 13, 18, 19, 27, 28, 29, 30, 31].includes(profile.banner_template_id)
+                            ? { animation: 'stellar-drift 10s ease-in-out infinite' }
+                            : {})
                         }
                       : {
                           background: 'linear-gradient(135deg, #0a0a2e 0%, #1a1a4a 25%, #2d1b6b 50%, #4c1d95 75%, #7c3aed 100%)',
@@ -7282,8 +7762,8 @@ function Dashboard() {
                           backgroundPosition: '0% 0%, 20% 20%, 40% 60%, 60% 40%, 80% 80%, 10% 30%',
                           border: '1px solid rgba(255, 255, 255, 0.15)',
                           animation: 'stellar-drift 8s ease-in-out infinite'
-                        }
-                }
+                        })
+                }}
                 onClick={handleBannerClick}
                 title="Click to change banner image"
               >
@@ -7359,22 +7839,114 @@ function Dashboard() {
                     );
                     
                     if (selectedTemplate?.emojis) {
+                      // Create a shuffled array to avoid duplicates next to each other
+                      const shuffleArray = (array: string[]) => {
+                        const shuffled = [...array];
+                        for (let i = shuffled.length - 1; i > 0; i--) {
+                          const j = Math.floor(Math.random() * (i + 1));
+                          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                        }
+                        return shuffled;
+                      };
+                      
+                      // Create a distributed array ensuring no duplicates are adjacent
+                      const createDistributedEmojis = (emojis: string[], count: number) => {
+                        const result = [];
+                        const emojiPool = [...emojis];
+                        
+                        for (let i = 0; i < count; i++) {
+                          if (emojiPool.length === 0) {
+                            emojiPool.push(...emojis);
+                          }
+                          
+                          // Try to pick an emoji that's different from the previous one
+                          let selectedIndex = 0;
+                          if (result.length > 0) {
+                            const lastEmoji = result[result.length - 1];
+                            const availableEmojis = emojiPool.filter(e => e !== lastEmoji);
+                            if (availableEmojis.length > 0) {
+                              const randomEmoji = availableEmojis[Math.floor(Math.random() * availableEmojis.length)];
+                              selectedIndex = emojiPool.indexOf(randomEmoji);
+                            } else {
+                              selectedIndex = Math.floor(Math.random() * emojiPool.length);
+                            }
+                          }
+                          
+                          result.push(emojiPool[selectedIndex]);
+                          emojiPool.splice(selectedIndex, 1);
+                        }
+                        
+                        return result;
+                      };
+                      
+                      const rows = 2; // Reduced from 3 to 2
+                      const cols = 4; // Reduced from 5 to 4 for 25% fewer emojis
+                      const totalPositions = rows * cols;
+                      const distributedEmojis = createDistributedEmojis(selectedTemplate.emojis, totalPositions);
+                      
                       return (
                         <div className="absolute inset-0 pointer-events-none z-5">
-                          {selectedTemplate.emojis.map((emoji, index) => (
-                            <span
-                              key={index}
-                              className="absolute text-2xl opacity-60"
-                              style={{
-                                left: `${15 + (index * 12) % 70}%`,
-                                top: `${20 + (index * 15) % 60}%`,
-                                animation: `float-${(index % 3) + 1} ${3 + (index % 2)}s ease-in-out infinite`,
-                                animationDelay: `${index * 0.5}s`
-                              }}
-                            >
-                              {emoji}
-                            </span>
-                          ))}
+                          {/* Regular floating emojis with better spacing */}
+                          {distributedEmojis.map((emoji, index) => {
+                            // Calculate grid position with more spacing
+                            const row = Math.floor(index / cols);
+                            const col = index % cols;
+                            
+                            // Base position from grid with even more spacing
+                            const baseLeft = (col * 25) + 12; // 25% spacing, 12% margin
+                            const baseTop = (row * 45) + 20; // 45% spacing, 20% margin
+                            
+                            // Add larger random offset for more natural distribution
+                            const randomOffsetX = (Math.random() - 0.5) * 18; // ±9%
+                            const randomOffsetY = (Math.random() - 0.5) * 25; // ±12.5%
+                            
+                            const left = Math.max(5, Math.min(95, baseLeft + randomOffsetX));
+                            const top = Math.max(5, Math.min(85, baseTop + randomOffsetY));
+                            
+                            const randomSize = 0.9 + Math.random() * 0.8; // 0.9-1.7rem
+                            const randomRotation = (Math.random() - 0.5) * 40; // ±20deg
+                            const isBlurred = Math.random() > 0.8; // 20% chance of blur
+                            const animationDuration = 8 + Math.random() * 6; // 8-14s
+                            const animationType = Math.floor(Math.random() * 3) + 1; // 1-3
+                            
+                            return (
+                              <span
+                                key={index}
+                                className="absolute"
+                                style={{
+                                  left: `${left}%`,
+                                  top: `${top}%`,
+                                  fontSize: `${randomSize}rem`,
+                                  transform: `rotate(${randomRotation}deg)`,
+                                  animation: `float-${animationType} ${animationDuration}s ease-in-out infinite`,
+                                  animationDelay: `${Math.random() * 4}s`,
+                                  filter: isBlurred ? 'blur(1px)' : 'none',
+                                  opacity: isBlurred ? 0.4 : 0.7,
+                                  zIndex: isBlurred ? 1 : 2
+                                }}
+                              >
+                                {emoji}
+                              </span>
+                            );
+                          })}
+                          
+                          {/* Big blurry emoji in bottom left corner */}
+                          <span
+                            className="absolute"
+                            style={{
+                              left: '8%',
+                              bottom: '10%',
+                              fontSize: '3rem',
+                              transform: 'rotate(-15deg)',
+                              animation: 'float-1 12s ease-in-out infinite',
+                              animationDelay: '2s',
+                              filter: 'blur(2px)',
+                              opacity: 0.3,
+                              zIndex: 0
+                            }}
+                          >
+                            {selectedTemplate.emojis[Math.floor(Math.random() * selectedTemplate.emojis.length)]}
+                          </span>
                         </div>
                       );
                     }
@@ -7462,17 +8034,18 @@ function Dashboard() {
                   </div>
                 </div>
                 {/* Profile and Greeting Content - High Z-Index */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-30 pointer-events-none">
-                  <div className="flex items-center gap-4">
-                    {/* Profile Picture Circle */}
+                <div className="relative z-30 pointer-events-none">
+                  <div className="flex items-start gap-3 md:gap-4">
+                    {/* Profile Picture Circle - Fixed position */}
                     <div 
-                      className="w-16 h-16 rounded-full cursor-pointer transition-all duration-200 transform hover:scale-105 flex items-center justify-center relative pointer-events-auto"
+                      className="w-12 h-12 md:w-16 md:h-16 rounded-full cursor-pointer transition-all duration-200 transform hover:scale-105 flex items-center justify-center relative pointer-events-auto flex-shrink-0"
                       style={{
                         backgroundColor: 'rgba(255, 255, 255, 0.1)',
                         backdropFilter: 'blur(10px)',
-                        border: '2px solid rgba(255, 255, 255, 0.2)'
+                        border: '2px solid rgba(255, 255, 255, 0.2)',
+                        marginTop: '2px' // Reduced margin for mobile alignment
                       }}
-                      onClick={handleProfilePictureClick}
+                      onClick={(e) => handleProfilePictureClick(e)}
                       title="Click to change profile photo"
                     >
                       {uploadingProfilePhoto ? (
@@ -7502,14 +8075,43 @@ function Dashboard() {
                       )}
                     </div>
                     
-                    <div>
-                      <h1 className="text-2xl md:text-3xl font-bold text-white mb-1"
+                    <div className="flex-1 min-w-0">
+                      {/* Greeting Section */}
+                      <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-white mb-1"
                           style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif' }}>
                         Greetings, {getUserDisplayName()}
                       </h1>
-                      <p className="text-sm text-gray-200">
+                      <p className="text-xs md:text-sm text-gray-200 mb-1 md:mb-2">
                         Mission Control Dashboard
                       </p>
+                      
+                      {/* Terminal Section - Below greeting, doesn't affect profile pic position */}
+                      {showTerminalLoader && (
+                        <div className="text-sm md:text-xs text-green-400 mt-2 md:mt-1 ml-0 md:ml-0"
+                             style={{
+                               fontFamily: '"VT323", monospace',
+                               fontSize: '16px', // Larger for mobile visibility
+                               textShadow: '0 0 5px rgba(0, 255, 0, 0.8)',
+                               letterSpacing: '0.05em',
+                               lineHeight: '1.3', // Better line height for mobile
+                               marginLeft: '0px' // Align with profile pic left edge on mobile
+                             }}>
+                          {!isTerminalTyping ? (
+                            <div>
+                              <span className="opacity-70">&gt; </span>
+                              {currentView === 'all-orders' ? 'LOADING ORDERS' : 
+                               currentView === 'financial' ? 'LOADING FINANCES' :
+                               currentView === 'design-vault' ? 'DESIGNS LOADING' :
+                               currentView === 'proofs' ? 'LOADING PROOFS' :
+                               currentView === 'support' ? 'HELP! REQUESTING BACK UP!' :
+                               currentView === 'settings' ? 'ADJUSTING PANELS' :
+                               'Loading Mainframe'}{terminalLoadingDots}
+                            </div>
+                          ) : (
+                            <div className="whitespace-pre-wrap">{terminalOrderText}</div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -7550,8 +8152,8 @@ function Dashboard() {
 
               {/* Main Layout - Sidebar + Content */}
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                {/* Sidebar - Stats & Quick Actions */}
-                <div className="lg:col-span-1 space-y-3">
+                {/* Sidebar - Stats & Quick Actions - Hidden on Mobile */}
+                <div className="hidden lg:block lg:col-span-1 space-y-3">
                   {/* Primary Action - Start New Mission */}
                   <Link 
                     href="/products"
@@ -7564,178 +8166,158 @@ function Dashboard() {
                     }}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-white/20">
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="p-2 rounded-lg bg-transparent">
+                        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                             style={{ color: '#ffffff', filter: 'drop-shadow(0 4px 12px rgba(255, 255, 255, 0.15))' }}>
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
                       </div>
                       <div>
-                        <h4 className="font-semibold text-white text-sm">🚀 Start New Mission</h4>
+                        <h4 className="font-semibold text-white text-sm">Start New Mission</h4>
                         <p className="text-xs text-white/80">Create custom stickers</p>
                       </div>
                     </div>
                   </Link>
 
-                  {/* Dashboard Button */}
+                                    {/* Dashboard Button */}
+                  <button 
+                    onClick={() => updateCurrentView('default')}
+                    className={`block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden ${
+                      currentView === 'default' ? 'rounded-2xl' : 'container-style'
+                    }`}
+                    style={currentView === 'default' ? {
+                      background: 'linear-gradient(135deg, rgba(100, 116, 139, 0.3) 0%, rgba(100, 116, 139, 0.2) 50%, rgba(100, 116, 139, 0.1) 100%)',
+                      backdropFilter: 'blur(25px) saturate(180%)',
+                      WebkitBackdropFilter: 'blur(25px) saturate(180%)' as any,
+                      border: '1px solid rgba(100, 116, 139, 0.4)',
+                      boxShadow: '0 4px 16px rgba(100, 116, 139, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                    } : {
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                      backdropFilter: 'blur(12px)',
+                      WebkitBackdropFilter: 'blur(12px)' as any
+                    }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-transparent">
+                      <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"
+                           style={{ color: '#8b5cf6', filter: 'drop-shadow(0 4px 12px rgba(139, 92, 246, 0.15))' }}>
+                        <rect x="3" y="3" width="8" height="5" rx="2"/>
+                        <rect x="13" y="3" width="8" height="11" rx="2"/>
+                        <rect x="3" y="10" width="8" height="11" rx="2"/>
+                        <rect x="13" y="16" width="8" height="5" rx="2"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-white text-sm">Dashboard</h4>
+                      <p className="text-xs text-gray-300">Mission overview</p>
+                    </div>
+                  </div>
+                </button>
+
+                  {/* Stats - Grid Layout for Mobile, Vertical for Desktop */}
+                  <div className="grid grid-cols-1 gap-3">
                                       <button 
-                      onClick={() => updateCurrentView('default')}
-                      className={`block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden ${
-                        currentView === 'default' ? 'rounded-2xl' : 'container-style'
-                      }`}
-                      style={currentView === 'default' ? {
-                        background: 'linear-gradient(135deg, rgba(100, 116, 139, 0.3) 0%, rgba(100, 116, 139, 0.2) 50%, rgba(100, 116, 139, 0.1) 100%)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: '1px solid rgba(100, 116, 139, 0.4)',
-                        boxShadow: '0 4px 16px rgba(100, 116, 139, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                      } : {}}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg"
-                           style={{
-                             background: 'linear-gradient(135deg, #8b5cf6, #a78bfa)',
-                             boxShadow: '0 4px 12px rgba(139, 92, 246, 0.15)'
-                           }}>
-                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <rect x="3" y="3" width="8" height="5" rx="2"/>
-                          <rect x="13" y="3" width="8" height="11" rx="2"/>
-                          <rect x="3" y="10" width="8" height="11" rx="2"/>
-                          <rect x="13" y="16" width="8" height="5" rx="2"/>
+                    onClick={() => updateCurrentView('all-orders')}
+                    className={`block p-3 lg:p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden ${
+                      currentView === 'all-orders' ? 'rounded-2xl' : 'container-style'
+                    }`}
+                    style={currentView === 'all-orders' ? {
+                      background: 'linear-gradient(135deg, rgba(75, 85, 99, 0.3) 0%, rgba(75, 85, 99, 0.2) 50%, rgba(75, 85, 99, 0.1) 100%)',
+                      backdropFilter: 'blur(25px) saturate(180%)',
+                      WebkitBackdropFilter: 'blur(25px) saturate(180%)' as any,
+                      border: '1px solid rgba(75, 85, 99, 0.4)',
+                      boxShadow: '0 4px 16px rgba(75, 85, 99, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                    } : {
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                      backdropFilter: 'blur(12px)',
+                      WebkitBackdropFilter: 'blur(12px)' as any
+                    }}>
+                    <div className="flex items-center gap-2 lg:gap-3">
+                      <div className="p-1.5 lg:p-2 rounded-lg bg-transparent">
+                        <svg className="w-5 lg:w-7 h-5 lg:h-7" fill="currentColor" viewBox="0 0 24 24"
+                             style={{ color: '#10b981', filter: 'drop-shadow(0 4px 12px rgba(16, 185, 129, 0.15))' }}>
+                          <path d="M6 2C4.9 2 4 2.9 4 4v16c0 .6.4 1 1 1 .2 0 .5-.1.7-.3L9 18l3.3 2.7c.4.4 1 .4 1.4 0L17 18l3.3 2.7c.2.2.5.3.7.3.6 0 1-.4 1-1V4c0-1.1-.9-2-2-2H6zm2 5h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h4c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1z"/>
                         </svg>
                       </div>
-                      <div>
-                        <h4 className="font-semibold text-white text-sm">Dashboard</h4>
-                        <p className="text-xs text-gray-300">Mission overview</p>
+                      <div className="min-w-0">
+                        <h4 className="font-semibold text-white text-xs lg:text-sm truncate">Orders</h4>
+                        <p className="text-xs text-gray-300">{orders.filter(order => order.status !== 'Delivered').length} active orders</p>
                       </div>
                     </div>
                   </button>
 
-                  {/* Stats - Grid Layout for Mobile, Vertical for Desktop */}
-                  <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
-                    <button 
-                      onClick={() => updateCurrentView('all-orders')}
-                      className={`block p-3 lg:p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden ${
-                        currentView === 'all-orders' ? 'rounded-2xl' : 'container-style'
-                      }`}
-                      style={currentView === 'all-orders' ? {
-                        background: 'linear-gradient(135deg, rgba(75, 85, 99, 0.3) 0%, rgba(75, 85, 99, 0.2) 50%, rgba(75, 85, 99, 0.1) 100%)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: '1px solid rgba(75, 85, 99, 0.4)',
-                        boxShadow: '0 4px 16px rgba(75, 85, 99, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                      } : {}}>
-                      <div className="flex items-center gap-2 lg:gap-3">
-                        <div className="p-1.5 lg:p-2 rounded-lg"
-                             style={{
-                               background: 'linear-gradient(135deg, #10b981, #34d399)',
-                               boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)'
-                             }}>
-                          <svg className="w-4 lg:w-5 h-4 lg:h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M6 2C4.9 2 4 2.9 4 4v16c0 .6.4 1 1 1 .2 0 .5-.1.7-.3L9 18l3.3 2.7c.4.4 1 .4 1.4 0L17 18l3.3 2.7c.2.2.5.3.7.3.6 0 1-.4 1-1V4c0-1.1-.9-2-2-2H6zm2 5h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h4c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1z"/>
-                          </svg>
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="font-semibold text-white text-xs lg:text-sm truncate">Orders</h4>
-                          <p className="text-xs text-gray-300">{orders.length} completed</p>
-                        </div>
+
+
+                                      <button 
+                    onClick={() => updateCurrentView('financial')}
+                    className={`block p-3 lg:p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden ${
+                      currentView === 'financial' ? 'rounded-2xl' : 'container-style'
+                    }`}
+                    style={currentView === 'financial' ? {
+                      background: 'linear-gradient(135deg, rgba(71, 85, 105, 0.3) 0%, rgba(71, 85, 105, 0.2) 50%, rgba(71, 85, 105, 0.1) 100%)',
+                      backdropFilter: 'blur(25px) saturate(180%)',
+                      WebkitBackdropFilter: 'blur(25px) saturate(180%)' as any,
+                      border: '1px solid rgba(71, 85, 105, 0.4)',
+                      boxShadow: '0 4px 16px rgba(71, 85, 105, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                    } : {
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                      backdropFilter: 'blur(12px)',
+                      WebkitBackdropFilter: 'blur(12px)' as any
+                    }}>
+                    <div className="flex items-center gap-2 lg:gap-3">
+                      <div className="p-1.5 lg:p-2 rounded-lg bg-transparent">
+                        <svg className="w-5 lg:w-7 h-5 lg:h-7" fill="currentColor" viewBox="0 0 24 24"
+                             style={{ color: '#3b82f6', filter: 'drop-shadow(0 4px 12px rgba(59, 130, 246, 0.15))' }}>
+                          <rect x="3" y="12" width="4" height="9" rx="2"/>
+                          <rect x="10" y="6" width="4" height="15" rx="2"/>
+                          <rect x="17" y="9" width="4" height="12" rx="2"/>
+                        </svg>
                       </div>
-                    </button>
-
-
-
-                    <button 
-                      onClick={() => updateCurrentView('financial')}
-                      className={`block p-3 lg:p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden ${
-                        currentView === 'financial' ? 'rounded-2xl' : 'container-style'
-                      }`}
-                      style={currentView === 'financial' ? {
-                        background: 'linear-gradient(135deg, rgba(71, 85, 105, 0.3) 0%, rgba(71, 85, 105, 0.2) 50%, rgba(71, 85, 105, 0.1) 100%)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: '1px solid rgba(71, 85, 105, 0.4)',
-                        boxShadow: '0 4px 16px rgba(71, 85, 105, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                      } : {}}>
-                      <div className="flex items-center gap-2 lg:gap-3">
-                        <div className="p-1.5 lg:p-2 rounded-lg"
-                             style={{
-                               background: 'linear-gradient(135deg, #3b82f6, #60a5fa)',
-                               boxShadow: '0 4px 12px rgba(59, 130, 246, 0.15)'
-                             }}>
-                          <svg className="w-4 lg:w-5 h-4 lg:h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                            <rect x="3" y="12" width="4" height="9" rx="2"/>
-                            <rect x="10" y="6" width="4" height="15" rx="2"/>
-                            <rect x="17" y="9" width="4" height="12" rx="2"/>
-                          </svg>
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="font-semibold text-white text-xs lg:text-sm truncate">Finances</h4>
-                          <p className="text-xs text-gray-300">${orders.reduce((sum, order) => sum + order.total, 0).toFixed(2)} invested</p>
-                        </div>
+                      <div className="min-w-0">
+                        <h4 className="font-semibold text-white text-xs lg:text-sm truncate">Finances</h4>
+                        <p className="text-xs text-gray-300">${orders.reduce((sum, order) => sum + order.total, 0).toFixed(2)} invested</p>
                       </div>
-                    </button>
+                    </div>
+                  </button>
 
-                    <button 
-                      onClick={() => updateCurrentView('design-vault')}
-                      className="block rounded-2xl p-3 lg:p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden"
-                      style={{
-                        background: currentView === 'design-vault' 
-                          ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.3) 0%, rgba(107, 114, 128, 0.2) 50%, rgba(107, 114, 128, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: currentView === 'design-vault' ? 'blur(25px) saturate(180%)' : 'blur(12px)',
-                        border: currentView === 'design-vault' 
-                          ? '1px solid rgba(107, 114, 128, 0.4)' 
-                          : '1px solid rgba(255, 255, 255, 0.1)',
-                        boxShadow: currentView === 'design-vault'
-                          ? '0 8px 32px rgba(107, 114, 128, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                          : '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
-                      }}
-                    >
-                      <div className="flex items-center gap-2 lg:gap-3">
-                        <div className="p-1.5 lg:p-2 rounded-lg"
-                             style={{
-                               background: 'linear-gradient(135deg, #ec4899, #f472b6)',
-                               boxShadow: '0 4px 12px rgba(236, 72, 153, 0.15)'
-                             }}>
-                          <svg className="w-4 lg:w-5 h-4 lg:h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/>
-                          </svg>
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="font-semibold text-white text-xs lg:text-sm truncate">Designs</h4>
-                          <p className="text-xs text-gray-300">Manage designs</p>
-                        </div>
+                                      <button 
+                    onClick={() => updateCurrentView('design-vault')}
+                    className="block rounded-2xl p-3 lg:p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden"
+                    style={{
+                      background: currentView === 'design-vault' 
+                        ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.3) 0%, rgba(107, 114, 128, 0.2) 50%, rgba(107, 114, 128, 0.1) 100%)'
+                        : 'rgba(255, 255, 255, 0.05)',
+                      backdropFilter: currentView === 'design-vault' ? 'blur(25px) saturate(180%)' : 'blur(12px)',
+                      WebkitBackdropFilter: currentView === 'design-vault' ? 'blur(25px) saturate(180%)' as any : 'blur(12px)' as any,
+                      border: currentView === 'design-vault' 
+                        ? '1px solid rgba(107, 114, 128, 0.4)' 
+                        : '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: currentView === 'design-vault'
+                        ? '0 8px 32px rgba(107, 114, 128, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                        : '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+                    }}
+                  >
+                    <div className="flex items-center gap-2 lg:gap-3">
+                      <div className="p-1.5 lg:p-2 rounded-lg bg-transparent">
+                        <svg className="w-5 lg:w-7 h-5 lg:h-7" fill="currentColor" viewBox="0 0 24 24"
+                             style={{ color: '#ec4899', filter: 'drop-shadow(0 4px 12px rgba(236, 72, 153, 0.15))' }}>
+                          <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/>
+                        </svg>
                       </div>
-                    </button>
+                      <div className="min-w-0">
+                        <h4 className="font-semibold text-white text-xs lg:text-sm truncate">Designs</h4>
+                        <p className="text-xs text-gray-300">Manage designs</p>
+                      </div>
+                    </div>
+                  </button>
 
-                    {/* Mobile Proof Review Button */}
-                    <button 
-                      onClick={() => updateCurrentView('proofs')}
-                      className={`lg:hidden block p-3 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden ${currentView === 'proofs' ? 'rounded-2xl' : 'container-style'}`}
-                      style={currentView === 'proofs' ? {
-                        background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.4) 0%, rgba(249, 115, 22, 0.25) 50%, rgba(249, 115, 22, 0.1) 100%)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: '1px solid rgba(249, 115, 22, 0.4)',
-                        boxShadow: '0 4px 16px rgba(249, 115, 22, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                      } : {}}
-                    >
-                            <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg"
-                             style={{
-                               background: 'linear-gradient(135deg, #f97316, #fb923c)',
-                               boxShadow: '0 4px 12px rgba(249, 115, 22, 0.15)'
-                             }}>
-                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 4.5C7.5 4.5 3.73 7.61 2.46 12c1.27 4.39 5.04 7.5 9.54 7.5s8.27-3.11 9.54-7.5c-1.27-4.39-5.04-7.5-9.54-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                          </svg>
-                              </div>
-                        <div className="min-w-0">
-                          <h4 className="font-semibold text-white text-xs truncate">Proof Review</h4>
-                          <p className="text-xs text-gray-300">
-                            {orders.filter(order => order.status === 'Proof Review Needed' || order.status === 'Reviewing Changes').length} pending
-                          </p>
-                            </div>
-                              </div>
-                      {orders.filter(order => order.status === 'Proof Review Needed' || order.status === 'Reviewing Changes').length > 0 && (
-                        <div className="absolute top-2 right-2 w-3 h-3 bg-orange-500 rounded-full animate-pulse"></div>
-                            )}
-                    </button>
+
                           </div>
 
                   {/* Secondary Actions - Hidden on mobile, shown at bottom */}
@@ -7748,17 +8330,21 @@ function Dashboard() {
                       style={currentView === 'proofs' ? {
                         background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.4) 0%, rgba(249, 115, 22, 0.25) 50%, rgba(249, 115, 22, 0.1) 100%)',
                         backdropFilter: 'blur(25px) saturate(180%)',
+                        WebkitBackdropFilter: 'blur(25px) saturate(180%)' as any,
                         border: '1px solid rgba(249, 115, 22, 0.4)',
                         boxShadow: '0 4px 16px rgba(249, 115, 22, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                      } : {}}
+                      } : {
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)',
+                        WebkitBackdropFilter: 'blur(12px)' as any
+                      }}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg"
-                             style={{
-                               background: 'linear-gradient(135deg, #f97316, #fb923c)',
-                               boxShadow: '0 4px 12px rgba(249, 115, 22, 0.15)'
-                             }}>
-                          <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <div className="p-2 rounded-lg bg-transparent">
+                          <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"
+                               style={{ color: '#f97316', filter: 'drop-shadow(0 4px 12px rgba(249, 115, 22, 0.15))' }}>
                             <path d="M12 4.5C7.5 4.5 3.73 7.61 2.46 12c1.27 4.39 5.04 7.5 9.54 7.5s8.27-3.11 9.54-7.5c-1.27-4.39-5.04-7.5-9.54-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
                           </svg>
                         </div>
@@ -7779,17 +8365,14 @@ function Dashboard() {
                         className="container-style block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg"
-                               style={{
-                                 background: 'linear-gradient(135deg, #ef4444, #f87171)',
-                                 boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
-                               }}>
-                            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <div className="p-2 rounded-lg bg-transparent">
+                            <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"
+                                 style={{ color: '#ef4444', filter: 'drop-shadow(0 4px 12px rgba(239, 68, 68, 0.15))' }}>
                               <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12l6 4v-18c0-1.1-.9-2-2-2z"/>
                             </svg>
-                        </div>
+                          </div>
                           <div>
-                            <h4 className="font-semibold text-white text-sm">Get Support</h4>
+                            <h4 className="font-semibold text-white text-sm">Support</h4>
                             <p className="text-xs text-gray-300">Contact ground crew</p>
                           </div>
                         </div>
@@ -7800,15 +8383,12 @@ function Dashboard() {
                         className="container-style block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg"
-                               style={{
-                                 background: 'linear-gradient(135deg, #374151, #4b5563)',
-                                 boxShadow: '0 4px 12px rgba(55, 65, 81, 0.15)'
-                               }}>
-                            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
-                            </svg>
-                          </div>
+                                                  <div className="p-2 rounded-lg bg-transparent">
+                          <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"
+                               style={{ color: '#9ca3af', filter: 'drop-shadow(0 4px 12px rgba(156, 163, 175, 0.15))' }}>
+                            <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+                          </svg>
+                        </div>
                           <div>
                             <h4 className="font-semibold text-white text-sm">Settings</h4>
                             <p className="text-xs text-gray-300">Manage account</p>
@@ -7825,12 +8405,9 @@ function Dashboard() {
                       className="container-style block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left opacity-75 relative overflow-hidden"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg"
-                            style={{
-                               background: 'linear-gradient(135deg, #6b7280, #9ca3af)',
-                               boxShadow: '0 4px 12px rgba(107, 114, 128, 0.15)'
-                             }}>
-                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="p-2 rounded-lg bg-transparent">
+                          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                               style={{ color: '#6b7280', filter: 'drop-shadow(0 4px 12px rgba(107, 114, 128, 0.15))' }}>
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                           </svg>
                         </div>
@@ -7843,60 +8420,12 @@ function Dashboard() {
                   </div>
                 </div>
 
-                {/* Main Content Area */}
-                <div className="lg:col-span-3 space-y-6">
+                {/* Main Content Area - Full width on mobile */}
+                <div className="col-span-1 lg:col-span-3 space-y-6">
                   {renderMainContent()}
                 </div>
 
-                {/* Mobile Action Buttons - Bottom of page */}
-                <div className="lg:hidden mt-6 space-y-3">
-                  {/* Get Support and Settings */}
-                  <div className="space-y-3">
-                    <button 
-                      onClick={handleGetSupport}
-                      className="container-style block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg"
-                             style={{
-                               background: 'linear-gradient(135deg, #ef4444, #f87171)',
-                               boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
-                             }}>
-                          <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12l6 4v-18c0-1.1-.9-2-2-2z"/>
-                          </svg>
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-white text-sm">Get Support</h4>
-                          <p className="text-xs text-gray-300">Contact ground crew</p>
-                        </div>
-                      </div>
-                    </button>
 
-                    <button 
-                      onClick={() => updateCurrentView('settings')}
-                      className="container-style block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg"
-                             style={{
-                               background: 'linear-gradient(135deg, #374151, #4b5563)',
-                               boxShadow: '0 4px 12px rgba(55, 65, 81, 0.15)'
-                             }}>
-                          <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
-                          </svg>
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-white text-sm">Settings</h4>
-                          <p className="text-xs text-gray-300">Manage account</p>
-                        </div>
-                      </div>
-                    </button>
-                  </div>
-
-                  
-                </div>
               </div>
             </div>
           </div>
@@ -7904,6 +8433,220 @@ function Dashboard() {
       </div>
     </ErrorBoundary>
   </Layout>
+
+  {/* Mobile/Tablet Dashboard Navigation Pill */}
+  <div className="lg:hidden fixed bottom-6 left-1/2 transform -translate-x-1/2 z-30">
+    <div 
+      className="rounded-full px-2 py-2 flex items-center gap-1"
+      style={{
+        background: 'rgba(255, 255, 255, 0.05)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+        backdropFilter: 'blur(12px)',
+      }}
+    >
+      {/* Dashboard */}
+      <button
+        onClick={() => {
+          updateCurrentView('default');
+          setExpandedPillButton(expandedPillButton === 'default' ? null : 'default');
+        }}
+        className={`relative flex items-center p-2.5 rounded-full transition-all duration-300 ${
+          currentView === 'default' 
+            ? 'text-purple-300' 
+            : 'text-white hover:text-gray-200'
+        } ${expandedPillButton === 'default' ? 'gap-2 pr-5' : ''}`}
+      >
+        {currentView === 'default' && (
+          <div className="absolute inset-px rounded-full" style={{
+            background: 'rgba(139, 92, 246, 0.2)',
+            boxShadow: '0 0 12px rgba(139, 92, 246, 0.5)'
+          }}></div>
+        )}
+        <svg className="w-5 h-5 relative z-10 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="8" height="5" rx="2"/>
+          <rect x="13" y="3" width="8" height="11" rx="2"/>
+          <rect x="3" y="10" width="8" height="11" rx="2"/>
+          <rect x="13" y="16" width="8" height="5" rx="2"/>
+        </svg>
+        {expandedPillButton === 'default' && (
+          <span className="text-xs font-medium whitespace-nowrap relative z-10 transition-all duration-300">
+            Dashboard
+          </span>
+        )}
+      </button>
+      
+      {/* Orders */}
+      <button
+        onClick={() => {
+          updateCurrentView('all-orders');
+          setExpandedPillButton(expandedPillButton === 'all-orders' ? null : 'all-orders');
+        }}
+        className={`relative flex items-center p-2.5 rounded-full transition-all duration-300 ${
+          currentView === 'all-orders' 
+            ? 'text-green-300' 
+            : 'text-white hover:text-gray-200'
+        } ${expandedPillButton === 'all-orders' ? 'gap-2 pr-5' : ''}`}
+      >
+        {currentView === 'all-orders' && (
+          <div className="absolute inset-px rounded-full" style={{
+            background: 'rgba(16, 185, 129, 0.2)',
+            boxShadow: '0 0 12px rgba(16, 185, 129, 0.5)'
+          }}></div>
+        )}
+        <svg className="w-5 h-5 relative z-10 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M6 2C4.9 2 4 2.9 4 4v16c0 .6.4 1 1 1 .2 0 .5-.1.7-.3L9 18l3.3 2.7c.4.4 1 .4 1.4 0L17 18l3.3 2.7c.2.2.5.3.7.3.6 0 1-.4 1-1V4c0-1.1-.9-2-2-2H6zm2 5h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h4c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1z"/>
+        </svg>
+        {expandedPillButton === 'all-orders' && (
+          <span className="text-xs font-medium whitespace-nowrap relative z-10 transition-all duration-300">
+            Orders
+          </span>
+        )}
+      </button>
+      
+      {/* Finance */}
+      <button
+        onClick={() => {
+          updateCurrentView('financial');
+          setExpandedPillButton(expandedPillButton === 'financial' ? null : 'financial');
+        }}
+        className={`relative flex items-center p-2.5 rounded-full transition-all duration-300 ${
+          currentView === 'financial' 
+            ? 'text-blue-300' 
+            : 'text-white hover:text-gray-200'
+        } ${expandedPillButton === 'financial' ? 'gap-2 pr-5' : ''}`}
+      >
+        {currentView === 'financial' && (
+          <div className="absolute inset-px rounded-full" style={{
+            background: 'rgba(59, 130, 246, 0.2)',  
+            boxShadow: '0 0 12px rgba(59, 130, 246, 0.5)'
+          }}></div>
+        )}
+        <svg className="w-5 h-5 relative z-10 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+          <rect x="3" y="12" width="4" height="9" rx="2"/>
+          <rect x="10" y="6" width="4" height="15" rx="2"/>
+          <rect x="17" y="9" width="4" height="12" rx="2"/>
+        </svg>
+        {expandedPillButton === 'financial' && (
+          <span className="text-xs font-medium whitespace-nowrap relative z-10 transition-all duration-300">
+            Finance
+          </span>
+        )}
+      </button>
+      
+      {/* Designs */}
+      <button
+        onClick={() => {
+          updateCurrentView('design-vault');
+          setExpandedPillButton(expandedPillButton === 'design-vault' ? null : 'design-vault');
+        }}
+        className={`relative flex items-center p-2.5 rounded-full transition-all duration-300 ${
+          currentView === 'design-vault' 
+            ? 'text-pink-300' 
+            : 'text-white hover:text-gray-200'
+        } ${expandedPillButton === 'design-vault' ? 'gap-2 pr-5' : ''}`}
+      >
+        {currentView === 'design-vault' && (
+          <div className="absolute inset-px rounded-full" style={{
+            background: 'rgba(236, 72, 153, 0.2)',
+            boxShadow: '0 0 12px rgba(236, 72, 153, 0.5)'
+          }}></div>
+        )}
+        <svg className="w-5 h-5 relative z-10 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/>
+        </svg>
+        {expandedPillButton === 'design-vault' && (
+          <span className="text-xs font-medium whitespace-nowrap relative z-10 transition-all duration-300">
+            Designs
+          </span>
+        )}
+      </button>
+      
+      {/* Proofs */}
+      <button
+        onClick={() => {
+          updateCurrentView('proofs');
+          setExpandedPillButton(expandedPillButton === 'proofs' ? null : 'proofs');
+        }}
+        className={`relative flex items-center p-2.5 rounded-full transition-all duration-300 ${
+          currentView === 'proofs' 
+            ? 'text-orange-300' 
+            : 'text-white hover:text-gray-200'
+        } ${expandedPillButton === 'proofs' ? 'gap-2 pr-5' : ''}`}
+      >
+        {currentView === 'proofs' && (
+          <div className="absolute inset-px rounded-full" style={{
+            background: 'rgba(249, 115, 22, 0.2)',
+            boxShadow: '0 0 12px rgba(249, 115, 22, 0.5)'
+          }}></div>
+        )}
+        <svg className="w-5 h-5 relative z-10 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 4.5C7.5 4.5 3.73 7.61 2.46 12c1.27 4.39 5.04 7.5 9.54 7.5s8.27-3.11 9.54-7.5c-1.27-4.39-5.04-7.5-9.54-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+        </svg>
+        {expandedPillButton === 'proofs' && (
+          <span className="text-xs font-medium whitespace-nowrap relative z-10 transition-all duration-300">
+            Proofs
+          </span>
+        )}
+      </button>
+      
+             {/* Settings */}
+       <button
+         onClick={() => {
+           updateCurrentView('settings');
+           setExpandedPillButton(expandedPillButton === 'settings' ? null : 'settings');
+         }}
+         className={`relative flex items-center p-2.5 rounded-full transition-all duration-300 ${
+           currentView === 'settings' 
+             ? 'text-gray-300' 
+             : 'text-white hover:text-gray-200'
+         } ${expandedPillButton === 'settings' ? 'gap-2 pr-5' : ''}`}
+       >
+         {currentView === 'settings' && (
+           <div className="absolute inset-px rounded-full" style={{
+             background: 'rgba(156, 163, 175, 0.2)',
+             boxShadow: '0 0 12px rgba(156, 163, 175, 0.5)'
+           }}></div>
+         )}
+                    <svg className="w-5 h-5 relative z-10 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+             <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+           </svg>
+         {expandedPillButton === 'settings' && (
+           <span className="text-xs font-medium whitespace-nowrap relative z-10 transition-all duration-300">
+             Settings
+           </span>
+         )}
+       </button>
+      
+             {/* Support */}
+       <button
+         onClick={() => {
+           handleGetSupport();
+           setExpandedPillButton(expandedPillButton === 'support' ? null : 'support');
+         }}
+         className={`relative flex items-center p-2.5 rounded-full transition-all duration-300 ${
+           currentView === 'support' 
+             ? 'text-red-300' 
+             : 'text-white hover:text-gray-200'
+         } ${expandedPillButton === 'support' ? 'gap-2 pr-5' : ''}`}
+       >
+         {currentView === 'support' && (
+           <div className="absolute inset-px rounded-full" style={{
+             background: 'rgba(239, 68, 68, 0.2)',
+             boxShadow: '0 0 12px rgba(239, 68, 68, 0.5)'
+           }}></div>
+         )}
+         <svg className="w-5 h-5 relative z-10 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+           <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12l6 4v-18c0-1.1-.9-2-2-2z"/>
+         </svg>
+         {expandedPillButton === 'support' && (
+           <span className="text-xs font-medium whitespace-nowrap relative z-10 transition-all duration-300">
+             Support
+           </span>
+         )}
+       </button>
+    </div>
+  </div>
 
   {/* Contact Form Modal */}
       {showContactForm && (
@@ -8239,15 +8982,18 @@ function Dashboard() {
                       
                       <div className="flex items-start gap-3 mb-3">
                         <div className="w-10 h-10 rounded bg-white/10 flex items-center justify-center flex-shrink-0">
-                          {item.image || itemData.customFiles?.[0] ? (
-                            <img 
-                              src={item.image || itemData.customFiles?.[0]} 
-                              alt={item.name || itemData.productName} 
-                              className="w-full h-full object-cover rounded" 
-                            />
-                          ) : (
-                            <span className="text-xs">📄</span>
-                          )}
+                          {(() => {
+                            const productImage = getProductImage(item, itemData);
+                            return productImage ? (
+                              <img 
+                                src={productImage} 
+                                alt={item.name || itemData.productName} 
+                                className="w-full h-full object-cover rounded" 
+                              />
+                            ) : (
+                              <span className="text-xs">📄</span>
+                            );
+                          })()}
                         </div>
                         <div className="flex-1">
                           <div className="text-white font-medium mb-2">
@@ -8527,8 +9273,12 @@ function Dashboard() {
                         onClick={() => handleSelectBannerTemplate(template)}
                       >
                         <div 
-                          className="h-24 w-full relative"
-                          style={template.style}
+                          className="w-full relative"
+                          style={{
+                            ...template.style,
+                            aspectRatio: '5.2/1', // Match the actual banner ratio
+                            minHeight: '60px' // Minimum height for readability
+                          }}
                         >
                           {template.isDefault && (
                             <div className="absolute top-2 right-2 bg-green-500/80 text-white text-xs px-2 py-1 rounded-full">
@@ -8559,8 +9309,12 @@ function Dashboard() {
                         onClick={() => handleSelectBannerTemplate(template)}
                       >
                         <div 
-                          className="h-24 w-full relative"
-                          style={template.style}
+                          className="w-full relative"
+                          style={{
+                            ...template.style,
+                            aspectRatio: '5.2/1', // Match the actual banner ratio
+                            minHeight: '60px' // Minimum height for readability
+                          }}
                         >
                           {/* Show sample icons for business templates */}
                           {template.emojis && (
@@ -8605,8 +9359,12 @@ function Dashboard() {
                         onClick={() => handleSelectBannerTemplate(template)}
                       >
                         <div 
-                          className="h-24 w-full relative"
-                          style={template.style}
+                          className="w-full relative"
+                          style={{
+                            ...template.style,
+                            aspectRatio: '5.2/1', // Match the actual banner ratio
+                            minHeight: '60px' // Minimum height for readability
+                          }}
                         >
                           <div className="absolute inset-0 bg-black/20"></div>
                           <div className="absolute bottom-2 left-2 text-white text-sm font-medium">

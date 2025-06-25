@@ -16,7 +16,7 @@ export default function Products() {
   return (
     <Layout title="Products - Sticker Shuttle">
         {/* Main Content */}
-        <main className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto py-12 px-6 md:px-4">
+        <main className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto py-12 px-6 md:px-4">
           {/* Hero */}
           <div className="text-center mb-8 relative">
             {/* Background Grid - Enhanced visibility */}

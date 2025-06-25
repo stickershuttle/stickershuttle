@@ -99,8 +99,8 @@ serve(async (req) => {
     // Send email notification
     const emailResult = await sendStatusUpdateEmail(notificationPayload)
     
-    // Send Discord notification (for business owner)
-    const discordResult = await sendDiscordNotification(notificationPayload)
+    // Discord notifications temporarily disabled
+    const discordResult = { success: true, message: 'Discord notifications disabled' }
     
     console.log('✅ Notifications sent:', {
       orderId: record.id,
@@ -162,7 +162,7 @@ async function sendResendEmail(payload: NotificationPayload): Promise<{ success:
   const htmlContent = generateEmailHtml(payload)
 
   const emailData = {
-    from: 'Sticker Shuttle <orders@stickershuttle.com>',
+    from: 'Sticker Shuttle <orbit@stickershuttle.com>',
     to: [payload.customerEmail],
     subject: subject,
     html: htmlContent,
@@ -200,7 +200,7 @@ async function sendSendGridEmail(payload: NotificationPayload): Promise<{ succes
       subject: subject,
     }],
     from: { 
-      email: 'orders@stickershuttle.com', 
+      email: 'orbit@stickershuttle.com', 
       name: 'Sticker Shuttle' 
     },
     content: [{
@@ -510,14 +510,14 @@ function generateEmailHtml(payload: NotificationPayload): string {
           <a href="https://stickershuttle.com/account/dashboard" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">View Your Orders</a>
         </div>
 
-        <p>Questions about your order? Just reply to this email or contact us at <a href="mailto:hello@stickershuttle.com">hello@stickershuttle.com</a></p>
+        <p>Questions about your order? Just reply to this email or contact us at <a href="mailto:orbit@stickershuttle.com">orbit@stickershuttle.com</a></p>
 
         <p>Thanks for choosing Sticker Shuttle! 🚀</p>
       </div>
 
       <div style="text-align: center; padding: 20px 0; border-top: 1px solid #eee; color: #666; font-size: 12px;">
         <p>Sticker Shuttle - Custom Stickers & Printing</p>
-        <p>📧 hello@stickershuttle.com | 🌐 <a href="https://stickershuttle.com">stickershuttle.com</a></p>
+        <p>📧 orbit@stickershuttle.com | 🌐 <a href="https://stickershuttle.com">stickershuttle.com</a></p>
       </div>
     </body>
     </html>

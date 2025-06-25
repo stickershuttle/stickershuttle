@@ -189,7 +189,7 @@ export default function Deals() {
     <Layout title="100 Custom Stickers for $29 - Sticker Shuttle Deals">
         {/* Hero Section */}
         <section className="py-4 -mt-4 md:mt-0">
-          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
+          <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
             <div 
               className="relative rounded-xl overflow-hidden pt-1 md:pt-1 pb-0"
               style={{
@@ -510,7 +510,7 @@ export default function Deals() {
 
         {/* Reviews Section */}
         <section className="py-12">
-          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
+          <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
             <h2 className="text-3xl font-bold text-center text-white mb-8">What customers say</h2>
             
             {/* Desktop Reviews Grid */}
@@ -867,7 +867,7 @@ export default function Deals() {
 
         {/* Brands Section - Moved above footer */}
         <section className="pt-7 pb-4">
-          <div className="w-[95%] md:w-[90%] xl:w-[70%] mx-auto px-6 md:px-4">
+          <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
             <div className="flex justify-center mb-6">
               <div 
                 className="px-6 py-2 rounded-full text-center text-lg text-gray-300"

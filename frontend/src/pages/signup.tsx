@@ -9,6 +9,11 @@ export default function SignUp() {
   const [signupMethod, setSignupMethod] = useState<'email' | 'phone'>('email');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Add OTP verification state
+  const [showOtpVerification, setShowOtpVerification] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [userEmail, setUserEmail] = useState('');
 
   const [formData, setFormData] = useState({
     email: router.query.email ? decodeURIComponent(router.query.email as string) : '',
@@ -40,6 +45,13 @@ export default function SignUp() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent multiple submissions
+    if (loading) {
+      console.log('⚠️ Already processing signup, ignoring duplicate submission...');
+      return;
+    }
+    
     console.log('🔄 Form submitted, starting signup process...');
     console.log('📋 Raw form data:', formData);
     console.log('🖥️ Form that submitted:', (e.target as HTMLFormElement)?.className || 'Unknown form');
@@ -113,6 +125,7 @@ export default function SignUp() {
         password: directPassword,
         options: {
           data: metadataToSend
+          // Remove emailRedirectTo for OTP flow
         }
       });
 
@@ -125,15 +138,132 @@ export default function SignUp() {
         return;
       }
 
-      console.log('✅ Signup successful, redirecting...');
-      // Success! Redirect to login with confirmation message
-      router.push('/login?message=Check your email to confirm your account');
+      console.log('✅ Signup successful, showing OTP verification...');
+      // Show OTP verification form instead of redirecting
+      setUserEmail(directEmail);
+      setShowOtpVerification(true);
+      setLoading(false);
       
     } catch (err: any) {
       console.log('❌ Catch error:', err);
       setError(err.message || 'An error occurred during signup');
       setLoading(false);
     }
+  };
+
+  const handleOtpVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const supabase = await getSupabase();
+      
+      // Debug Supabase client configuration
+      console.log('🔧 Supabase client created:', {
+        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        client: !!supabase
+      });
+      
+      console.log('🔄 Verifying OTP:', { 
+        email: userEmail, 
+        token: otpCode, 
+        length: otpCode.length,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Try multiple verification types to see which one works
+      console.log('🧪 Trying signup verification type...');
+      let result = await supabase.auth.verifyOtp({
+        email: userEmail,
+        token: otpCode,
+        type: 'signup'
+      });
+      
+      console.log('📊 Signup verification result:', { 
+        success: !!result.data?.user, 
+        error: result.error?.message,
+        errorCode: result.error?.code 
+      });
+      
+      // If signup fails, try email type
+      if (result.error) {
+        console.log('🧪 Trying email verification type...');
+        result = await supabase.auth.verifyOtp({
+          email: userEmail,
+          token: otpCode,
+          type: 'email'
+        });
+        
+        console.log('📊 Email verification result:', { 
+          success: !!result.data?.user, 
+          error: result.error?.message,
+          errorCode: result.error?.code 
+        });
+      }
+      
+      // If both fail, try invite type (just in case)
+      if (result.error) {
+        console.log('🧪 Trying invite verification type...');
+        const inviteResult = await supabase.auth.verifyOtp({
+          email: userEmail,
+          token: otpCode,
+          type: 'invite'
+        });
+        
+        console.log('📊 Invite verification result:', { 
+          success: !!inviteResult.data?.user, 
+          error: inviteResult.error?.message,
+          errorCode: inviteResult.error?.code 
+        });
+        
+        if (!inviteResult.error) {
+          result = inviteResult;
+        }
+      }
+      
+      const { data, error } = result;
+
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ Email verified successfully!');
+      // Redirect to dashboard after successful verification
+      router.push('/account/dashboard');
+      
+    } catch (err: any) {
+      setError(err.message || 'An error occurred during verification');
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const supabase = await getSupabase();
+      
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: userEmail
+      });
+
+      if (error) {
+        setError(error.message);
+      } else {
+        setError('New code sent to your email!');
+      }
+      
+    } catch (err: any) {
+      setError(err.message || 'Failed to resend code');
+    }
+    
+    setLoading(false);
   };
 
   const handleOAuthSignup = async (provider: string) => {
@@ -178,6 +308,144 @@ export default function SignUp() {
       color: '#4285F4'
     }
   ];
+
+  // Show OTP verification form if needed
+  if (showOtpVerification) {
+    return (
+      <Layout title="Verify Your Email - Sticker Shuttle">
+        <div className="fixed inset-0 w-full h-full overflow-hidden z-0">
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ transform: 'scale(1.75)' }}
+            onLoadedData={(e) => {
+              const video = e.target as HTMLVideoElement;
+              video.currentTime = 117;
+              video.play().catch(console.error);
+            }}
+          >
+            <source src="https://images-assets.nasa.gov/video/KSC-19890502-MH-NAS01-0001-Apollo_11_The_Twentieth_Year_1969_to_1989-B_0514/KSC-19890502-MH-NAS01-0001-Apollo_11_The_Twentieth_Year_1969_to_1989-B_0514~large.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-black/60"></div>
+        </div>
+        
+        <div className="min-h-screen py-4 px-6 md:px-4 relative z-10 flex items-center justify-center">
+          <div className="max-w-md w-full">
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold text-white mb-2">Check Your Email</h1>
+              <p className="text-gray-300">We sent a 6-digit code to</p>
+              <p className="text-white font-semibold">{userEmail}</p>
+            </div>
+
+            <div 
+              className="rounded-2xl p-8 shadow-xl"
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.15)'
+              }}
+            >
+              {error && (
+                <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/50 text-red-200 text-sm">
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleOtpVerification}>
+                <div className="mb-6">
+                  <label htmlFor="otpCode" className="block text-sm font-medium text-gray-300 mb-2">
+                    Verification Code
+                  </label>
+                  <input
+                    type="text"
+                    id="otpCode"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="123456"
+                    required
+                    maxLength={6}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-2xl font-mono tracking-widest"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || otpCode.length !== 6}
+                  className="w-full py-3 px-4 rounded-xl text-white font-semibold transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg hover:shadow-xl"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                  }}
+                >
+                  {loading ? 'Verifying...' : 'Verify Email'}
+                </button>
+              </form>
+
+              <div className="mt-6 text-center">
+                <p className="text-gray-400 text-sm mb-2">Didn't receive the code?</p>
+                <div className="flex gap-4 justify-center">
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={loading}
+                    className="text-blue-400 hover:text-blue-300 text-sm font-semibold transition-colors disabled:opacity-50"
+                  >
+                    Send New Code
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const supabase = await getSupabase();
+                        const { error } = await supabase.auth.signInWithOtp({
+                          email: userEmail,
+                          options: {
+                            emailRedirectTo: `${window.location.origin}/account/dashboard`
+                          }
+                        });
+                        if (!error) {
+                          setError('Magic link sent! Check your email for a clickable link.');
+                        } else {
+                          setError(error.message);
+                        }
+                      } catch (err: any) {
+                        setError(err.message);
+                      }
+                    }}
+                    disabled={loading}
+                    className="text-green-400 hover:text-green-300 text-sm font-semibold transition-colors disabled:opacity-50"
+                  >
+                    Send Magic Link Instead
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowOtpVerification(false);
+                    setOtpCode('');
+                    setUserEmail('');
+                    setError(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-300 text-sm transition-colors"
+                >
+                  ← Back to Sign Up
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout title="Sign Up - Join Sticker Shuttle">
