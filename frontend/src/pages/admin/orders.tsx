@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from '@/components/AdminLayout';
+import ProofUpload from '@/components/ProofUpload';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { getSupabase } from '../../lib/supabase';
 import {
@@ -113,6 +114,35 @@ const SEND_PROOFS = gql`
 
 // Admin check - add your admin email(s) here
 const ADMIN_EMAILS = ['justin@stickershuttle.com']; // Add all admin emails here
+
+// Helper function to check if an item is a sample pack
+const isSamplePackItem = (item: any) => {
+  return item.productId === 'sample-pack' || 
+         item.sku === 'SP-001' ||
+         item.productName?.toLowerCase().includes('sample pack') ||
+         item.productCategory?.toLowerCase().includes('sample');
+};
+
+// Helper function to check if an order contains sample packs
+const isSamplePackOrder = (order: Order) => {
+  return order.items?.some(item => isSamplePackItem(item));
+};
+
+// Helper function to get product image with sample pack support
+const getProductImage = (item: any) => {
+  // Check for sample pack first
+  if (isSamplePackItem(item)) {
+    return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750890354/Sample-Pack_jsy2yf.png';
+  }
+  
+  // Check for custom files
+  if (item.customFiles?.[0]) {
+    return item.customFiles[0];
+  }
+  
+  // No image available
+  return null;
+};
 
 interface Order {
   id: string;
@@ -599,6 +629,19 @@ export default function AdminOrders() {
 
   // Get proof status (updated with shipping statuses)
   const getProofStatus = (order: Order) => {
+    // Check if this is a sample pack order (skip proof system)
+    if (isSamplePackOrder(order)) {
+      if (order.orderStatus === 'Assume Delivered' || order.fulfillmentStatus === 'fulfilled') {
+        return 'Assume Delivered';
+      }
+      if (order.orderStatus === 'Shipped' || order.proof_status === 'shipped' || (order.fulfillmentStatus === 'partial' && order.trackingNumber)) {
+        return 'Shipped';
+      }
+      // Default sample pack status is packaging
+      return 'Packaging';
+    }
+
+    // Regular orders (non-sample pack) - existing proof system
     // Check for orders that skip proofs and go directly to printing
     if (order.orderStatus === 'Printing') {
       return 'Printing';
@@ -642,6 +685,8 @@ export default function AdminOrders() {
         return 'bg-orange-900 bg-opacity-40 text-orange-300';
       case 'Printing':
         return 'bg-green-900 bg-opacity-40 text-green-300';
+      case 'Packaging':
+        return 'bg-blue-900 bg-opacity-40 text-blue-300';
       case 'Proof Approved':
         return 'bg-green-900 bg-opacity-40 text-green-300';
       case 'Label Created':
@@ -654,10 +699,44 @@ export default function AdminOrders() {
         return 'bg-indigo-900 bg-opacity-40 text-indigo-300';
       case 'Delivered':
         return 'bg-green-900 bg-opacity-40 text-green-300';
+      case 'Assume Delivered':
+        return 'bg-green-900 bg-opacity-40 text-green-300';
       case 'Changes Requested':
         return 'bg-amber-900 bg-opacity-40 text-amber-300';
       default:
         return 'bg-gray-800 bg-opacity-40 text-gray-300';
+    }
+  };
+
+  // Get LED glow color for status indicators
+  const getLEDGlowColor = (status: string) => {
+    switch (status) {
+      case 'Building Proof':
+        return '#fcd34d'; // yellow-300
+      case 'Awaiting Approval':
+        return '#fdba74'; // orange-300
+      case 'Printing':
+        return '#86efac'; // green-300
+      case 'Packaging':
+        return '#93c5fd'; // blue-300
+      case 'Proof Approved':
+        return '#86efac'; // green-300
+      case 'Label Created':
+        return '#93c5fd'; // blue-300
+      case 'Label Printed':
+        return '#93c5fd'; // blue-300
+      case 'Shipped':
+        return '#c4b5fd'; // purple-300
+      case 'Out for Delivery':
+        return '#a5b4fc'; // indigo-300
+      case 'Delivered':
+        return '#86efac'; // green-300
+      case 'Assume Delivered':
+        return '#86efac'; // green-300
+      case 'Changes Requested':
+        return '#fcd34d'; // amber-300
+      default:
+        return '#d1d5db'; // gray-300
     }
   };
 
@@ -911,6 +990,11 @@ export default function AdminOrders() {
       case '7':
         cutoffDate.setDate(now.getDate() - 7);
         break;
+      case 'mtd':
+        // Month to date - first day of current month
+        cutoffDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        cutoffDate.setHours(0, 0, 0, 0);
+        break;
       case '30':
         cutoffDate.setDate(now.getDate() - 30);
         break;
@@ -940,10 +1024,22 @@ export default function AdminOrders() {
     // Initialize data for the time period
     let periodDays = parseInt(days);
     if (days === '1') periodDays = 1;
+    if (days === 'mtd') {
+      // For month to date, calculate days from start of month to today
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      periodDays = Math.ceil((now.getTime() - startOfMonth.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    }
     
     for (let i = periodDays - 1; i >= 0; i--) {
       const date = new Date(now);
-      date.setDate(date.getDate() - i);
+      if (days === 'mtd') {
+        // For month to date, start from beginning of month
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        date.setTime(startOfMonth.getTime() + (i * 24 * 60 * 60 * 1000));
+      } else {
+        date.setDate(date.getDate() - i);
+      }
+      
       if (days === '1') {
         // For today, show hourly data
         for (let hour = 0; hour < 24; hour++) {
@@ -994,6 +1090,7 @@ export default function AdminOrders() {
     switch (days) {
       case '1': return 'Today';
       case '7': return 'Last 7 days';
+      case 'mtd': return 'Month to date';
       case '30': return 'Last 30 days';
       case '90': return 'Last 90 days';
       case '365': return 'Last 365 days';
@@ -1119,7 +1216,7 @@ export default function AdminOrders() {
       <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#030140' }}>
         {/* Main Content */}
         <div className="pt-8 pb-8">
-          <div className="w-full max-w-full px-4 md:px-6">
+          <div className="w-full px-8">
             {!selectedOrder ? (
               // Orders List View
               <>
@@ -1165,6 +1262,26 @@ export default function AdminOrders() {
                       }}
                     >
                       Last 7 days
+                    </button>
+                    <button
+                      onClick={() => setTimeFilter('mtd')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        timeFilter === 'mtd'
+                          ? 'text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      style={{
+                        background: timeFilter === 'mtd' 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: `1px solid ${timeFilter === 'mtd' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                        boxShadow: timeFilter === 'mtd' 
+                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                      }}
+                    >
+                      Month to date
                     </button>
                     <button
                       onClick={() => setTimeFilter('30')}
@@ -1229,118 +1346,170 @@ export default function AdminOrders() {
                   </div>
                 </div>
 
-                {/* Analytics Cards - Time Filtered */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                  <div className="glass-container p-4 lg:p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-gray-400 uppercase tracking-wider">Total Sales</span>
-                      <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                      </svg>
+                {/* Analytics & Sales Overview Container */}
+                <div className="glass-container p-6 mb-6">
+                  {/* Analytics Cards */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div 
+                      className="p-3 lg:p-4 rounded-lg transition-all hover:scale-105 cursor-pointer"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        boxShadow: 'rgba(0, 0, 0, 0.2) 0px 4px 16px, rgba(255, 255, 255, 0.05) 0px 1px 0px inset',
+                        backdropFilter: 'blur(8px)'
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Total Sales</span>
+                        <div className="p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(34, 197, 94, 0.2)' }}>
+                          <svg className="w-3 h-3 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="text-lg lg:text-xl font-bold mb-1" style={{ color: '#86efac' }}>
+                        {formatCurrency(timeFilteredAnalytics?.totalSales || 0)}
+                      </div>
+                      <div className="text-xs text-gray-500">Revenue generated</div>
                     </div>
-                    <div className="text-lg lg:text-2xl font-bold" style={{ color: '#86efac' }}>
-                      {formatCurrency(timeFilteredAnalytics?.totalSales || 0)}
+
+                    <div 
+                      className="p-3 lg:p-4 rounded-lg transition-all hover:scale-105 cursor-pointer"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        boxShadow: 'rgba(0, 0, 0, 0.2) 0px 4px 16px, rgba(255, 255, 255, 0.05) 0px 1px 0px inset',
+                        backdropFilter: 'blur(8px)'
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Average Order</span>
+                        <div className="p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)' }}>
+                          <svg className="w-3 h-3 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="text-lg lg:text-xl font-bold text-white mb-1">
+                        {formatCurrency(timeFilteredAnalytics?.avgOrderValue || 0)}
+                      </div>
+                      <div className="text-xs text-gray-500">Per order value</div>
                     </div>
-                    <div className="text-xs text-gray-400 mt-1">{getTimeFilterLabel(timeFilter)}</div>
+
+                    <div 
+                      className="p-3 lg:p-4 rounded-lg transition-all hover:scale-105 cursor-pointer"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        boxShadow: 'rgba(0, 0, 0, 0.2) 0px 4px 16px, rgba(255, 255, 255, 0.05) 0px 1px 0px inset',
+                        backdropFilter: 'blur(8px)'
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Orders</span>
+                        <div className="p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(147, 51, 234, 0.2)' }}>
+                          <svg className="w-3 h-3 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="text-lg lg:text-xl font-bold text-white mb-1">
+                        {timeFilteredAnalytics?.totalOrders || 0}
+                      </div>
+                      <div className="text-xs text-gray-500">Total orders placed</div>
+                    </div>
+
+                    <div 
+                      className="p-3 lg:p-4 rounded-lg transition-all hover:scale-105 cursor-pointer"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        boxShadow: 'rgba(0, 0, 0, 0.2) 0px 4px 16px, rgba(255, 255, 255, 0.05) 0px 1px 0px inset',
+                        backdropFilter: 'blur(8px)'
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Stickers</span>
+                        <div className="p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(251, 146, 60, 0.2)' }}>
+                          <svg className="w-3 h-3 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="text-lg lg:text-xl font-bold text-white mb-1">
+                        {timeFilteredAnalytics?.totalStickers || 0}
+                      </div>
+                      <div className="text-xs text-gray-500">Units produced</div>
+                    </div>
                   </div>
 
-                  <div className="glass-container p-4 lg:p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-gray-400 uppercase tracking-wider">Average Order Value</span>
+                  {/* Sales Chart */}
+                  {timeFilteredAnalytics?.chartData && timeFilteredAnalytics.chartData.length > 0 && (
+                    <div className="border-t border-gray-700 border-opacity-30 pt-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-base font-semibold text-white">Sales Overview</h3>
+                        <div className="text-sm text-gray-400">{getTimeFilterLabel(timeFilter)}</div>
+                      </div>
+                      <div className="h-16">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={timeFilteredAnalytics.chartData}>
+                            <defs>
+                              <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid 
+                              strokeDasharray="3 3" 
+                              stroke="rgba(255, 255, 255, 0.1)" 
+                              vertical={false}
+                            />
+                            <XAxis 
+                              dataKey="date" 
+                              stroke="rgba(255, 255, 255, 0.4)"
+                              fontSize={11}
+                              tick={{ fill: 'rgba(255, 255, 255, 0.7)' }}
+                              axisLine={{ stroke: 'rgba(255, 255, 255, 0.1)' }}
+                              tickLine={false}
+                            />
+                            <YAxis 
+                              stroke="rgba(255, 255, 255, 0.4)"
+                              fontSize={11}
+                              tick={{ fill: 'rgba(255, 255, 255, 0.7)' }}
+                              axisLine={{ stroke: 'rgba(255, 255, 255, 0.1)' }}
+                              tickLine={false}
+                              tickFormatter={(value) => `$${value}`}
+                            />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: 'rgba(3, 1, 64, 0.95)',
+                                border: '1px solid rgba(255, 255, 255, 0.15)',
+                                borderRadius: '12px',
+                                backdropFilter: 'blur(12px)',
+                                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
+                              }}
+                              labelStyle={{ color: 'rgba(255, 255, 255, 0.7)', marginBottom: '4px' }}
+                              itemStyle={{ color: '#fff' }}
+                              formatter={(value: number, name: string) => {
+                                if (name === 'sales') return [`$${value.toFixed(2)}`, 'Sales'];
+                                if (name === 'orders') return [value, 'Orders'];
+                                return [value, name];
+                              }}
+                            />
+                            <Area 
+                              type="monotone" 
+                              dataKey="sales" 
+                              stroke="#3b82f6" 
+                              strokeWidth={2}
+                              fillOpacity={1} 
+                              fill="url(#salesGradient)" 
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
-                    <div className="text-lg lg:text-2xl font-bold text-white">
-                      {formatCurrency(timeFilteredAnalytics?.avgOrderValue || 0)}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-1">{getTimeFilterLabel(timeFilter)}</div>
-                  </div>
-
-                  <div className="glass-container p-4 lg:p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-gray-400 uppercase tracking-wider">Orders</span>
-                    </div>
-                    <div className="text-lg lg:text-2xl font-bold text-white">
-                      {timeFilteredAnalytics?.totalOrders || 0}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-1">{getTimeFilterLabel(timeFilter)}</div>
-                  </div>
-
-                  <div className="glass-container p-4 lg:p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-gray-400 uppercase tracking-wider">Stickers</span>
-                    </div>
-                    <div className="text-lg lg:text-2xl font-bold text-white">
-                      {timeFilteredAnalytics?.totalStickers || 0}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-1">{getTimeFilterLabel(timeFilter)}</div>
-                  </div>
+                  )}
                 </div>
-
-                {/* Sales Chart */}
-                {timeFilteredAnalytics?.chartData && timeFilteredAnalytics.chartData.length > 0 && (
-                  <div className="glass-container p-6 mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-white">Sales Overview</h3>
-                      <div className="text-sm text-gray-400">{getTimeFilterLabel(timeFilter)}</div>
-                    </div>
-                    <div className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={timeFilteredAnalytics.chartData}>
-                          <defs>
-                            <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid 
-                            strokeDasharray="3 3" 
-                            stroke="rgba(255, 255, 255, 0.1)" 
-                            vertical={false}
-                          />
-                          <XAxis 
-                            dataKey="date" 
-                            stroke="rgba(255, 255, 255, 0.4)"
-                            fontSize={12}
-                            tick={{ fill: 'rgba(255, 255, 255, 0.7)' }}
-                            axisLine={{ stroke: 'rgba(255, 255, 255, 0.1)' }}
-                            tickLine={false}
-                          />
-                          <YAxis 
-                            stroke="rgba(255, 255, 255, 0.4)"
-                            fontSize={12}
-                            tick={{ fill: 'rgba(255, 255, 255, 0.7)' }}
-                            axisLine={{ stroke: 'rgba(255, 255, 255, 0.1)' }}
-                            tickLine={false}
-                            tickFormatter={(value) => `$${value}`}
-                          />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: 'rgba(3, 1, 64, 0.95)',
-                              border: '1px solid rgba(255, 255, 255, 0.15)',
-                              borderRadius: '12px',
-                              backdropFilter: 'blur(12px)',
-                              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
-                            }}
-                            labelStyle={{ color: 'rgba(255, 255, 255, 0.7)', marginBottom: '4px' }}
-                            itemStyle={{ color: '#fff' }}
-                            formatter={(value: number, name: string) => {
-                              if (name === 'sales') return [`$${value.toFixed(2)}`, 'Sales'];
-                              if (name === 'orders') return [value, 'Orders'];
-                              return [value, name];
-                            }}
-                          />
-                          <Area 
-                            type="monotone" 
-                            dataKey="sales" 
-                            stroke="#3b82f6" 
-                            strokeWidth={2}
-                            fillOpacity={1} 
-                            fill="url(#salesGradient)" 
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                )}
 
                 {/* Mobile/Tablet Filters */}
                 <div className="xl:hidden mb-4 px-4">
@@ -1523,7 +1692,7 @@ export default function AdminOrders() {
                           {orders.map((order: Order, orderIndex: number) => {
                             const firstItem = order.items[0] || {};
                             const totalQuantity = order.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
-                            const itemImage = firstItem.customFiles?.[0] || null;
+                            const itemImage = getProductImage(firstItem);
                             const proofStatus = getProofStatus(order);
                             
                             return (
@@ -1739,8 +1908,8 @@ export default function AdminOrders() {
                       </thead>
                       <tbody>
                         {filteredOrders.map((order) => {
-                          // Get first item's image for preview
-                          const firstItemImage = order.items[0]?.customFiles?.[0] || null;
+                          // Get first item's image for preview with sample pack support
+                          const firstItemImage = getProductImage(order.items[0]);
                           const totalQuantity = order.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
 
                           // Get first item's selections for columns
@@ -1762,13 +1931,14 @@ export default function AdminOrders() {
                               <td className="pl-6 pr-3 py-4">
                                 <div className="flex items-center gap-2.5">
                                   <div
-                                    className={`rounded-full ${getProofStatusColor(getProofStatus(order))}`}
+                                    className="rounded-full"
                                     style={{
                                       width: '8px',
                                       height: '8px',
                                       minWidth: '8px',
                                       minHeight: '8px',
-                                      boxShadow: '0 0 10px currentColor',
+                                      backgroundColor: getLEDGlowColor(getProofStatus(order)),
+                                      boxShadow: `0 0 12px ${getLEDGlowColor(getProofStatus(order))}, 0 0 8px ${getLEDGlowColor(getProofStatus(order))}`,
                                       position: 'relative',
                                       zIndex: 10
                                     }}
@@ -1796,8 +1966,8 @@ export default function AdminOrders() {
                                     customerReplacementFileName?: string;
                                     customerReplacementAt?: string;
                                   }, index: number) => {
-                                    // Get the full item data with images
-                                    const itemImage = item.customFiles?.[0] || null;
+                                    // Get the full item data with images using helper function
+                                    const itemImage = getProductImage(item);
                                     
                                     return (
                                       <div key={`preview-${item.id}-${index}`} className="flex-shrink-0">
@@ -2068,7 +2238,7 @@ export default function AdminOrders() {
                         {selectedOrder.items.map((item, idx) => {
                           const selections = item.calculatorSelections || {};
                           const size = selections.size || selections.sizePreset || {};
-                          const itemImage = item.customFiles?.[0] || null;
+                          const itemImage = getProductImage(item);
 
                           return (
                             <div key={idx} className="py-4 border-b border-gray-700 border-opacity-30 last:border-b-0">
@@ -2279,13 +2449,14 @@ export default function AdminOrders() {
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2.5">
                       <div
-                        className={`rounded-full ${getProofStatusColor(getProofStatus(selectedOrder))}`}
+                        className="rounded-full"
                         style={{
                           width: '8px',
                           height: '8px',
                           minWidth: '8px',
                           minHeight: '8px',
-                          boxShadow: '0 0 8px currentColor',
+                          backgroundColor: getLEDGlowColor(getProofStatus(selectedOrder)),
+                          boxShadow: `0 0 12px ${getLEDGlowColor(getProofStatus(selectedOrder))}, 0 0 8px ${getLEDGlowColor(getProofStatus(selectedOrder))}`,
                           position: 'relative',
                           zIndex: 10
                         }}
@@ -2377,7 +2548,7 @@ export default function AdminOrders() {
                         {selectedOrder.items.map((item, idx) => {
                           const selections = item.calculatorSelections || {};
                           const size = selections.size || selections.sizePreset || {};
-                          const itemImage = item.customFiles?.[0] || null;
+                          const itemImage = getProductImage(item);
 
                           return (
                             <div key={idx} className="py-4 border-b border-gray-700 border-opacity-30 last:border-b-0">
@@ -2520,8 +2691,11 @@ export default function AdminOrders() {
 
                       {/* Order Summary Actions */}
                       <div className="grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-gray-700 border-opacity-30">
-                        {/* Show Send Proofs if proofs haven't been sent, otherwise show View Proofs */}
-                        {!selectedOrder.proof_sent_at && selectedOrder.proofs && selectedOrder.proofs.length > 0 ? (
+                        {/* Hide proof actions for sample packs */}
+                        {!isSamplePackOrder(selectedOrder) && (
+                          <>
+                            {/* Show Send Proofs if proofs haven't been sent, otherwise show View Proofs */}
+                            {!selectedOrder.proof_sent_at && selectedOrder.proofs && selectedOrder.proofs.length > 0 ? (
                           <button
                             onClick={async () => {
                               setSendingProofs(true);
@@ -2621,11 +2795,114 @@ export default function AdminOrders() {
                             Create Shipping Label
                           </button>
                         )}
+                            </>
+                        )}
+
+                        {/* Always show tracking for sample packs */}
+                        {isSamplePackOrder(selectedOrder) && (
+                          <>
+                            {selectedOrder.trackingNumber ? (
+                              <button
+                                onClick={() => handleViewTracking(selectedOrder)}
+                                className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105 col-span-2"
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(75, 85, 99, 0.4) 0%, rgba(75, 85, 99, 0.25) 50%, rgba(75, 85, 99, 0.1) 100%)',
+                                  backdropFilter: 'blur(25px) saturate(180%)',
+                                  border: '1px solid rgba(75, 85, 99, 0.4)',
+                                  boxShadow: 'rgba(75, 85, 99, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                }}
+                              >
+                                <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                                View Tracking
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => router.push(`/admin/shipping-labels/${selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}`)}
+                                className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105 col-span-2"
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.4) 0%, rgba(234, 179, 8, 0.25) 50%, rgba(234, 179, 8, 0.1) 100%)',
+                                  backdropFilter: 'blur(25px) saturate(180%)',
+                                  border: '1px solid rgba(234, 179, 8, 0.4)',
+                                  boxShadow: 'rgba(234, 179, 8, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                }}
+                              >
+                                <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                                Create Shipping Label
+                              </button>
+                            )}
+                          </>
+                        )}
                       </div>
                     </div>
 
-                    {/* Approved Proofs Display - Collapsible - Desktop Only */}
-                    {selectedOrder.proofs && selectedOrder.proofs.filter((p: any) => p.status === 'approved').length > 0 && (
+                    {/* Proof Management System - Hide if proofs are approved OR if it's a sample pack */}
+                    {!isSamplePackOrder(selectedOrder) && selectedOrder.proof_status !== 'approved' && (
+                      <div className="glass-container p-6">
+                        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                          <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          Proof Management
+                        </h3>
+                        <ProofUpload
+                          orderId={selectedOrder.id}
+                          proofStatus={selectedOrder.proof_status}
+                          existingProofs={selectedOrder.proofs || []}
+                          isAdmin={true}
+                          orderItems={selectedOrder.items}
+                          onProofUploaded={() => {
+                            // Refresh the order data
+                            refetch();
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Approved Proofs Display - Show when proofs are approved (not for sample packs) */}
+                    {!isSamplePackOrder(selectedOrder) && selectedOrder.proof_status === 'approved' && selectedOrder.proofs && selectedOrder.proofs.filter((p: any) => p.status === 'approved').length > 0 && (
+                      <div className="glass-container p-6">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                            <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <h3 className="text-lg font-semibold text-white">Approved Proofs</h3>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                          {selectedOrder.proofs.filter((p: any) => p.status === 'approved').map((proof: any) => (
+                            <div key={proof.id} className="space-y-2">
+                              <div 
+                                className="rounded-lg overflow-hidden aspect-square p-2 cursor-pointer hover:opacity-80 transition-opacity"
+                                style={{
+                                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                                }}
+                                onClick={() => window.open(proof.proofUrl, '_blank')}
+                              >
+                                <img 
+                                  src={proof.proofUrl} 
+                                  alt={proof.proofTitle}
+                                  className="w-full h-full object-contain"
+                                />
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-white truncate">{proof.proofTitle}</p>
+                                <p className="text-xs text-green-400">✓ Approved</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Approved Proofs Display - Collapsible - Desktop Only - Show when proof status is not approved but has approved proofs (not for sample packs) */}
+                    {!isSamplePackOrder(selectedOrder) && selectedOrder.proof_status !== 'approved' && selectedOrder.proofs && selectedOrder.proofs.filter((p: any) => p.status === 'approved').length > 0 && (
                       <div className="hidden xl:block">
                         <details className="glass-container p-6">
                         <summary className="flex items-center justify-between cursor-pointer -m-6 p-6">
