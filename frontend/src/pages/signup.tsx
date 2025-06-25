@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from "@/components/Layout";
 import Link from "next/link";
@@ -11,7 +11,7 @@ export default function SignUp() {
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    email: '',
+    email: router.query.email ? decodeURIComponent(router.query.email as string) : '',
     phone: '',
     password: '',
     confirmPassword: '',
@@ -19,6 +19,16 @@ export default function SignUp() {
     lastName: '',
     agreeToTerms: false
   });
+
+  // Update email if URL param changes
+  useEffect(() => {
+    if (router.query.email) {
+      setFormData(prev => ({
+        ...prev,
+        email: decodeURIComponent(router.query.email as string)
+      }));
+    }
+  }, [router.query.email]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
