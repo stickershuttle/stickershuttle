@@ -3,6 +3,7 @@ const stripeClient = require('./stripe-client');
 const supabaseClient = require('./supabase-client');
 const notificationHelpers = require('./notification-helpers');
 const { discountManager } = require('./discount-manager');
+const { createGuestAccount, emailExists } = require('./guest-account-manager');
 
 const router = express.Router();
 
@@ -133,6 +134,115 @@ async function handleCheckoutSessionCompleted(session) {
     // Get customer info and shipping address
     const customer = fullSession.customer_details || {};
     const shippingAddress = fullSession.shipping_details?.address || fullSession.customer_details?.address || {};
+    
+    // Handle guest account creation if needed
+    let guestAccountInfo = null;
+    console.log('🔍 Checking for guest checkout - userId:', metadata.userId, 'customer email:', customer.email);
+    
+    if (metadata.userId === 'guest' && customer.email) {
+      console.log('👤 Processing guest checkout for:', customer.email);
+      
+      try {
+        // Check if account already exists
+        const accountExists = await emailExists(customer.email);
+        
+        if (!accountExists) {
+          // Extract guest data from session
+          const guestData = {
+            firstName: customer.name?.split(' ')[0] || '',
+            lastName: customer.name?.split(' ').slice(1).join(' ') || '',
+            email: customer.email
+          };
+          
+          console.log('🔐 Creating guest account with data:', guestData);
+          
+          // Create the guest account
+          const accountResult = await createGuestAccount(guestData);
+          
+          if (accountResult.success) {
+            console.log('✅ Guest account created successfully');
+            guestAccountInfo = {
+              email: guestData.email,
+              password: accountResult.password,
+              userId: accountResult.user.id
+            };
+            
+            // Store guest account info for order success page with auto-login flag
+            if (supabaseClient.isReady()) {
+              const client = supabaseClient.getServiceClient();
+              try {
+                // First check if the table exists
+                const { error: tableCheckError } = await client
+                  .from('guest_account_info')
+                  .select('id')
+                  .limit(1);
+                
+                if (tableCheckError && tableCheckError.message.includes('relation') && tableCheckError.message.includes('does not exist')) {
+                  console.error('❌ guest_account_info table does not exist! Please run CREATE_GUEST_ACCOUNT_INFO_TABLE.sql');
+                  // Store password in order tags as fallback
+                  const { data: orderForTags } = await client
+                    .from('orders_main')
+                    .select('order_tags')
+                    .eq('stripe_session_id', session.id)
+                    .single();
+                  
+                  await client
+                    .from('orders_main')
+                    .update({
+                      order_tags: [...(orderForTags?.order_tags || []), `guest_pwd:${accountResult.password}`],
+                      guest_email: guestData.email,
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('stripe_session_id', session.id);
+                } else {
+                  // Table exists, insert normally
+                  const { error: insertError } = await client
+                    .from('guest_account_info')
+                    .insert({
+                      stripe_session_id: session.id,
+                      email: guestData.email,
+                      password: accountResult.password,
+                      auto_login: true,
+                      created_at: new Date().toISOString()
+                    });
+                  
+                  if (insertError) {
+                    console.error('⚠️ Failed to store guest account info:', insertError);
+                    // Store password in order tags as fallback
+                    const { data: orderForTags } = await client
+                      .from('orders_main')
+                      .select('order_tags')
+                      .eq('stripe_session_id', session.id)
+                      .single();
+                    
+                    await client
+                      .from('orders_main')
+                      .update({
+                        order_tags: [...(orderForTags?.order_tags || []), `guest_pwd:${accountResult.password}`],
+                        guest_email: guestData.email,
+                        updated_at: new Date().toISOString()
+                      })
+                      .eq('stripe_session_id', session.id);
+                  } else {
+                    console.log('✅ Guest account info stored for order success page with auto-login');
+                  }
+                }
+              } catch (error) {
+                console.error('⚠️ Error handling guest account info storage:', error);
+              }
+            }
+          } else {
+            console.error('❌ Failed to create guest account:', accountResult.error);
+          }
+        } else {
+          console.log('👤 Account already exists for:', customer.email);
+        }
+      } catch (guestError) {
+        console.error('❌ Error in guest account creation process:', guestError);
+      }
+    } else {
+      console.log('📋 Not a guest checkout - userId:', metadata.userId);
+    }
     
     // Look for existing order by Stripe session ID
     let existingOrderId = null;
