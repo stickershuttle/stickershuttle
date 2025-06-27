@@ -49,16 +49,16 @@ export default function UniversalFooter() {
                   </Link>
                 </li>
                 <li>
-                  <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
+                  <Link href="/blog" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
                     <span className="mr-2">📝</span>
                     Blog Posts
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
+                  <Link href="/contact-us" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
                     <span className="mr-2">📞</span>
                     Contact Us
-                  </a>
+                  </Link>
                 </li>
               </ul>
             </div>
@@ -112,38 +112,43 @@ export default function UniversalFooter() {
                   </>
                 )}
                 <li>
-                  <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200">
+                  <Link href="/cart" className="text-gray-300 hover:text-white transition-colors duration-200">
                     🛒 Cart
-                  </a>
+                  </Link>
                 </li>
               </ul>
             </div>
 
-            {/* Info */}
+            {/* Legal & Info */}
             <div>
               <h3 className="text-white font-semibold text-lg mb-4">
-                Info
+                Legal & Info
               </h3>
               <ul className="space-y-3">
                 <li>
-                  <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200">
-                    Terms of Service
-                  </a>
+                  <Link href="/terms-and-conditions" className="text-gray-300 hover:text-white transition-colors duration-200">
+                    Terms & Conditions
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200">
-                    Refund policy
-                  </a>
+                  <Link href="/returns" className="text-gray-300 hover:text-white transition-colors duration-200">
+                    Returns & Refunds
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200">
+                  <Link href="/privacy-policy" className="text-gray-300 hover:text-white transition-colors duration-200">
                     Privacy Policy
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="text-gray-300 hover:text-white transition-colors duration-200">
-                    Shipping Policy
-                  </a>
+                  <Link href="/cookie-policy" className="text-gray-300 hover:text-white transition-colors duration-200">
+                    Cookie Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/dmca-copyright" className="text-gray-300 hover:text-white transition-colors duration-200">
+                    DMCA Copyright
+                  </Link>
                 </li>
               </ul>
             </div>

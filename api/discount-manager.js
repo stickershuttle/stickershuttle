@@ -4,12 +4,48 @@
 const supabaseClient = require('./supabase-client');
 
 const discountManager = {
+  // Track active discount sessions to prevent multiple discounts
+  activeSessions: new Map(),
+  cleanupInterval: null,
+
+  // Initialize cleanup interval
+  init() {
+    // Clean up old sessions every hour
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupOldSessions();
+    }, 60 * 60 * 1000); // 1 hour in milliseconds
+    
+    console.log('✅ Discount manager initialized with periodic cleanup');
+  },
+
+  // Cleanup on shutdown
+  destroy() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+      console.log('🧹 Discount manager cleanup interval cleared');
+    }
+  },
+
   // Validate a discount code
-  async validateCode(code, orderAmount, userId = null, guestEmail = null) {
+  async validateCode(code, orderAmount, userId = null, guestEmail = null, sessionId = null) {
     try {
       const client = supabaseClient.getServiceClient();
       
       console.log('🏷️ Validating discount code:', code, 'for amount:', orderAmount);
+      
+      // Create a session identifier for tracking
+      const sessionIdentifier = sessionId || userId || guestEmail || 'anonymous';
+      
+      // Check if this session already has an active discount
+      const existingDiscount = this.activeSessions.get(sessionIdentifier);
+      if (existingDiscount && existingDiscount.code !== code.toUpperCase()) {
+        console.log('❌ Session already has active discount:', existingDiscount.code);
+        return {
+          valid: false,
+          message: `Cannot apply multiple discount codes. Remove "${existingDiscount.code}" first to use a different discount code.`
+        };
+      }
       
       // Call the SQL function for validation
       const { data, error } = await client.rpc('validate_discount_code', {
@@ -26,6 +62,18 @@ const discountManager = {
 
       const result = data[0];
       
+      if (result.is_valid) {
+        // Store the active discount for this session
+        this.activeSessions.set(sessionIdentifier, {
+          code: code.toUpperCase(),
+          amount: result.discount_amount,
+          timestamp: Date.now()
+        });
+        
+        // Clean up old sessions (older than 1 hour)
+        this.cleanupOldSessions();
+      }
+      
       return {
         valid: result.is_valid,
         discountCode: result.is_valid ? {
@@ -40,6 +88,24 @@ const discountManager = {
     } catch (error) {
       console.error('❌ Error in validateCode:', error);
       return { valid: false, message: 'Error validating discount code' };
+    }
+  },
+
+  // Remove discount from session tracking
+  removeDiscountFromSession(userId = null, guestEmail = null, sessionId = null) {
+    const sessionIdentifier = sessionId || userId || guestEmail || 'anonymous';
+    this.activeSessions.delete(sessionIdentifier);
+    console.log('🗑️ Removed discount from session:', sessionIdentifier);
+  },
+
+  // Clean up old sessions (called periodically)
+  cleanupOldSessions() {
+    const oneHourAgo = Date.now() - (60 * 60 * 1000);
+    for (const [sessionId, session] of this.activeSessions.entries()) {
+      if (session.timestamp < oneHourAgo) {
+        this.activeSessions.delete(sessionId);
+        console.log('🧹 Cleaned up old discount session:', sessionId);
+      }
     }
   },
 

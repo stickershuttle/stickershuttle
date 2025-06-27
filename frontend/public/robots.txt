@@ -1,0 +1,34 @@
+# Robots.txt for Sticker Shuttle Website
+# Allow all web crawlers to access all content
+
+User-agent: *
+Allow: /
+
+# Specific directives for major search engines
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+# Disallow crawling of admin areas and sensitive paths
+Disallow: /admin/
+Disallow: /api/
+Disallow: /account/
+Disallow: /_next/
+Disallow: /cart
+Disallow: /login
+Disallow: /signup
+
+# Allow crawling of important pages
+Allow: /
+Allow: /products/
+Allow: /blog/
+Allow: /contact
+Allow: /deals
+
+# Sitemap location
+Sitemap: https://stickershuttle.com/sitemap.xml

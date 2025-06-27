@@ -1,151 +1,81 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Confirm Your Signup - Sticker Shuttle</title>
-  <!--[if mso]>
-  <noscript>
-    <xml>
-      <o:OfficeDocumentSettings>
-        <o:PixelsPerInch>96</o:PixelsPerInch>
-      </o:OfficeDocumentSettings>
-    </xml>
-  </noscript>
-  <![endif]-->
+  <title>Verify Your Email - Sticker Shuttle</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #030140; min-height: 100vh;">
-  
-  <!-- Outer Container -->
-  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: #030140; min-height: 500px;">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        
-        <!-- Main Container -->
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; width: 100%; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 20px; backdrop-filter: blur(20px); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);">
-          
-          <!-- Header Section -->
-          <tr>
-            <td align="center" style="padding: 40px 30px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
-              <!-- Logo Area -->
-              <div style="margin-bottom: 20px; text-align: center;">
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" alt="Sticker Shuttle" width="200" height="60" style="display: block; margin: 0 auto; max-width: 200px; height: auto; border: 0; outline: none; text-decoration: none;" />
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Main Content -->
-          <tr>
-            <td style="padding: 40px 30px;">
-              
-              <!-- Verification Code Section -->
-              <div style="text-align: center; margin: 40px 0;">
-                <p style="margin: 0 0 24px; font-size: 18px; color: rgba(255, 255, 255, 0.9); font-weight: 500;">
-                  Enter this verification code:
-                </p>
-                  
-                  <!-- The Token -->
-                  <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 12px; padding: 20px; margin: 16px 0; box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2); display: flex; align-items: center; justify-content: center; gap: 12px;">
-                    <span id="verification-code" style="font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 24px; font-weight: 700; color: #ffffff; letter-spacing: 4px; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">
-                      {{ .Token }}
-                    </span>
-                    <button onclick="copyToClipboard()" title="Copy verification code" aria-label="Copy verification code to clipboard" style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; padding: 8px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center;" onmouseover="this.style.background='rgba(255, 255, 255, 0.2)'" onmouseout="this.style.background='rgba(255, 255, 255, 0.1)'">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color: #ffffff;">
-                        <path d="M8 5H6C4.89543 5 4 5.89543 4 7V19C4 20.1046 4.89543 21 6 21H14C15.1046 21 16 20.1046 16 19V18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M8 5C8 3.89543 8.89543 3 10 3H18C19.1046 3 20 3.89543 20 5V15C20 16.1046 19.1046 17 18 17H10C8.89543 17 8 16.1046 8 15V5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                      </svg>
-                    </button>
-                  </div>
-                  
-                  <script>
-                    function copyToClipboard() {
-                      const code = document.getElementById('verification-code').textContent.trim();
-                      navigator.clipboard.writeText(code).then(function() {
-                        // Show success feedback
-                        const button = event.target.closest('button');
-                        const originalHTML = button.innerHTML;
-                        button.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color: #10b981;"><path d="M20 6L9 17L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-                        button.style.background = 'rgba(16, 185, 129, 0.2)';
-                        
-                        setTimeout(function() {
-                          button.innerHTML = originalHTML;
-                          button.style.background = 'rgba(255, 255, 255, 0.1)';
-                        }, 2000);
-                      }).catch(function(err) {
-                        console.error('Failed to copy: ', err);
-                      });
-                    }
-                  </script>
-                  
-                <p style="margin: 16px 0 0; font-size: 14px; color: rgba(255, 255, 255, 0.7);">
-                  Code expires in 1 hour
-                </p>
-              </div>
-              
-              <!-- Instructions -->
-              <div style="text-align: center; margin: 40px 0;">
-                <p style="margin: 0 0 20px; font-size: 16px; color: rgba(255, 255, 255, 0.9); line-height: 1.6;">
-                  Copy and paste this code into the verification form to complete your account setup.
-                </p>
-                
-                
-            </div>
-            
-            <!-- Help Section -->
-            <div style="text-align: center; margin-top: 40px; padding-top: 30px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
-              <p style="margin: 0 0 16px; font-size: 14px; color: rgba(255, 255, 255, 0.7);">
-                Didn't request this email? You can safely ignore it.
-              </p>
-              <p style="margin: 0; font-size: 14px; color: rgba(255, 255, 255, 0.7);">
-                Need help? Contact us at 
-                <a href="mailto:orbit@stickershuttle.com" style="color: #3b82f6; text-decoration: none;">
-                  orbit@stickershuttle.com
-                </a>
-              </p>
-            </div>
-            
-          </td>
-        </tr>
-        
-        <!-- Footer -->
-        <tr>
-          <td style="padding: 30px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.1);">
-            <div style="margin-bottom: 20px;">
-              <p style="margin: 0 0 8px; font-size: 14px; color: rgba(255, 255, 255, 0.9); font-weight: 600;">
-                Sticker Shuttle
-              </p>
-            </div>
-            
-            <!-- Social Links (Optional) -->
-            <div style="margin: 20px 0;">
-              <a href="https://stickershuttle.com" style="color: rgba(255, 255, 255, 0.6); text-decoration: none; margin: 0 8px; font-size: 12px;">
-                Website
-              </a>
-              <span style="color: rgba(255, 255, 255, 0.3);">•</span>
-              <a href="#" style="color: rgba(255, 255, 255, 0.6); text-decoration: none; margin: 0 8px; font-size: 12px;">
-                Support
-              </a>
-              <span style="color: rgba(255, 255, 255, 0.3);">•</span>
-              <a href="#" style="color: rgba(255, 255, 255, 0.6); text-decoration: none; margin: 0 8px; font-size: 12px;">
-                Terms
-              </a>
-            </div>
-            
-            <p style="margin: 20px 0 0; font-size: 11px; color: rgba(255, 255, 255, 0.5); line-height: 1.4;">
-              © 2024 Sticker Shuttle. All rights reserved.<br>
-              This email was sent to you because you signed up for an account.
-            </p>
-          </td>
-        </tr>
-        
-      </table>
-      
-      <!-- Bottom Spacer -->
-      <div style="height: 40px;"></div>
-      
-    </td>
-  </tr>
-</table>
+<body style="margin: 0; padding: 20px; background-color: #030140; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-height: 100vh;">
+  <div style="max-width: 600px; margin: 0 auto; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); border-radius: 16px; overflow: hidden;">
+    
+    <!-- Header -->
+    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 30px 20px; text-align: center;">
+      <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: bold;">
+        📧 Verify Your Email
+      </h1>
+      <p style="color: #e2e8f0; margin: 10px 0 0 0; font-size: 16px;">
+        Complete your account setup
+      </p>
+    </div>
 
+    <!-- Main Content -->
+    <div style="padding: 30px 20px;">
+          
+      <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); border-left: 4px solid #3B82F6; padding: 20px; margin-bottom: 30px; border-radius: 12px;">
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #ffffff;">
+          We've sent you a verification code to complete your account setup. Enter the code below to get started!
+        </p>
+      </div>
+
+      <!-- Verification Code Section -->
+      <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 20px; border-radius: 12px; margin-bottom: 30px; text-align: center;">
+        <h3 style="margin: 0 0 15px 0; color: #ffffff; font-size: 18px;">Your Verification Code</h3>
+        
+        <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%); backdrop-filter: blur(25px) saturate(180%); border: 1px solid rgba(59, 130, 246, 0.4); box-shadow: rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset; border-radius: 12px; padding: 20px; margin: 16px 0;">
+          <span style="font-family: 'Courier New', monospace; font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: 6px;">
+            {{ .Token }}
+          </span>
+        </div>
+        
+        <p style="margin: 16px 0 0; font-size: 14px; color: #d1d5db;">
+          Code expires in 1 hour
+        </p>
+      </div>
+
+      <!-- Instructions -->
+      <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 20px; border-radius: 12px; margin-bottom: 30px; text-align: center;">
+        <p style="margin: 0; font-size: 16px; color: #ffffff; line-height: 1.6;">
+          Copy and paste this code into the verification form to complete your account setup.
+        </p>
+      </div>
+
+      <!-- Support Section -->
+      <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 20px; text-align: center;">
+        <p style="margin: 0 0 10px 0; color: #d1d5db; font-size: 14px;">
+          Didn't request this email? You can safely ignore it.
+        </p>
+        <p style="margin: 0; color: #d1d5db; font-size: 14px;">
+          Need help? Contact us at 
+          <a href="mailto:orbit@stickershuttle.com" style="color: #60a5fa; text-decoration: none;">
+            orbit@stickershuttle.com
+          </a>
+        </p>
+      </div>
+    </div>
+    <!-- Footer -->
+    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 20px; text-align: center;">
+      <!-- Logo -->
+      <div style="margin-bottom: 15px;">
+        <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
+      </div>
+      
+      <p style="margin: 0 0 10px 0; color: #d1d5db; font-size: 14px;">
+        Thank you for choosing Sticker Shuttle!
+      </p>
+      <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+        This email was sent to you because you signed up for an account.
+      </p>
+    </div>
+  </div>
 </body>
 </html> 

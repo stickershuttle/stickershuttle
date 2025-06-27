@@ -393,6 +393,11 @@ export default function CartPage() {
   const [otpCode, setOtpCode] = useState('');
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  
+  // Login modal state
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginData, setLoginData] = useState({ email: '', password: '' });
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Query for user credit balance
   const { data: creditData } = useQuery(GET_USER_CREDIT_BALANCE, {
@@ -422,6 +427,16 @@ export default function CartPage() {
       }
     };
     checkUser();
+  }, []);
+
+  // Clean up session storage on component mount
+  useEffect(() => {
+    // Clean up any leftover session storage from previous sessions
+    const fromStripe = sessionStorage.getItem('stripe_checkout_initiated');
+    if (fromStripe) {
+      sessionStorage.removeItem('stripe_checkout_initiated');
+      sessionStorage.removeItem('pre_checkout_credit_state');
+    }
   }, []);
 
   // Show login banner for logged-out users
@@ -810,6 +825,40 @@ export default function CartPage() {
 
     // Update persistent cart
     updateCartItemCustomization(itemId, updatedItem);
+  };
+
+  // Handle login
+  const handleLogin = async () => {
+    if (!loginData.email.trim() || !loginData.password.trim()) {
+      alert('Please enter both email and password');
+      return;
+    }
+
+    setIsLoggingIn(true);
+    try {
+      const supabase = await getSupabase();
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginData.email,
+        password: loginData.password,
+      });
+
+      if (error) {
+        alert(`Login failed: ${error.message}`);
+        return;
+      }
+
+      if (data.user) {
+        setUser(data.user);
+        setShowLoginModal(false);
+        setLoginData({ email: '', password: '' });
+      }
+    } catch (error: any) {
+      console.error('Login error:', error);
+      alert('Login failed. Please try again.');
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   // Calculate cart totals
@@ -1840,6 +1889,13 @@ export default function CartPage() {
                       </div>
                     )}
                     <hr className="border-white/20 my-3" />
+                    {/* Total Savings */}
+                    {(reorderDiscount > 0 || discountAmount > 0 || creditToApply > 0) && (
+                      <div className="flex justify-between text-green-400 font-semibold">
+                        <span>Total Savings</span>
+                        <span>-${(reorderDiscount + discountAmount + creditToApply).toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-xl font-bold text-white">
                       <span>Total</span>
                       <span>${finalTotal.toFixed(2)}</span>
@@ -1913,6 +1969,9 @@ export default function CartPage() {
                     <DiscountCodeInput
                       orderAmount={subtotal - reorderDiscount}
                       onDiscountApplied={setAppliedDiscount}
+                      currentAppliedDiscount={appliedDiscount}
+                      hasReorderDiscount={hasReorderItems}
+                      reorderDiscountAmount={reorderDiscount}
                       className="w-full"
                     />
                   </div>
@@ -1990,6 +2049,15 @@ export default function CartPage() {
                           </div>
                           <div className="text-xs text-gray-400 mt-2">
                             <p>We'll create an account for you automatically to track your order and future purchases.</p>
+                            <p className="mt-2">
+                              Already have an account?{' '}
+                              <button
+                                onClick={() => setShowLoginModal(true)}
+                                className="text-purple-400 hover:text-purple-300 underline"
+                              >
+                                Log in
+                              </button>
+                            </p>
                           </div>
                         </>
                       ) : (
@@ -2507,6 +2575,103 @@ export default function CartPage() {
           </div>
         </div>,
         document.body
+      )}
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div 
+            className="max-w-md w-full rounded-2xl p-6"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+              backdropFilter: 'blur(12px)'
+            }}
+          >
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-bold text-white mb-2">Welcome Back!</h3>
+              <p className="text-white/80 text-sm">Sign in to your account to continue</p>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={loginData.email}
+                  onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 focus:bg-white/10 transition-all"
+                  placeholder="Enter your email"
+                  onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={loginData.password}
+                  onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 focus:bg-white/10 transition-all"
+                  placeholder="Enter your password"
+                  onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowLoginModal(false);
+                  setLoginData({ email: '', password: '' });
+                }}
+                className="flex-1 py-2 px-4 rounded-lg font-semibold transition-all duration-200"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: '#ffffff'
+                }}
+              >
+                Cancel
+              </button>
+              
+              <button
+                onClick={handleLogin}
+                disabled={isLoggingIn}
+                className="flex-1 py-2 px-4 rounded-lg font-semibold transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(180%)',
+                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                  boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                  color: '#ffffff'
+                }}
+              >
+                {isLoggingIn ? 'Signing In...' : 'Sign In'}
+              </button>
+            </div>
+            
+            <div className="text-center mt-4">
+              <p className="text-xs text-gray-400">
+                Don't have an account?{' '}
+                <button
+                  onClick={() => {
+                    setShowLoginModal(false);
+                    // Guest checkout form is already visible, so just close modal
+                  }}
+                  className="text-purple-400 hover:text-purple-300 underline"
+                >
+                  Create one during checkout
+                </button>
+              </p>
+            </div>
+          </div>
+        </div>
       )}
     </Layout>
   );

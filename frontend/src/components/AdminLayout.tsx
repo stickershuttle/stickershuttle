@@ -1,5 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
 import Head from "next/head";
+import Link from "next/link";
 import UniversalHeader from "./UniversalHeader";
 import { useRouter } from "next/router";
 import { AdminContext } from "@/hooks/useAdminContext";
@@ -595,17 +596,17 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
                   {/* Dropdown Menu */}
                   {showMarketingDropdown && (
                     <div className="ml-8 mt-1">
-                      <a
-                        href="#"
+                      <Link
+                        href="/admin/klaviyo"
                         className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all"
                         style={{
                           backgroundColor: 'transparent'
                         }}
-                        onMouseEnter={(e) => {
+                        onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
                           e.currentTarget.style.backgroundColor = 'rgba(236, 72, 153, 0.1)';
                           e.currentTarget.style.color = '#F9A8D4';
                         }}
-                        onMouseLeave={(e) => {
+                        onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
                           e.currentTarget.style.backgroundColor = 'transparent';
                           e.currentTarget.style.color = '';
                         }}
@@ -616,7 +617,7 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
                           className="w-5 h-5 mr-3"
                         />
                         Klaviyo
-                      </a>
+                      </Link>
                     </div>
                   )}
                 </div>

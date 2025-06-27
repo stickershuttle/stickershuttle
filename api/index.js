@@ -10,6 +10,17 @@ const express = require('express');
 const cors = require('cors');
 const { json } = require('body-parser');
 const { GraphQLError } = require('graphql');
+
+// Create custom AuthenticationError
+class AuthenticationError extends GraphQLError {
+  constructor(message) {
+    super(message, {
+      extensions: {
+        code: 'UNAUTHENTICATED',
+      },
+    });
+  }
+}
 const uploadRoutes = require('./upload-routes');
 const supabaseClient = require('./supabase-client');
 const stripeClient = require('./stripe-client');
@@ -18,6 +29,7 @@ const easyPostClient = require('./easypost-client');
 const EasyPostTrackingEnhancer = require('./easypost-tracking-enhancer');
 const { discountManager } = require('./discount-manager');
 const creditHandlers = require('./credit-handlers');
+const klaviyoClient = require('./klaviyo-client');
 
 // Initialize enhanced tracking
 const trackingEnhancer = new EasyPostTrackingEnhancer(easyPostClient);
@@ -205,6 +217,14 @@ const typeDefs = gql`
     blog_posts_aggregate(where: BlogPostWhere): BlogPostAggregate!
     blog_posts_by_pk(id: ID!): BlogPost
     blog_categories(order_by: BlogCategoryOrderBy): [BlogCategory!]!
+    
+    # Klaviyo queries
+    getKlaviyoSubscriptionStatus(email: String!, listId: String): KlaviyoSubscriptionStatus!
+    getKlaviyoLists: [KlaviyoList!]!
+    getKlaviyoConfiguredLists: KlaviyoConfiguredListsResult!
+    getKlaviyoProfiles(limit: Int, cursor: String): KlaviyoProfilesResult!
+    getKlaviyoProfilesFromAllLists(limit: Int): KlaviyoAllListsProfilesResult!
+    getAllKlaviyoProfiles(limit: Int): KlaviyoAllProfilesResult!
   }
 
   type Mutation {
@@ -257,13 +277,15 @@ const typeDefs = gql`
     createDiscountCode(input: CreateDiscountCodeInput!): DiscountCode!
     updateDiscountCode(id: ID!, input: UpdateDiscountCodeInput!): DiscountCode!
     deleteDiscountCode(id: ID!): Boolean!
-    applyDiscountToCheckout(code: String!, orderAmount: Float!): DiscountValidation!
+    applyDiscountToCheckout(code: String!, orderAmount: Float!, hasReorderItems: Boolean): DiscountValidation!
+    removeDiscountSession: MutationResult!
     
     # Credit mutations
     markCreditNotificationsRead(userId: String!): MutationResult!
     addUserCredits(input: AddUserCreditsInput!): AddUserCreditsResult!
     addCreditsToAllUsers(amount: Float!, reason: String!): AddCreditsToAllUsersResult!
     applyCreditsToOrder(orderId: String!, amount: Float!): ApplyCreditsResult!
+
     
     # User Profile mutations
     updateUserProfileNames(userId: ID!, firstName: String!, lastName: String!): UserProfileResult!
@@ -281,6 +303,15 @@ const typeDefs = gql`
     insert_blog_categories_one(object: BlogCategoryInput!): BlogCategory!
     update_blog_categories_by_pk(pk_columns: BlogCategoryPkInput!, _set: BlogCategorySetInput!): BlogCategory
     delete_blog_categories_by_pk(id: ID!): BlogCategory
+    
+    # Klaviyo mutations
+    subscribeToKlaviyo(email: String!, listId: String): KlaviyoMutationResult!
+    unsubscribeFromKlaviyo(email: String!, listId: String): KlaviyoMutationResult!
+    syncCustomerToKlaviyo(customerData: KlaviyoCustomerInput!): KlaviyoMutationResult!
+    bulkSyncCustomersToKlaviyo(customers: [KlaviyoCustomerInput!]!): KlaviyoBulkSyncResult!
+    updateCustomerSubscription(email: String!, subscribed: Boolean!): CustomerSubscriptionResult!
+    trackKlaviyoEvent(email: String!, eventName: String!, properties: JSON): KlaviyoMutationResult!
+    syncAllCustomersToKlaviyo: KlaviyoBulkSyncResult!
   }
 
   type Customer {
@@ -497,6 +528,139 @@ const typeDefs = gql`
   }
 
   scalar JSON
+
+  # Klaviyo Types
+  type KlaviyoSubscriptionStatus {
+    isSubscribed: Boolean!
+    profileId: String
+    error: String
+  }
+
+  type KlaviyoList {
+    id: ID!
+    name: String!
+    created: String
+    updated: String
+  }
+
+  type KlaviyoConfiguredList {
+    id: String!
+    name: String!
+    type: String!
+    configured: Boolean!
+  }
+
+  type KlaviyoConfiguredListsResult {
+    success: Boolean!
+    lists: [KlaviyoConfiguredList!]!
+    error: String
+  }
+
+  type KlaviyoProfile {
+    id: ID!
+    email: String!
+    firstName: String
+    lastName: String
+    phone: String
+    city: String
+    state: String
+    country: String
+    totalOrders: Int!
+    totalSpent: Float!
+    averageOrderValue: Float!
+    firstOrderDate: String
+    lastOrderDate: String
+    createdAt: String
+    updatedAt: String
+    listMembership: [String!]
+    sources: [String!]
+  }
+
+  type KlaviyoProfilesResult {
+    success: Boolean!
+    profiles: [KlaviyoProfile!]!
+    nextCursor: String
+    total: Int!
+    error: String
+  }
+
+  type KlaviyoListSummary {
+    listType: String!
+    listId: String!
+    count: Int!
+  }
+
+  type KlaviyoAllListsProfilesResult {
+    success: Boolean!
+    profiles: [KlaviyoProfile!]!
+    totalProfiles: Int!
+    uniqueProfiles: Int!
+    profilesByList: [KlaviyoListSummary!]!
+    errors: [KlaviyoError!]!
+  }
+
+  type KlaviyoError {
+    listType: String
+    listId: String
+    error: String!
+  }
+
+  type KlaviyoSourceSummary {
+    sourceName: String!
+    sourceId: String!
+    sourceType: String!
+    count: Int!
+  }
+
+  type KlaviyoAllProfilesResult {
+    success: Boolean!
+    profiles: [KlaviyoProfile!]!
+    totalProfiles: Int!
+    uniqueProfiles: Int!
+    profilesBySource: [KlaviyoSourceSummary!]!
+    errors: [KlaviyoError!]!
+  }
+
+  type KlaviyoMutationResult {
+    success: Boolean!
+    message: String
+    profileId: String
+    error: String
+  }
+
+  type KlaviyoBulkSyncResult {
+    success: Int!
+    failed: Int!
+    total: Int!
+    errors: [KlaviyoSyncError!]!
+  }
+
+  type KlaviyoSyncError {
+    email: String!
+    error: String!
+  }
+
+  type CustomerSubscriptionResult {
+    success: Boolean!
+    message: String
+    customer: Customer
+  }
+
+  input KlaviyoCustomerInput {
+    email: String!
+    firstName: String
+    lastName: String
+    phone: String
+    city: String
+    state: String
+    country: String
+    totalOrders: Int
+    totalSpent: Float
+    averageOrderValue: Float
+    firstOrderDate: String
+    lastOrderDate: String
+    marketingOptIn: Boolean!
+  }
 
   input CustomerInput {
     email: String
@@ -921,6 +1085,8 @@ const typeDefs = gql`
     remainingBalance: Float
     error: String
   }
+
+
   
   input AddUserCreditsInput {
     userId: String!
@@ -2446,6 +2612,214 @@ const resolvers = {
         console.error('❌ Error in blog_categories resolver:', error);
         throw error;
       }
+    },
+
+    // Klaviyo Queries
+    getKlaviyoSubscriptionStatus: async (_, { email, listId }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const isSubscribed = await klaviyoClient.isSubscribedToList(email, listId);
+        const profile = await klaviyoClient.getProfileByEmail(email);
+        
+        return {
+          isSubscribed,
+          profileId: profile?.id || null,
+          error: null
+        };
+      } catch (error) {
+        console.error('Error checking Klaviyo subscription status:', error);
+        return {
+          isSubscribed: false,
+          profileId: null,
+          error: error.message
+        };
+      }
+    },
+
+    getKlaviyoLists: async (_, args, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const lists = await klaviyoClient.getLists();
+        return lists.map(list => ({
+          id: list.id,
+          name: list.attributes?.name || 'Unnamed List',
+          created: list.attributes?.created || null,
+          updated: list.attributes?.updated || null
+        }));
+      } catch (error) {
+        console.error('Error fetching Klaviyo lists:', error);
+        return [];
+      }
+    },
+
+    getKlaviyoConfiguredLists: async (_, args, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        return klaviyoClient.getConfiguredLists();
+      } catch (error) {
+        console.error('Error getting configured Klaviyo lists:', error);
+        return {
+          success: false,
+          lists: [],
+          error: error.message
+        };
+      }
+    },
+
+    getKlaviyoProfiles: async (_, { limit, cursor }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const result = await klaviyoClient.getAllProfiles(limit, cursor);
+        return {
+          success: result.success,
+          profiles: result.profiles.map(profile => ({
+            id: profile.id,
+            email: profile.attributes?.email || '',
+            firstName: profile.attributes?.first_name || '',
+            lastName: profile.attributes?.last_name || '',
+            phone: profile.attributes?.phone_number || '',
+            city: profile.attributes?.location?.city || '',
+            state: profile.attributes?.location?.region || '',
+            country: profile.attributes?.location?.country || '',
+            totalOrders: profile.attributes?.properties?.total_orders || 0,
+            totalSpent: profile.attributes?.properties?.total_spent || 0,
+            averageOrderValue: profile.attributes?.properties?.average_order_value || 0,
+            firstOrderDate: profile.attributes?.properties?.first_order_date || null,
+            lastOrderDate: profile.attributes?.properties?.last_order_date || null,
+            createdAt: profile.attributes?.created || null,
+            updatedAt: profile.attributes?.updated || null
+          })),
+          nextCursor: result.nextCursor,
+          total: result.total,
+          error: result.error || null
+        };
+      } catch (error) {
+        console.error('Error getting Klaviyo profiles:', error);
+        return {
+          success: false,
+          profiles: [],
+          nextCursor: null,
+          total: 0,
+          error: error.message
+        };
+      }
+    },
+
+    getKlaviyoProfilesFromAllLists: async (_, { limit }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const result = await klaviyoClient.getProfilesFromAllLists(limit);
+        return {
+          success: result.success,
+          profiles: result.allProfiles.map(profile => ({
+            id: profile.id,
+            email: profile.attributes?.email || '',
+            firstName: profile.attributes?.first_name || '',
+            lastName: profile.attributes?.last_name || '',
+            phone: profile.attributes?.phone_number || '',
+            city: profile.attributes?.location?.city || '',
+            state: profile.attributes?.location?.region || '',
+            country: profile.attributes?.location?.country || '',
+            totalOrders: profile.attributes?.properties?.total_orders || 0,
+            totalSpent: profile.attributes?.properties?.total_spent || 0,
+            averageOrderValue: profile.attributes?.properties?.average_order_value || 0,
+            firstOrderDate: profile.attributes?.properties?.first_order_date || null,
+            lastOrderDate: profile.attributes?.properties?.last_order_date || null,
+            createdAt: profile.attributes?.created || null,
+            updatedAt: profile.attributes?.updated || null,
+            listMembership: profile.listMembership || []
+          })),
+          totalProfiles: result.totalProfiles,
+          uniqueProfiles: result.uniqueProfiles,
+          profilesByList: Object.entries(result.profilesByList).map(([listType, data]) => ({
+            listType,
+            listId: data.listId,
+            count: data.count
+          })),
+          errors: result.errors || []
+        };
+      } catch (error) {
+        console.error('Error getting profiles from all Klaviyo lists:', error);
+        return {
+          success: false,
+          profiles: [],
+          totalProfiles: 0,
+          uniqueProfiles: 0,
+          profilesByList: [],
+          errors: [{ error: error.message }]
+        };
+      }
+    },
+
+    getAllKlaviyoProfiles: async (_, { limit }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const result = await klaviyoClient.getAllKlaviyoProfiles(limit);
+        return {
+          success: result.success,
+          profiles: result.allProfiles.map(profile => ({
+            id: profile.id,
+            email: profile.attributes?.email || '',
+            firstName: profile.attributes?.first_name || '',
+            lastName: profile.attributes?.last_name || '',
+            phone: profile.attributes?.phone_number || '',
+            city: profile.attributes?.location?.city || '',
+            state: profile.attributes?.location?.region || '',
+            country: profile.attributes?.location?.country || '',
+            totalOrders: profile.attributes?.properties?.total_orders || 0,
+            totalSpent: profile.attributes?.properties?.total_spent || 0,
+            averageOrderValue: profile.attributes?.properties?.average_order_value || 0,
+            firstOrderDate: profile.attributes?.properties?.first_order_date || null,
+            lastOrderDate: profile.attributes?.properties?.last_order_date || null,
+            createdAt: profile.attributes?.created || null,
+            updatedAt: profile.attributes?.updated || null,
+            sources: profile.sources || []
+          })),
+          totalProfiles: result.totalProfiles,
+          uniqueProfiles: result.uniqueProfiles,
+          profilesBySource: Object.entries(result.profilesBySource).map(([sourceName, data]) => ({
+            sourceName,
+            sourceId: data.id,
+            sourceType: data.type,
+            count: data.count
+          })),
+          errors: result.errors || []
+        };
+      } catch (error) {
+        console.error('Error getting all Klaviyo profiles:', error);
+        return {
+          success: false,
+          profiles: [],
+          totalProfiles: 0,
+          uniqueProfiles: 0,
+          profilesBySource: [],
+          errors: [{ error: error.message }]
+        };
+      }
     }
   },
 
@@ -2625,6 +2999,31 @@ const resolvers = {
            console.error('❌ Failed to send Discord notification:', notifError);
            // Don't throw - we still want to return the updated order
          }
+       }
+       
+       // Send admin email notification for proof actions
+       try {
+         console.log('📧 Sending admin email notification for proof action...');
+         const emailNotifications = require('./email-notifications');
+         
+         const extraData = {};
+         if (status === 'changes_requested' && customerNotes) {
+           extraData.customerNotes = customerNotes;
+         }
+         
+         const adminEmailResult = await emailNotifications.sendAdminProofActionNotification(
+           updatedOrder, 
+           status, 
+           extraData
+         );
+         
+         if (adminEmailResult.success) {
+           console.log('✅ Admin proof action email notification sent successfully');
+         } else {
+           console.error('❌ Admin proof action email notification failed:', adminEmailResult.error);
+         }
+       } catch (emailError) {
+         console.error('⚠️ Failed to send admin proof action email (proof update still processed):', emailError);
        }
        
        return updatedOrder;
@@ -2995,6 +3394,26 @@ const resolvers = {
          throw new Error(`Failed to approve proof: ${updateError.message}`);
        }
        
+       // Send admin email notification for admin proof approval
+       try {
+         console.log('📧 Sending admin email notification for admin proof approval...');
+         const emailNotifications = require('./email-notifications');
+         
+         const adminEmailResult = await emailNotifications.sendAdminProofActionNotification(
+           updatedOrder, 
+           'approved', 
+           { adminNotes: adminNotes }
+         );
+         
+         if (adminEmailResult.success) {
+           console.log('✅ Admin proof approval email notification sent successfully');
+         } else {
+           console.error('❌ Admin proof approval email notification failed:', adminEmailResult.error);
+         }
+       } catch (emailError) {
+         console.error('⚠️ Failed to send admin proof approval email (proof approval still processed):', emailError);
+       }
+       
        return updatedOrder;
      } catch (error) {
        console.error('Error approving proof:', error);
@@ -3051,6 +3470,26 @@ const resolvers = {
          
        if (updateError) {
          throw new Error(`Failed to request proof changes: ${updateError.message}`);
+       }
+       
+       // Send admin email notification for admin proof changes request
+       try {
+         console.log('📧 Sending admin email notification for admin proof changes request...');
+         const emailNotifications = require('./email-notifications');
+         
+         const adminEmailResult = await emailNotifications.sendAdminProofActionNotification(
+           updatedOrder, 
+           'changes_requested', 
+           { adminNotes: adminNotes }
+         );
+         
+         if (adminEmailResult.success) {
+           console.log('✅ Admin proof changes request email notification sent successfully');
+         } else {
+           console.error('❌ Admin proof changes request email notification failed:', adminEmailResult.error);
+         }
+       } catch (emailError) {
+         console.error('⚠️ Failed to send admin proof changes request email (proof update still processed):', emailError);
        }
        
        return updatedOrder;
@@ -3327,32 +3766,32 @@ const resolvers = {
               await supabaseClient.createOrderItems(orderItems);
               console.log('✅ Order items created');
 
-              // CRITICAL FIX: Actually deduct credits NOW, not in webhook
+              // Store credit info for webhook processing - DON'T deduct yet
               if (actualCreditsApplied > 0 && input.userId) {
+                console.log('💳 Storing credit info for webhook processing:', actualCreditsApplied);
+                console.log('💳 Order ID:', customerOrder.id);
+                console.log('💳 User ID:', input.userId);
+                
+                // Store the credit application info in the order for webhook processing
                 try {
-                  console.log('💳 DEDUCTING credits immediately:', actualCreditsApplied);
-                  console.log('💳 Order ID:', customerOrder.id);
-                  console.log('💳 User ID:', input.userId);
+                  const client = supabaseClient.getServiceClient();
+                  const { error: creditUpdateError } = await client
+                    .from('orders_main')
+                    .update({
+                      credits_to_apply: actualCreditsApplied,
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('id', customerOrder.id);
                   
-                  const creditResult = await creditHandlers.applyCreditsToOrder(
-                    customerOrder.id,
-                    actualCreditsApplied,
-                    input.userId
-                  );
-                  
-                  if (creditResult.success) {
-                    console.log('✅ Credits deducted successfully, remaining balance:', creditResult.remainingBalance);
-                    remainingCredits = creditResult.remainingBalance;
+                  if (creditUpdateError) {
+                    console.error('⚠️ Failed to store credit info in order:', creditUpdateError);
+                    errors.push(`Credit tracking failed: ${creditUpdateError.message}`);
                   } else {
-                    console.error('⚠️ Failed to deduct credits immediately:', creditResult.error);
-                    // If credit deduction fails, we should not proceed with checkout
-                    errors.push(`Credit deduction failed: ${creditResult.error}`);
-                    actualCreditsApplied = 0; // Reset credits applied
+                    console.log('✅ Credit info stored in order for webhook processing');
                   }
-                } catch (creditError) {
-                  console.error('⚠️ Critical error deducting credits:', creditError);
-                  errors.push(`Credit system error: ${creditError.message}`);
-                  actualCreditsApplied = 0; // Reset credits applied
+                } catch (creditStoreError) {
+                  console.error('⚠️ Critical error storing credit info:', creditStoreError);
+                  errors.push(`Credit system error: ${creditStoreError.message}`);
                 }
               }
             }
@@ -4401,9 +4840,20 @@ const resolvers = {
       }
     },
 
-    applyDiscountToCheckout: async (_, { code, orderAmount }, context) => {
+    applyDiscountToCheckout: async (_, { code, orderAmount, hasReorderItems }, context) => {
       try {
-        console.log('💰 Applying discount to checkout:', code, orderAmount);
+        console.log('💰 Applying discount to checkout:', code, orderAmount, 'hasReorderItems:', hasReorderItems);
+        
+        // Check if there are reorder items - prevent stacking with reorder discount
+        if (hasReorderItems) {
+          console.log('❌ Cannot apply discount code with reorder items');
+          return {
+            valid: false,
+            discountCode: null,
+            discountAmount: 0,
+            message: 'Cannot apply discount codes with reorder discount. You\'re already saving 10% on this reorder!'
+          };
+        }
         
         // Get user info from context if available
         const userId = context.user?.id || null;
@@ -4439,6 +4889,29 @@ const resolvers = {
           discountCode: null,
           discountAmount: 0,
           message: 'Error applying discount'
+        };
+      }
+    },
+
+    removeDiscountSession: async (_, args, context) => {
+      try {
+        console.log('🗑️ Removing discount session');
+        
+        // Get user info from context if available
+        const userId = context.user?.id || null;
+        const guestEmail = context.guestEmail || null;
+        
+        discountManager.removeDiscountFromSession(userId, guestEmail);
+        
+        return {
+          success: true,
+          message: 'Discount session removed successfully'
+        };
+      } catch (error) {
+        console.error('❌ Error removing discount session:', error);
+        return {
+          success: false,
+          message: 'Error removing discount session'
         };
       }
     },
@@ -4487,6 +4960,8 @@ const resolvers = {
         throw new Error('Failed to apply credits');
       }
     },
+
+
 
     // User Profile mutations
     updateUserProfileNames: async (_, { userId, firstName, lastName }) => {
@@ -5121,6 +5596,241 @@ const resolvers = {
         console.error('❌ Error in delete_blog_categories_by_pk:', error);
         throw error;
       }
+    },
+
+    // Klaviyo Mutations
+    subscribeToKlaviyo: async (_, { email, listId }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const result = await klaviyoClient.subscribeToList(email, listId);
+        return {
+          success: result.success,
+          message: 'Successfully subscribed to Klaviyo',
+          profileId: result.profileId,
+          error: null
+        };
+      } catch (error) {
+        console.error('Error subscribing to Klaviyo:', error);
+        return {
+          success: false,
+          message: 'Failed to subscribe to Klaviyo',
+          profileId: null,
+          error: error.message
+        };
+      }
+    },
+
+    unsubscribeFromKlaviyo: async (_, { email, listId }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const result = await klaviyoClient.unsubscribeFromList(email, listId);
+        return {
+          success: result.success,
+          message: 'Successfully unsubscribed from Klaviyo',
+          profileId: result.profileId,
+          error: null
+        };
+      } catch (error) {
+        console.error('Error unsubscribing from Klaviyo:', error);
+        return {
+          success: false,
+          message: 'Failed to unsubscribe from Klaviyo',
+          profileId: null,
+          error: error.message
+        };
+      }
+    },
+
+    syncCustomerToKlaviyo: async (_, { customerData }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const result = await klaviyoClient.syncCustomerToKlaviyo(customerData);
+        return {
+          success: result.success,
+          message: result.success ? 'Customer synced to Klaviyo successfully' : 'Failed to sync customer to Klaviyo',
+          profileId: null,
+          error: result.error || null
+        };
+      } catch (error) {
+        console.error('Error syncing customer to Klaviyo:', error);
+        return {
+          success: false,
+          message: 'Failed to sync customer to Klaviyo',
+          profileId: null,
+          error: error.message
+        };
+      }
+    },
+
+    bulkSyncCustomersToKlaviyo: async (_, { customers }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const result = await klaviyoClient.bulkSyncCustomers(customers);
+        return {
+          success: result.success,
+          failed: result.failed,
+          total: customers.length,
+          errors: result.errors
+        };
+      } catch (error) {
+        console.error('Error bulk syncing customers to Klaviyo:', error);
+        return {
+          success: 0,
+          failed: customers.length,
+          total: customers.length,
+          errors: [{ email: 'bulk_sync_error', error: error.message }]
+        };
+      }
+    },
+
+    updateCustomerSubscription: async (_, { email, subscribed }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        // Update in local database
+        const client = supabaseClient.getServiceClient();
+        const { data: customer, error } = await client
+          .from('customers')
+          .update({ marketing_opt_in: subscribed })
+          .eq('email', email)
+          .select('*')
+          .single();
+
+        if (error) {
+          throw new Error(`Failed to update customer subscription: ${error.message}`);
+        }
+
+        // Sync with Klaviyo
+        if (subscribed) {
+          await klaviyoClient.subscribeToList(email);
+        } else {
+          await klaviyoClient.unsubscribeFromList(email);
+        }
+
+        return {
+          success: true,
+          message: `Customer ${subscribed ? 'subscribed' : 'unsubscribed'} successfully`,
+          customer: {
+            id: customer.id,
+            email: customer.email,
+            firstName: customer.first_name,
+            lastName: customer.last_name,
+            city: customer.city,
+            state: customer.state,
+            country: customer.country,
+            totalOrders: customer.total_orders,
+            totalSpent: customer.total_spent,
+            averageOrderValue: customer.average_order_value,
+            marketingOptIn: customer.marketing_opt_in,
+            lastOrderDate: customer.last_order_date,
+            firstOrderDate: customer.first_order_date,
+            orders: []
+          }
+        };
+      } catch (error) {
+        console.error('Error updating customer subscription:', error);
+        return {
+          success: false,
+          message: 'Failed to update customer subscription',
+          customer: null
+        };
+      }
+    },
+
+    trackKlaviyoEvent: async (_, { email, eventName, properties }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        const result = await klaviyoClient.trackEvent(email, eventName, properties);
+        return {
+          success: result.success,
+          message: result.success ? 'Event tracked successfully' : 'Failed to track event',
+          profileId: null,
+          error: result.error || null
+        };
+      } catch (error) {
+        console.error('Error tracking Klaviyo event:', error);
+        return {
+          success: false,
+          message: 'Failed to track event',
+          profileId: null,
+          error: error.message
+        };
+      }
+    },
+
+    syncAllCustomersToKlaviyo: async (_, args, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        // Get all customers from database
+        const client = supabaseClient.getServiceClient();
+        const { data: customers, error } = await client
+          .from('customers')
+          .select('*');
+
+        if (error) {
+          throw new Error(`Failed to fetch customers: ${error.message}`);
+        }
+
+        // Format customers for Klaviyo
+        const klaviyoCustomers = customers.map(customer => ({
+          email: customer.email,
+          firstName: customer.first_name,
+          lastName: customer.last_name,
+          phone: customer.phone,
+          city: customer.city,
+          state: customer.state,
+          country: customer.country,
+          totalOrders: customer.total_orders,
+          totalSpent: customer.total_spent,
+          averageOrderValue: customer.average_order_value,
+          firstOrderDate: customer.first_order_date,
+          lastOrderDate: customer.last_order_date,
+          marketingOptIn: customer.marketing_opt_in
+        }));
+
+        const result = await klaviyoClient.bulkSyncCustomers(klaviyoCustomers);
+        return {
+          success: result.success,
+          failed: result.failed,
+          total: klaviyoCustomers.length,
+          errors: result.errors
+        };
+      } catch (error) {
+        console.error('Error syncing all customers to Klaviyo:', error);
+        return {
+          success: 0,
+          failed: 0,
+          total: 0,
+          errors: [{ email: 'sync_all_error', error: error.message }]
+        };
+      }
     }
   }
 };
@@ -5285,6 +5995,9 @@ async function startServer() {
       console.log(`💚 Health check: http://localhost:${PORT}/health`);
       console.log(`💳 Stripe webhooks: http://localhost:${PORT}/webhooks/stripe`);
       
+      // Initialize discount manager
+      discountManager.init();
+      
       // Check Stripe configuration
       if (stripeClient.isReady()) {
         console.log('✅ Stripe payment system is configured');
@@ -5298,6 +6011,19 @@ async function startServer() {
       } else {
         console.log('⚠️  Supabase is not configured - order tracking will not work');
       }
+      
+      // Handle graceful shutdown
+      process.on('SIGTERM', () => {
+        console.log('🛑 Received SIGTERM, shutting down gracefully');
+        discountManager.destroy();
+        process.exit(0);
+      });
+      
+      process.on('SIGINT', () => {
+        console.log('🛑 Received SIGINT, shutting down gracefully');
+        discountManager.destroy();
+        process.exit(0);
+      });
     });
   } catch (error) {
     console.error('❌ Failed to start Apollo Server:', error);

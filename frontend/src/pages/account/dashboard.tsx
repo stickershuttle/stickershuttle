@@ -13,6 +13,7 @@ import {
   MARK_CREDIT_NOTIFICATIONS_READ,
   GET_USER_EARNED_CREDITS_BY_ORDER
 } from '../../lib/credit-mutations';
+import { SYNC_CUSTOMER_TO_KLAVIYO } from '../../lib/klaviyo-mutations';
 import { UPDATE_USER_PROFILE_PHOTO, UPDATE_USER_PROFILE_BANNER } from '../../lib/profile-mutations';
 
 
@@ -141,6 +142,9 @@ function Dashboard() {
   
   // Credit queries and mutations
   const [markCreditNotificationsRead] = useMutation(MARK_CREDIT_NOTIFICATIONS_READ);
+  
+  // Klaviyo integration
+  const [syncToKlaviyo] = useMutation(SYNC_CUSTOMER_TO_KLAVIYO);
 
   // File upload state
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -434,23 +438,41 @@ function Dashboard() {
   }, []);
 
   useEffect(() => {
-    // Check authentication when component mounts
-    if (!userLoading && !user) {
-      router.push('/login?message=Please log in to access your dashboard');
-      return;
-    }
+    // Give a bit more time for OAuth redirects to settle
+    const checkAuth = async () => {
+      // If we're still loading user data, wait
+      if (userLoading) {
+        return;
+      }
+      
+      // If no user after loading is complete, redirect to login
+      if (!user) {
+        // Small delay to handle OAuth redirect timing
+        setTimeout(() => {
+          if (!user) {
+            router.push('/login?message=Please log in to access your dashboard');
+          }
+        }, 1000);
+        return;
+      }
 
-    // Fetch profile data when user is available
-    if (user && !profile) {
-      fetchProfile();
-    }
-    
-    // Fetch credit data when user is available
-    if (user && (user as any)?.id) {
-      (async () => {
+      // Fetch profile data when user is available
+      if (!profile) {
+        fetchProfile();
+      }
+      
+      // Fetch credit data when user is available
+      if ((user as any)?.id) {
         await fetchCreditData();
-      })();
-    }
+      }
+
+      // Sync new customers to Klaviyo (especially OAuth users)
+      if (profile && (user as any)?.email) {
+        syncNewCustomerToKlaviyo();
+      }
+    };
+
+    checkAuth();
 
     // Load pricing data
     if (!pricingData) {
@@ -1013,6 +1035,40 @@ function Dashboard() {
   const [uploadingProfilePhoto, setUploadingProfilePhoto] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [showBannerTemplates, setShowBannerTemplates] = useState(false);
+
+  const syncNewCustomerToKlaviyo = async () => {
+    try {
+      // Only sync if we haven't synced this user before
+      const hasBeenSynced = localStorage.getItem(`klaviyo_synced_${(user as any)?.id}`);
+      if (hasBeenSynced) {
+        return; // Already synced
+      }
+
+      console.log('🔄 Syncing customer to Klaviyo default list...');
+      
+      await syncToKlaviyo({
+        variables: {
+          customerData: {
+            email: (user as any)?.email,
+            firstName: profile?.first_name || (user as any)?.user_metadata?.first_name || (user as any)?.raw_user_meta_data?.given_name || '',
+            lastName: profile?.last_name || (user as any)?.user_metadata?.last_name || (user as any)?.raw_user_meta_data?.family_name || '',
+            marketingOptIn: true, // Default to subscribed for new customers
+            totalOrders: orders?.length || 0,
+            totalSpent: orders?.reduce((sum, order) => sum + (order.total || 0), 0) || 0,
+            averageOrderValue: orders?.length ? (orders.reduce((sum, order) => sum + (order.total || 0), 0) / orders.length) : 0
+          }
+        }
+      });
+      
+      // Mark as synced so we don't sync again
+      localStorage.setItem(`klaviyo_synced_${(user as any)?.id}`, 'true');
+      console.log('✅ Customer synced to Klaviyo successfully!');
+      
+    } catch (klaviyoError) {
+      console.error('⚠️ Klaviyo sync failed (non-critical):', klaviyoError);
+      // Don't block dashboard if Klaviyo fails
+    }
+  };
 
 
   const handleProfilePictureClick = (e?: React.MouseEvent) => {
@@ -8918,7 +8974,13 @@ function Dashboard() {
       {showReorderPopup && reorderOrderData && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div 
-            className="container-style p-6 max-w-lg w-full relative"
+            className="max-w-2xl w-full relative rounded-2xl p-8"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+              backdropFilter: 'blur(12px)'
+            }}
           >
             {/* Close Button */}
             <button
@@ -8938,132 +9000,197 @@ function Dashboard() {
               </svg>
             </button>
 
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-yellow-500/20 flex items-center justify-center">
-                <svg className="w-8 h-8 text-yellow-400" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            {/* Header Section */}
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center"
+                   style={{
+                     background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
+                     backdropFilter: 'blur(25px) saturate(180%)',
+                     border: '1px solid rgba(245, 158, 11, 0.4)',
+                     boxShadow: 'rgba(245, 158, 11, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                   }}>
+                <svg className="w-10 h-10 text-amber-300" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                   <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Reorder with Changes?</h3>
-              <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-3 mb-4">
-                <p className="text-green-300 text-sm font-medium flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <h3 className="text-2xl font-bold text-white mb-4">Reorder with Changes?</h3>
+              <div className="rounded-lg p-4 mb-6"
+                   style={{
+                     background: 'rgba(34, 197, 94, 0.1)',
+                     border: '1px solid rgba(34, 197, 94, 0.2)',
+                     backdropFilter: 'blur(12px)'
+                   }}>
+                <p className="text-green-300 text-lg font-medium flex items-center justify-center gap-3">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
-                  🎉 10% Off for Reordering!
+                  <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                  10% Off for Reordering!
                 </p>
               </div>
-
             </div>
             
             {/* Order Items */}
-            <div className="space-y-4 mb-6">
+            <div className="space-y-4 mb-8">
               {reorderOrderData.items.map((item: any, index: number) => {
                 // Skip removed items
                 if (removedItems.has(index)) return null;
                 
-                                  // Get full item data if available
-                  const itemData = reorderOrderData._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
-                  const originalQty = itemData.quantity || item.quantity || 1;
-                  const currentQty = updatedQuantities[index] ?? originalQty;
+                // Get full item data if available
+                const itemData = reorderOrderData._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+                const originalQty = itemData.quantity || item.quantity || 1;
+                const currentQty = updatedQuantities[index] ?? originalQty;
                 
                 return (
-                  <div key={index} className="border border-white/10 bg-white/5 rounded-lg p-3 relative">
+                  <div key={index} 
+                       className="rounded-xl p-6 relative"
+                       style={{
+                         background: 'rgba(255, 255, 255, 0.05)',
+                         border: '1px solid rgba(255, 255, 255, 0.1)',
+                         boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                         backdropFilter: 'blur(12px)'
+                       }}>
                       {/* Remove Item Button */}
                       <button
                         onClick={() => handleRemoveItem(index)}
-                        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-colors duration-200 z-10"
+                        className="absolute top-4 right-4 w-8 h-8 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-colors duration-200 z-10"
                         title="Remove item from order"
                       >
-                        <svg className="w-3.5 h-3.5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                         </svg>
                       </button>
                       
-                      <div className="flex items-start gap-3 mb-3">
-                        <div className="w-10 h-10 rounded bg-white/10 flex items-center justify-center flex-shrink-0">
+                      <div className="flex items-start gap-6">
+                        {/* Product Image */}
+                        <div className="w-16 h-16 rounded-xl flex items-center justify-center flex-shrink-0"
+                             style={{
+                               background: 'rgba(255, 255, 255, 0.1)',
+                               border: '1px solid rgba(255, 255, 255, 0.2)'
+                             }}>
                           {(() => {
                             const productImage = getProductImage(item, itemData);
                             return productImage ? (
                               <img 
                                 src={productImage} 
                                 alt={item.name || itemData.productName} 
-                                className="w-full h-full object-cover rounded" 
+                                className="w-full h-full object-cover rounded-xl" 
                               />
                             ) : (
-                              <span className="text-xs">📄</span>
+                              <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                              </svg>
                             );
                           })()}
                         </div>
+                        
                         <div className="flex-1">
-                          <div className="text-white font-medium mb-2">
+                          {/* Product Name */}
+                          <div className="text-white font-semibold text-lg mb-4">
                             {itemData.productName || item.name}
                           </div>
                           
-                          {/* Product Specifications - Simplified */}
-                          <div className="space-y-2 mb-3">
+                          {/* Product Specifications */}
+                          <div className="grid grid-cols-2 gap-3 mb-4">
                             {(() => {
                               const selections = itemData.calculatorSelections || {};
                               const specs = [];
                               
                               // Get size
                               if (selections.sizePreset?.displayValue || selections.size?.displayValue || item.size) {
-                                specs.push(`📏 ${selections.sizePreset?.displayValue || selections.size?.displayValue || item.size}`);
+                                specs.push({
+                                  icon: <span className="text-blue-400 text-base">📏</span>,
+                                  label: 'Size',
+                                  value: selections.sizePreset?.displayValue || selections.size?.displayValue || item.size
+                                });
                               }
                               
                               // Get material
                               if (selections.material?.displayValue || item.material) {
-                                specs.push(`🎨 ${selections.material?.displayValue || item.material}`);
+                                specs.push({
+                                  icon: <span className="text-blue-400 text-base">🧻</span>,
+                                  label: 'Material',
+                                  value: selections.material?.displayValue || item.material
+                                });
                               }
                               
                               // Get cut/shape
                               if (selections.cut?.displayValue || selections.shape?.displayValue) {
-                                specs.push(`✂️ ${selections.cut?.displayValue || selections.shape?.displayValue}`);
+                                specs.push({
+                                  icon: <span className="text-blue-400 text-base">✂️</span>,
+                                  label: 'Cut',
+                                  value: selections.cut?.displayValue || selections.shape?.displayValue
+                                });
                               }
                               
                               // Get proof option
                               if (selections.proof?.value !== false) {
-                                specs.push(`✅ Send Proof`);
-                              }
-                              
-                              // Get rush status (only if not removed)
-                              if (selections.rush?.value === true && !removedRushItems.has(index)) {
-                                specs.push(
-                                  <div key="rush" className="flex items-center justify-between">
-                                    <span>🚀 Rush Order</span>
-                                    <button
-                                      onClick={() => handleRemoveRushOrder(index)}
-                                      className="ml-2 w-4 h-4 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-colors duration-200"
-                                      title="Remove rush order (-40%)"
-                                    >
-                                      <svg className="w-2.5 h-2.5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                      </svg>
-                                    </button>
-                                  </div>
-                                );
+                                specs.push({
+                                  icon: <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>,
+                                  label: 'Proof',
+                                  value: 'Send Proof'
+                                });
                               }
                               
                               return specs.map((spec, idx) => (
-                                <div key={idx} className="text-xs text-gray-300 bg-white/5 rounded px-2 py-1">
-                                  {spec}
+                                <div key={idx} 
+                                     className="flex items-center gap-2 text-sm p-2 rounded-lg"
+                                     style={{
+                                       background: 'rgba(255, 255, 255, 0.05)',
+                                       border: '1px solid rgba(255, 255, 255, 0.1)'
+                                     }}>
+                                  <span className="text-blue-400">{spec.icon}</span>
+                                  <span className="text-gray-300 font-medium">{spec.label}:</span>
+                                  <span className="text-white">{spec.value}</span>
                                 </div>
                               ));
                             })()}
                             
-                            {/* Show rush order removal notice */}
+                            {/* Rush Order Status */}
                             {(() => {
                               const selections = itemData.calculatorSelections || {};
                               const hadRushOrder = selections.rush?.value === true;
                               const rushOrderRemoved = removedRushItems.has(index);
                               
-                              if (hadRushOrder && rushOrderRemoved) {
+                              if (hadRushOrder && !rushOrderRemoved) {
                                 return (
-                                  <div className="text-xs text-green-400 bg-green-500/10 border border-green-500/20 rounded px-2 py-1 flex items-center gap-1">
-                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                    </svg>
-                                    Rush order removed (-40% savings)
+                                  <div className="flex items-center justify-between p-2 rounded-lg"
+                                       style={{
+                                         background: 'rgba(245, 158, 11, 0.1)',
+                                         border: '1px solid rgba(245, 158, 11, 0.2)'
+                                       }}>
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                      </svg>
+                                      <span className="text-amber-300 font-medium">Rush Order</span>
+                                    </div>
+                                    <button
+                                      onClick={() => handleRemoveRushOrder(index)}
+                                      className="w-6 h-6 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-colors duration-200"
+                                      title="Remove rush order (-40%)"
+                                    >
+                                      <svg className="w-3 h-3 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                );
+                              } else if (hadRushOrder && rushOrderRemoved) {
+                                return (
+                                  <div className="p-2 rounded-lg col-span-2"
+                                       style={{
+                                         background: 'rgba(34, 197, 94, 0.1)',
+                                         border: '1px solid rgba(34, 197, 94, 0.2)'
+                                       }}>
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                      </svg>
+                                      <span className="text-green-300 font-medium">Rush order removed (-40% savings)</span>
+                                    </div>
                                   </div>
                                 );
                               }
@@ -9071,27 +9198,31 @@ function Dashboard() {
                             })()}
                           </div>
 
-                          {/* Quantity Controls - Compact */}
-                          <div className="flex items-center justify-between bg-white/5 rounded-lg p-2 mb-2">
-                            <div className="text-xs text-gray-400">Quantity:</div>
-                            <div className="flex items-center gap-2">
+                          {/* Quantity Controls */}
+                          <div className="flex items-center justify-between p-4 rounded-lg"
+                               style={{
+                                 background: 'rgba(255, 255, 255, 0.05)',
+                                 border: '1px solid rgba(255, 255, 255, 0.1)'
+                               }}>
+                            <div className="text-gray-300 font-medium">Quantity:</div>
+                            <div className="flex items-center gap-3">
                               <button
                                 onClick={() => {
                                   const newQty = Math.max(50, currentQty - 50);
                                   handleQuantityUpdate(index, newQty);
                                 }}
-                                className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-sm font-bold transition-all duration-200 transform hover:scale-105"
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-lg font-bold transition-all duration-200 transform hover:scale-105"
                                 style={{
-                                  background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.4) 0%, rgba(14, 165, 233, 0.25) 50%, rgba(14, 165, 233, 0.1) 100%)',
+                                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
                                   backdropFilter: 'blur(25px) saturate(180%)',
-                                  border: '1px solid rgba(14, 165, 233, 0.4)',
-                                  boxShadow: 'rgba(14, 165, 233, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                                  boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                                 }}
                               >
                                 −
                               </button>
                               <div 
-                                className="min-w-[60px] px-2 py-1 rounded text-center text-white text-sm font-mono"
+                                className="min-w-[80px] px-4 py-2 rounded-lg text-center text-white text-lg font-mono font-semibold"
                                 style={{
                                   background: 'rgba(255, 255, 255, 0.05)',
                                   border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -9106,12 +9237,12 @@ function Dashboard() {
                                   const newQty = currentQty + 50;
                                   handleQuantityUpdate(index, newQty);
                                 }}
-                                className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-sm font-bold transition-all duration-200 transform hover:scale-105"
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-lg font-bold transition-all duration-200 transform hover:scale-105"
                                 style={{
-                                  background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.4) 0%, rgba(14, 165, 233, 0.25) 50%, rgba(14, 165, 233, 0.1) 100%)',
+                                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
                                   backdropFilter: 'blur(25px) saturate(180%)',
-                                  border: '1px solid rgba(14, 165, 233, 0.4)',
-                                  boxShadow: 'rgba(14, 165, 233, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                                  boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                                 }}
                               >
                                 +
@@ -9124,19 +9255,24 @@ function Dashboard() {
                   );
                 })}
                 
-                              {/* Show message if all items are removed */}
-              {reorderOrderData.items.every((_: any, index: number) => removedItems.has(index)) && (
-                <div className="text-sm text-gray-400 text-center py-4 border border-white/10 bg-white/5 rounded-lg">
-                  All items have been removed from this order
-                </div>
-              )}
+                {/* Show message if all items are removed */}
+                {reorderOrderData.items.every((_: any, index: number) => removedItems.has(index)) && (
+                  <div className="text-center py-8 rounded-xl"
+                       style={{
+                         background: 'rgba(255, 255, 255, 0.05)',
+                         border: '1px solid rgba(255, 255, 255, 0.1)',
+                         backdropFilter: 'blur(12px)'
+                       }}>
+                    <div className="text-gray-400 text-lg">All items have been removed from this order</div>
+                  </div>
+                )}
             </div>
             
             {/* Estimated Total */}
-            <div className="border-t border-white/10 mt-4 pt-3 mb-6">
-                              <div className="flex justify-between text-white font-semibold">
-                  <span>Estimated Total:</span>
-                  <span>${(() => {
+            <div className="border-t border-white/20 pt-6 mb-8">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xl font-semibold text-white">Estimated Total:</span>
+                <span className="text-2xl font-bold text-white">${(() => {
                     // Calculate total with updated quantities and prices
                     let calculatedTotal = 0;
                     
@@ -9177,55 +9313,52 @@ function Dashboard() {
                     return formatTotal;
                   })()}</span>
                 </div>
-              <div className="text-xs text-right space-y-1">
-                <div className="text-green-400">
-                  (10% reorder discount applied)
-                </div>
-                {rushSavingsAmount > 0 && (
-                  <div className="text-blue-400">
-                    (Rush removal saved: ${rushSavingsAmount.toFixed(2)})
+                <div className="text-right space-y-1">
+                  <div className="text-green-400 font-medium">
+                    (10% reorder discount applied)
                   </div>
-                )}
+                  {rushSavingsAmount > 0 && (
+                    <div className="text-blue-400 font-medium">
+                      (Rush removal saved: ${rushSavingsAmount.toFixed(2)})
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="flex flex-col gap-3">
-              {/* Keep Same - Signup Button Style */}
-              <button
-                onClick={() => handleReorderConfirm(false)}
-                disabled={reorderOrderData.items.every((_: any, index: number) => removedItems.has(index))}
-                className="w-full py-3 px-4 rounded-lg font-bold transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  background: reorderOrderData.items.every((_: any, index: number) => removedItems.has(index)) 
-                    ? '#666' 
-                    : 'linear-gradient(135deg, #ffd713, #ffed4e)',
-                  color: '#030140',
-                  border: 'none'
-                }}
-              >
-                <svg className="w-5 h-5 inline mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-                Add to Cart & Checkout
-              </button>
+              {/* Action Buttons */}
+              <div className="space-y-4">
+                {/* Add to Cart & Checkout - Signup Button Style */}
+                <button
+                  onClick={() => handleReorderConfirm(false)}
+                  disabled={reorderOrderData.items.every((_: any, index: number) => removedItems.has(index))}
+                  className="w-full py-4 px-6 rounded-lg font-bold text-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                  style={{
+                    background: reorderOrderData.items.every((_: any, index: number) => removedItems.has(index)) 
+                      ? '#666' 
+                      : 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                    color: 'white'
+                  }}
+                >
+                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Add to Cart & Checkout
+                </button>
 
-              {/* Make Changes - Light Grey Button */}
-              <button
-                onClick={() => handleReorderConfirm(true)}
-                disabled={reorderOrderData.items.every((_: any, index: number) => removedItems.has(index))}
-                className="w-full py-3 px-4 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed border border-gray-400/30"
-                style={{
-                  background: reorderOrderData.items.every((_: any, index: number) => removedItems.has(index))
-                    ? '#444'
-                    : '#6B7280'
-                }}
-              >
-                <svg className="w-5 h-5 inline mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                </svg>
-                Customize & Add to Cart
-              </button>
-            </div>
+                {/* Wait! I need to make changes... - Clickable Text */}
+                <div className="text-center">
+                  <button
+                    onClick={() => handleReorderConfirm(true)}
+                    disabled={reorderOrderData.items.every((_: any, index: number) => removedItems.has(index))}
+                    className="text-gray-300 hover:text-white transition-colors duration-200 underline text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Wait! I need to make changes...
+                  </button>
+                </div>
+              </div>
           </div>
         </div>
       )}

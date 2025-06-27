@@ -82,7 +82,7 @@ export default function Login() {
           scopes: 'openid email profile',
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent',
+            prompt: 'select_account', // Changed from 'consent' to 'select_account' for better UX
           },
           redirectTo: `${window.location.origin}/account/dashboard`
         }

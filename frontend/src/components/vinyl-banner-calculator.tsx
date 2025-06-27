@@ -777,15 +777,21 @@ const VinylBannerCalculator: React.FC = () => {
             disabled={pricing.total === 0}
             className={`w-full py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 flex items-center justify-center relative overflow-hidden group ${
               pricing.total > 0
-                ? 'bg-yellow-400 text-black hover:bg-yellow-300 shadow-[0_0_15px_rgba(255,234,55,0.5)] button-interactive hover:shadow-[0_0_25px_rgba(255,234,55,0.7)] hover:scale-105'
+                ? 'hover:scale-105'
                 : 'bg-gray-600 text-white cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100'
             }`}
+            style={pricing.total > 0 ? {
+              background: 'linear-gradient(135deg, rgba(255, 193, 7, 0.4) 0%, rgba(255, 193, 7, 0.25) 50%, rgba(255, 193, 7, 0.1) 100%)',
+              backdropFilter: 'blur(25px) saturate(180%)',
+              border: '1px solid rgba(255, 193, 7, 0.4)',
+              boxShadow: 'rgba(255, 193, 7, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+              color: '#ffffff'
+            } : {}}
           >
             <span className="relative z-10 flex items-center justify-center gap-2">
               <ShoppingCart className="h-5 w-5" />
               Add to Cart - ${pricing.total.toFixed(2)}
             </span>
-            <div className="absolute inset-0 bg-gradient-to-r from-yellow-300 to-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           </button>
         </div>
       </div>

@@ -423,30 +423,63 @@ async function handleCheckoutSessionCompleted(session) {
         orderNumber: updatedOrder?.order_number
       });
       
-      // Credits are now deducted at checkout time, not in webhook
-      // Just ensure the order is updated with credits_applied field
-      if (cartMetadata?.creditsApplied && parseFloat(cartMetadata.creditsApplied) > 0 && metadata.userId !== 'guest') {
+      // Send admin notification for order update (payment completion)
+      try {
+        console.log('📧 Attempting to send admin notification for order update...');
+        const emailNotifications = require('./email-notifications');
+        
+        const adminEmailResult = await emailNotifications.sendAdminNewOrderNotification(updatedOrder);
+        
+        if (adminEmailResult.success) {
+          console.log('✅ Order update admin email notification sent successfully');
+        } else {
+          console.error('❌ Order update admin email notification failed:', adminEmailResult.error);
+        }
+      } catch (emailError) {
+        console.error('⚠️ Failed to send order update admin email (order still processed):', emailError);
+      }
+      
+      // NOW deduct credits when payment is successful
+      if (updatedOrder.credits_to_apply && parseFloat(updatedOrder.credits_to_apply) > 0 && metadata.userId !== 'guest') {
         try {
-          console.log('💳 Updating order with credits already applied:', cartMetadata.creditsApplied);
+          const creditsToApply = parseFloat(updatedOrder.credits_to_apply);
+          console.log('💳 Deducting credits on successful payment:', creditsToApply);
           console.log('💳 Order ID:', updatedOrder.id);
+          console.log('💳 User ID:', metadata.userId);
           
-          // Just update the order record to track credits used
-          await client
-            .from('orders_main')
-            .update({
-              credits_applied: parseFloat(cartMetadata.creditsApplied),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', updatedOrder.id);
+          // Actually deduct the credits now
+          const creditHandlers = require('./credit-handlers');
+          const creditResult = await creditHandlers.applyCreditsToOrder(
+            updatedOrder.id,
+            creditsToApply,
+            metadata.userId
+          );
           
-          console.log('✅ Order updated with credits tracking');
-        } catch (updateError) {
-          console.error('⚠️ Failed to update order with credits tracking:', updateError);
-          // Don't fail the order processing for this error
+          if (creditResult.success) {
+            console.log('✅ Credits deducted successfully on payment completion:', creditResult.remainingBalance);
+            
+            // Update the order record to track credits used and clear credits_to_apply
+            await client
+              .from('orders_main')
+              .update({
+                credits_applied: creditsToApply,
+                credits_to_apply: null, // Clear the pending credit amount
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', updatedOrder.id);
+              
+            console.log('✅ Order updated with final credits tracking');
+          } else {
+            console.error('⚠️ Failed to deduct credits on payment completion:', creditResult.error);
+            // Don't fail the order processing, but log the issue
+          }
+        } catch (creditError) {
+          console.error('⚠️ Critical error deducting credits on payment completion:', creditError);
+          // Don't fail the order processing for credit errors
         }
       } else {
-        console.log('💳 No credits to track:', {
-          creditsApplied: cartMetadata?.creditsApplied,
+        console.log('💳 No credits to deduct:', {
+          creditsToApply: updatedOrder.credits_to_apply,
           userId: metadata.userId,
           isGuest: metadata.userId === 'guest'
         });
@@ -503,8 +536,25 @@ async function handleCheckoutSessionCompleted(session) {
         }
       }
 
-      // All notifications disabled to fix webhook errors
-      console.log('✅ Order processed successfully - notifications disabled');
+      // Send email notification for order status change
+      try {
+        console.log('📧 Attempting to send email notification...');
+        console.log('📧 Updated order object keys:', Object.keys(updatedOrder));
+        console.log('📧 Order status:', updatedOrder.order_status);
+        console.log('📧 Customer email:', updatedOrder.customer_email);
+        console.log('📧 Order number:', updatedOrder.order_number);
+        
+        const emailNotifications = require('./email-notifications');
+        const emailResult = await emailNotifications.sendOrderStatusNotification(updatedOrder, updatedOrder.order_status);
+        
+        if (emailResult.success) {
+          console.log('✅ Order status email notification sent successfully');
+        } else {
+          console.error('❌ Email notification failed:', emailResult.error);
+        }
+      } catch (emailError) {
+        console.error('⚠️ Failed to send order status email (order still processed):', emailError);
+      }
       
       // Update line items with Stripe line item IDs if needed
       if (fullSession.line_items?.data) {
@@ -779,27 +829,43 @@ async function handleCheckoutSessionCompleted(session) {
       
       console.log('✅ New order created:', order?.id);
       
-      // Credits are now deducted at checkout time, not in webhook
-      // Just update order tracking for new orders (credits already deducted)
+      // Handle credits for new orders (fallback case)
       if (cartMetadata?.creditsApplied && parseFloat(cartMetadata.creditsApplied) > 0 && metadata.userId !== 'guest' && order?.id) {
         try {
-          console.log('💳 Updating new order with credits already applied:', cartMetadata.creditsApplied);
+          const creditsToApply = parseFloat(cartMetadata.creditsApplied);
+          console.log('💳 Deducting credits for new order on successful payment:', creditsToApply);
           console.log('💳 Order ID:', order.id);
+          console.log('💳 User ID:', metadata.userId);
           
-          // Just update the order record to track credits used
-          const client = supabaseClient.getServiceClient();
-          await client
-            .from('orders_main')
-            .update({
-              credits_applied: parseFloat(cartMetadata.creditsApplied),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', order.id);
+          // Actually deduct the credits now
+          const creditHandlers = require('./credit-handlers');
+          const creditResult = await creditHandlers.applyCreditsToOrder(
+            order.id,
+            creditsToApply,
+            metadata.userId
+          );
           
-          console.log('✅ New order updated with credits tracking');
-        } catch (updateError) {
-          console.error('⚠️ Failed to update new order with credits tracking:', updateError);
-          // Don't fail the order processing for this error
+          if (creditResult.success) {
+            console.log('✅ Credits deducted successfully for new order:', creditResult.remainingBalance);
+            
+            // Update the order record to track credits used
+            const client = supabaseClient.getServiceClient();
+            await client
+              .from('orders_main')
+              .update({
+                credits_applied: creditsToApply,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', order.id);
+              
+            console.log('✅ New order updated with credits tracking');
+          } else {
+            console.error('⚠️ Failed to deduct credits for new order:', creditResult.error);
+            // Don't fail the order processing, but log the issue
+          }
+        } catch (creditError) {
+          console.error('⚠️ Critical error deducting credits for new order:', creditError);
+          // Don't fail the order processing for credit errors
         }
       }
       
@@ -826,9 +892,37 @@ async function handleCheckoutSessionCompleted(session) {
         }
       }
 
-      // Discord notifications temporarily disabled for new orders
+      // Send email notification for new order
       if (order?.id) {
-        console.log('📱 Discord notifications disabled - new order created successfully');
+        try {
+          console.log('📧 Attempting to send new order email notification...');
+          console.log('📧 New order object keys:', Object.keys(order));
+          console.log('📧 Order status:', order.order_status);
+          console.log('📧 Customer email:', order.customer_email);
+          console.log('📧 Order number:', order.order_number);
+          
+          const emailNotifications = require('./email-notifications');
+          
+          // Send customer notification
+          const emailResult = await emailNotifications.sendOrderStatusNotification(order, order.order_status || 'Building Proof');
+          
+          if (emailResult.success) {
+            console.log('✅ New order customer email notification sent successfully');
+          } else {
+            console.error('❌ New order customer email notification failed:', emailResult.error);
+          }
+          
+          // Send admin notification
+          const adminEmailResult = await emailNotifications.sendAdminNewOrderNotification(order);
+          
+          if (adminEmailResult.success) {
+            console.log('✅ New order admin email notification sent successfully');
+          } else {
+            console.error('❌ New order admin email notification failed:', adminEmailResult.error);
+          }
+        } catch (emailError) {
+          console.error('⚠️ Failed to send new order emails (order still processed):', emailError);
+        }
       }
     }
     

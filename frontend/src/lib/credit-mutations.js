@@ -127,6 +127,8 @@ export const APPLY_CREDITS_TO_ORDER = gql`
   }
 `;
 
+
+
 // Get earned points/credits per order for the user
 export const GET_USER_EARNED_CREDITS_BY_ORDER = gql`
   query GetUserEarnedCreditsByOrder($userId: String!) {

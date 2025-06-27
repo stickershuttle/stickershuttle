@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import AdminLayout from '../../components/AdminLayout';
 import ImageUpload from '../../components/ImageUpload';
 import { 
@@ -9,8 +9,6 @@ import {
   CREATE_BLOG_POST,
   UPDATE_BLOG_POST,
   DELETE_BLOG_POST,
-  PUBLISH_BLOG_POST,
-  UNPUBLISH_BLOG_POST,
   GET_BLOG_POST_ADMIN
 } from '../../lib/blog-mutations';
 import { format } from 'date-fns';
@@ -53,6 +51,7 @@ export default function AdminBlogs() {
     published: false
   });
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const client = useApolloClient();
 
   // Safe date formatting function
   const formatDate = (dateString: string | null | undefined): string => {
@@ -91,8 +90,6 @@ export default function AdminBlogs() {
   const [createPost] = useMutation(CREATE_BLOG_POST);
   const [updatePost] = useMutation(UPDATE_BLOG_POST);
   const [deletePost] = useMutation(DELETE_BLOG_POST);
-  const [publishPost] = useMutation(PUBLISH_BLOG_POST);
-  const [unpublishPost] = useMutation(UNPUBLISH_BLOG_POST);
 
   // Calculate blog statistics
   const blogStats = {
@@ -205,28 +202,49 @@ export default function AdminBlogs() {
     }
   };
 
-  // Handle edit
-  const handleEdit = (post: BlogPost) => {
+  // Handle edit - fetch full post data including content
+  const handleEdit = async (post: BlogPost) => {
     console.log('Edit clicked for post:', post.id);
     try {
-      setEditingPost(post);
+      // Fetch the full post data including content using Apollo Client
+      const { loading: postLoading, error: postError, data: postData } = await client.query({
+        query: GET_BLOG_POST_ADMIN,
+        variables: { id: post.id },
+        fetchPolicy: 'network-only' // Always fetch fresh data
+      });
+
+      if (postError) {
+        console.error('Error fetching post for edit:', postError);
+        alert('Error loading post data. Please try again.');
+        return;
+      }
+
+      const fullPost = postData?.blog_posts_by_pk;
+      if (!fullPost) {
+        console.error('Post not found:', post.id);
+        alert('Post not found. Please refresh and try again.');
+        return;
+      }
+
+      setEditingPost(fullPost);
       setFormData({
-        title: post.title,
-        slug: post.slug,
-        excerpt: post.excerpt || '',
-        content: post.content || '',
-        featured_image: post.featured_image || '',
-        category: post.category || 'company-updates',
-        tags: post.tags || [],
-        meta_title: post.meta_title || '',
-        meta_description: post.meta_description || '',
-        og_image: post.og_image || '',
-        published: post.published || false
+        title: fullPost.title || '',
+        slug: fullPost.slug || '',
+        excerpt: fullPost.excerpt || '',
+        content: fullPost.content || '',
+        featured_image: fullPost.featured_image || '',
+        category: fullPost.category || 'company-updates',
+        tags: fullPost.tags || [],
+        meta_title: fullPost.meta_title || '',
+        meta_description: fullPost.meta_description || '',
+        og_image: fullPost.og_image || '',
+        published: fullPost.published || false
       });
       setShowEditor(true);
-      console.log('Edit form data set successfully');
+      console.log('Edit form data set successfully with content:', fullPost.content?.length || 0, 'characters');
     } catch (error) {
       console.error('Error in handleEdit:', error);
+      alert('Error loading post data. Please try again.');
     }
   };
 
@@ -247,12 +265,19 @@ export default function AdminBlogs() {
   const handleTogglePublish = async (post: BlogPost) => {
     try {
       if (post.published) {
-        await unpublishPost({ variables: { id: post.id } });
-      } else {
-        await publishPost({ 
+        // Unpublish: set published to false
+        await updatePost({ 
           variables: { 
             id: post.id,
-            published_at: new Date().toISOString()
+            published: false
+          } 
+        });
+      } else {
+        // Publish: set published to true and add published_at timestamp
+        await updatePost({ 
+          variables: { 
+            id: post.id,
+            published: true
           } 
         });
       }

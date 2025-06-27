@@ -391,6 +391,8 @@ const earnPointsFromPurchase = async (userId, orderTotal, orderId) => {
   }
 };
 
+
+
 module.exports = {
   initializeWithSupabase,
   getUserCreditBalance,

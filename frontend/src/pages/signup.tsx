@@ -3,6 +3,8 @@ import { useRouter } from 'next/router';
 import Layout from "@/components/Layout";
 import Link from "next/link";
 import { getSupabase } from '../lib/supabase';
+import { useMutation } from '@apollo/client';
+import { SYNC_CUSTOMER_TO_KLAVIYO } from '../lib/klaviyo-mutations';
 
 export default function SignUp() {
   const router = useRouter();
@@ -14,6 +16,11 @@ export default function SignUp() {
   const [showOtpVerification, setShowOtpVerification] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  const [userFirstName, setUserFirstName] = useState('');
+  const [userLastName, setUserLastName] = useState('');
+
+  // Klaviyo integration
+  const [syncToKlaviyo] = useMutation(SYNC_CUSTOMER_TO_KLAVIYO);
 
   const [formData, setFormData] = useState({
     email: router.query.email ? decodeURIComponent(router.query.email as string) : '',
@@ -141,6 +148,8 @@ export default function SignUp() {
       console.log('✅ Signup successful, showing OTP verification...');
       // Show OTP verification form instead of redirecting
       setUserEmail(directEmail);
+      setUserFirstName(directFirstName);
+      setUserLastName(directLastName);
       setShowOtpVerification(true);
       setLoading(false);
       
@@ -232,6 +241,29 @@ export default function SignUp() {
       }
 
       console.log('✅ Email verified successfully!');
+      
+      // Sync new customer to Klaviyo default list
+      try {
+        console.log('🔄 Syncing new customer to Klaviyo...');
+        await syncToKlaviyo({
+          variables: {
+            customerData: {
+              email: userEmail,
+              firstName: userFirstName,
+              lastName: userLastName,
+              marketingOptIn: true, // New signups default to subscribed
+              totalOrders: 0,
+              totalSpent: 0,
+              averageOrderValue: 0
+            }
+          }
+        });
+        console.log('✅ Customer synced to Klaviyo successfully!');
+      } catch (klaviyoError) {
+        console.error('⚠️ Klaviyo sync failed (non-critical):', klaviyoError);
+        // Don't block signup if Klaviyo fails
+      }
+      
       // Redirect to dashboard after successful verification
       router.push('/account/dashboard');
       
@@ -282,7 +314,7 @@ export default function SignUp() {
           scopes: 'openid email profile',
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent',
+            prompt: 'select_account', // Changed from 'consent' to 'select_account' for better UX
           },
           redirectTo: `${window.location.origin}/account/dashboard`
         }

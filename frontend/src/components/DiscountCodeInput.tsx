@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useLazyQuery, gql } from '@apollo/client';
+import { useLazyQuery, useMutation, gql } from '@apollo/client';
 
 const VALIDATE_DISCOUNT = gql`
   query ValidateDiscountCode($code: String!, $orderAmount: Float!) {
@@ -17,17 +17,52 @@ const VALIDATE_DISCOUNT = gql`
   }
 `;
 
+const REMOVE_DISCOUNT_SESSION = gql`
+  mutation RemoveDiscountSession {
+    removeDiscountSession {
+      success
+      message
+    }
+  }
+`;
+
 interface DiscountCodeInputProps {
   orderAmount: number;
   onDiscountApplied: (discount: { code: string; amount: number } | null) => void;
   className?: string;
+  currentAppliedDiscount?: { code: string; amount: number } | null;
+  hasReorderDiscount?: boolean;
+  reorderDiscountAmount?: number;
 }
 
-export default function DiscountCodeInput({ orderAmount, onDiscountApplied, className = '' }: DiscountCodeInputProps) {
+export default function DiscountCodeInput({ orderAmount, onDiscountApplied, className = '', currentAppliedDiscount, hasReorderDiscount, reorderDiscountAmount }: DiscountCodeInputProps) {
   const [discountCode, setDiscountCode] = useState('');
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<any>(null);
   const [hasValidated, setHasValidated] = useState(false);
+
+  // Initialize component state based on current applied discount
+  React.useEffect(() => {
+    if (currentAppliedDiscount && !validationResult) {
+      setDiscountCode(currentAppliedDiscount.code);
+      setValidationResult({
+        valid: true,
+        discountCode: {
+          code: currentAppliedDiscount.code,
+          discountType: 'unknown', // We don't have this info from the prop
+          discountValue: 0 // We don't have this info from the prop
+        },
+        discountAmount: currentAppliedDiscount.amount,
+        message: `Discount code "${currentAppliedDiscount.code}" applied`
+      });
+      setHasValidated(true);
+    } else if (!currentAppliedDiscount && validationResult?.valid) {
+      // Reset if no discount is applied externally but we have a valid result
+      setDiscountCode('');
+      setValidationResult(null);
+      setHasValidated(false);
+    }
+  }, [currentAppliedDiscount]);
 
   const [validateDiscount] = useLazyQuery(VALIDATE_DISCOUNT, {
     onCompleted: (data) => {
@@ -36,6 +71,16 @@ export default function DiscountCodeInput({ orderAmount, onDiscountApplied, clas
       setIsValidating(false);
 
       if (result.valid) {
+        // Check if there's already a different discount applied
+        if (currentAppliedDiscount && currentAppliedDiscount.code !== result.discountCode.code) {
+          setValidationResult({
+            valid: false,
+            message: `Cannot apply "${result.discountCode.code}". Remove "${currentAppliedDiscount.code}" first to use a different discount code.`
+          });
+          onDiscountApplied(null);
+          return;
+        }
+
         onDiscountApplied({
           code: result.discountCode.code,
           amount: result.discountAmount
@@ -55,8 +100,53 @@ export default function DiscountCodeInput({ orderAmount, onDiscountApplied, clas
     }
   });
 
+  const [removeDiscountSession] = useMutation(REMOVE_DISCOUNT_SESSION, {
+    onCompleted: (data) => {
+      console.log('Discount session removed successfully:', data);
+    },
+    onError: (error) => {
+      console.error('Error removing discount session:', error);
+    }
+  });
+
   const handleValidate = async () => {
     if (!discountCode.trim()) return;
+
+    // Check if there's a reorder discount active
+    if (hasReorderDiscount) {
+      setValidationResult({
+        valid: false,
+        message: `Cannot apply discount codes with reorder discount. You're already saving ${reorderDiscountAmount ? `$${reorderDiscountAmount.toFixed(2)}` : '10%'} on this reorder!`
+      });
+      setHasValidated(true);
+      return;
+    }
+
+    // Check if there's already a different discount applied
+    if (currentAppliedDiscount && currentAppliedDiscount.code !== discountCode.toUpperCase()) {
+      setValidationResult({
+        valid: false,
+        message: `Cannot apply multiple discount codes. Remove "${currentAppliedDiscount.code}" first to use a different discount code.`
+      });
+      setHasValidated(true);
+      return;
+    }
+
+    // If trying to apply the same discount that's already applied, show success
+    if (currentAppliedDiscount && currentAppliedDiscount.code === discountCode.toUpperCase()) {
+      setValidationResult({
+        valid: true,
+        discountCode: {
+          code: currentAppliedDiscount.code,
+          discountType: 'unknown',
+          discountValue: 0
+        },
+        discountAmount: currentAppliedDiscount.amount,
+        message: `Discount code "${currentAppliedDiscount.code}" is already applied`
+      });
+      setHasValidated(true);
+      return;
+    }
 
     setIsValidating(true);
     setHasValidated(true);
@@ -74,6 +164,7 @@ export default function DiscountCodeInput({ orderAmount, onDiscountApplied, clas
     setValidationResult(null);
     setHasValidated(false);
     onDiscountApplied(null);
+    removeDiscountSession();
   };
 
   const formatDiscountDisplay = () => {
@@ -106,6 +197,32 @@ export default function DiscountCodeInput({ orderAmount, onDiscountApplied, clas
 
   return (
     <div className={`space-y-3 ${className}`}>
+      {/* Show reorder discount notice if active */}
+      {hasReorderDiscount && (
+        <div 
+          className="text-sm px-4 py-3 rounded-lg"
+          style={{
+            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
+            backdropFilter: 'blur(25px) saturate(180%)',
+            border: '1px solid rgba(245, 158, 11, 0.4)',
+            boxShadow: 'rgba(245, 158, 11, 0.15) 0px 4px 16px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+            color: 'rgb(254, 240, 138)'
+          }}
+        >
+          <div className="flex items-center space-x-2">
+            <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+            </svg>
+            <span className="font-medium">
+              Reorder Discount Active: {reorderDiscountAmount ? `$${reorderDiscountAmount.toFixed(2)}` : '10%'} off
+            </span>
+          </div>
+          <div className="text-xs mt-1 opacity-90">
+            Additional discount codes cannot be applied with reorder discounts.
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-3">
         {/* Search bar styled input */}
         <div className="relative flex-1">
@@ -115,7 +232,7 @@ export default function DiscountCodeInput({ orderAmount, onDiscountApplied, clas
             value={discountCode}
             onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
             onKeyDown={(e) => e.key === 'Enter' && handleValidate()}
-            disabled={validationResult?.valid}
+            disabled={validationResult?.valid || hasReorderDiscount}
             className="w-full rounded-xl px-4 py-3 pl-11 text-white text-sm placeholder-white/60 focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ 
               background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(255, 255, 255, 0.02) 100%)',
@@ -133,7 +250,7 @@ export default function DiscountCodeInput({ orderAmount, onDiscountApplied, clas
         {!validationResult?.valid ? (
           <button
             onClick={handleValidate}
-            disabled={isValidating || !discountCode.trim()}
+            disabled={isValidating || !discountCode.trim() || hasReorderDiscount}
             className="px-6 py-3 rounded-xl font-semibold text-white text-sm transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg hover:shadow-xl"
             style={checkoutButtonStyle}
           >
