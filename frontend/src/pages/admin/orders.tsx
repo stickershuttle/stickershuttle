@@ -118,7 +118,7 @@ const ADMIN_EMAILS = ['justin@stickershuttle.com']; // Add all admin emails here
 // Helper function to check if an item is a sample pack
 const isSamplePackItem = (item: any) => {
   return item.productId === 'sample-pack' || 
-         item.sku === 'SP-001' ||
+         item.sku === 'SS-Sample' ||
          item.productName?.toLowerCase().includes('sample pack') ||
          item.productCategory?.toLowerCase().includes('sample');
 };
@@ -206,18 +206,17 @@ interface Order {
 
 // Define column configuration
 const defaultColumns = [
-  { id: 'status', name: 'Status', width: 'pl-6 pr-3', align: 'left' },
-  { id: 'image', name: 'Image', width: 'px-3', align: 'left' },
-  { id: 'total', name: 'Total', width: 'px-3', align: 'left' },
-  { id: 'order', name: 'Order', width: 'px-3', align: 'left' },
-  { id: 'customer', name: 'Customer', width: 'px-3', align: 'left' },
-  { id: 'qty', name: 'QTY', width: 'px-3', align: 'left' },
-  { id: 'items', name: 'Items', width: 'pl-4 pr-2', align: 'left' },
+  { id: 'status', name: 'Status', width: 'pl-2 pr-3', align: 'left' }, // Reduced from pl-6
+  { id: 'image', name: 'Image', width: 'px-2', align: 'left' }, // Reduced from px-3
+  { id: 'total', name: 'Total', width: 'px-2', align: 'left' }, // Reduced from px-3
+  { id: 'order', name: 'Order', width: 'px-2', align: 'left' }, // Reduced from px-3
+  { id: 'customer', name: 'Customer', width: 'px-2', align: 'left' }, // Reduced from px-3
+  { id: 'qty', name: 'QTY', width: 'px-2', align: 'left' }, // Reduced from px-3
+  { id: 'items', name: 'Items', width: 'pl-2 pr-2', align: 'left' }, // Reduced from pl-4
   { id: 'shape', name: 'Shape', width: 'px-2', align: 'left' },
   { id: 'material', name: 'Material', width: 'px-2', align: 'left' },
   { id: 'size', name: 'Size', width: 'px-2', align: 'left' },
-
-  { id: 'actions', name: 'Actions', width: 'px-6', align: 'center' }
+  { id: 'actions', name: 'Actions', width: 'px-4', align: 'center' } // Reduced from px-6
 ];
 
 export default function AdminOrders() {
@@ -231,7 +230,7 @@ export default function AdminOrders() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   const [columns, setColumns] = useState(defaultColumns);
-  const [timeFilter, setTimeFilter] = useState('30');  // '1' = today, '7' = last 7 days, '30' = last 30 days, etc.
+  const [timeFilter, setTimeFilter] = useState('mtd');  // '1' = today, '7' = last 7 days, 'mtd' = month to date, '30' = last 30 days, etc.
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState('all');
 
@@ -1016,73 +1015,45 @@ export default function AdminOrders() {
 
   // Generate chart data
   const generateChartData = (orders: Order[], days: string) => {
-    const filteredOrders = getFilteredOrdersByTime(orders?.filter(order => order.financialStatus === 'paid') || [], days);
+    if (!orders.length) return [];
+
+    let startDate: Date;
+    let endDate = new Date();
     
-    const dailyData = new Map();
-    const now = new Date();
-    
-    // Initialize data for the time period
-    let periodDays = parseInt(days);
-    if (days === '1') periodDays = 1;
     if (days === 'mtd') {
-      // For month to date, calculate days from start of month to today
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      periodDays = Math.ceil((now.getTime() - startOfMonth.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      // Start from the first day of the current month
+      startDate = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    } else {
+      // For other time periods, calculate based on days
+      const daysNum = parseInt(days);
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - (daysNum - 1));
+      startDate.setHours(0, 0, 0, 0);
     }
+
+    // Create array of dates from start to end
+    const dateArray = [];
+    let currentDate = new Date(startDate);
     
-    for (let i = periodDays - 1; i >= 0; i--) {
-      const date = new Date(now);
-      if (days === 'mtd') {
-        // For month to date, start from beginning of month
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        date.setTime(startOfMonth.getTime() + (i * 24 * 60 * 60 * 1000));
-      } else {
-        date.setDate(date.getDate() - i);
-      }
-      
-      if (days === '1') {
-        // For today, show hourly data
-        for (let hour = 0; hour < 24; hour++) {
-          const hourDate = new Date(date);
-          hourDate.setHours(hour, 0, 0, 0);
-          const key = hourDate.toISOString().slice(0, 13);
-          dailyData.set(key, { 
-            date: hourDate.getHours() + ':00', 
-            sales: 0, 
-            orders: 0 
-          });
-        }
-      } else {
-        const key = date.toISOString().split('T')[0];
-        dailyData.set(key, { 
-          date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), 
-          sales: 0, 
-          orders: 0 
-        });
-      }
+    while (currentDate <= endDate) {
+      dateArray.push(new Date(currentDate));
+      currentDate.setDate(currentDate.getDate() + 1);
     }
-    
-    // Aggregate order data
-    filteredOrders.forEach(order => {
-      const orderDate = new Date(order.orderCreatedAt || order.createdAt || '');
-      let key: string;
-      
-      if (days === '1') {
-        // Hourly data for today
-        key = orderDate.toISOString().slice(0, 13);
-      } else {
-        // Daily data
-        key = orderDate.toISOString().split('T')[0];
-      }
-      
-      const existing = dailyData.get(key);
-      if (existing) {
-        existing.sales += order.totalPrice;
-        existing.orders += 1;
-      }
+
+    // Map dates to sales data
+    return dateArray.map(date => {
+      const dayOrders = orders.filter(order => {
+        const orderDate = new Date(order.orderCreatedAt || order.createdAt || '');
+        return orderDate.toDateString() === date.toDateString();
+      });
+
+      const totalSales = dayOrders.reduce((sum, order) => sum + order.totalPrice, 0);
+
+      return {
+        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        sales: totalSales
+      };
     });
-    
-    return Array.from(dailyData.values());
   };
 
   // Get time filter label
@@ -1216,13 +1187,14 @@ export default function AdminOrders() {
       <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#030140' }}>
         {/* Main Content */}
         <div className="pt-8 pb-8">
-          <div className="w-full px-8">
+          <div className="w-full pl-2 pr-8 lg:pl-2 lg:pr-8"> {/* Keep original right padding, reduce left */}
             {!selectedOrder ? (
               // Orders List View
               <>
-                {/* Time Filter Buttons */}
+                {/* Time Filter Buttons/Dropdown */}
                 <div className="mb-6">
-                  <div className="flex flex-wrap gap-2 justify-center lg:justify-start">
+                  {/* Desktop Filter Buttons */}
+                  <div className="hidden lg:flex flex-wrap gap-2 justify-center lg:justify-start">
                     <button
                       onClick={() => setTimeFilter('1')}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -1344,14 +1316,35 @@ export default function AdminOrders() {
                       Last year
                     </button>
                   </div>
+                  
+                  {/* Mobile Filter Dropdown */}
+                  <div className="lg:hidden">
+                    <select
+                      value={timeFilter}
+                      onChange={(e) => setTimeFilter(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                      style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)'
+                      }}
+                      aria-label="Select time filter"
+                    >
+                      <option value="1" style={{ backgroundColor: '#030140' }}>Today</option>
+                      <option value="7" style={{ backgroundColor: '#030140' }}>Last 7 days</option>
+                      <option value="mtd" style={{ backgroundColor: '#030140' }}>Month to date</option>
+                      <option value="30" style={{ backgroundColor: '#030140' }}>Last 30 days</option>
+                      <option value="90" style={{ backgroundColor: '#030140' }}>Last 90 days</option>
+                      <option value="365" style={{ backgroundColor: '#030140' }}>Last year</option>
+                    </select>
+                  </div>
                 </div>
 
-                {/* Analytics & Sales Overview Container */}
-                <div className="glass-container p-6 mb-6">
-                  {/* Analytics Cards */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                {/* Analytics & Sales Overview Container - Mobile Wall-to-Wall */}
+                <div className="lg:glass-container lg:p-6 mb-6 -mx-8 lg:mx-0 lg:rounded-2xl">
+                  {/* Analytics Cards - Mobile: 2x2 Grid, Desktop: 1x4 Grid */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-4 mb-4 lg:mb-6 px-4 lg:px-0">
                     <div 
-                      className="p-3 lg:p-4 rounded-lg transition-all hover:scale-105 cursor-pointer"
+                      className="p-2 lg:p-4 rounded-lg transition-all hover:scale-105 cursor-pointer"
                       style={{
                         background: 'rgba(255, 255, 255, 0.08)',
                         border: '1px solid rgba(255, 255, 255, 0.15)',
@@ -1359,22 +1352,22 @@ export default function AdminOrders() {
                         backdropFilter: 'blur(8px)'
                       }}
                     >
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center justify-between mb-1 lg:mb-2">
                         <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Total Sales</span>
-                        <div className="p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(34, 197, 94, 0.2)' }}>
-                          <svg className="w-3 h-3 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="p-1 lg:p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(34, 197, 94, 0.2)' }}>
+                          <svg className="w-2 h-2 lg:w-3 lg:h-3 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                           </svg>
                         </div>
                       </div>
-                      <div className="text-lg lg:text-xl font-bold mb-1" style={{ color: '#86efac' }}>
+                      <div className="text-sm lg:text-xl font-bold mb-1" style={{ color: '#86efac' }}>
                         {formatCurrency(timeFilteredAnalytics?.totalSales || 0)}
                       </div>
-                      <div className="text-xs text-gray-500">Revenue generated</div>
+                      <div className="text-xs text-gray-500 hidden lg:block">Revenue generated</div>
                     </div>
 
                     <div 
-                      className="p-3 lg:p-4 rounded-lg transition-all hover:scale-105 cursor-pointer"
+                      className="p-2 lg:p-4 rounded-lg transition-all hover:scale-105 cursor-pointer"
                       style={{
                         background: 'rgba(255, 255, 255, 0.08)',
                         border: '1px solid rgba(255, 255, 255, 0.15)',
@@ -1382,22 +1375,22 @@ export default function AdminOrders() {
                         backdropFilter: 'blur(8px)'
                       }}
                     >
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center justify-between mb-1 lg:mb-2">
                         <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Average Order</span>
-                        <div className="p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)' }}>
-                          <svg className="w-3 h-3 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="p-1 lg:p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)' }}>
+                          <svg className="w-2 h-2 lg:w-3 lg:h-3 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                           </svg>
                         </div>
                       </div>
-                      <div className="text-lg lg:text-xl font-bold text-white mb-1">
+                      <div className="text-sm lg:text-xl font-bold text-white mb-1">
                         {formatCurrency(timeFilteredAnalytics?.avgOrderValue || 0)}
                       </div>
-                      <div className="text-xs text-gray-500">Per order value</div>
+                      <div className="text-xs text-gray-500 hidden lg:block">Per order value</div>
                     </div>
 
                     <div 
-                      className="p-3 lg:p-4 rounded-lg transition-all hover:scale-105 cursor-pointer"
+                      className="p-2 lg:p-4 rounded-lg transition-all hover:scale-105 cursor-pointer"
                       style={{
                         background: 'rgba(255, 255, 255, 0.08)',
                         border: '1px solid rgba(255, 255, 255, 0.15)',
@@ -1405,22 +1398,22 @@ export default function AdminOrders() {
                         backdropFilter: 'blur(8px)'
                       }}
                     >
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center justify-between mb-1 lg:mb-2">
                         <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Orders</span>
-                        <div className="p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(147, 51, 234, 0.2)' }}>
-                          <svg className="w-3 h-3 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="p-1 lg:p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(147, 51, 234, 0.2)' }}>
+                          <svg className="w-2 h-2 lg:w-3 lg:h-3 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                           </svg>
                         </div>
                       </div>
-                      <div className="text-lg lg:text-xl font-bold text-white mb-1">
+                      <div className="text-sm lg:text-xl font-bold text-white mb-1">
                         {timeFilteredAnalytics?.totalOrders || 0}
                       </div>
-                      <div className="text-xs text-gray-500">Total orders placed</div>
+                      <div className="text-xs text-gray-500 hidden lg:block">Total orders placed</div>
                     </div>
 
                     <div 
-                      className="p-3 lg:p-4 rounded-lg transition-all hover:scale-105 cursor-pointer"
+                      className="p-2 lg:p-4 rounded-lg transition-all hover:scale-105 cursor-pointer"
                       style={{
                         background: 'rgba(255, 255, 255, 0.08)',
                         border: '1px solid rgba(255, 255, 255, 0.15)',
@@ -1428,24 +1421,24 @@ export default function AdminOrders() {
                         backdropFilter: 'blur(8px)'
                       }}
                     >
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center justify-between mb-1 lg:mb-2">
                         <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Stickers</span>
-                        <div className="p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(251, 146, 60, 0.2)' }}>
-                          <svg className="w-3 h-3 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="p-1 lg:p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(251, 146, 60, 0.2)' }}>
+                          <svg className="w-2 h-2 lg:w-3 lg:h-3 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                           </svg>
                         </div>
                       </div>
-                      <div className="text-lg lg:text-xl font-bold text-white mb-1">
+                      <div className="text-sm lg:text-xl font-bold text-white mb-1">
                         {timeFilteredAnalytics?.totalStickers || 0}
                       </div>
-                      <div className="text-xs text-gray-500">Units produced</div>
+                      <div className="text-xs text-gray-500 hidden lg:block">Units produced</div>
                     </div>
                   </div>
 
-                  {/* Sales Chart */}
+                  {/* Sales Chart - Hidden on mobile to save space */}
                   {timeFilteredAnalytics?.chartData && timeFilteredAnalytics.chartData.length > 0 && (
-                    <div className="border-t border-gray-700 border-opacity-30 pt-4">
+                    <div className="border-t border-gray-700 border-opacity-30 pt-4 hidden lg:block px-0">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-base font-semibold text-white">Sales Overview</h3>
                         <div className="text-sm text-gray-400">{getTimeFilterLabel(timeFilter)}</div>
@@ -1513,8 +1506,17 @@ export default function AdminOrders() {
 
                 {/* Mobile/Tablet Filters */}
                 <div className="xl:hidden mb-4 px-4">
-                  {/* Filter pills */}
-                  <div className="flex gap-2 overflow-x-auto pb-2 filter-pills-container">
+                  <div 
+                    className="p-4 rounded-lg"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                      backdropFilter: 'blur(12px)',
+                    }}
+                  >
+                    {/* Filter pills */}
+                    <div className="flex gap-2 overflow-x-auto pb-2 filter-pills-container">
                     <button 
                       onClick={() => setFilterStatus('all')}
                       className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
@@ -1595,6 +1597,7 @@ export default function AdminOrders() {
                     >
                       Delivered
                     </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1605,17 +1608,26 @@ export default function AdminOrders() {
                     <select
                       value={filterStatus}
                       onChange={(e) => setFilterStatus(e.target.value)}
-                      className="bg-gray-800 border border-gray-600 rounded px-3 py-1 text-sm"
+                      className="appearance-none bg-transparent border border-white/20 rounded-xl px-4 py-2 pl-10 text-white text-sm font-medium focus:outline-none focus:border-purple-400 transition-all cursor-pointer hover:scale-105"
+                      style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 8px center',
+                        backgroundSize: '16px',
+                        paddingRight: '32px'
+                      }}
                       aria-label="Filter orders by status"
                     >
-                      <option value="all">All Orders</option>
-                      <option value="building">Building</option>
-                      <option value="awaiting">Awaiting Approval</option>
-                      <option value="approved">Approved</option>
-                      <option value="label-printed">Label Printed</option>
-                      <option value="shipped">Shipped</option>
-                      <option value="out-for-delivery">Out for Delivery</option>
-                      <option value="delivered">Delivered</option>
+                      <option value="all" style={{ backgroundColor: '#030140' }}>All Orders</option>
+                      <option value="building" style={{ backgroundColor: '#030140' }}>Building</option>
+                      <option value="awaiting" style={{ backgroundColor: '#030140' }}>Awaiting Approval</option>
+                      <option value="approved" style={{ backgroundColor: '#030140' }}>Approved</option>
+                      <option value="label-printed" style={{ backgroundColor: '#030140' }}>Label Printed</option>
+                      <option value="shipped" style={{ backgroundColor: '#030140' }}>Shipped</option>
+                      <option value="out-for-delivery" style={{ backgroundColor: '#030140' }}>Out for Delivery</option>
+                      <option value="delivered" style={{ backgroundColor: '#030140' }}>Delivered</option>
                     </select>
                     <svg className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -1635,6 +1647,8 @@ export default function AdminOrders() {
                       }}
                       className="appearance-none bg-transparent border border-white/20 rounded-xl px-4 py-2 pl-10 text-white text-sm font-medium focus:outline-none focus:border-purple-400 transition-all cursor-pointer hover:scale-105"
                       style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
                         backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
                         backgroundRepeat: 'no-repeat',
                         backgroundPosition: 'right 8px center',
@@ -1664,7 +1678,11 @@ export default function AdminOrders() {
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="bg-transparent border border-white/20 rounded-xl px-4 py-2 pl-10 text-white text-sm placeholder-white/60 focus:outline-none focus:border-purple-400 transition-all"
-                      style={{ minWidth: '200px' }}
+                      style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        minWidth: '200px'
+                      }}
                     />
                     <svg className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -1687,7 +1705,7 @@ export default function AdminOrders() {
 
                     return Object.entries(ordersByDate).map(([date, orders]: [string, any]) => (
                       <div key={date}>
-                        <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2 px-4">{date}</h3>
+                        <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2 px-2">{date}</h3>
                         <div className="bg-black/20 border-y border-gray-700/50">
                           {orders.map((order: Order, orderIndex: number) => {
                             const firstItem = order.items[0] || {};
@@ -1699,7 +1717,7 @@ export default function AdminOrders() {
                               <div
                                 key={order.id}
                                 onClick={() => selectOrder(order)}
-                                className="flex items-center px-4 py-4 cursor-pointer active:bg-white/5 transition-colors"
+                                className="flex items-center px-2 py-4 cursor-pointer active:bg-white/5 transition-colors"
                                 style={{
                                   borderBottom: orderIndex < orders.length - 1 ? '1px solid rgba(255, 255, 255, 0.08)' : 'none'
                                 }}
@@ -1928,7 +1946,7 @@ export default function AdminOrders() {
                               onClick={() => selectOrder(order)}
                             >
                               {/* Status */}
-                              <td className="pl-6 pr-3 py-4">
+                              <td className="pl-2 pr-3 py-4">
                                 <div className="flex items-center gap-2.5">
                                   <div
                                     className="rounded-full"
@@ -1938,7 +1956,6 @@ export default function AdminOrders() {
                                       minWidth: '8px',
                                       minHeight: '8px',
                                       backgroundColor: getLEDGlowColor(getProofStatus(order)),
-                                      boxShadow: `0 0 12px ${getLEDGlowColor(getProofStatus(order))}, 0 0 8px ${getLEDGlowColor(getProofStatus(order))}`,
                                       position: 'relative',
                                       zIndex: 10
                                     }}
@@ -2229,7 +2246,7 @@ export default function AdminOrders() {
                       <div className="flex justify-between items-start mb-6">
                         <h3 className="text-lg font-semibold text-white">Order Summary</h3>
                         <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.financialStatus)}`}>
-                          {selectedOrder.financialStatus}
+                          {selectedOrder.financialStatus.charAt(0).toUpperCase() + selectedOrder.financialStatus.slice(1)}
                         </span>
                       </div>
 
@@ -2525,7 +2542,7 @@ export default function AdminOrders() {
                       <div className="flex justify-between items-start mb-6">
                         <h3 className="text-lg font-semibold text-white">Order Summary</h3>
                         <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.financialStatus)}`}>
-                          {selectedOrder.financialStatus}
+                          {selectedOrder.financialStatus.charAt(0).toUpperCase() + selectedOrder.financialStatus.slice(1)}
                         </span>
                       </div>
 

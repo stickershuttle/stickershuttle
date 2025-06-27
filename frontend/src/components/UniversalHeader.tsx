@@ -154,19 +154,52 @@ export default function UniversalHeader() {
     <header className={`w-full fixed top-0 z-50 ${!isAdminPage ? 'pb-[5px]' : ''}`} style={{ backgroundColor: '#030140' }}>
               <div className={isAdminPage ? "w-full py-4 px-8" : "w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto py-4 px-4"}>
         <div className="flex items-center justify-between relative" style={{ paddingTop: '2px' }}>
-          {/* Mobile/Tablet Left Side - Hamburger */}
+          {/* Mobile/Tablet Left Side - Profile Picture instead of Hamburger */}
           <div className="lg:hidden flex items-center">
-            <button 
-              className="text-white text-2xl z-50 relative" 
-              aria-label="Open menu"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            >
-              <div className="flex flex-col space-y-1">
-                <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${isMobileMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
-                <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${isMobileMenuOpen ? 'opacity-0' : ''}`}></div>
-                <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${isMobileMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></div>
-              </div>
-            </button>
+            {showAccountDashboard ? (
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="flex items-center gap-2 font-medium text-white transition-all duration-200 transform hover:scale-105"
+                style={{ background: 'transparent', border: 'none' }}
+              >
+                {/* Profile Picture */}
+                <div className="w-10 h-10 rounded-full overflow-hidden border border-white/15 transition-all duration-200 hover:border-white/40 hover:brightness-75">
+                  {profile?.profile_photo_url ? (
+                    <img 
+                      src={profile.profile_photo_url} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-base font-bold">
+                      {getUserDisplayName().charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Dropdown Arrow */}
+                <svg 
+                  className={`w-4 h-4 transition-transform duration-200 ${isMobileMenuOpen ? 'rotate-180' : ''}`} 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            ) : (
+              <button 
+                className="text-white text-2xl z-50 relative" 
+                aria-label="Open menu"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              >
+                <div className="flex flex-col space-y-1">
+                  <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${isMobileMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
+                  <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${isMobileMenuOpen ? 'opacity-0' : ''}`}></div>
+                  <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${isMobileMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></div>
+                </div>
+              </button>
+            )}
           </div>
 
           {/* Desktop Left Side - Logo */}
@@ -592,7 +625,7 @@ export default function UniversalHeader() {
                         </Link>
 
                         <Link 
-                          href="/account/settings"
+                          href="/account/dashboard?view=settings"
                           className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
                           onClick={() => setShowProfileDropdown(false)}
                         >
@@ -665,7 +698,163 @@ export default function UniversalHeader() {
       </div>
 
       {/* Mobile Menu Overlay */}
-      {isMobileMenuOpen && (
+      {isMobileMenuOpen && showAccountDashboard && (
+        <div 
+          className="fixed inset-0 z-40 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Mobile Profile Dropdown Menu - Shows below profile picture */}
+      {isMobileMenuOpen && showAccountDashboard && (
+        <div 
+          className="absolute top-full left-4 mt-2 w-64 rounded-xl shadow-2xl z-50 lg:hidden"
+          style={{
+            backgroundColor: 'rgba(3, 1, 64, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.15)'
+          }}
+        >
+          <div className="p-4">
+            {/* Profile Header */}
+            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/10">
+              <div className="w-12 h-12 rounded-full overflow-hidden">
+                {profile?.profile_photo_url ? (
+                  <img 
+                    src={profile.profile_photo_url} 
+                    alt="Profile" 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-lg font-bold">
+                    {getUserDisplayName().charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <div>
+                <h3 className="text-white font-semibold">{getUserDisplayName()}</h3>
+                <p className="text-gray-300 text-sm">{user?.email}</p>
+              </div>
+            </div>
+
+            {/* Menu Items */}
+            <div className="space-y-1">
+              <Link 
+                href="/account/dashboard"
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#8b5cf6' }}>
+                  <rect x="3" y="3" width="8" height="5" rx="2"/>
+                  <rect x="13" y="3" width="8" height="11" rx="2"/>
+                  <rect x="3" y="10" width="8" height="11" rx="2"/>
+                  <rect x="13" y="16" width="8" height="5" rx="2"/>
+                </svg>
+                <span>Dashboard</span>
+              </Link>
+
+              <Link 
+                href="/account/dashboard?view=all-orders"
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#10b981' }}>
+                  <path d="M6 2C4.9 2 4 2.9 4 4v16c0 .6.4 1 1 1 .2 0 .5-.1.7-.3L9 18l3.3 2.7c.4.4 1 .4 1.4 0L17 18l3.3 2.7c.2.2.5.3.7.3.6 0 1-.4 1-1V4c0-1.1-.9-2-2-2H6zm2 5h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h4c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1z"/>
+                </svg>
+                <span>Orders</span>
+              </Link>
+
+              <Link 
+                href="/account/dashboard?view=finances"
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#3b82f6' }}>
+                  <rect x="3" y="12" width="4" height="9" rx="2"/>
+                  <rect x="10" y="6" width="4" height="15" rx="2"/>
+                  <rect x="17" y="9" width="4" height="12" rx="2"/>
+                </svg>
+                <span>Finances</span>
+              </Link>
+
+              <Link 
+                href="/account/dashboard?view=design-vault"
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#ec4899' }}>
+                  <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/>
+                </svg>
+                <span>Designs</span>
+              </Link>
+
+              <Link 
+                href="/account/dashboard?view=proofs"
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#f97316' }}>
+                  <path d="M12 4.5C7.5 4.5 3.73 7.61 2.46 12c1.27 4.39 5.04 7.5 9.54 7.5s8.27-3.11 9.54-7.5c-1.27-4.39-5.04-7.5-9.54-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                </svg>
+                <span>Proofs</span>
+              </Link>
+
+              <Link 
+                href="/account/support"
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white w-full text-left"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#ef4444' }}>
+                  <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12l6 4v-18c0-1.1-.9-2-2-2z"/>
+                </svg>
+                <span>Get Support</span>
+              </Link>
+
+              <Link 
+                href="/account/dashboard?view=settings"
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#9ca3af' }}>
+                  <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+                </svg>
+                <span>Settings</span>
+              </Link>
+
+              <hr className="border-white/10 my-2" />
+
+              {isAdmin && (
+                <Link 
+                  href="/admin/orders"
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-purple-500/20 transition-colors duration-200 text-purple-300"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  <span>Admin Panel</span>
+                </Link>
+              )}
+
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  handleSignOut();
+                }}
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-red-500/20 transition-colors duration-200 text-red-300 w-full text-left"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span>Sign Out</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Menu Slide-out for non-authenticated users */}
+      {isMobileMenuOpen && !showAccountDashboard && (
         <div 
           className="fixed inset-0 z-40 lg:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
@@ -674,10 +863,9 @@ export default function UniversalHeader() {
         </div>
       )}
 
-      {/* Mobile Menu Slide-out */}
       <div 
         className={`fixed top-0 left-0 h-full w-80 z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${
-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+          isMobileMenuOpen && !showAccountDashboard ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{ 
           backgroundColor: 'rgba(3, 1, 64, 0.95)',
@@ -687,7 +875,7 @@ export default function UniversalHeader() {
       >
         <div className="p-6">
           {/* Menu Header */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-8">
             <img 
               src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
               alt="Sticker Shuttle Logo" 
@@ -701,81 +889,6 @@ export default function UniversalHeader() {
               ✕
             </button>
           </div>
-
-          {/* Profile Section for Logged In Users */}
-          {user && (
-            <div className="mb-6 pb-6 border-b border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-white/20">
-                  {profile?.profile_photo_url ? (
-                    <img 
-                      src={profile.profile_photo_url} 
-                      alt="Profile" 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-lg font-bold">
-                      {getUserDisplayName().charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-white font-semibold text-lg">{getUserDisplayName()}</h3>
-                  <p className="text-gray-300 text-sm">{user?.email}</p>
-                </div>
-              </div>
-              
-              {/* Quick Menu Items */}
-              <div className="mt-4 grid grid-cols-4 gap-2">
-                <Link 
-                  href="/account/dashboard"
-                  className="flex flex-col items-center p-2 rounded-lg hover:bg-white/10 transition-colors duration-200"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <svg className="w-5 h-5 text-white mb-1" fill="currentColor" viewBox="0 0 24 24">
-                    <rect x="3" y="3" width="8" height="5" rx="2"/>
-                    <rect x="13" y="3" width="8" height="11" rx="2"/>
-                    <rect x="3" y="10" width="8" height="11" rx="2"/>
-                    <rect x="13" y="16" width="8" height="5" rx="2"/>
-                  </svg>
-                  <span className="text-xs text-gray-300">Dashboard</span>
-                </Link>
-                
-                <Link 
-                  href="/account/dashboard?view=all-orders"
-                  className="flex flex-col items-center p-2 rounded-lg hover:bg-white/10 transition-colors duration-200"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <svg className="w-5 h-5 text-white mb-1" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M6 2C4.9 2 4 2.9 4 4v16c0 .6.4 1 1 1 .2 0 .5-.1.7-.3L9 18l3.3 2.7c.4.4 1 .4 1.4 0L17 18l3.3 2.7c.2.2.5.3.7.3.6 0 1-.4 1-1V4c0-1.1-.9-2-2-2H6zm2 5h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h4c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1z"/>
-                  </svg>
-                  <span className="text-xs text-gray-300">Orders</span>
-                </Link>
-                
-                <Link 
-                  href="/account/dashboard?view=proofs"
-                  className="flex flex-col items-center p-2 rounded-lg hover:bg-white/10 transition-colors duration-200"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <svg className="w-5 h-5 text-white mb-1" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 4.5C7.5 4.5 3.73 7.61 2.46 12c1.27 4.39 5.04 7.5 9.54 7.5s8.27-3.11 9.54-7.5c-1.27-4.39-5.04-7.5-9.54-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                  </svg>
-                  <span className="text-xs text-gray-300">Proofs</span>
-                </Link>
-                
-                <Link 
-                  href="/account/dashboard?view=design-vault"
-                  className="flex flex-col items-center p-2 rounded-lg hover:bg-white/10 transition-colors duration-200"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <svg className="w-5 h-5 text-white mb-1" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/>
-                  </svg>
-                  <span className="text-xs text-gray-300">Designs</span>
-                </Link>
-              </div>
-            </div>
-          )}
 
           {/* Sticker Types Quick Access - 2 Column Grid */}
           <div className="mb-8">
@@ -912,52 +1025,29 @@ export default function UniversalHeader() {
               </Link>
             )}
             
-            {/* Mobile Authentication Navigation - Show login/signup by default unless user verified */}
-            {showAccountDashboard ? (
-              /* Logged In and Verified - Show Sign Out only */
-              <>
-                {isAdmin && (
-                  <Link 
-                    href="/admin/orders" 
-                    className={`w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center${router.pathname === '/admin/orders' || router.asPath === '/admin/orders' || router.pathname.startsWith('/admin') ? ' bg-amber-500 bg-opacity-20 border-l-4 border-amber-400' : ''}`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <span className="mr-3">🛠️</span>
-                    Admin Dashboard
-                  </Link>
-                )}
-                <button 
-                  onClick={() => {
-                    handleSignOut();
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center"
-                >
-                  <span className="mr-3">🚪</span>
-                  Sign Out
-                </button>
-              </>
-            ) : (
-              /* Default state - Show Login and Signup */
-              <>
-                <Link 
-                  href="/login" 
-                  className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <span className="mr-3">👤</span>
-                  Log in
-                </Link>
-                <Link 
-                  href="/signup" 
-                  className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <span className="mr-3">✨</span>
-                  Signup
-                </Link>
-              </>
-            )}
+            {/* Mobile Authentication Navigation - Show login/signup */}
+            <>
+              <Link 
+                href="/login" 
+                className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <svg className="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+                Log in
+              </Link>
+              <Link 
+                href="/signup" 
+                className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <svg className="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+                Signup
+              </Link>
+            </>
           </nav>
         </div>
       </div>

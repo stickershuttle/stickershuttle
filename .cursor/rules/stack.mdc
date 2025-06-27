@@ -3,6 +3,8 @@ description:
 globs: 
 alwaysApply: true
 ---
+NEVER ACCESS GIT OR REPLACE PAGES OR ANYTHING LIKE THAT WITHOUT A YES OR NO
+
 🎨 Frontend
 Next.js 13+ - React framework with App Router
 React 18 - UI library

@@ -199,6 +199,12 @@ const typeDefs = gql`
     # User queries
     getAllUsers: [User!]!
     getUserProfile(userId: ID!): UserProfile
+    
+    # Blog queries
+    blog_posts(limit: Int, offset: Int, where: BlogPostWhere, order_by: BlogPostOrderBy): [BlogPost!]!
+    blog_posts_aggregate(where: BlogPostWhere): BlogPostAggregate!
+    blog_posts_by_pk(id: ID!): BlogPost
+    blog_categories(order_by: BlogCategoryOrderBy): [BlogCategory!]!
   }
 
   type Mutation {
@@ -266,6 +272,15 @@ const typeDefs = gql`
     updateUserProfileBanner(userId: ID!, bannerUrl: String, bannerPublicId: String, bannerTemplate: String, bannerTemplateId: Int): UserProfileResult!
     updateUserProfileCompany(userId: ID!, companyName: String!): UserProfileResult!
     updateUserProfileComprehensive(userId: ID!, input: UserProfileInput!): UserProfileResult!
+    
+    # Blog mutations
+    insert_blog_posts_one(object: BlogPostInput!): BlogPost!
+    update_blog_posts_by_pk(pk_columns: BlogPostPkInput!, _set: BlogPostSetInput!): BlogPost
+    delete_blog_posts_by_pk(id: ID!): BlogPost
+    increment_blog_views(args: IncrementBlogViewsInput!): IncrementBlogViewsResult!
+    insert_blog_categories_one(object: BlogCategoryInput!): BlogCategory!
+    update_blog_categories_by_pk(pk_columns: BlogCategoryPkInput!, _set: BlogCategorySetInput!): BlogCategory
+    delete_blog_categories_by_pk(id: ID!): BlogCategory
   }
 
   type Customer {
@@ -912,6 +927,141 @@ const typeDefs = gql`
     amount: Float!
     reason: String
     expiresAt: String
+  }
+  
+  # Blog Types
+  type BlogPost {
+    id: ID!
+    title: String!
+    slug: String!
+    excerpt: String
+    content: String!
+    featured_image: String
+    author_id: ID
+    author_name: String
+    category: String
+    tags: [String]
+    meta_title: String
+    meta_description: String
+    og_image: String
+    published: Boolean!
+    published_at: String
+    created_at: String!
+    updated_at: String!
+    views: Int!
+    read_time_minutes: Int
+  }
+  
+  type BlogCategory {
+    id: ID!
+    name: String!
+    slug: String!
+    description: String
+    created_at: String!
+  }
+  
+  type BlogPostAggregate {
+    aggregate: BlogAggregateFields!
+  }
+  
+  type BlogAggregateFields {
+    count: Int!
+  }
+  
+  input BlogPostWhere {
+    published: BooleanComparisonExp
+    category: StringComparisonExp
+    slug: StringComparisonExp
+    _and: [BlogPostWhere]
+    _or: [BlogPostWhere]
+  }
+  
+  input BlogPostOrderBy {
+    created_at: OrderDirection
+    published_at: OrderDirection
+  }
+  
+  input BlogCategoryOrderBy {
+    name: OrderDirection
+  }
+  
+  input BooleanComparisonExp {
+    _eq: Boolean
+  }
+  
+  input StringComparisonExp {
+    _eq: String
+    _neq: String
+    _ilike: String
+    _contains: String
+  }
+  
+  enum OrderDirection {
+    asc
+    desc
+  }
+  
+  input BlogPostInput {
+    title: String!
+    slug: String!
+    excerpt: String
+    content: String!
+    featured_image: String
+    author_id: ID
+    author_name: String
+    category: String
+    tags: [String]
+    meta_title: String
+    meta_description: String
+    og_image: String
+    published: Boolean
+    published_at: String
+    read_time_minutes: Int
+  }
+  
+  input BlogPostPkInput {
+    id: ID!
+  }
+  
+  input BlogPostSetInput {
+    title: String
+    slug: String
+    excerpt: String
+    content: String
+    featured_image: String
+    author_id: ID
+    author_name: String
+    category: String
+    tags: [String]
+    meta_title: String
+    meta_description: String
+    og_image: String
+    published: Boolean
+    read_time_minutes: Int
+  }
+  
+  input BlogCategoryInput {
+    name: String!
+    slug: String!
+    description: String
+  }
+  
+  input BlogCategoryPkInput {
+    id: ID!
+  }
+  
+  input BlogCategorySetInput {
+    name: String
+    slug: String
+    description: String
+  }
+  
+  input IncrementBlogViewsInput {
+    post_slug: String!
+  }
+  
+  type IncrementBlogViewsResult {
+    success: Boolean!
   }
 `;
 
@@ -2147,6 +2297,154 @@ const resolvers = {
       } catch (error) {
         console.error('❌ Error in getUserProfile:', error);
         throw new Error(error.message);
+      }
+    },
+    
+    // Blog query resolvers
+    blog_posts: async (_, { limit, offset, where, order_by }) => {
+      try {
+        console.log('🔍 blog_posts query called with:', { limit, offset, where, order_by });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Blog service is currently unavailable');
+        }
+        
+        const client = supabaseClient.getServiceClient();
+        let query = client.from('blog_posts').select('*');
+        
+        // Apply where conditions
+        if (where) {
+          if (where.published && where.published._eq !== undefined) {
+            query = query.eq('published', where.published._eq);
+          }
+          if (where.category && where.category._eq) {
+            query = query.eq('category', where.category._eq);
+          }
+          if (where.slug && where.slug._eq) {
+            query = query.eq('slug', where.slug._eq);
+          }
+        }
+        
+        // Apply ordering
+        if (order_by) {
+          if (order_by.created_at) {
+            query = query.order('created_at', { ascending: order_by.created_at === 'asc' });
+          } else if (order_by.published_at) {
+            query = query.order('published_at', { ascending: order_by.published_at === 'asc' });
+          }
+        } else {
+          // Default ordering
+          query = query.order('created_at', { ascending: false });
+        }
+        
+        // Apply limit and offset
+        if (limit) query = query.limit(limit);
+        if (offset) query = query.range(offset, offset + (limit || 10) - 1);
+        
+        const { data, error } = await query;
+        
+        if (error) {
+          console.error('❌ Error fetching blog posts:', error);
+          throw new Error(error.message);
+        }
+        
+        console.log('✅ Fetched blog posts:', data?.length || 0);
+        return data || [];
+      } catch (error) {
+        console.error('❌ Error in blog_posts resolver:', error);
+        throw error;
+      }
+    },
+    
+    blog_posts_aggregate: async (_, { where }) => {
+      try {
+        if (!supabaseClient.isReady()) {
+          throw new Error('Blog service is currently unavailable');
+        }
+        
+        const client = supabaseClient.getServiceClient();
+        let query = client.from('blog_posts').select('id', { count: 'exact', head: true });
+        
+        // Apply where conditions
+        if (where) {
+          if (where.published && where.published._eq !== undefined) {
+            query = query.eq('published', where.published._eq);
+          }
+          if (where.category && where.category._eq) {
+            query = query.eq('category', where.category._eq);
+          }
+        }
+        
+        const { count, error } = await query;
+        
+        if (error) {
+          console.error('❌ Error fetching blog posts aggregate:', error);
+          throw new Error(error.message);
+        }
+        
+        return {
+          aggregate: {
+            count: count || 0
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in blog_posts_aggregate resolver:', error);
+        throw error;
+      }
+    },
+    
+    blog_posts_by_pk: async (_, { id }) => {
+      try {
+        if (!supabaseClient.isReady()) {
+          throw new Error('Blog service is currently unavailable');
+        }
+        
+        const client = supabaseClient.getServiceClient();
+        const { data, error } = await client
+          .from('blog_posts')
+          .select('*')
+          .eq('id', id)
+          .single();
+        
+        if (error) {
+          console.error('❌ Error fetching blog post by pk:', error);
+          return null;
+        }
+        
+        return data;
+      } catch (error) {
+        console.error('❌ Error in blog_posts_by_pk resolver:', error);
+        throw error;
+      }
+    },
+    
+    blog_categories: async (_, { order_by }) => {
+      try {
+        if (!supabaseClient.isReady()) {
+          throw new Error('Blog service is currently unavailable');
+        }
+        
+        const client = supabaseClient.getServiceClient();
+        let query = client.from('blog_categories').select('*');
+        
+        // Apply ordering
+        if (order_by && order_by.name) {
+          query = query.order('name', { ascending: order_by.name === 'asc' });
+        } else {
+          query = query.order('name', { ascending: true });
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+          console.error('❌ Error fetching blog categories:', error);
+          throw new Error(error.message);
+        }
+        
+        return data || [];
+      } catch (error) {
+        console.error('❌ Error in blog_categories resolver:', error);
+        throw error;
       }
     }
   },
@@ -4581,6 +4879,247 @@ const resolvers = {
           message: error.message,
           userProfile: null
         };
+      }
+    },
+    
+    // Blog mutation resolvers
+    insert_blog_posts_one: async (_, { object }) => {
+      try {
+        console.log('📝 Creating new blog post:', { title: object.title });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Blog service is currently unavailable');
+        }
+        
+        const client = supabaseClient.getServiceClient();
+        const { data, error } = await client
+          .from('blog_posts')
+          .insert(object)
+          .select('*')
+          .single();
+        
+        if (error) {
+          console.error('❌ Error creating blog post:', error);
+          throw new Error(error.message);
+        }
+        
+        console.log('✅ Blog post created:', data.id);
+        return data;
+      } catch (error) {
+        console.error('❌ Error in insert_blog_posts_one:', error);
+        throw error;
+      }
+    },
+    
+    update_blog_posts_by_pk: async (_, { pk_columns, _set }) => {
+      try {
+        console.log('📝 Updating blog post:', pk_columns.id);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Blog service is currently unavailable');
+        }
+        
+        const client = supabaseClient.getServiceClient();
+        
+        // If published is being set to true, update published_at
+        if (_set.published === true) {
+          _set.published_at = new Date().toISOString();
+        }
+        
+        const { data, error } = await client
+          .from('blog_posts')
+          .update(_set)
+          .eq('id', pk_columns.id)
+          .select('*')
+          .single();
+        
+        if (error) {
+          console.error('❌ Error updating blog post:', error);
+          throw new Error(error.message);
+        }
+        
+        console.log('✅ Blog post updated:', data.id);
+        return data;
+      } catch (error) {
+        console.error('❌ Error in update_blog_posts_by_pk:', error);
+        throw error;
+      }
+    },
+    
+    delete_blog_posts_by_pk: async (_, { id }) => {
+      try {
+        console.log('🗑️ Deleting blog post:', id);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Blog service is currently unavailable');
+        }
+        
+        const client = supabaseClient.getServiceClient();
+        
+        // Get the post before deleting
+        const { data: postToDelete, error: fetchError } = await client
+          .from('blog_posts')
+          .select('*')
+          .eq('id', id)
+          .single();
+        
+        if (fetchError) {
+          console.error('❌ Error fetching blog post to delete:', fetchError);
+          return null;
+        }
+        
+        // Delete the post
+        const { error } = await client
+          .from('blog_posts')
+          .delete()
+          .eq('id', id);
+        
+        if (error) {
+          console.error('❌ Error deleting blog post:', error);
+          throw new Error(error.message);
+        }
+        
+        console.log('✅ Blog post deleted:', id);
+        return postToDelete;
+      } catch (error) {
+        console.error('❌ Error in delete_blog_posts_by_pk:', error);
+        throw error;
+      }
+    },
+    
+    increment_blog_views: async (_, { args }) => {
+      try {
+        if (!supabaseClient.isReady()) {
+          throw new Error('Blog service is currently unavailable');
+        }
+        
+        const client = supabaseClient.getServiceClient();
+        
+        // Get current views
+        const { data: post, error: fetchError } = await client
+          .from('blog_posts')
+          .select('views')
+          .eq('slug', args.post_slug)
+          .single();
+        
+        if (fetchError) {
+          console.error('❌ Error fetching blog post for view increment:', fetchError);
+          return { success: false };
+        }
+        
+        // Increment views
+        const { error: updateError } = await client
+          .from('blog_posts')
+          .update({ views: (post.views || 0) + 1 })
+          .eq('slug', args.post_slug);
+        
+        if (updateError) {
+          console.error('❌ Error incrementing blog views:', updateError);
+          return { success: false };
+        }
+        
+        return { success: true };
+      } catch (error) {
+        console.error('❌ Error in increment_blog_views:', error);
+        return { success: false };
+      }
+    },
+    
+    insert_blog_categories_one: async (_, { object }) => {
+      try {
+        console.log('📝 Creating new blog category:', { name: object.name });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Blog service is currently unavailable');
+        }
+        
+        const client = supabaseClient.getServiceClient();
+        const { data, error } = await client
+          .from('blog_categories')
+          .insert(object)
+          .select('*')
+          .single();
+        
+        if (error) {
+          console.error('❌ Error creating blog category:', error);
+          throw new Error(error.message);
+        }
+        
+        console.log('✅ Blog category created:', data.id);
+        return data;
+      } catch (error) {
+        console.error('❌ Error in insert_blog_categories_one:', error);
+        throw error;
+      }
+    },
+    
+    update_blog_categories_by_pk: async (_, { pk_columns, _set }) => {
+      try {
+        console.log('📝 Updating blog category:', pk_columns.id);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Blog service is currently unavailable');
+        }
+        
+        const client = supabaseClient.getServiceClient();
+        const { data, error } = await client
+          .from('blog_categories')
+          .update(_set)
+          .eq('id', pk_columns.id)
+          .select('*')
+          .single();
+        
+        if (error) {
+          console.error('❌ Error updating blog category:', error);
+          throw new Error(error.message);
+        }
+        
+        console.log('✅ Blog category updated:', data.id);
+        return data;
+      } catch (error) {
+        console.error('❌ Error in update_blog_categories_by_pk:', error);
+        throw error;
+      }
+    },
+    
+    delete_blog_categories_by_pk: async (_, { id }) => {
+      try {
+        console.log('🗑️ Deleting blog category:', id);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Blog service is currently unavailable');
+        }
+        
+        const client = supabaseClient.getServiceClient();
+        
+        // Get the category before deleting
+        const { data: categoryToDelete, error: fetchError } = await client
+          .from('blog_categories')
+          .select('*')
+          .eq('id', id)
+          .single();
+        
+        if (fetchError) {
+          console.error('❌ Error fetching blog category to delete:', fetchError);
+          return null;
+        }
+        
+        // Delete the category
+        const { error } = await client
+          .from('blog_categories')
+          .delete()
+          .eq('id', id);
+        
+        if (error) {
+          console.error('❌ Error deleting blog category:', error);
+          throw new Error(error.message);
+        }
+        
+        console.log('✅ Blog category deleted:', id);
+        return categoryToDelete;
+      } catch (error) {
+        console.error('❌ Error in delete_blog_categories_by_pk:', error);
+        throw error;
       }
     }
   }
