@@ -49,4 +49,4 @@ jobs:
       env:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       with:
-        service: "sticker-shuttle-api"
+        service: "enchanting-upliftment"
