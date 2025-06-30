@@ -125,6 +125,32 @@ class EasyPostService {
             console.log('📦 Creating EasyPost shipment...');
             const shipment = await this.client.Shipment.create(shipmentData);
             console.log('✅ EasyPost shipment created:', shipment.id);
+            
+            // Debug: Log carriers and rate count
+            if (shipment.rates && shipment.rates.length > 0) {
+                const carrierCounts = {};
+                shipment.rates.forEach(rate => {
+                    const carrier = rate.carrier.toUpperCase();
+                    carrierCounts[carrier] = (carrierCounts[carrier] || 0) + 1;
+                });
+                
+                console.log(`📊 Rates received by carrier:`, carrierCounts);
+                console.log(`📊 Total rates: ${shipment.rates.length}`);
+                
+                // Check specifically for UPS
+                const hasUPS = Object.keys(carrierCounts).some(carrier => 
+                    carrier === 'UPS' || carrier === 'UPSDAP'
+                );
+                if (!hasUPS) {
+                    console.log('⚠️ No UPS rates returned from EasyPost');
+                    console.log('📍 From address:', JSON.stringify(shipmentData.from_address, null, 2));
+                    console.log('📍 To address:', JSON.stringify(shipmentData.to_address, null, 2));
+                    console.log('📦 Parcel:', JSON.stringify(shipmentData.parcel, null, 2));
+                }
+            } else {
+                console.log('⚠️ No rates returned from EasyPost at all');
+            }
+            
             return shipment;
         } catch (error) {
             console.error('❌ Failed to create EasyPost shipment:', error);
@@ -320,13 +346,21 @@ class EasyPostService {
             }
 
             // Minimum package dimensions
+            // UPS typically requires minimum 1 lb (16 oz) for some services
             parcel = {
                 length: Math.max(maxLength, 6), // Minimum 6 inches
                 width: Math.max(maxWidth, 4),   // Minimum 4 inches  
                 height: Math.max(totalHeight, 1), // Minimum 1 inch
-                weight: Math.max(totalWeight, 1)  // Minimum 1 oz
+                weight: Math.max(totalWeight, 2)  // Minimum 2 oz (some UPS services need more)
             };
         }
+
+        // Format phone number for better carrier compatibility (remove non-numeric characters)
+        const formatPhone = (phone) => {
+            if (!phone) return null;
+            // Remove all non-numeric characters
+            return phone.replace(/\D/g, '');
+        };
 
         const toAddress = {
             name: `${order.customerFirstName || order.customer_first_name || ''} ${order.customerLastName || order.customer_last_name || ''}`.trim(),
@@ -337,7 +371,7 @@ class EasyPostService {
             state: shippingAddr.province || shippingAddr.state,
             zip: shippingAddr.zip || shippingAddr.postal_code,
             country: shippingAddr.country || 'US',
-            phone: shippingAddr.phone || order.customerPhone || order.customer_phone,
+            phone: formatPhone(shippingAddr.phone || order.customerPhone || order.customer_phone),
             email: order.customerEmail || order.customer_email
         };
 

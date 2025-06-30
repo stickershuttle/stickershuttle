@@ -239,7 +239,10 @@ class SupabaseClient {
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', orderId)
-                .select()
+                .select(`
+                    *,
+                    order_items_new(*)
+                `)
                 .single();
 
             if (error) {

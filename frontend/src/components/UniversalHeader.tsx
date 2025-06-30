@@ -154,16 +154,16 @@ export default function UniversalHeader() {
     <header className={`w-full fixed top-0 z-50 ${!isAdminPage ? 'pb-[5px]' : ''}`} style={{ backgroundColor: '#030140' }}>
               <div className={isAdminPage ? "w-full py-4 px-8" : "w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto py-4 px-4"}>
         <div className="flex items-center justify-between relative" style={{ paddingTop: '2px' }}>
-          {/* Mobile/Tablet Left Side - Profile Picture instead of Hamburger */}
+          {/* Mobile/Tablet Left Side - Avatar or Login Icons */}
           <div className="lg:hidden flex items-center">
             {showAccountDashboard ? (
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="flex items-center gap-2 font-medium text-white transition-all duration-200 transform hover:scale-105"
+                className="transition-all duration-200 transform hover:scale-105"
                 style={{ background: 'transparent', border: 'none' }}
               >
-                {/* Profile Picture */}
-                <div className="w-10 h-10 rounded-full overflow-hidden border border-white/15 transition-all duration-200 hover:border-white/40 hover:brightness-75">
+                {/* Profile Avatar */}
+                <div className="w-10 h-10 rounded-full overflow-hidden border border-white/20 transition-all duration-200 hover:border-white/40">
                   {profile?.profile_photo_url ? (
                     <img 
                       src={profile.profile_photo_url} 
@@ -176,29 +176,29 @@ export default function UniversalHeader() {
                     </div>
                   )}
                 </div>
-                
-                {/* Dropdown Arrow */}
-                <svg 
-                  className={`w-4 h-4 transition-transform duration-200 ${isMobileMenuOpen ? 'rotate-180' : ''}`} 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
               </button>
             ) : (
-              <button 
-                className="text-white text-2xl z-50 relative" 
-                aria-label="Open menu"
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              >
-                <div className="flex flex-col space-y-1">
-                  <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${isMobileMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></div>
-                  <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${isMobileMenuOpen ? 'opacity-0' : ''}`}></div>
-                  <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${isMobileMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></div>
-                </div>
-              </button>
+              <div className="flex items-center gap-3">
+                {/* Signup Button */}
+                <Link 
+                  href="/signup"
+                  className="primaryButton px-3 py-1.5 text-sm font-medium transition-all duration-200 transform hover:scale-105 rounded-lg"
+                  aria-label="Signup"
+                >
+                  Signup
+                </Link>
+                
+                {/* Avatar Icon */}
+                <Link 
+                  href="/login"
+                  className="text-white transition-all duration-200 transform hover:scale-105"
+                  aria-label="Login"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </Link>
+              </div>
             )}
           </div>
 
@@ -228,9 +228,22 @@ export default function UniversalHeader() {
             </Link>
           </div>
 
-          {/* Mobile/Tablet Right Side - Cart */}
-          <div className="lg:hidden flex items-center">
-            {!isAdminPage && <CartIndicator />}
+          {/* Mobile/Tablet Right Side - Cart/Logout */}
+          <div className="lg:hidden flex items-center gap-3">
+            {showAccountDashboard ? (
+              <>
+                {!isAdminPage && <CartIndicator />}
+                <button
+                  onClick={handleSignOut}
+                  className="text-white transition-all duration-200 transform hover:scale-105 text-sm font-medium"
+                  aria-label="Sign Out"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              !isAdminPage && <CartIndicator />
+            )}
           </div>
 
           {/* Desktop Search Bar */}

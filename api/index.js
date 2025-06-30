@@ -3,6 +3,38 @@ require('dotenv').config({ path: './.env.local' });
 require('dotenv').config({ path: './.env' });
 require('dotenv').config();
 
+// Initialize Sentry error monitoring (must be first)
+const Sentry = require("@sentry/node");
+const { nodeProfilingIntegration } = require("@sentry/profiling-node");
+
+// Initialize Sentry
+Sentry.init({
+  dsn: process.env.SENTRY_DSN || "https://your-sentry-dsn-here.ingest.sentry.io/project-id",
+  environment: process.env.NODE_ENV || 'development',
+  integrations: [
+    // Performance monitoring
+    nodeProfilingIntegration(),
+  ],
+  // Performance monitoring
+  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+  // Profiling
+  profilesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+  // Error filtering
+  beforeSend(event) {
+    // Don't send errors in development unless explicitly enabled
+    if (process.env.NODE_ENV === 'development' && !process.env.SENTRY_DEBUG) {
+      return null;
+    }
+    return event;
+  },
+});
+
+console.log('🔍 Sentry error monitoring initialized:', {
+  environment: process.env.NODE_ENV || 'development',
+  dsn_configured: !!process.env.SENTRY_DSN,
+  monitoring: process.env.NODE_ENV === 'production' ? 'enabled' : 'development mode'
+});
+
 const { ApolloServer } = require('@apollo/server');
 const { expressMiddleware } = require('@apollo/server/express4');
 const gql = require('graphql-tag');
@@ -10,6 +42,8 @@ const express = require('express');
 const cors = require('cors');
 const { json } = require('body-parser');
 const { GraphQLError } = require('graphql');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 
 // Create custom AuthenticationError
 class AuthenticationError extends GraphQLError {
@@ -47,10 +81,110 @@ console.log('  - EasyPost:', easyPostClient.isReady() ? '✅ Ready' : '❌ Not c
 const app = express();
 
 // Add CORS middleware
+// CORS configuration - restrict to production domains only
+const allowedOrigins = [
+  'https://stickershuttle.com',
+  'https://www.stickershuttle.com',
+  ...(process.env.NODE_ENV === 'development' ? [
+    'http://localhost:3000', 
+    'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'https://localhost:3000'
+  ] : [])
+];
+
 app.use(cors({
-  origin: true, // Allow all origins in development
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    // In development OR when NODE_ENV is undefined, be more lenient with localhost
+    if (!isProduction) {
+      if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('192.168.'))) {
+        console.log(`✅ CORS allowed development origin: ${origin}`);
+        return callback(null, true);
+      }
+    }
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      console.log(`✅ CORS allowed whitelisted origin: ${origin}`);
+      callback(null, true);
+    } else {
+      console.log(`🚫 CORS blocked origin: ${origin} (NODE_ENV: ${process.env.NODE_ENV || 'undefined'})`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
+
+// Add security headers with Helmet
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com", "https://checkout.stripe.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      connectSrc: ["'self'", "https://api.stripe.com", "https://checkout.stripe.com"],
+      frameSrc: ["'self'", "https://checkout.stripe.com", "https://js.stripe.com"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
+}));
+
+// Rate limiting configuration
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: {
+    error: 'Too many requests from this IP, please try again later.',
+    retryAfter: 900
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const strictLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // Limit each IP to 10 uploads per hour
+  message: {
+    error: 'Too many upload attempts from this IP, please try again later.',
+    retryAfter: 3600
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 1000, // Allow up to 1000 webhook requests per hour
+  message: {
+    error: 'Webhook rate limit exceeded',
+    retryAfter: 3600
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply general rate limiting to all requests
+app.use(generalLimiter);
+
+// Apply strict rate limiting to upload routes
+app.use('/api/upload', strictLimiter);
+
+// Apply webhook rate limiting to webhook routes
+app.use('/webhooks', webhookLimiter);
+
+// Add Sentry request handling middleware (temporarily commented out)
+// app.use(Sentry.Handlers.requestHandler());
 
 // Add upload routes
 app.use('/api', uploadRoutes);
@@ -120,6 +254,12 @@ app.get('/', (req, res) => {
   });
 });
 
+// Add Sentry test endpoint
+app.get('/debug-sentry', (req, res) => {
+  console.log('🐛 Testing Sentry error capture...');
+  throw new Error('This is a test error for Sentry!');
+});
+
 // Add webhook diagnostic endpoint
 app.get('/webhooks/test', async (req, res) => {
   const diagnostics = {
@@ -171,6 +311,23 @@ app.get('/easypost/status', (req, res) => {
   }
 
   res.json(diagnostics);
+});
+
+// Add Sentry error handler middleware (temporarily commented out)
+// app.use(Sentry.Handlers.errorHandler());
+
+// Add custom error handler for non-Sentry errors
+app.use((error, req, res, next) => {
+  console.error('❌ Unhandled error:', error);
+  
+  // Capture error in Sentry
+  Sentry.captureException(error);
+  
+  // Send error response
+  res.status(500).json({
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
+  });
 });
 
 // 1. Schema
@@ -2841,7 +2998,36 @@ const resolvers = {
         if (!supabaseClient.isReady()) {
           throw new Error('Order service is currently unavailable');
         }
-        return await supabaseClient.updateOrderStatus(orderId, statusUpdate);
+        
+        // Update the order status
+        const updatedOrder = await supabaseClient.updateOrderStatus(orderId, statusUpdate);
+        
+        if (!updatedOrder) {
+          throw new Error('Failed to update order status');
+        }
+        
+        // Send customer email notification if order status changed to specific states
+        if (statusUpdate.orderStatus && ['Proof Sent', 'Shipped', 'Delivered', 'Printing', 'Building Proof'].includes(statusUpdate.orderStatus)) {
+          try {
+            console.log('📧 Sending status update email notification to customer...');
+            const emailNotifications = require('./email-notifications');
+            
+            const emailResult = await emailNotifications.sendOrderStatusNotification(
+              updatedOrder, 
+              statusUpdate.orderStatus
+            );
+            
+            if (emailResult.success) {
+              console.log(`✅ Status update email sent successfully for order ${updatedOrder.order_number}`);
+            } else {
+              console.error('❌ Status update email failed:', emailResult.error);
+            }
+          } catch (emailError) {
+            console.error('⚠️ Failed to send status update email (status update still processed):', emailError);
+          }
+        }
+        
+        return updatedOrder;
       } catch (error) {
         console.error('Error updating order status:', error);
         throw new Error(error.message);
@@ -2968,9 +3154,10 @@ const resolvers = {
          proofs: updatedProofs 
        };
        
-       // If all proofs are approved, update the order-level proof status
+       // If all proofs are approved, update the order-level proof status AND order status
        if (allApproved) {
          updateData.proof_status = 'approved';
+         updateData.order_status = 'Printing'; // Set order to printing when all proofs approved
        } else if (status === 'changes_requested') {
          updateData.proof_status = 'changes_requested';
        }
@@ -3024,6 +3211,35 @@ const resolvers = {
          }
        } catch (emailError) {
          console.error('⚠️ Failed to send admin proof action email (proof update still processed):', emailError);
+       }
+       
+       // Send customer email notification when all proofs are approved
+       if (allApproved) {
+         try {
+           console.log('📧 Sending customer notification that order is now printing...');
+           const emailNotifications = require('./email-notifications');
+           
+           // Ensure order has customer email
+           const orderForEmail = {
+             ...updatedOrder,
+             customerEmail: updatedOrder.customer_email,
+             orderNumber: updatedOrder.order_number || updatedOrder.id,
+             totalPrice: updatedOrder.total_price
+           };
+           
+           const customerEmailResult = await emailNotifications.sendOrderStatusNotification(
+             orderForEmail, 
+             'Printing'
+           );
+           
+           if (customerEmailResult.success) {
+             console.log('✅ Customer printing notification sent successfully');
+           } else {
+             console.error('❌ Customer printing notification failed:', customerEmailResult.error);
+           }
+         } catch (emailError) {
+           console.error('⚠️ Failed to send customer printing notification (proof approval still processed):', emailError);
+         }
        }
        
        return updatedOrder;
@@ -3086,6 +3302,26 @@ const resolvers = {
        // Log successful proof sending (here you would trigger email notification)
        console.log(`✅ Proofs sent for order ${currentOrder.order_number} to ${currentOrder.customer_email}`);
        console.log(`📧 Proof approval link: ${proofLink}`);
+       
+       // Send email notification to customer
+       try {
+         console.log('📧 Sending proof notification email to customer...');
+         const emailNotifications = require('./email-notifications');
+         
+         // Send proof notification using the "Proof Sent" status
+         const emailResult = await emailNotifications.sendOrderStatusNotification(
+           updatedOrder, 
+           'Proof Sent'
+         );
+         
+         if (emailResult.success) {
+           console.log('✅ Proof notification email sent successfully to:', updatedOrder.customer_email);
+         } else {
+           console.error('❌ Proof notification email failed:', emailResult.error);
+         }
+       } catch (emailError) {
+         console.error('⚠️ Failed to send proof notification email (proofs still marked as sent):', emailError);
+       }
        
        return updatedOrder;
      } catch (error) {
@@ -3380,7 +3616,7 @@ const resolvers = {
            proofs: updatedProofs,
            ...(allApproved && { 
              proof_status: 'approved',
-             order_status: 'Ready for Production'
+             order_status: 'Printing' // Changed from 'Ready for Production' to 'Printing'
            })
          })
          .eq('id', orderId)
@@ -3412,6 +3648,35 @@ const resolvers = {
          }
        } catch (emailError) {
          console.error('⚠️ Failed to send admin proof approval email (proof approval still processed):', emailError);
+       }
+       
+       // Send customer email notification when all proofs are approved
+       if (allApproved) {
+         try {
+           console.log('📧 Sending customer notification that order is now printing...');
+           const emailNotifications = require('./email-notifications');
+           
+           // Ensure order has customer email
+           const orderForEmail = {
+             ...updatedOrder,
+             customerEmail: updatedOrder.customer_email,
+             orderNumber: updatedOrder.order_number || updatedOrder.id,
+             totalPrice: updatedOrder.total_price
+           };
+           
+           const customerEmailResult = await emailNotifications.sendOrderStatusNotification(
+             orderForEmail, 
+             'Printing'
+           );
+           
+           if (customerEmailResult.success) {
+             console.log('✅ Customer printing notification sent successfully');
+           } else {
+             console.error('❌ Customer printing notification failed:', customerEmailResult.error);
+           }
+         } catch (emailError) {
+           console.error('⚠️ Failed to send customer printing notification (proof approval still processed):', emailError);
+         }
        }
        
        return updatedOrder;
@@ -4031,8 +4296,9 @@ const resolvers = {
             state: 'CO',
             zip: '80210',
             country: 'US',
-            phone: '720-555-0000', // Test phone number
-            email: 'justin@stickershuttle.com'
+            phone: '7205550000', // UPS prefers no dashes in phone numbers
+            email: 'justin@stickershuttle.com',
+            verify: ['delivery'] // Verify address for better carrier compatibility
           };
         } else {
           console.log('📍 Production mode - using pre-verified address ID');
@@ -4151,10 +4417,10 @@ const resolvers = {
               console.log('✅ Order updated with tracking information and status set to Shipped:', boughtShipment.tracking_code);
               console.log('Updated order ID:', orderId);
               
-              // Verify the update
+              // Verify the update and get full order data
               const { data: verifyOrder, error: verifyError } = await client
                 .from('orders_main')
-                .select('id, order_status, proof_status, tracking_number, tracking_company, tracking_url')
+                .select('*')
                 .eq('id', orderId)
                 .single();
                 
@@ -4162,6 +4428,32 @@ const resolvers = {
                 console.error('❌ Error verifying order update:', verifyError);
               } else {
                 console.log('✅ Verified order status:', verifyOrder);
+                
+                // Send shipped email notification
+                try {
+                  console.log('📧 Sending shipped notification to customer...');
+                  const emailNotifications = require('./email-notifications');
+                  
+                  const orderForEmail = {
+                    ...verifyOrder,
+                    customerEmail: verifyOrder.customer_email,
+                    orderNumber: verifyOrder.order_number || verifyOrder.id,
+                    totalPrice: verifyOrder.total_price
+                  };
+                  
+                  const emailResult = await emailNotifications.sendOrderStatusNotification(
+                    orderForEmail,
+                    'Shipped'
+                  );
+                  
+                  if (emailResult.success) {
+                    console.log('✅ Shipped notification sent successfully');
+                  } else {
+                    console.error('❌ Shipped notification failed:', emailResult.error);
+                  }
+                } catch (emailError) {
+                  console.error('⚠️ Failed to send shipped notification (label still purchased):', emailError);
+                }
               }
             }
           } catch (updateErr) {

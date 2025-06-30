@@ -537,3 +537,43 @@ h1 {
   background: none;
   padding: 0;
 }
+
+/* Prevent mobile zoom on input focus */
+/* This fixes the issue where mobile browsers zoom in when tapping on input fields */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="search"],
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="month"],
+  input[type="time"],
+  input[type="week"],
+  textarea,
+  select {
+    font-size: 16px !important;
+    transform: scale(1);
+    transform-origin: left top;
+  }
+  
+  /* Ensure consistent styling for all form inputs */
+  input, textarea, select {
+    font-size: 16px !important;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+  }
+  
+  /* Prevent zoom on focus for any input element */
+  input:focus,
+  textarea:focus,
+  select:focus {
+    font-size: 16px !important;
+    transform: scale(1);
+    transform-origin: left top;
+  }
+}

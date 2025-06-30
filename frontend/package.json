@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && npm run sentry:sourcemaps",
     "start": "next start",
     "lint": "next lint",
     "analyze": "ANALYZE=true npm run build",
-    "lighthouse": "lighthouse http://localhost:3000 --output html --output-path ./lighthouse-report.html --chrome-flags=\"--headless\""
+    "lighthouse": "lighthouse http://localhost:3000 --output html --output-path ./lighthouse-report.html --chrome-flags=\"--headless\"",
+    "sentry:sourcemaps": "sentry-cli sourcemaps inject --org sticker-shuttle --project sticker-shuttle-frontend .next && sentry-cli sourcemaps upload --org sticker-shuttle --project sticker-shuttle-frontend .next"
   },
   "dependencies": {
     "@apollo/client": "^3.13.8",
@@ -22,6 +23,8 @@
     "@lexical/rich-text": "^0.32.1",
     "@lexical/selection": "^0.32.1",
     "@lexical/utils": "^0.32.1",
+    "@sentry/cli": "^2.46.0",
+    "@sentry/react": "^9.33.0",
     "@stripe/stripe-js": "^7.3.1",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.50.0",

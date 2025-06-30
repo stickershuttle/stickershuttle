@@ -385,6 +385,11 @@ async function handleCheckoutSessionCompleted(session) {
         subtotal_price: (fullSession.amount_subtotal / 100).toFixed(2),
         total_tax: ((fullSession.amount_total - fullSession.amount_subtotal) / 100).toFixed(2),
         total_price: (fullSession.amount_total / 100).toFixed(2),
+        // Add customer information from Stripe
+        customer_first_name: customer.name?.split(' ')[0] || '',
+        customer_last_name: customer.name?.split(' ').slice(1).join(' ') || '',
+        customer_email: customer.email,
+        customer_phone: customer.phone,
         // Update shipping address from Stripe if provided
         shipping_address: {
           line1: shippingAddress.line1,
@@ -470,12 +475,36 @@ async function handleCheckoutSessionCompleted(session) {
         orderNumber: updatedOrder?.order_number
       });
       
+      // Fetch complete order data since RPC function might not return all fields
+      if (updatedOrder?.id) {
+        const { data: completeOrder, error: fetchError } = await client
+          .from('orders_main')
+          .select('*')
+          .eq('id', updatedOrder.id)
+          .single();
+          
+        if (!fetchError && completeOrder) {
+          console.log('📊 Complete order data fetched, customer_email:', completeOrder.customer_email);
+          updatedOrder = completeOrder;
+        } else {
+          console.error('⚠️ Failed to fetch complete order data:', fetchError);
+        }
+      }
+      
       // Send admin notification for order update (payment completion)
       try {
         console.log('📧 Attempting to send admin notification for order update...');
         const emailNotifications = require('./email-notifications');
         
-        const adminEmailResult = await emailNotifications.sendAdminNewOrderNotification(updatedOrder);
+        // Normalize order data for admin email
+        const orderForAdminEmail = {
+          ...updatedOrder,
+          customerEmail: updatedOrder.customer_email,
+          orderNumber: updatedOrder.order_number || updatedOrder.id,
+          totalPrice: updatedOrder.total_price
+        };
+        
+        const adminEmailResult = await emailNotifications.sendAdminNewOrderNotification(orderForAdminEmail);
         
         if (adminEmailResult.success) {
           console.log('✅ Order update admin email notification sent successfully');
@@ -587,12 +616,34 @@ async function handleCheckoutSessionCompleted(session) {
       try {
         console.log('📧 Attempting to send email notification...');
         console.log('📧 Updated order object keys:', Object.keys(updatedOrder));
+        console.log('📧 Full updatedOrder object:', JSON.stringify(updatedOrder, null, 2));
         console.log('📧 Order status:', updatedOrder.order_status);
         console.log('📧 Customer email:', updatedOrder.customer_email);
         console.log('📧 Order number:', updatedOrder.order_number);
         
+        // If customer email is missing, try to get it from the checkout session
+        if (!updatedOrder.customer_email && customer.email) {
+          console.log('⚠️ Customer email missing from order, using from Stripe session:', customer.email);
+          updatedOrder.customer_email = customer.email;
+        }
+        
         const emailNotifications = require('./email-notifications');
-        const emailResult = await emailNotifications.sendOrderStatusNotification(updatedOrder, updatedOrder.order_status);
+        
+        // Ensure order has all required fields for email (normalizing field names)
+        const orderForEmail = {
+          ...updatedOrder,
+          customerEmail: updatedOrder.customer_email || customer.email,
+          orderNumber: updatedOrder.order_number || updatedOrder.id,
+          totalPrice: updatedOrder.total_price
+        };
+        
+        console.log('📧 Order data prepared for email:', {
+          hasCustomerEmail: !!orderForEmail.customer_email,
+          customerEmail: orderForEmail.customer_email,
+          customerEmailSource: updatedOrder.customer_email ? 'order' : 'stripe_session'
+        });
+        
+        const emailResult = await emailNotifications.sendOrderStatusNotification(orderForEmail, updatedOrder.order_status);
         
         if (emailResult.success) {
           console.log('✅ Order status email notification sent successfully');
@@ -950,8 +1001,23 @@ async function handleCheckoutSessionCompleted(session) {
           
           const emailNotifications = require('./email-notifications');
           
+          // Make sure order has all required fields for email
+          const orderForEmail = {
+            ...order,
+            customerEmail: order.customer_email,
+            orderNumber: order.order_number || order.id,
+            totalPrice: order.total_price
+          };
+          
+          console.log('📧 Order data for email:', {
+            hasCustomerEmail: !!orderForEmail.customer_email,
+            customerEmail: orderForEmail.customer_email,
+            orderNumber: orderForEmail.order_number,
+            orderStatus: orderForEmail.order_status
+          });
+          
           // Send customer notification
-          const emailResult = await emailNotifications.sendOrderStatusNotification(order, order.order_status || 'Building Proof');
+          const emailResult = await emailNotifications.sendOrderStatusNotification(orderForEmail, order.order_status || 'Building Proof');
           
           if (emailResult.success) {
             console.log('✅ New order customer email notification sent successfully');
@@ -959,8 +1025,8 @@ async function handleCheckoutSessionCompleted(session) {
             console.error('❌ New order customer email notification failed:', emailResult.error);
           }
           
-          // Send admin notification
-          const adminEmailResult = await emailNotifications.sendAdminNewOrderNotification(order);
+          // Send admin notification with normalized order data
+          const adminEmailResult = await emailNotifications.sendAdminNewOrderNotification(orderForEmail);
           
           if (adminEmailResult.success) {
             console.log('✅ New order admin email notification sent successfully');

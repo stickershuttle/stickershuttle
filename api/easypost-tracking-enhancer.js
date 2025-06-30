@@ -48,6 +48,35 @@ class EasyPostTrackingEnhancer {
                     console.error('❌ Error updating order with tracking info:', error);
                 } else {
                     console.log(`✅ Order ${orderId} updated with tracking: ${trackingCode}`);
+                    
+                    // Send shipped email notification
+                    if (updatedOrder && updatedOrder.length > 0) {
+                        try {
+                            console.log('📧 Sending shipped notification to customer...');
+                            const emailNotifications = require('./email-notifications');
+                            
+                            const orderData = updatedOrder[0];
+                            const orderForEmail = {
+                                ...orderData,
+                                customerEmail: orderData.customer_email,
+                                orderNumber: orderData.order_number || orderData.id,
+                                totalPrice: orderData.total_price
+                            };
+                            
+                            const emailResult = await emailNotifications.sendOrderStatusNotification(
+                                orderForEmail,
+                                'Shipped'
+                            );
+                            
+                            if (emailResult.success) {
+                                console.log('✅ Shipped notification sent successfully');
+                            } else {
+                                console.error('❌ Shipped notification failed:', emailResult.error);
+                            }
+                        } catch (emailError) {
+                            console.error('⚠️ Failed to send shipped notification (tracking still created):', emailError);
+                        }
+                    }
                 }
             }
 
@@ -197,6 +226,45 @@ class EasyPostTrackingEnhancer {
             console.log(`✅ Order ${order.order_number || order.id} status updated:`);
             console.log(`   ${order.order_status} -> ${statusMapping.orderStatus}`);
             console.log(`   Tracking: ${trackingCode} (${tracker.carrier})`);
+
+            // Send email notifications for important status changes
+            if (order.order_status !== statusMapping.orderStatus && 
+                ['Shipped', 'Out for Delivery', 'Delivered'].includes(statusMapping.orderStatus)) {
+                try {
+                    console.log(`📧 Sending customer notification for status: ${statusMapping.orderStatus}`);
+                    const emailNotifications = require('./email-notifications');
+                    
+                    // Get complete order data for email
+                    const { data: fullOrder, error: fetchError } = await client
+                        .from('orders_main')
+                        .select('*')
+                        .eq('id', order.id)
+                        .single();
+                    
+                    if (!fetchError && fullOrder) {
+                        // Ensure order has customer email
+                        const orderForEmail = {
+                            ...fullOrder,
+                            customerEmail: fullOrder.customer_email,
+                            orderNumber: fullOrder.order_number || fullOrder.id,
+                            totalPrice: fullOrder.total_price
+                        };
+                        
+                        const emailResult = await emailNotifications.sendOrderStatusNotification(
+                            orderForEmail,
+                            statusMapping.orderStatus
+                        );
+                        
+                        if (emailResult.success) {
+                            console.log(`✅ Customer ${statusMapping.orderStatus} notification sent successfully`);
+                        } else {
+                            console.error(`❌ Customer ${statusMapping.orderStatus} notification failed:`, emailResult.error);
+                        }
+                    }
+                } catch (emailError) {
+                    console.error('⚠️ Failed to send tracking update email (tracking update still processed):', emailError);
+                }
+            }
 
             // Log special events
             if (status === 'out_for_delivery') {

@@ -35,6 +35,13 @@ const getOrderStatusEmailTemplate = (orderData, newStatus) => {
       emoji: '📦',
       color: '#8B5CF6'
     },
+    'Out for Delivery': {
+      subject: `🚚 Your order is out for delivery! - Order #${orderData.orderNumber}`,
+      title: 'Your stickers are almost there!',
+      message: 'Great news! Your order is out for delivery today. Keep an eye out for your package!',
+      emoji: '🚚',
+      color: '#F59E0B'
+    },
     'Delivered': {
       subject: `✅ Knock Knock, your order has been delivered! - Order #${orderData.orderNumber}`,
       title: 'Order Delivered!',
@@ -229,6 +236,16 @@ const sendEmail = async (to, subject, html) => {
 // Main notification functions
 const sendOrderStatusNotification = async (orderData, newStatus) => {
   try {
+    console.log('📧 sendOrderStatusNotification called with:', {
+      orderDataKeys: Object.keys(orderData),
+      newStatus,
+      hasCustomerEmail: !!orderData.customer_email,
+      hasCustomerEmailCamelCase: !!orderData.customerEmail,
+      hasGuestEmail: !!orderData.guest_email,
+      rawCustomerEmail: orderData.customer_email,
+      rawCustomerEmailCamelCase: orderData.customerEmail
+    });
+    
     // Map different possible field names to standardized format
     const normalizedOrderData = {
       orderNumber: orderData.order_number || orderData.orderNumber || orderData.id || 'N/A',
@@ -240,11 +257,14 @@ const sendOrderStatusNotification = async (orderData, newStatus) => {
     
     console.log(`📧 Sending order status notification for order ${normalizedOrderData.orderNumber}: ${newStatus}`);
     console.log(`📧 Order data fields:`, Object.keys(orderData));
-    console.log(`📧 Customer email: ${normalizedOrderData.customerEmail}`);
+    console.log(`📧 Customer email:`, normalizedOrderData.customerEmail);
+    console.log(`📧 Normalized data:`, normalizedOrderData);
     
     if (!normalizedOrderData.customerEmail) {
-      console.log('❌ No customer email found for order:', normalizedOrderData.orderNumber);
-      console.log('❌ Available order fields:', Object.keys(orderData));
+      console.error('❌ Email notification failed: No customer email');
+      console.error('📧 Customer email:', normalizedOrderData.customerEmail);
+      console.error('❌ No customer email found for order:', normalizedOrderData.orderNumber);
+      console.error('❌ Available order fields:', Object.keys(orderData).map(key => `'${key}'`).join(', '));
       return { success: false, error: 'No customer email' };
     }
 

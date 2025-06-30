@@ -84,7 +84,7 @@ const GET_ALL_ORDERS = gql`
 
 // Mutation to update order status
 const UPDATE_ORDER_STATUS = gql`
-  mutation UpdateOrderStatus($orderId: ID!, $statusUpdate: OrderStatusInput!) {
+  mutation UpdateOrderStatus($orderId: String!, $statusUpdate: OrderStatusInput!) {
     updateOrderStatus(orderId: $orderId, statusUpdate: $statusUpdate) {
       id
       orderStatus
@@ -99,7 +99,7 @@ const UPDATE_ORDER_STATUS = gql`
 
 // Mutation to send proofs
 const SEND_PROOFS = gql`
-  mutation SendProofs($orderId: ID!) {
+  mutation SendProofs($orderId: String!) {
     sendProofs(orderId: $orderId) {
       id
       proof_status
@@ -343,6 +343,8 @@ export default function AdminOrders() {
 
 
 
+
+
   // Check if user is admin
   useEffect(() => {
     async function checkAdmin() {
@@ -462,7 +464,7 @@ export default function AdminOrders() {
 
       await updateOrderStatus({
         variables: {
-          orderId,
+          orderId: String(orderId),
           statusUpdate
         }
       });
@@ -474,6 +476,8 @@ export default function AdminOrders() {
       alert('Failed to update order status');
     }
   };
+
+
 
   // Format date
   const formatDate = (dateString?: string) => {
@@ -770,7 +774,7 @@ export default function AdminOrders() {
     setSendingProofs(true);
     try {
       await sendProofs({
-        variables: { orderId }
+        variables: { orderId: String(orderId) }
       });
       
       // Update state to show proofs were sent
@@ -3026,7 +3030,7 @@ export default function AdminOrders() {
                           </div>
                         </div>
                       </div>
-                    </div>
+                                        </div>
 
                     {/* Shipping Address */}
                     {selectedOrder.shippingAddress && (
@@ -3313,6 +3317,8 @@ export default function AdminOrders() {
                         ) : null}
                       </div>
                     </div>
+
+
                   </div>
                 </div>
               </div>
