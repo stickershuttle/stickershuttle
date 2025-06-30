@@ -403,16 +403,63 @@ async function handleCheckoutSessionCompleted(session) {
         updateData.proof_status = proofStatus;
       }
       
-      const { data: updatedOrder, error: updateError } = await client
-        .from('orders_main')
-        .update(updateData)
-        .eq('id', existingOrderId)
-        .select()
-        .single();
+      let updatedOrder;
       
-      if (updateError) {
-        console.error('❌ Error updating order:', updateError);
-        throw updateError;
+      // Try using the RPC function first to avoid RLS issues
+      console.log('📝 Attempting to update order with ID:', existingOrderId);
+      
+      try {
+        // First, try the RPC function that bypasses RLS
+        const { data: rpcData, error: rpcError } = await client.rpc('update_order_payment_status', {
+          p_order_id: existingOrderId,
+          p_payment_intent_id: fullSession.payment_intent,
+          p_session_id: session.id,
+          p_order_status: orderStatus,
+          p_financial_status: 'paid',
+          p_order_number: orderNumber,
+          p_subtotal: parseFloat((fullSession.amount_subtotal / 100).toFixed(2)),
+          p_tax: parseFloat(((fullSession.amount_total - fullSession.amount_subtotal) / 100).toFixed(2)),
+          p_total: parseFloat((fullSession.amount_total / 100).toFixed(2)),
+          p_proof_status: proofStatus || null
+        });
+        
+        if (!rpcError && rpcData && rpcData.length > 0) {
+          console.log('✅ Order updated successfully using RPC function');
+          updatedOrder = rpcData[0];
+          
+          // Update shipping address separately if needed
+          await client
+            .from('orders_main')
+            .update({ shipping_address: updateData.shipping_address })
+            .eq('id', existingOrderId);
+        } else {
+          // Fallback to standard update if RPC function doesn't exist or fails
+          console.log('⚠️ RPC function not available or failed, trying standard update...');
+          if (rpcError) {
+            console.log('RPC error:', rpcError.message);
+          }
+          
+          const { data, error: updateError } = await client
+            .from('orders_main')
+            .update(updateData)
+            .eq('id', existingOrderId)
+            .select()
+            .single();
+          
+          if (updateError) {
+            console.error('❌ Error updating order:', updateError);
+            console.error('❌ Error code:', updateError.code);
+            console.error('❌ Error details:', updateError.details);
+            console.error('❌ Error hint:', updateError.hint);
+            console.error('❌ Error message:', updateError.message);
+            throw updateError;
+          }
+          
+          updatedOrder = data;
+        }
+      } catch (error) {
+        console.error('❌ Failed to update order:', error);
+        throw error;
       }
       
       console.log('✅ Order updated successfully:', updatedOrder?.id);
@@ -1005,10 +1052,10 @@ async function handleChargeRefunded(charge) {
 }
 
 // Helper function to generate order numbers
-async function generateOrderNumber(supabaseClient) {
+async function generateOrderNumber(client) {
   try {
     // Get the highest existing order number
-    const { data: existingOrders, error } = await supabaseClient
+    const { data: existingOrders, error } = await client
       .from('orders_main')
       .select('order_number')
       .not('order_number', 'is', null)
