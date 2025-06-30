@@ -15,6 +15,7 @@ import {
 } from '../../lib/credit-mutations';
 import { SYNC_CUSTOMER_TO_KLAVIYO } from '../../lib/klaviyo-mutations';
 import { UPDATE_USER_PROFILE_PHOTO, UPDATE_USER_PROFILE_BANNER } from '../../lib/profile-mutations';
+import AIFileImage from '../../components/AIFileImage';
 
 
 // Mutation to update proof status (same as proofs page)
@@ -4941,10 +4942,13 @@ function Dashboard() {
                         }`}>
                           {order.proofs.slice(0, 9).map((proof: any, index: number) => (
                             <div key={index} className="relative bg-gray-100 rounded overflow-hidden">
-                              <img 
+                              <AIFileImage 
                                 src={proof.proofUrl} 
+                                filename={proof.proofTitle || `design-${index + 1}.jpg`}
                                 alt={`Design ${index + 1}`}
                                 className="w-full h-full object-contain"
+                                size="thumbnail"
+                                showFileType={true}
                               />
                               {/* Design number badge */}
                               <div className="absolute top-0.5 left-0.5 bg-black/70 text-white text-xs px-1 py-0.5 rounded text-center leading-none">
@@ -4962,10 +4966,13 @@ function Dashboard() {
                           )}
                         </div>
                       ) : (
-                        <img 
+                        <AIFileImage 
                           src={(order.proofs && order.proofs.length > 0) ? order.proofs[0].proofUrl : order.proofUrl} 
+                          filename={(order.proofs && order.proofs.length > 0) ? order.proofs[0].proofTitle || 'design.jpg' : 'proof.jpg'}
                           alt="Approved Proof"
                           className="w-full h-full object-contain"
+                          size="preview"
+                          showFileType={true}
                         />
                       )}
                       {/* Reorder Badge */}

@@ -1,9 +1,11 @@
 -- Migration: Simpler webhook-based order status notification
 -- This uses Supabase's native webhook functionality which is more reliable
 
--- First, let's clean up the previous approach
+-- Clean up any existing triggers and functions (multiple attempts for safety)
 DROP TRIGGER IF EXISTS order_status_change_trigger ON orders_main;
+DROP TRIGGER IF EXISTS log_order_status_change_trigger ON orders_main;
 DROP FUNCTION IF EXISTS notify_order_status_change();
+DROP FUNCTION IF EXISTS log_order_status_change();
 
 -- Create a simple logging function for debugging
 CREATE OR REPLACE FUNCTION log_order_status_change()
@@ -26,6 +28,9 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Ensure trigger is dropped before creating
+DROP TRIGGER IF EXISTS log_order_status_change_trigger ON orders_main;
 
 -- Create the trigger for logging
 CREATE TRIGGER log_order_status_change_trigger

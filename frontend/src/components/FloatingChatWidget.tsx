@@ -94,9 +94,10 @@ export default function FloatingChatWidget({ showOnProductPages = true }: Floati
         
         {/* Message content */}
         <div className="relative z-10 pr-4">
-          <p className="text-sm text-white font-medium leading-relaxed drop-shadow-sm mb-3">
+          <p className="text-sm text-white font-medium leading-relaxed drop-shadow-sm mb-2">
             It's recommended you sign in for the best experience and deals!
           </p>
+
           
           {/* Login/Signup Buttons */}
           <div className="flex gap-2 mt-3">
@@ -104,8 +105,10 @@ export default function FloatingChatWidget({ showOnProductPages = true }: Floati
               href="/login"
               className="flex-1 px-3 py-2 text-xs font-medium text-center rounded-lg transition-all duration-200 transform hover:scale-105"
               style={{
-                background: 'rgba(255, 255, 255, 0.2)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                backdropFilter: 'blur(12px)',
                 color: 'white'
               }}
             >
@@ -113,12 +116,7 @@ export default function FloatingChatWidget({ showOnProductPages = true }: Floati
             </a>
             <a
               href="/signup"
-              className="flex-1 px-3 py-2 text-xs font-medium text-center rounded-lg transition-all duration-200 transform hover:scale-105"
-              style={{
-                background: 'linear-gradient(135deg, #ffd713, #ffed4e)',
-                color: '#030140',
-                border: 'none'
-              }}
+              className="primaryButton flex-1 px-3 py-2 text-xs font-medium text-center rounded-lg transition-all duration-200 transform hover:scale-105"
             >
               Signup
             </a>

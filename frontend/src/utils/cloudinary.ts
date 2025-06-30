@@ -186,4 +186,104 @@ export const validateFile = (file: File): { valid: boolean; error?: string } => 
   }
 
   return { valid: true };
+};
+
+// Utility functions for AI file display in dashboard/admin
+
+/**
+ * Converts any Cloudinary URL (including AI files) to a web-displayable image
+ * Automatically handles AI, EPS, PSD, PDF files by converting them to PNG/JPG
+ */
+export const getImageUrlForDisplay = (
+  cloudinaryUrl: string, 
+  options: {
+    width?: number;
+    height?: number;
+    quality?: 'auto' | number;
+    format?: 'auto' | 'png' | 'jpg' | 'webp';
+    crop?: 'fill' | 'fit' | 'scale' | 'limit';
+  } = {}
+): string => {
+  if (!cloudinaryUrl || !cloudinaryUrl.includes('cloudinary.com')) {
+    return cloudinaryUrl; // Return as-is if not a Cloudinary URL
+  }
+
+  const {
+    width = 400,
+    height = 300,
+    quality = 'auto',
+    format = 'auto',
+    crop = 'limit'
+  } = options;
+
+  // For AI, EPS, PSD, PDF files, Cloudinary automatically converts them
+  // We just need to add the right transformation parameters
+  const transformations = [
+    `w_${width}`,
+    `h_${height}`,
+    `c_${crop}`,
+    `f_${format}`,
+    `q_${quality}`
+  ].join(',');
+
+  // Insert transformations into the Cloudinary URL
+  return cloudinaryUrl.replace(
+    '/image/upload/',
+    `/image/upload/${transformations}/`
+  );
+};
+
+/**
+ * Gets a thumbnail version of any file type for dashboard/admin lists
+ */
+export const getThumbnailUrl = (cloudinaryUrl: string): string => {
+  return getImageUrlForDisplay(cloudinaryUrl, {
+    width: 150,
+    height: 150,
+    crop: 'fill',
+    quality: 'auto',
+    format: 'auto'
+  });
+};
+
+/**
+ * Gets a high-quality preview version for detailed views
+ */
+export const getPreviewUrl = (cloudinaryUrl: string): string => {
+  return getImageUrlForDisplay(cloudinaryUrl, {
+    width: 800,
+    height: 600,
+    crop: 'limit',
+    quality: 'auto',
+    format: 'auto'
+  });
+};
+
+/**
+ * Detects if a file is a design file (AI, EPS, PSD) that needs conversion
+ */
+export const isDesignFile = (filename: string): boolean => {
+  const designExtensions = ['ai', 'eps', 'psd'];
+  const extension = filename.toLowerCase().split('.').pop();
+  return designExtensions.includes(extension || '');
+};
+
+/**
+ * Gets the appropriate display URL with a fallback for design files
+ */
+export const getDisplayUrl = (
+  cloudinaryUrl: string, 
+  filename: string,
+  options?: Parameters<typeof getImageUrlForDisplay>[1]
+): string => {
+  if (isDesignFile(filename)) {
+    // For design files, always use the conversion URL
+    return getImageUrlForDisplay(cloudinaryUrl, options);
+  } else {
+    // For regular images, use the optimized URL
+    return cloudinaryUrl.replace(
+      '/image/upload/',
+      '/image/upload/f_auto,q_auto/'
+    );
+  }
 }; 

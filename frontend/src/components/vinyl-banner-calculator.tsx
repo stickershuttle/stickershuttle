@@ -777,19 +777,24 @@ const VinylBannerCalculator: React.FC = () => {
             disabled={pricing.total === 0}
             className={`w-full py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 flex items-center justify-center relative overflow-hidden group ${
               pricing.total > 0
-                ? 'hover:scale-105'
+                ? 'hover:scale-[1.025]'
                 : 'bg-gray-600 text-white cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100'
             }`}
             style={pricing.total > 0 ? {
-              background: 'linear-gradient(135deg, rgba(255, 193, 7, 0.4) 0%, rgba(255, 193, 7, 0.25) 50%, rgba(255, 193, 7, 0.1) 100%)',
-              backdropFilter: 'blur(25px) saturate(180%)',
-              border: '1px solid rgba(255, 193, 7, 0.4)',
-              boxShadow: 'rgba(255, 193, 7, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
-              color: '#ffffff'
+              background: 'linear-gradient(135deg, #ffd713, #ffed4e)',
+              color: '#030140',
+              fontWeight: 'bold',
+              border: 'solid',
+              borderWidth: '0.03125rem',
+              borderColor: '#e6c211',
+              boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
+              cursor: 'pointer'
             } : {}}
           >
             <span className="relative z-10 flex items-center justify-center gap-2">
-              <ShoppingCart className="h-5 w-5" />
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
               Add to Cart - ${pricing.total.toFixed(2)}
             </span>
           </button>

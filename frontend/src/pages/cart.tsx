@@ -930,15 +930,20 @@ export default function CartPage() {
                   </div>
                   <div className="flex-1">
                     <p className="text-white font-medium mb-2">
-                      It's recommended you sign in for the best experience and future orders!
+                      It's recommended you sign in for the best experience and deals!
+                    </p>
+                    <p className="text-white/80 text-sm mb-2">
+                      Sign up to track orders, manage proofs, get exclusive discounts, and more.
                     </p>
                     <div className="flex gap-2">
                       <a
                         href="/login"
                         className="px-3 py-2 text-xs font-medium text-center rounded-lg transition-all duration-200 transform hover:scale-105"
                         style={{
-                          background: 'rgba(255, 255, 255, 0.2)',
-                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                          backdropFilter: 'blur(12px)',
                           color: 'white'
                         }}
                       >
@@ -946,12 +951,7 @@ export default function CartPage() {
                       </a>
                       <a
                         href="/signup"
-                        className="px-3 py-2 text-xs font-medium text-center rounded-lg transition-all duration-200 transform hover:scale-105"
-                        style={{
-                          background: 'linear-gradient(135deg, #ffd713, #ffed4e)',
-                          color: '#030140',
-                          border: 'none'
-                        }}
+                        className="primaryButton px-3 py-2 text-xs font-medium text-center rounded-lg transition-all duration-200 transform hover:scale-105"
                       >
                         Sign Up
                       </a>
@@ -988,17 +988,16 @@ export default function CartPage() {
                       className="w-16 h-16 transition-transform duration-300 hover:scale-110"
                     />
                   </div>
-                  <h3 className="text-xl font-bold text-white mb-2">Sign in for the best experience!</h3>
-                  <p className="text-white/80 mb-6">
-                    Get access to order history, faster checkout, and exclusive deals.
-                  </p>
+
                   <div className="flex gap-3 justify-center mb-4">
                     <a
                       href="/login"
                       className="px-6 md:px-4 py-2 text-sm font-medium text-center rounded-lg transition-all duration-200 transform hover:scale-105"
                       style={{
-                        background: 'rgba(255, 255, 255, 0.2)',
-                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)',
                         color: 'white'
                       }}
                     >
@@ -1006,12 +1005,7 @@ export default function CartPage() {
                     </a>
                     <a
                       href="/signup"
-                      className="px-6 md:px-4 py-2 text-sm font-medium text-center rounded-lg transition-all duration-200 transform hover:scale-105"
-                      style={{
-                        background: 'linear-gradient(135deg, #ffd713, #ffed4e)',
-                        color: '#030140',
-                        border: 'none'
-                      }}
+                      className="primaryButton px-6 md:px-4 py-2 text-sm font-medium text-center rounded-lg transition-all duration-200 transform hover:scale-105"
                     >
                       Sign Up
                     </a>
