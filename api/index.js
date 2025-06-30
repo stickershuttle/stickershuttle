@@ -85,12 +85,14 @@ const app = express();
 const allowedOrigins = [
   'https://stickershuttle.com',
   'https://www.stickershuttle.com',
-  ...(process.env.NODE_ENV === 'development' ? [
+  'https://stickershuttle.vercel.app',
+  ...(process.env.NODE_ENV !== 'production' ? [
     'http://localhost:3000', 
     'http://127.0.0.1:3000',
     'http://localhost:3001',
     'http://localhost:3002',
-    'https://localhost:3000'
+    'https://localhost:3000',
+    'https://studio.apollographql.com'
   ] : [])
 ];
 
