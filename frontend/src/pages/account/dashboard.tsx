@@ -578,7 +578,7 @@ function Dashboard() {
           case 'all-orders':
             orderText = '> LOADING ORDERS...';
             // After typing LOADING ORDERS..., show order list with typing effect
-            setTimeout(() => {
+            const ordersTimeout = setTimeout(() => {
               let ordersDisplay = '';
               if (orders.length > 0) {
                 // Show last 3 orders
@@ -597,12 +597,15 @@ function Dashboard() {
               }
               typeText(ordersDisplay, '> LOADING ORDERS...');
             }, 1500);
+            
+            // Store timeout for cleanup
+            (window as any).ordersTimeout = ordersTimeout;
             break;
             
           case 'financial':
             orderText = '> LOADING FINANCES...';
             // After typing LOADING FINANCES..., show financial info with typing effect
-            setTimeout(() => {
+            const financialTimeout = setTimeout(() => {
               // Calculate total stickers from all orders
               let totalStickers = 0;
               let totalInvested = 0;
@@ -616,12 +619,15 @@ function Dashboard() {
               const financialDisplay = `\n> $${creditBalance.toFixed(2)} STORE CREDIT\n> $${totalInvested.toFixed(2)} TOTAL INVESTED\n> ${totalStickers} STICKERS PRINTED`;
               typeText(financialDisplay, '> LOADING FINANCES...');
             }, 1500);
+            
+            // Store timeout for cleanup
+            (window as any).financialTimeout = financialTimeout;
             break;
             
           case 'design-vault':
             orderText = '> DESIGNS LOADING...';
             // After typing DESIGNS LOADING..., show design count with typing effect
-            setTimeout(() => {
+            const designTimeout = setTimeout(() => {
               // Count unique designs from orders (same logic as design vault view)
               const uniqueDesigns = new Set();
               orders.forEach(order => {
@@ -637,6 +643,9 @@ function Dashboard() {
               const designDisplay = `\n> ${designCount} ${designWord} IN THE CLOUD`;
               typeText(designDisplay, '> DESIGNS LOADING...');
             }, 1500);
+            
+            // Store timeout for cleanup
+            (window as any).designTimeout = designTimeout;
             break;
             
           case 'proofs':
@@ -731,6 +740,19 @@ function Dashboard() {
           clearInterval((window as any).adjustInterval);
           delete (window as any).adjustInterval;
         }
+        // Clear additional timeouts
+        if ((window as any).financialTimeout) {
+          clearTimeout((window as any).financialTimeout);
+          delete (window as any).financialTimeout;
+        }
+        if ((window as any).designTimeout) {
+          clearTimeout((window as any).designTimeout);
+          delete (window as any).designTimeout;
+        }
+        if ((window as any).ordersTimeout) {
+          clearTimeout((window as any).ordersTimeout);
+          delete (window as any).ordersTimeout;
+        }
       };
     }
   }, [currentView, orders, creditBalance, lifetimeCredits]);
@@ -761,23 +783,12 @@ function Dashboard() {
     // If already on the same view, do nothing
     if (currentView === view) return;
     
-    // Use a transition state to prevent flashing
-    const prevView = currentView;
-    
     // Update state immediately
     setCurrentView(view);
     
     // Update URL to reflect the current view
     const url = view === 'default' ? '/account/dashboard' : `/account/dashboard?view=${view}`;
     router.push(url, undefined, { shallow: true });
-    
-    // Force re-render if moving to/from default view
-    if (view === 'default' || prevView === 'default') {
-      // Small timeout to ensure smooth transition
-      setTimeout(() => {
-        setCurrentView(view);
-      }, 10);
-    }
     
     // Load saved support form draft when switching to support view
     if (view === 'support') {
@@ -2926,16 +2937,13 @@ function Dashboard() {
                                     }}
                                     title={`Click to view ${name} in Design Vault`}
                                   >
-                                    <img 
-                                      src={productImage} 
+                                    <AIFileImage
+                                      src={productImage}
+                                      filename={productImage.split('/').pop()?.split('?')[0] || 'design.jpg'}
                                       alt={name}
                                       className="max-w-full max-h-full object-contain rounded"
-                                      onError={(e) => {
-                                        const parent = e.currentTarget.parentElement;
-                                        if (parent) {
-                                          parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-gray-400 text-lg">📄</div>';
-                                        }
-                                      }}
+                                      size="thumbnail"
+                                      showFileType={false}
                                     />
                                     {/* Re-Order Pill */}
                                     {itemData.isReorder && (
@@ -3036,7 +3044,7 @@ function Dashboard() {
                         <div className="flex flex-col gap-2">
                           <button
                             onClick={() => handleViewOrderDetails(order)}
-                            className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
+                            className="px-3 py-1 rounded text-xs font-medium transition-colors duration-150 cursor-pointer flex items-center gap-1"
                             style={{
                               background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
                               backdropFilter: 'blur(25px) saturate(180%)',
@@ -3052,7 +3060,7 @@ function Dashboard() {
                           </button>
                           <button
                             onClick={() => handleReorder(order.id)}
-                            className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
+                            className="px-3 py-1 rounded text-xs font-medium transition-colors duration-150 cursor-pointer flex items-center gap-1"
                             style={{
                               background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
                               backdropFilter: 'blur(25px) saturate(180%)',
@@ -3070,7 +3078,7 @@ function Dashboard() {
                         {order.status === 'Proof Review Needed' && (
                           <button
                             onClick={() => setCurrentView('proofs')}
-                            className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105"
+                            className="px-3 py-1 rounded text-xs font-medium transition-colors duration-150 cursor-pointer"
                             style={{
                               backgroundColor: 'rgba(249, 115, 22, 0.2)',
                               border: '1px solid rgba(249, 115, 22, 0.3)',
@@ -3135,10 +3143,13 @@ function Dashboard() {
                             return (
                               <div key={index} className="w-16 h-16 rounded-lg overflow-hidden border border-white/10 bg-black/20">
                                 {productImage ? (
-                                  <img 
-                                    src={productImage} 
+                                  <AIFileImage
+                                    src={productImage}
+                                    filename={productImage.split('/').pop()?.split('?')[0] || 'design.jpg'}
                                     alt={item.name}
                                     className="w-full h-full object-cover"
+                                    size="thumbnail"
+                                    showFileType={false}
                                   />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-gray-400 text-lg">📄</div>
@@ -3218,7 +3229,7 @@ function Dashboard() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleViewOrderDetails(order)}
-                            className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
+                            className="flex-1 px-3 py-2 rounded text-xs font-medium transition-colors duration-150 cursor-pointer flex items-center justify-center gap-1"
                             style={{
                               background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
                               backdropFilter: 'blur(25px) saturate(180%)',
@@ -3979,10 +3990,14 @@ function Dashboard() {
     orders.forEach(order => {
       order.items.forEach(item => {
         if (!designs.find(d => d.name === item.name)) {
+          // Get the full item data with images using same logic as other components
+          const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+          const productImage = getProductImage(item, itemData);
+          
           designs.push({
             id: item.id,
             name: item.name,
-            image: item.image || '',
+            image: productImage || item.image || '',
             design: item.design || '',
             timesOrdered: orders.reduce((count, o) => 
               count + o.items.filter(i => i.name === item.name).reduce((sum, i) => sum + i.quantity, 0), 0),
@@ -4034,12 +4049,15 @@ function Dashboard() {
                 )}
                 <div className="aspect-square mb-4 rounded-lg overflow-hidden relative"
                      style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
-                  <img 
-                    src={design.image} 
+                  <AIFileImage
+                    src={design.image}
+                    filename={design.image.split('/').pop()?.split('?')[0] || 'design.jpg'}
                     alt={design.name}
                     className={`w-full h-full object-contain p-4 transition-all duration-300 ${
                       isHighlighted ? 'ring-2 ring-blue-400 ring-inset' : ''
                     }`}
+                    size="preview"
+                    showFileType={false}
                   />
                 </div>
                 <h3 className="font-semibold text-white mb-2">{design.name}</h3>
@@ -4231,10 +4249,13 @@ function Dashboard() {
                   }}
                   onClick={() => window.open(proof.proofUrl, '_blank')}
                 >
-                  <img
+                  <AIFileImage
                     src={proof.proofUrl}
+                    filename={proof.proofUrl.split('/').pop()?.split('?')[0] || 'proof.jpg'}
                     alt={proof.proofTitle}
                     className="w-full h-full object-contain p-4 transition-all duration-200 bg-white"
+                    size="preview"
+                    showFileType={false}
                   />
                   {/* Size Overlay - PDF Cut Contour Dimensions */}
                   {(() => {
@@ -4967,7 +4988,7 @@ function Dashboard() {
                         </div>
                       ) : (
                         <AIFileImage 
-                          src={(order.proofs && order.proofs.length > 0) ? order.proofs[0].proofUrl : order.proofUrl} 
+                          src={(order.proofs && order.proofs.length > 0) ? order.proofs[0].proofUrl : (order.proofUrl || '')} 
                           filename={(order.proofs && order.proofs.length > 0) ? order.proofs[0].proofTitle || 'design.jpg' : 'proof.jpg'}
                           alt="Approved Proof"
                           className="w-full h-full object-contain"
@@ -5070,10 +5091,13 @@ function Dashboard() {
                         }`}>
                           {order.proofs.slice(0, 9).map((proof: any, index: number) => (
                             <div key={index} className="relative bg-gray-100 rounded overflow-hidden">
-                              <img 
+                              <AIFileImage 
                                 src={proof.proofUrl} 
+                                filename={proof.proofTitle || `design-${index + 1}.jpg`}
                                 alt={`Design ${index + 1}`}
                                 className="w-full h-full object-contain"
+                                size="thumbnail"
+                                showFileType={true}
                               />
                               {/* Design number badge */}
                               <div className="absolute top-0.5 left-0.5 bg-black/70 text-white text-xs px-1 py-0.5 rounded text-center leading-none">
@@ -5091,10 +5115,13 @@ function Dashboard() {
                           )}
                         </div>
                       ) : (
-                        <img 
-                          src={(order.proofs && order.proofs.length > 0) ? order.proofs[0].proofUrl : order.proofUrl} 
+                        <AIFileImage 
+                          src={(order.proofs && order.proofs.length > 0) ? order.proofs[0].proofUrl : (order.proofUrl || '')} 
+                          filename={(order.proofs && order.proofs.length > 0) ? order.proofs[0].proofTitle || 'design.jpg' : 'proof.jpg'}
                           alt="Approved Proof"
                           className="w-full h-full object-contain"
+                          size="preview"
+                          showFileType={true}
                         />
                       )}
                       {/* Reorder Badge */}
@@ -5178,11 +5205,14 @@ function Dashboard() {
                     </div>
                     
                     <div className="rounded-lg overflow-hidden mb-3 bg-white p-2" style={{ aspectRatio: '7/5' }}>
-                      <img 
-                        src={(order.proofs && order.proofs.length > 0) ? order.proofs[0].proofUrl : order.proofUrl} 
-                        alt="Original Proof"
-                        className="w-full h-full object-contain"
-                      />
+                                             <AIFileImage 
+                          src={(order.proofs && order.proofs.length > 0) ? order.proofs[0].proofUrl : (order.proofUrl || '')} 
+                          filename={(order.proofs && order.proofs.length > 0) ? (order.proofs[0].proofTitle || 'design.jpg') : 'proof.jpg'}
+                          alt="Original Proof"
+                          className="w-full h-full object-contain"
+                          size="preview"
+                          showFileType={true}
+                        />
                     </div>
                     
                     <p className="text-xs text-gray-400 mb-3">
@@ -5454,10 +5484,13 @@ function Dashboard() {
                     {firstImage && (
                       <div className="flex-shrink-0">
                         <div className="w-24 h-24 rounded-lg overflow-hidden border border-white/20 bg-black/20">
-                          <img 
-                            src={firstImage} 
+                          <AIFileImage
+                            src={firstImage}
+                            filename={firstImage.split('/').pop()?.split('?')[0] || 'design.jpg'}
                             alt={item.productName || item.name}
                             className="w-full h-full object-cover"
+                            size="thumbnail"
+                            showFileType={false}
                           />
                         </div>
                         {customFiles && customFiles.length > 1 && (
@@ -5771,8 +5804,10 @@ function Dashboard() {
                 required
                 className="w-full px-6 md:px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
                 }}
                 placeholder="Your name"
               />
@@ -5791,8 +5826,10 @@ function Dashboard() {
                 required
                 className="w-full px-6 md:px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
                 }}
                 placeholder="your@email.com"
               />
@@ -5811,8 +5848,10 @@ function Dashboard() {
               required
               className="w-full px-6 md:px-4 py-3 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
               style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.2)'
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(12px)'
               }}
             >
               <option value="" style={{ backgroundColor: '#030140' }}>Select a reason</option>
@@ -5834,8 +5873,10 @@ function Dashboard() {
                 onClick={() => setShowOrderDropdown(!showOrderDropdown)}
                 className="w-full px-6 md:px-4 py-3 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center justify-between"
                 style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
                 }}
               >
                 <span>
@@ -5844,10 +5885,13 @@ function Dashboard() {
                       const selectedOrder = orders.find(order => order.id === contactFormData.relatedOrder);
                       return selectedOrder ? (
                         <div className="flex items-center gap-3">
-                          <img 
-                            src={selectedOrder.items[0]?.image || 'https://via.placeholder.com/40'} 
+                          <AIFileImage
+                            src={getProductImage(selectedOrder.items[0], selectedOrder._fullOrderData?.items?.[0]) || selectedOrder.items[0]?.image || 'https://via.placeholder.com/40'}
+                            filename={selectedOrder.items[0]?.customFiles?.[0]?.split('/').pop()?.split('?')[0] || 'design.jpg'}
                             alt="Order preview"
                             className="w-10 h-10 rounded object-cover"
+                            size="thumbnail"
+                            showFileType={false}
                           />
                           <span>Order #{getOrderDisplayNumber(selectedOrder)} - ${selectedOrder.total.toFixed(2)}</span>
                         </div>
@@ -5891,10 +5935,13 @@ function Dashboard() {
                         className="w-full p-3 rounded-lg text-left hover:bg-white/10 transition-colors"
                       >
                         <div className="flex items-center gap-3">
-                          <img 
-                            src={order.items[0]?.image || 'https://via.placeholder.com/40'} 
+                          <AIFileImage
+                            src={getProductImage(order.items[0], order._fullOrderData?.items?.[0]) || order.items[0]?.image || 'https://via.placeholder.com/40'}
+                            filename={order.items[0]?.customFiles?.[0]?.split('/').pop()?.split('?')[0] || 'design.jpg'}
                             alt={order.items[0]?.name}
                             className="w-12 h-12 rounded object-cover"
+                            size="thumbnail"
+                            showFileType={false}
                           />
                           <div>
                             <div className="text-white font-medium">Order #{getOrderDisplayNumber(order)}</div>
@@ -5922,8 +5969,10 @@ function Dashboard() {
               rows={5}
               className="w-full px-6 md:px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
               style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.2)'
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(12px)'
               }}
               placeholder="Please describe your issue or question..."
             />
@@ -7091,16 +7140,13 @@ function Dashboard() {
                                     }}
                                     title={`Click to view ${name} in Design Vault`}
                                   >
-                                    <img 
-                                      src={productImage} 
+                                    <AIFileImage
+                                      src={productImage}
+                                      filename={productImage.split('/').pop()?.split('?')[0] || 'design.jpg'}
                                       alt={name}
                                       className="max-w-full max-h-full object-contain rounded"
-                                      onError={(e) => {
-                                        const parent = e.currentTarget.parentElement;
-                                        if (parent) {
-                                          parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-gray-400 text-lg">📄</div>';
-                                        }
-                                      }}
+                                      size="thumbnail"
+                                      showFileType={false}
                                     />
                                     {/* Re-Order Pill */}
                                     {itemData.isReorder && (
@@ -7278,10 +7324,13 @@ function Dashboard() {
                             return (
                               <div key={index} className="w-16 h-16 rounded-lg overflow-hidden border border-white/10 bg-black/20">
                                 {productImage ? (
-                                  <img 
-                                    src={productImage} 
+                                  <AIFileImage
+                                    src={productImage}
+                                    filename={productImage.split('/').pop()?.split('?')[0] || 'design.jpg'}
                                     alt={item.name}
                                     className="w-full h-full object-cover"
+                                    size="thumbnail"
+                                    showFileType={false}
                                   />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-gray-400 text-lg">📄</div>
@@ -8802,10 +8851,12 @@ function Dashboard() {
                       required
                       className="w-full px-6 md:px-4 py-3 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                       style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                              color: 'white'
-                            }}
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                        backdropFilter: 'blur(12px)',
+                        color: 'white'
+                      }}
                           >
                       <option value="" style={{ backgroundColor: '#030140', color: 'white' }}>Select a topic</option>
                       <option value="concern" style={{ backgroundColor: '#030140', color: 'white' }}>Raise a Concern</option>
@@ -8828,8 +8879,10 @@ function Dashboard() {
                         onClick={() => setShowOrderDropdown(!showOrderDropdown)}
                         className="w-full px-6 md:px-4 py-3 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center justify-between"
                         style={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                          border: '1px solid rgba(255, 255, 255, 0.2)'
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                          backdropFilter: 'blur(12px)'
                         }}
                       >
                         <span className="text-left">
@@ -8878,10 +8931,13 @@ function Dashboard() {
                                 <div className="flex items-center gap-3">
                                   <div className="flex-shrink-0">
                                     <div className="w-12 h-12 rounded-lg bg-white/10 border border-white/10 p-1 flex items-center justify-center">
-                                      <img 
-                                        src={order.items[0].image} 
+                                      <AIFileImage
+                                        src={getProductImage(order.items[0], order._fullOrderData?.items?.[0]) || order.items[0].image}
+                                        filename={order.items[0]?.customFiles?.[0]?.split('/').pop()?.split('?')[0] || 'design.jpg'}
                                         alt={order.items[0].name}
                                         className="max-w-full max-h-full object-contain rounded"
+                                        size="thumbnail"
+                                        showFileType={false}
                                       />
                                     </div>
                                   </div>
@@ -8925,9 +8981,11 @@ function Dashboard() {
                       required
                       rows={6}
                       className="w-full px-6 md:px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                            style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)'
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                        backdropFilter: 'blur(12px)'
                       }}
                       placeholder="Tell us how we can help..."
                     />

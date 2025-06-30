@@ -9,6 +9,7 @@ import {
   calculateSquareInches 
 } from "@/utils/real-pricing"
 import { uploadToCloudinary, validateFile, CloudinaryUploadResult, UploadProgress, CalculatorMetadata } from "@/utils/cloudinary"
+import AIFileImage from './AIFileImage'
 import { useCart } from "@/components/CartContext"
 import { generateCartItemId } from "@/types/product"
 import { useRouter } from "next/router"
@@ -1191,20 +1192,14 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative z-10">
-                        <img
+                        <AIFileImage
                           src={uploadedFile.secure_url}
+                          filename={uploadedFile.original_filename}
                           alt={uploadedFile.original_filename}
                           className="w-full h-full object-cover rounded-lg relative z-10"
-                          onError={(e) => {
-                            // Fallback to file icon if image fails to load
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            target.nextElementSibling!.classList.remove('hidden');
-                          }}
+                          size="thumbnail"
+                          showFileType={false}
                         />
-                        <div className="hidden w-full h-full flex items-center justify-center text-white/60 text-xl relative z-10">
-                          📄
-                        </div>
                       </div>
                       <div>
                         <p className="text-green-200 font-medium">{uploadedFile.original_filename}</p>

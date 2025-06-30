@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Layout from "../components/Layout";
+import SitewideAlert from "../components/SitewideAlert";
 import { useRouter } from "next/router";
 import { getSupabase } from "../lib/supabase";
 
@@ -68,6 +69,9 @@ export default function Home() {
 
   return (
     <Layout title="Sticker Shuttle - Custom Stickers & Vinyl Signs">
+        {/* Sitewide Alert Banner */}
+        <SitewideAlert />
+        
         {/* Hero Section with Banner Background */}
         <section className="relative pt-[20px]">
                       <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4 pb-4">

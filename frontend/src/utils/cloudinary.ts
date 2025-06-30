@@ -204,8 +204,8 @@ export const getImageUrlForDisplay = (
     crop?: 'fill' | 'fit' | 'scale' | 'limit';
   } = {}
 ): string => {
-  if (!cloudinaryUrl || !cloudinaryUrl.includes('cloudinary.com')) {
-    return cloudinaryUrl; // Return as-is if not a Cloudinary URL
+  if (!cloudinaryUrl || cloudinaryUrl.trim() === '' || !cloudinaryUrl.includes('cloudinary.com')) {
+    return cloudinaryUrl || ''; // Return empty string if no URL
   }
 
   const {
@@ -276,14 +276,22 @@ export const getDisplayUrl = (
   filename: string,
   options?: Parameters<typeof getImageUrlForDisplay>[1]
 ): string => {
+  if (!cloudinaryUrl || cloudinaryUrl.trim() === '') {
+    return '';
+  }
+  
   if (isDesignFile(filename)) {
     // For design files, always use the conversion URL
     return getImageUrlForDisplay(cloudinaryUrl, options);
   } else {
     // For regular images, use the optimized URL
-    return cloudinaryUrl.replace(
-      '/image/upload/',
-      '/image/upload/f_auto,q_auto/'
-    );
+    if (cloudinaryUrl.includes('cloudinary.com')) {
+      return cloudinaryUrl.replace(
+        '/image/upload/',
+        '/image/upload/f_auto,q_auto/'
+      );
+    } else {
+      return cloudinaryUrl;
+    }
   }
 }; 

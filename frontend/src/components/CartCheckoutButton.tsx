@@ -4,8 +4,9 @@ import { getSupabase } from '@/lib/supabase';
 import { useStripeCheckout } from '@/hooks/useStripeCheckout';
 import { useOrderCompletion } from '@/hooks/useOrderCompletion';
 import { useCart } from '@/components/CartContext';
-import { useQuery } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client';
 import { GET_USER_CREDIT_BALANCE } from '@/lib/credit-mutations';
+import { TRACK_KLAVIYO_EVENT } from '@/lib/klaviyo-mutations';
 
 interface CartCheckoutButtonProps {
   cartItems: any[];
@@ -47,6 +48,9 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
   const [creditAmount, setCreditAmount] = useState(creditsToApply);
   const [showGuestEmailModal, setShowGuestEmailModal] = useState(false);
   const [guestEmail, setGuestEmail] = useState('');
+  
+  // Add Klaviyo tracking mutation
+  const [trackKlaviyoEvent] = useMutation(TRACK_KLAVIYO_EVENT);
   
   // Sync local credit amount with prop changes
   useEffect(() => {
@@ -172,6 +176,53 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
         email: user?.email || guestInfo.email || '',
         phone: user?.user_metadata?.phone || ''
       };
+
+      // Track Started Checkout event in Klaviyo for abandoned cart recovery
+      const customerEmail = customerInfo.email;
+      if (customerEmail) {
+        try {
+          console.log('📧 Tracking Started Checkout event in Klaviyo for:', customerEmail);
+          
+          // Calculate cart total
+          const cartTotal = cartItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+          
+          // Track the event
+          await trackKlaviyoEvent({
+            variables: {
+              email: customerEmail,
+              eventName: 'Started Checkout',
+              properties: {
+                $event_id: `checkout_${Date.now()}`,
+                $value: cartTotal,
+                items: cartItems.map(item => ({
+                  product_name: item.product?.name || item.name || 'Custom Stickers',
+                  product_id: item.product?.id || item.productId || 'custom',
+                  quantity: item.quantity || 1,
+                  price: item.unitPrice || item.price || 0,
+                  total: item.totalPrice || 0,
+                  customization: {
+                    size: item.customization?.selections?.size?.displayValue || 'Medium (3")',
+                    material: item.customization?.selections?.finish?.value || 'default',
+                    shape: item.customization?.selections?.shape?.value || 'custom'
+                  }
+                })),
+                item_count: cartItems.length,
+                cart_total: cartTotal,
+                discount_code: discountCode || null,
+                discount_amount: discountAmount || 0,
+                credits_to_apply: creditsToApply || 0,
+                checkout_url: typeof window !== 'undefined' ? window.location.href : '',
+                timestamp: new Date().toISOString()
+              }
+            }
+          });
+          
+          console.log('✅ Started Checkout event tracked in Klaviyo');
+        } catch (klaviyoError) {
+          // Don't block checkout if Klaviyo tracking fails
+          console.error('⚠️ Failed to track Klaviyo event (non-blocking):', klaviyoError);
+        }
+      }
 
       // Create minimal shipping address - Shopify will collect the full address
       const shippingAddress = {

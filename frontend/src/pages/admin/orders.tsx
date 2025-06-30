@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from '@/components/AdminLayout';
 import ProofUpload from '@/components/ProofUpload';
+import AIFileImage from '@/components/AIFileImage';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { getSupabase } from '../../lib/supabase';
 import {
@@ -1950,7 +1951,7 @@ export default function AdminOrders() {
                               onClick={() => selectOrder(order)}
                             >
                               {/* Status */}
-                              <td className="pl-2 pr-3 py-4">
+                              <td className="pl-6 pr-3 py-4">
                                 <div className="flex items-center gap-2.5">
                                   <div
                                     className="rounded-full"
@@ -2002,10 +2003,13 @@ export default function AdminOrders() {
                                           }}
                                         >
                                           {itemImage ? (
-                                            <img
+                                            <AIFileImage
                                               src={itemImage}
+                                              filename={itemImage.split('/').pop()?.split('?')[0] || 'design.jpg'}
                                               alt="Design preview"
                                               className="w-full h-full object-contain p-2"
+                                              size="thumbnail"
+                                              showFileType={false}
                                             />
                                           ) : (
                                             <div className="w-full h-full flex items-center justify-center">
@@ -2276,10 +2280,13 @@ export default function AdminOrders() {
                                     }}
                                   >
                                     {itemImage ? (
-                                      <img
+                                      <AIFileImage
                                         src={itemImage}
+                                        filename={itemImage.split('/').pop()?.split('?')[0] || 'design.jpg'}
                                         alt={`${item.productName} design`}
                                         className="w-full h-full object-contain p-4"
+                                        size="thumbnail"
+                                        showFileType={false}
                                       />
                                     ) : (
                                       <div className="w-full h-full flex items-center justify-center">
@@ -2588,10 +2595,13 @@ export default function AdminOrders() {
                                     }}
                                   >
                                     {itemImage ? (
-                                      <img
+                                      <AIFileImage
                                         src={itemImage}
+                                        filename={itemImage.split('/').pop()?.split('?')[0] || 'design.jpg'}
                                         alt={`${item.productName} design`}
                                         className="w-full h-full object-contain p-4"
+                                        size="thumbnail"
+                                        showFileType={true}
                                       />
                                     ) : (
                                       <div className="w-full h-full flex items-center justify-center">

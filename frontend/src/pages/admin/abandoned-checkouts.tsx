@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from '@/components/AdminLayout';
+import AIFileImage from '@/components/AIFileImage';
 import { useQuery, gql } from '@apollo/client';
 import { getSupabase } from '../../lib/supabase';
 
@@ -690,10 +691,13 @@ export default function AbandonedCheckouts() {
                                       }}
                                     >
                                       {itemImage ? (
-                                        <img
+                                        <AIFileImage
                                           src={itemImage}
+                                          filename={itemImage.split('/').pop()?.split('?')[0] || 'design.jpg'}
                                           alt="Design preview"
                                           className="w-full h-full object-contain p-2"
+                                          size="thumbnail"
+                                          showFileType={false}
                                         />
                                       ) : (
                                         <div className="w-full h-full flex items-center justify-center">
@@ -893,10 +897,13 @@ export default function AbandonedCheckouts() {
                             }}
                           >
                             {itemImage ? (
-                              <img
+                              <AIFileImage
                                 src={itemImage}
+                                filename={itemImage.split('/').pop()?.split('?')[0] || 'design.jpg'}
                                 alt="Design preview"
                                 className="w-full h-full object-contain p-1"
+                                size="thumbnail"
+                                showFileType={false}
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">

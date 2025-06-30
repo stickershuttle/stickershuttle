@@ -3,6 +3,7 @@ import { useCart } from "@/components/CartContext";
 import Link from "next/link";
 import Image from "next/image";
 import CartCheckoutButton from "@/components/CartCheckoutButton";
+import AIFileImage from "@/components/AIFileImage";
 import { CartItem } from "@/types/product";
 import { useState, useEffect, useRef } from "react";
 import { 
@@ -16,10 +17,10 @@ import {
 import { getSupabase } from "@/lib/supabase";
 import { createPortal } from "react-dom";
 import { GET_USER_CREDIT_BALANCE } from "@/lib/credit-mutations";
-import { useQuery } from "@apollo/client";
+import { useQuery, useMutation } from "@apollo/client";
 import DiscountCodeInput from "@/components/DiscountCodeInput";
 import { UPDATE_USER_PROFILE_NAMES, CREATE_USER_PROFILE } from "@/lib/profile-mutations";
-import { useMutation } from "@apollo/client";
+import { TRACK_KLAVIYO_EVENT } from "@/lib/klaviyo-mutations";
 
 // Available configuration options
 const SHAPE_OPTIONS = ["Custom Shape", "Circle", "Oval", "Rectangle", "Square"];
@@ -1383,25 +1384,17 @@ export default function CartPage() {
                         <div className="w-full md:w-48 flex-shrink-0">
                           {item.customization.customFiles?.[0] || item.product.name === 'Sample Pack by Sticker Shuttle' ? (
                             <div className="relative aspect-square rounded-xl overflow-hidden bg-gray-800/50 p-4">
-                              <img
+                              <AIFileImage
                                 src={item.customization.customFiles?.[0] || (item.product.name === 'Sample Pack by Sticker Shuttle' ? 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750890354/Sample-Pack_jsy2yf.png' : '')}
+                                filename={item.customization.customFiles?.[0] ? 
+                                  item.customization.customFiles[0].split('/').pop()?.split('?')[0] || 'design.jpg' : 
+                                  'sample-pack.png'
+                                }
                                 alt={item.product.name}
                                 className="w-full h-full object-contain"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.style.display = 'none';
-                                  const fallback = target.parentElement?.querySelector('.fallback-content');
-                                  if (fallback) {
-                                    (fallback as HTMLElement).style.display = 'flex';
-                                  }
-                                }}
+                                size="preview"
+                                showFileType={true}
                               />
-                              <div className="fallback-content absolute inset-0 hidden items-center justify-center bg-gray-800/50 text-white/50">
-                                <div className="text-center">
-                                  <div className="text-2xl mb-2">📁</div>
-                                  <span className="text-sm font-medium">Preview</span>
-                                </div>
-                              </div>
                               {/* Reorder Badge */}
                               {item.customization.isReorder && (
                                 <div className="absolute -top-2 -right-2 bg-amber-500 text-black text-xs px-2 py-1 rounded-full font-bold leading-none">

@@ -169,6 +169,16 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
             </svg>
           )
         });
+      } else if (segments[1] === 'alerts') {
+        breadcrumbs.push({
+          label: 'Alerts',
+          href: '/admin/alerts',
+          icon: (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+            </svg>
+          )
+        });
       } else if (segments[1] === 'blogs') {
         breadcrumbs.push({
           label: 'Blogs',
@@ -478,6 +488,33 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   Credits
+                </a>
+
+                {/* Alerts */}
+                <a
+                  href="/admin/alerts"
+                  className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
+                    router.asPath.startsWith('/admin/alerts')
+                      ? 'text-white bg-pink-500/15 border-l-3 border-pink-500'
+                      : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                  }`}
+                  onMouseEnter={(e) => {
+                    if (!router.asPath.startsWith('/admin/alerts')) {
+                      e.currentTarget.style.backgroundColor = 'rgba(236, 72, 153, 0.1)';
+                      e.currentTarget.style.color = '#F9A8D4';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!router.asPath.startsWith('/admin/alerts')) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '';
+                    }
+                  }}
+                >
+                  <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                  </svg>
+                  Alerts
                 </a>
 
                 {/* Blogs */}

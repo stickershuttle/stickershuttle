@@ -129,7 +129,7 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com", "https://checkout.stripe.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://js.stripe.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       connectSrc: ["'self'", "https://api.stripe.com", "https://checkout.stripe.com"],
       frameSrc: ["'self'", "https://checkout.stripe.com", "https://js.stripe.com"],
@@ -384,6 +384,10 @@ const typeDefs = gql`
     getKlaviyoProfiles(limit: Int, cursor: String): KlaviyoProfilesResult!
     getKlaviyoProfilesFromAllLists(limit: Int): KlaviyoAllListsProfilesResult!
     getAllKlaviyoProfiles(limit: Int): KlaviyoAllProfilesResult!
+    
+    # Sitewide Alert queries
+    getActiveSitewideAlerts: [SitewideAlert!]!
+    getAllSitewideAlerts: [SitewideAlert!]!
   }
 
   type Mutation {
@@ -471,6 +475,12 @@ const typeDefs = gql`
     updateCustomerSubscription(email: String!, subscribed: Boolean!): CustomerSubscriptionResult!
     trackKlaviyoEvent(email: String!, eventName: String!, properties: JSON): KlaviyoMutationResult!
     syncAllCustomersToKlaviyo: KlaviyoBulkSyncResult!
+    
+    # Sitewide Alert mutations
+    createSitewideAlert(input: CreateSitewideAlertInput!): SitewideAlert!
+    updateSitewideAlert(id: ID!, input: UpdateSitewideAlertInput!): SitewideAlert!
+    deleteSitewideAlert(id: ID!): Boolean!
+    toggleSitewideAlert(id: ID!, isActive: Boolean!): SitewideAlert!
   }
 
   type Customer {
@@ -488,6 +498,47 @@ const typeDefs = gql`
     lastOrderDate: String
     firstOrderDate: String
     orders: [CustomerOrder!]!
+  }
+
+  # Sitewide Alert types
+  type SitewideAlert {
+    id: ID!
+    title: String!
+    message: String!
+    backgroundColor: String
+    textColor: String
+    linkUrl: String
+    linkText: String
+    isActive: Boolean!
+    startDate: String
+    endDate: String
+    createdAt: String!
+    updatedAt: String!
+    createdBy: String
+  }
+
+  input CreateSitewideAlertInput {
+    title: String!
+    message: String!
+    backgroundColor: String
+    textColor: String
+    linkUrl: String
+    linkText: String
+    isActive: Boolean
+    startDate: String
+    endDate: String
+  }
+
+  input UpdateSitewideAlertInput {
+    title: String
+    message: String
+    backgroundColor: String
+    textColor: String
+    linkUrl: String
+    linkText: String
+    isActive: Boolean
+    startDate: String
+    endDate: String
   }
 
   type User {
@@ -2978,6 +3029,89 @@ const resolvers = {
           profilesBySource: [],
           errors: [{ error: error.message }]
         };
+      }
+    },
+
+    // Sitewide Alert queries
+    getActiveSitewideAlerts: async () => {
+      try {
+        if (!supabaseClient.isReady()) {
+          throw new Error('Alert service is currently unavailable');
+        }
+        
+        const client = supabaseClient.getServiceClient();
+        const { data: alerts, error } = await client
+          .from('sitewide_alerts')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('❌ Error fetching active alerts:', error);
+          throw new Error('Failed to fetch active alerts');
+        }
+
+        return (alerts || []).map(alert => ({
+          id: String(alert.id),
+          title: alert.title,
+          message: alert.message,
+          backgroundColor: alert.background_color,
+          textColor: alert.text_color,
+          linkUrl: alert.link_url,
+          linkText: alert.link_text,
+          isActive: alert.is_active,
+          startDate: alert.start_date,
+          endDate: alert.end_date,
+          createdAt: alert.created_at,
+          updatedAt: alert.updated_at,
+          createdBy: alert.created_by
+        }));
+      } catch (error) {
+        console.error('Error fetching active sitewide alerts:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    getAllSitewideAlerts: async (_, args, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        if (!supabaseClient.isReady()) {
+          throw new Error('Alert service is currently unavailable');
+        }
+        
+        const client = supabaseClient.getServiceClient();
+        const { data: alerts, error } = await client
+          .from('sitewide_alerts')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('❌ Error fetching all alerts:', error);
+          throw new Error('Failed to fetch alerts');
+        }
+
+        return (alerts || []).map(alert => ({
+          id: String(alert.id),
+          title: alert.title,
+          message: alert.message,
+          backgroundColor: alert.background_color,
+          textColor: alert.text_color,
+          linkUrl: alert.link_url,
+          linkText: alert.link_text,
+          isActive: alert.is_active,
+          startDate: alert.start_date,
+          endDate: alert.end_date,
+          createdAt: alert.created_at,
+          updatedAt: alert.updated_at,
+          createdBy: alert.created_by
+        }));
+      } catch (error) {
+        console.error('Error fetching all sitewide alerts:', error);
+        throw new Error(error.message);
       }
     }
   },
@@ -6051,10 +6185,9 @@ const resolvers = {
     },
 
     trackKlaviyoEvent: async (_, { email, eventName, properties }, context) => {
-      const { user } = context;
-      if (!user) {
-        throw new AuthenticationError('Authentication required');
-      }
+      // Note: We're removing the authentication requirement here because
+      // we need to track events for guest users too (e.g., abandoned carts)
+      // The email parameter is sufficient for tracking
 
       try {
         const result = await klaviyoClient.trackEvent(email, eventName, properties);
@@ -6124,6 +6257,193 @@ const resolvers = {
           total: 0,
           errors: [{ email: 'sync_all_error', error: error.message }]
         };
+      }
+    },
+
+    // Sitewide Alert mutations
+    createSitewideAlert: async (_, { input }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        if (!supabaseClient.isReady()) {
+          throw new Error('Alert service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        const { data: alert, error } = await client
+          .from('sitewide_alerts')
+          .insert({
+            title: input.title,
+            message: input.message,
+            background_color: input.backgroundColor || '#FFD700',
+            text_color: input.textColor || '#030140',
+            link_url: input.linkUrl,
+            link_text: input.linkText,
+            is_active: input.isActive || false,
+            start_date: input.startDate,
+            end_date: input.endDate,
+            created_by: user.email
+          })
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error creating alert:', error);
+          throw new Error('Failed to create alert');
+        }
+
+        return {
+          id: String(alert.id),
+          title: alert.title,
+          message: alert.message,
+          backgroundColor: alert.background_color,
+          textColor: alert.text_color,
+          linkUrl: alert.link_url,
+          linkText: alert.link_text,
+          isActive: alert.is_active,
+          startDate: alert.start_date,
+          endDate: alert.end_date,
+          createdAt: alert.created_at,
+          updatedAt: alert.updated_at,
+          createdBy: alert.created_by
+        };
+      } catch (error) {
+        console.error('Error creating sitewide alert:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    updateSitewideAlert: async (_, { id, input }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        if (!supabaseClient.isReady()) {
+          throw new Error('Alert service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        const updateData = {};
+        
+        if (input.title !== undefined) updateData.title = input.title;
+        if (input.message !== undefined) updateData.message = input.message;
+        if (input.backgroundColor !== undefined) updateData.background_color = input.backgroundColor;
+        if (input.textColor !== undefined) updateData.text_color = input.textColor;
+        if (input.linkUrl !== undefined) updateData.link_url = input.linkUrl;
+        if (input.linkText !== undefined) updateData.link_text = input.linkText;
+        if (input.isActive !== undefined) updateData.is_active = input.isActive;
+        if (input.startDate !== undefined) updateData.start_date = input.startDate;
+        if (input.endDate !== undefined) updateData.end_date = input.endDate;
+
+        const { data: alert, error } = await client
+          .from('sitewide_alerts')
+          .update(updateData)
+          .eq('id', id)
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error updating alert:', error);
+          throw new Error('Failed to update alert');
+        }
+
+        return {
+          id: String(alert.id),
+          title: alert.title,
+          message: alert.message,
+          backgroundColor: alert.background_color,
+          textColor: alert.text_color,
+          linkUrl: alert.link_url,
+          linkText: alert.link_text,
+          isActive: alert.is_active,
+          startDate: alert.start_date,
+          endDate: alert.end_date,
+          createdAt: alert.created_at,
+          updatedAt: alert.updated_at,
+          createdBy: alert.created_by
+        };
+      } catch (error) {
+        console.error('Error updating sitewide alert:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    deleteSitewideAlert: async (_, { id }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        if (!supabaseClient.isReady()) {
+          throw new Error('Alert service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        const { error } = await client
+          .from('sitewide_alerts')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          console.error('❌ Error deleting alert:', error);
+          throw new Error('Failed to delete alert');
+        }
+
+        return true;
+      } catch (error) {
+        console.error('Error deleting sitewide alert:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    toggleSitewideAlert: async (_, { id, isActive }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        if (!supabaseClient.isReady()) {
+          throw new Error('Alert service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        const { data: alert, error } = await client
+          .from('sitewide_alerts')
+          .update({ is_active: isActive })
+          .eq('id', id)
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error toggling alert:', error);
+          throw new Error('Failed to toggle alert');
+        }
+
+        return {
+          id: String(alert.id),
+          title: alert.title,
+          message: alert.message,
+          backgroundColor: alert.background_color,
+          textColor: alert.text_color,
+          linkUrl: alert.link_url,
+          linkText: alert.link_text,
+          isActive: alert.is_active,
+          startDate: alert.start_date,
+          endDate: alert.end_date,
+          createdAt: alert.created_at,
+          updatedAt: alert.updated_at,
+          createdBy: alert.created_by
+        };
+      } catch (error) {
+        console.error('Error toggling sitewide alert:', error);
+        throw new Error(error.message);
       }
     }
   }
