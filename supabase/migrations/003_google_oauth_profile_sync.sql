@@ -106,5 +106,4 @@ CREATE TRIGGER universal_user_profile_trigger
 GRANT EXECUTE ON FUNCTION handle_user_profile_creation() TO service_role;
 
 -- Add comments for documentation
-COMMENT ON FUNCTION handle_user_profile_creation IS 'Automatically creates user profiles for all users (OAuth and email/password) when they sign up';
-COMMENT ON TRIGGER universal_user_profile_trigger ON auth.users IS 'Creates user profiles for all user signups (OAuth and email/password)'; 
+COMMENT ON FUNCTION handle_user_profile_creation IS 'Automatically creates user profiles for all users (OAuth and email/password) when they sign up'; 
