@@ -5466,31 +5466,36 @@ const resolvers = {
 
         const client = supabaseClient.getServiceClient();
         
-        // Call the database function we created
-        const { data, error } = await client.rpc('create_user_profile', {
-          p_user_id: userId,
-          p_first_name: firstName,
-          p_last_name: lastName
-        });
+        // Get a random default avatar
+        const { getRandomAvatar } = require('./avatar-utils');
+        const randomAvatar = getRandomAvatar();
+        console.log('🎭 Assigned random avatar:', randomAvatar);
+        
+        // Create profile with random avatar
+        const displayName = firstName && lastName ? `${firstName} ${lastName}` : null;
+        
+        const { data: profile, error } = await client
+          .from('user_profiles')
+          .upsert({
+            user_id: userId,
+            first_name: firstName,
+            last_name: lastName,
+            display_name: displayName,
+            profile_photo_url: randomAvatar,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id'
+          })
+          .select('*')
+          .single();
 
         if (error) {
           console.error('❌ Error creating user profile:', error);
           throw new Error(`Failed to create profile: ${error.message}`);
         }
 
-        // Fetch the created profile
-        const { data: profile, error: fetchError } = await client
-          .from('user_profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .single();
-
-        if (fetchError) {
-          console.error('❌ Error fetching created profile:', fetchError);
-          throw new Error('Profile created but failed to fetch result');
-        }
-
-        console.log('✅ Successfully created user profile');
+        console.log('✅ Successfully created user profile with random avatar');
         
         return {
           success: true,

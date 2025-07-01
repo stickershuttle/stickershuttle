@@ -72,6 +72,23 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+
+  // Proxy API requests to backend server during development
+  async rewrites() {
+    if (process.env.NODE_ENV === 'development') {
+      return [
+        {
+          source: '/api/:path*',
+          destination: 'http://localhost:4000/api/:path*',
+        },
+        {
+          source: '/webhooks/:path*',
+          destination: 'http://localhost:4000/webhooks/:path*',
+        },
+      ];
+    }
+    return [];
+  },
 }
 
 module.exports = nextConfig

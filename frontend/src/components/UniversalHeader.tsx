@@ -159,7 +159,7 @@ export default function UniversalHeader() {
             {showAccountDashboard ? (
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="transition-all duration-200 transform hover:scale-105"
+                className="flex items-center gap-2 font-medium text-white transition-all duration-200 transform hover:scale-105"
                 style={{ background: 'transparent', border: 'none' }}
               >
                 {/* Profile Avatar */}
@@ -176,6 +176,16 @@ export default function UniversalHeader() {
                     </div>
                   )}
                 </div>
+                
+                {/* Dropdown Arrow */}
+                <svg 
+                  className={`w-4 h-4 transition-transform duration-200 ${isMobileMenuOpen ? 'rotate-180' : ''}`} 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
             ) : (
               <div className="flex items-center gap-3">
@@ -266,24 +276,21 @@ export default function UniversalHeader() {
             </form>
           ) : (
             <div className={`hidden lg:flex flex-1 items-center relative search-dropdown-container mx-4`}>
-              <input 
-                type="text"
-                placeholder="Select sticker type..."
-                className="headerButton flex-1 px-4 py-2 pr-12 rounded-lg font-medium text-white transition-all duration-200 transform focus:scale-101 focus:outline-none placeholder-gray-400"
-                onFocus={() => setIsSearchDropdownOpen(true)}
-                onBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 300)}
-              />
               <button 
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white transition-all duration-200 hover:scale-110"
-                aria-label="Select Type"
+                className="headerButton flex-1 px-4 py-2 pr-12 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 text-left"
+                onClick={() => setIsSearchDropdownOpen(!isSearchDropdownOpen)}
+                onBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 300)}
               >
+                Select sticker type...
+              </button>
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                 <svg 
                   xmlns="http://www.w3.org/2000/svg" 
                   fill="none" 
                   viewBox="0 0 24 24" 
                   strokeWidth={2} 
                   stroke="currentColor" 
-                  className="w-5 h-5"
+                  className={`w-5 h-5 transition-transform duration-200 ${isSearchDropdownOpen ? 'rotate-180' : ''}`}
                 >
                   <path 
                     strokeLinecap="round" 
@@ -291,7 +298,7 @@ export default function UniversalHeader() {
                     d="M19.5 8.25l-7.5 7.5-7.5-7.5" 
                   />
                 </svg>
-              </button>
+              </div>
               
               {/* Search Dropdown - Only show on non-admin pages */}
               {!isAdminPage && isSearchDropdownOpen && (
@@ -428,6 +435,58 @@ export default function UniversalHeader() {
                       <div className="flex-1">
                         <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Glitter Stickers</p>
                         <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(59, 130, 246)' }}>Sparkly Glitter Finish</p>
+                      </div>
+                    </Link>
+                    
+                    {/* Clear Stickers */}
+                    <Link 
+                      href="/products/clear-stickers" 
+                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200 group block no-underline"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleLinkClick('/products/clear-stickers');
+                      }}
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
+                        <img 
+                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749849590/StickerShuttle_ClearIcon_zxjnqc.svg" 
+                          alt="Clear" 
+                          className="max-w-full max-h-full object-contain"
+                          style={{
+                            filter: 'drop-shadow(0 0 6px rgba(34, 197, 94, 0.4))'
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Clear Stickers</p>
+                        <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(34, 197, 94)' }}>Transparent Finish</p>
+                      </div>
+                    </Link>
+                    
+                    {/* Sticker Sheets */}
+                    <Link 
+                      href="/products/sticker-sheets" 
+                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200 group block no-underline"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleLinkClick('/products/sticker-sheets');
+                      }}
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
+                        <img 
+                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749847809/StickerShuttle_StickerSheetsIcon_2_g61dty.svg" 
+                          alt="Sticker Sheets" 
+                          className="max-w-full max-h-full object-contain"
+                          style={{
+                            filter: 'drop-shadow(0 0 6px rgba(248, 113, 113, 0.4))'
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Sticker Sheets</p>
+                        <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(248, 113, 113)' }}>Multiple Stickers Per Sheet</p>
                       </div>
                     </Link>
                     

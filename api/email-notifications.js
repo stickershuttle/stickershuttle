@@ -585,10 +585,226 @@ const sendAdminProofActionNotification = async (orderData, action, extraData = {
   }
 };
 
+// User file upload to support email template
+const getUserFileUploadTemplate = (userData, fileName, fileSize, message) => {
+  return {
+    subject: `📎 File Upload from ${userData.name || userData.email} - ${fileName}`,
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Upload from Customer</title>
+</head>
+<body style="margin: 0; padding: 20px; background-color: #030140; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-height: 100vh;">
+  <div style="max-width: 600px; margin: 0 auto; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); border-radius: 16px; overflow: hidden;">
+    
+    <!-- Header -->
+    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 30px 20px; text-align: center;">
+      <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: bold;">
+        📎 Customer File Upload
+      </h1>
+      <p style="color: #e2e8f0; margin: 10px 0 0 0; font-size: 16px;">
+        ${fileName}
+      </p>
+    </div>
+
+    <!-- Main Content -->
+    <div style="padding: 30px 20px;">
+      <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); border-left: 4px solid #3B82F6; padding: 20px; margin-bottom: 30px; border-radius: 12px;">
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #ffffff;">
+          A customer has uploaded a file through their settings dashboard.
+        </p>
+      </div>
+
+      <!-- Customer Details -->
+      <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 20px; border-radius: 12px; margin-bottom: 30px;">
+        <h3 style="margin: 0 0 15px 0; color: #ffffff; font-size: 18px;">Customer Information</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">Customer Name:</td>
+            <td style="padding: 8px 0; color: #ffffff; font-weight: 600;">${userData.name || 'N/A'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">Email:</td>
+            <td style="padding: 8px 0; color: #ffffff; font-weight: 600;">${userData.email}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">File Name:</td>
+            <td style="padding: 8px 0; color: #ffffff; font-weight: 600;">${fileName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">File Size:</td>
+            <td style="padding: 8px 0; color: #ffffff; font-weight: 600;">${(fileSize / (1024 * 1024)).toFixed(2)} MB</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">Upload Time:</td>
+            <td style="padding: 8px 0; color: #ffffff; font-weight: 600;">${new Date().toLocaleString()}</td>
+          </tr>
+        </table>
+      </div>
+
+      ${message ? `
+      <!-- Customer Message -->
+      <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 20px; border-radius: 12px; margin-bottom: 30px;">
+        <h3 style="margin: 0 0 15px 0; color: #ffffff; font-size: 18px;">Customer Message</h3>
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #ffffff; white-space: pre-wrap;">${message}</p>
+      </div>
+      ` : ''}
+
+      <!-- Instructions -->
+      <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 20px; text-align: center;">
+        <p style="margin: 0 0 10px 0; color: #d1d5db; font-size: 14px;">
+          The uploaded file is attached to this email.
+        </p>
+        <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+          Please download and review the file, then respond to the customer if needed.
+        </p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 20px; text-align: center;">
+      <!-- Logo -->
+      <div style="margin-bottom: 15px;">
+        <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
+      </div>
+      
+      <p style="margin: 0 0 10px 0; color: #d1d5db; font-size: 14px;">
+        Customer File Upload - Sticker Shuttle
+      </p>
+      <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+        This email was sent to orbit@stickershuttle.com from ${userData.email}
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+    `
+  };
+};
+
+// Send email with file attachment function
+const sendEmailWithAttachment = async (to, subject, html, attachmentBuffer, attachmentFilename, attachmentMimeType) => {
+  if (!RESEND_API_KEY) {
+    console.error('❌ RESEND_API_KEY not configured');
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  // Debug API key format (without exposing the full key)
+  console.log('🔑 RESEND_API_KEY configured:', {
+    hasKey: !!RESEND_API_KEY,
+    keyPrefix: RESEND_API_KEY ? RESEND_API_KEY.substring(0, 8) + '...' : 'None',
+    keyLength: RESEND_API_KEY ? RESEND_API_KEY.length : 0
+  });
+
+  try {
+    // Validate inputs
+    if (!to || !subject || !html) {
+      throw new Error('Missing required email fields (to, subject, html)');
+    }
+    
+    if (!attachmentBuffer || !attachmentFilename) {
+      throw new Error('Missing attachment data');
+    }
+
+    // Prepare request payload
+    const emailPayload = {
+      from: FROM_EMAIL,
+      to: [to],
+      reply_to: [REPLY_TO_EMAIL],
+      subject: subject,
+      html: html,
+      attachments: [{
+        filename: attachmentFilename,
+        content: attachmentBuffer.toString('base64'),
+        content_type: attachmentMimeType
+      }]
+    };
+
+    console.log('📧 Sending email with attachment:', {
+      to: to,
+      subject: subject,
+      filename: attachmentFilename,
+      fileSize: attachmentBuffer.length,
+      mimeType: attachmentMimeType
+    });
+
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(emailPayload),
+    });
+
+    if (!response.ok) {
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      try {
+        // Try to parse as JSON first
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } else {
+          // If not JSON, get the text response
+          const errorText = await response.text();
+          errorMessage = errorText || errorMessage;
+        }
+      } catch (parseError) {
+        console.warn('Failed to parse error response:', parseError);
+        // Use the default error message
+      }
+      throw new Error(`Resend API error: ${errorMessage}`);
+    }
+
+    const result = await response.json();
+    console.log('✅ Email with attachment sent successfully:', result.id);
+    return { success: true, id: result.id };
+  } catch (error) {
+    console.error('❌ Email with attachment sending failed:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Function to send user file upload to support
+const sendUserFileUpload = async (userData, fileBuffer, fileName, fileSize, mimeType, message = '') => {
+  try {
+    console.log('📧 Sending user file upload to support:', {
+      userEmail: userData.email,
+      fileName,
+      fileSize,
+      hasMessage: !!message
+    });
+    
+    const template = getUserFileUploadTemplate(userData, fileName, fileSize, message);
+    const result = await sendEmailWithAttachment(
+      'orbit@stickershuttle.com',
+      template.subject,
+      template.html,
+      fileBuffer,
+      fileName,
+      mimeType
+    );
+    
+    if (result.success) {
+      console.log(`✅ User file upload email sent for ${userData.email}`);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('❌ Error sending user file upload email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendOrderStatusNotification,
   sendProofNotification,
-  sendEmail,
   sendAdminNewOrderNotification,
-  sendAdminProofActionNotification
+  sendAdminProofActionNotification,
+  sendEmail,
+  sendUserFileUpload
 }; 

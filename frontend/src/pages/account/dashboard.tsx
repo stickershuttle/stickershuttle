@@ -16,6 +16,7 @@ import {
 import { SYNC_CUSTOMER_TO_KLAVIYO } from '../../lib/klaviyo-mutations';
 import { UPDATE_USER_PROFILE_PHOTO, UPDATE_USER_PROFILE_BANNER } from '../../lib/profile-mutations';
 import AIFileImage from '../../components/AIFileImage';
+import FileUploadToEmail from '../../components/FileUploadToEmail';
 
 
 // Mutation to update proof status (same as proofs page)
@@ -6384,18 +6385,23 @@ function Dashboard() {
                   >
                     Change Photo
                   </button>
-                  {profile?.profile_photo_url && (
+                  {                profile?.profile_photo_url && (
                     <button
                       onClick={async () => {
-                        if (!user || !confirm('Are you sure you want to remove your profile photo?')) return;
+                        if (!user || !confirm('Are you sure you want to reset your profile photo to a default avatar?')) return;
                         
                         setUploadingProfilePhoto(true);
                         try {
+                          // Get a random default avatar
+                          const { getRandomAvatar } = await import('../../utils/avatars');
+                          const randomAvatar = getRandomAvatar();
+                          console.log('🎭 Assigning new random avatar:', randomAvatar);
+
                           const supabase = await getSupabase();
                           const { error } = await supabase
                             .from('user_profiles')
                             .update({
-                              profile_photo_url: null,
+                              profile_photo_url: randomAvatar,
                               profile_photo_public_id: null,
                               updated_at: new Date().toISOString()
                             })
@@ -6405,19 +6411,19 @@ function Dashboard() {
 
                           setProfile((prev: any) => ({
                             ...prev,
-                            profile_photo_url: null,
+                            profile_photo_url: randomAvatar,
                             profile_photo_public_id: null
                           }));
                           
                           setSettingsNotification({
-                            message: 'Profile photo removed',
+                            message: 'Profile photo reset to default avatar',
                             type: 'success'
                           });
                           setTimeout(() => setSettingsNotification(null), 3000);
                         } catch (error) {
-                          console.error('Error removing profile photo:', error);
+                          console.error('Error resetting profile photo:', error);
                           setSettingsNotification({
-                            message: 'Failed to remove profile photo',
+                            message: 'Failed to reset profile photo',
                             type: 'error'
                           });
                           setTimeout(() => setSettingsNotification(null), 3000);
@@ -6425,15 +6431,15 @@ function Dashboard() {
                           setUploadingProfilePhoto(false);
                         }
                       }}
-                      className="ml-2 px-4 py-2 rounded-lg text-red-400 text-sm font-medium transition-all duration-200 transform hover:scale-105"
+                      className="ml-2 px-4 py-2 rounded-lg text-blue-400 text-sm font-medium transition-all duration-200 transform hover:scale-105"
                       style={{
-                        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
+                        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
                         backdropFilter: 'blur(25px) saturate(180%)',
-                        border: '1px solid rgba(239, 68, 68, 0.4)',
-                        boxShadow: 'rgba(239, 68, 68, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                        border: '1px solid rgba(59, 130, 246, 0.4)',
+                        boxShadow: 'rgba(59, 130, 246, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                       }}
                     >
-                      Remove
+                      Reset to Default
                     </button>
                   )}
                 </div>
@@ -6708,6 +6714,44 @@ function Dashboard() {
               </button>
             </div>
           </div>
+        </div>
+        
+        {/* File Upload to Support Section */}
+        <div className="container-style p-6">
+          <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+            <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            Send File to Support
+          </h3>
+          
+          <div className="mb-4">
+            <p className="text-gray-300 text-sm mb-2">
+              Upload design files, documents, or other materials for our team to review. Your file will be sent directly to orbit@stickershuttle.com.
+            </p>
+          </div>
+          
+          <FileUploadToEmail
+            userData={{
+              email: (user as any)?.email || '',
+              name: getUserDisplayName()
+            }}
+            onUploadComplete={(success) => {
+              if (success) {
+                setSettingsNotification({
+                  message: 'File uploaded and sent successfully!',
+                  type: 'success'
+                });
+                setTimeout(() => setSettingsNotification(null), 5000);
+              } else {
+                setSettingsNotification({
+                  message: 'Failed to upload file. Please try again.',
+                  type: 'error'
+                });
+                setTimeout(() => setSettingsNotification(null), 5000);
+              }
+            }}
+          />
         </div>
       </div>
     );

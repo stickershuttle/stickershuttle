@@ -109,7 +109,13 @@ const ContactUs: NextPage = () => {
                         value={formData.name}
                         onChange={handleInputChange}
                         required
-                        className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                          backdropFilter: 'blur(12px)'
+                        }}
                         placeholder="Your full name"
                       />
                     </div>
@@ -125,7 +131,13 @@ const ContactUs: NextPage = () => {
                         value={formData.email}
                         onChange={handleInputChange}
                         required
-                        className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                          backdropFilter: 'blur(12px)'
+                        }}
                         placeholder="your@email.com"
                       />
                     </div>
@@ -140,7 +152,13 @@ const ContactUs: NextPage = () => {
                         value={formData.subject}
                         onChange={handleInputChange}
                         required
-                        className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-3 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                          backdropFilter: 'blur(12px)'
+                        }}
                       >
                         <option value="" className="bg-gray-800">Select a subject</option>
                         <option value="general" className="bg-gray-800">General Inquiry</option>
@@ -164,7 +182,13 @@ const ContactUs: NextPage = () => {
                         onChange={handleInputChange}
                         required
                         rows={6}
-                        className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical"
+                        className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical"
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                          backdropFilter: 'blur(12px)'
+                        }}
                         placeholder="Tell us how we can help you..."
                       />
                     </div>
@@ -194,18 +218,14 @@ const ContactUs: NextPage = () => {
                       className="p-6 rounded-lg"
                       style={{
                         background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
                       }}
                     >
                       <h3 className="text-white font-semibold mb-3">📧 Email Support</h3>
-                      <p className="text-gray-300 mb-2">
-                        <strong>General:</strong> support@stickershuttle.com
-                      </p>
-                      <p className="text-gray-300 mb-2">
-                        <strong>Orders:</strong> orders@stickershuttle.com
-                      </p>
                       <p className="text-gray-300">
-                        <strong>Custom Designs:</strong> design@stickershuttle.com
+                        <strong>All inquiries:</strong> orbit@stickershuttle.com
                       </p>
                     </div>
 
@@ -213,7 +233,9 @@ const ContactUs: NextPage = () => {
                       className="p-6 rounded-lg"
                       style={{
                         background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
                       }}
                     >
                       <h3 className="text-white font-semibold mb-3">⏰ Response Times</h3>
@@ -232,43 +254,21 @@ const ContactUs: NextPage = () => {
                       className="p-6 rounded-lg"
                       style={{
                         background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
                       }}
                     >
                       <h3 className="text-white font-semibold mb-3">🕒 Business Hours</h3>
                       <p className="text-gray-300 mb-2">
-                        <strong>Monday - Friday:</strong> 9:00 AM - 6:00 PM EST
+                        <strong>Monday - Friday:</strong> 7:00 AM - 6:00 PM MT
                       </p>
                       <p className="text-gray-300 mb-2">
-                        <strong>Saturday:</strong> 10:00 AM - 4:00 PM EST
+                        <strong>Saturday:</strong> Closed
                       </p>
                       <p className="text-gray-300">
                         <strong>Sunday:</strong> Closed
                       </p>
-                    </div>
-
-                    <div 
-                      className="p-6 rounded-lg"
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)'
-                      }}
-                    >
-                      <h3 className="text-white font-semibold mb-3">💡 Quick Help</h3>
-                      <p className="text-gray-300 mb-4">
-                        Looking for answers right away? Check out these resources:
-                      </p>
-                      <div className="space-y-2">
-                        <a href="/shipping-process" className="block text-blue-300 hover:text-blue-200 transition-colors">
-                          → Shipping & Delivery Info
-                        </a>
-                        <a href="/account/support" className="block text-blue-300 hover:text-blue-200 transition-colors">
-                          → Support Center
-                        </a>
-                        <a href="/products" className="block text-blue-300 hover:text-blue-200 transition-colors">
-                          → Product Information
-                        </a>
-                      </div>
                     </div>
                   </div>
                 </div>

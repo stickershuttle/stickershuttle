@@ -54,12 +54,14 @@ export default function UniversalFooter() {
                     Blog Posts
                   </Link>
                 </li>
-                <li>
-                  <Link href="/contact-us" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
-                    <span className="mr-2">📞</span>
-                    Contact Us
-                  </Link>
-                </li>
+                {!user && (
+                  <li>
+                    <Link href="/contact-us" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
+                      <span className="mr-2">📞</span>
+                      Contact Us
+                    </Link>
+                  </li>
+                )}
               </ul>
             </div>
 
