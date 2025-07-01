@@ -50,6 +50,7 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
   const [additionalNotes, setAdditionalNotes] = useState("")
   const [hoveredGoldTier, setHoveredGoldTier] = useState<number | null>(null)
   const [showCustomGoldMessage, setShowCustomGoldMessage] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   
   // File upload states
   const [uploadedFile, setUploadedFile] = useState<CloudinaryUploadResult | null>(null)
@@ -57,7 +58,26 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
+  // Check for mobile on component mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
+  // Auto-expand textarea when additionalNotes changes
+  useEffect(() => {
+    const textarea = document.querySelector('textarea[placeholder*="instructions"]') as HTMLTextAreaElement;
+    if (textarea && additionalNotes) {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.max(50, textarea.scrollHeight) + 'px';
+    }
+  }, [additionalNotes])
 
   // Pricing data for different sizes
   const getPriceDataForSize = (sizeInches: number) => {
@@ -1144,264 +1164,325 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
           </div>
 
           {/* Bottom Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            {/* Artwork Upload */}
-            <div className="container-style p-6 transition-colors duration-200">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">📁 Artwork Upload *</h2>
-              
-              {/* Hidden file input - always present */}
-              <input
-                id="file-input"
-                type="file"
-                accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd"
-                onChange={handleFileSelect}
-                className="hidden"
-                aria-label="Upload artwork file"
-              />
-
-              {!uploadedFile ? (
-                <div 
-                  className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative"
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                  onClick={() => document.getElementById('file-input')?.click()}
-                >
+          <div className="mb-4 lg:mb-6">
+            {/* Single Wide Container for Artwork Upload, Additional Instructions, and Proof Options */}
+            <div className="container-style p-4 lg:p-6 transition-colors duration-200">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column - Artwork Upload & Additional Instructions */}
+                <div>
+                  <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">📁 Artwork Upload *</h2>
                   
-                  {isUploading ? (
-                    <div className="mb-4">
-                      <div className="text-4xl mb-3">⏳</div>
-                      <p className="text-white font-medium text-base mb-2">Uploading...</p>
-                      {uploadProgress && (
-                        <div className="w-full bg-white/20 rounded-full h-2 mb-2">
-                          <div 
-                            className="bg-purple-400 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${uploadProgress.percentage}%` }}
-                          ></div>
+                  {/* Hidden file input - always present */}
+                  <input
+                    id="file-input"
+                    type="file"
+                    accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    aria-label="Upload artwork file"
+                  />
+
+                  {!uploadedFile ? (
+                    <div 
+                      className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative"
+                      onDrop={handleDrop}
+                      onDragOver={handleDragOver}
+                      onClick={() => document.getElementById('file-input')?.click()}
+                    >
+                      
+                      {isUploading ? (
+                        <div className="mb-4">
+                          <div className="text-4xl mb-3">⏳</div>
+                          <p className="text-white font-medium text-base mb-2">Uploading...</p>
+                          {uploadProgress && (
+                            <div className="w-full bg-white/20 rounded-full h-2 mb-2">
+                              <div 
+                                className="bg-purple-400 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${uploadProgress.percentage}%` }}
+                              ></div>
+                            </div>
+                          )}
+                          {uploadProgress && (
+                            <p className="text-white/80 text-sm">{uploadProgress.percentage}% complete</p>
+                          )}
                         </div>
-                      )}
-                      {uploadProgress && (
-                        <p className="text-white/80 text-sm">{uploadProgress.percentage}% complete</p>
+                      ) : (
+                        <div className="mb-4">
+                          <div className="mb-3 flex justify-center -ml-4">
+                            <img 
+                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751341811/StickerShuttleFileIcon4_gkhsu5.png" 
+                              alt="Upload file" 
+                              className="w-20 h-20 object-contain"
+                            />
+                          </div>
+                          <p className="text-white font-medium text-base mb-2 hidden md:block">Drag or click to upload your file</p>
+                          <p className="text-white font-medium text-base mb-2 md:hidden">Tap to add file</p>
+                          <p className="text-white/80 text-sm">All formats supported. Max file size: 10MB | 1 file per order</p>
+                        </div>
                       )}
                     </div>
                   ) : (
-                    <div className="mb-4">
-                      <div className="text-4xl mb-3">📁</div>
-                      <p className="text-white font-medium text-base mb-2 hidden md:block">Drag or click to upload your file</p>
-                      <p className="text-white font-medium text-base mb-2 md:hidden">Tap to add file</p>
-                      <p className="text-white/70 text-sm">Supported formats:</p>
-                      <p className="text-white/80 text-sm font-mono">.ai, .svg, .eps, .png, .jpg, .psd</p>
-                      <p className="text-white/60 text-xs mt-2">Max file size: 10MB</p>
+                    <div className="border border-green-400/50 rounded-xl p-4 bg-green-500/10 backdrop-blur-md">
+                      <div className="flex items-center justify-between min-w-0">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative z-10">
+                            <AIFileImage
+                              src={uploadedFile.secure_url}
+                              filename={uploadedFile.original_filename}
+                              alt={uploadedFile.original_filename}
+                              className="w-full h-full object-cover rounded-lg relative z-10"
+                              size="thumbnail"
+                              showFileType={false}
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-green-200 font-medium truncate">{uploadedFile.original_filename}</p>
+                            <p className="text-green-300/80 text-sm">
+                              {(uploadedFile.bytes / 1024 / 1024).toFixed(2)} MB • {uploadedFile.format.toUpperCase()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => document.getElementById('file-input')?.click()}
+                            className="text-blue-300 hover:text-blue-200 p-2 hover:bg-blue-500/20 rounded-lg transition-colors cursor-pointer"
+                            title="Replace file"
+                          >
+                            🔄
+                          </button>
+                          <button
+                            onClick={removeUploadedFile}
+                            className="text-red-300 hover:text-red-200 p-2 hover:bg-red-500/20 rounded-lg transition-colors cursor-pointer"
+                            title="Remove file"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {uploadError && (
+                    <div className="mt-3 p-3 bg-red-500/20 border border-red-400/50 rounded-lg">
+                      <p className="text-red-200 text-sm flex items-center gap-2">
+                        <span>⚠️</span>
+                        {uploadError}
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="mt-4 flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+                       style={{
+                         background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                         border: '1px solid rgba(147, 51, 234, 0.4)',
+                         backdropFilter: 'blur(12px)'
+                       }}>
+                    <button
+                      onClick={() => setUploadLater(!uploadLater)}
+                      disabled={!!uploadedFile}
+                      title={uploadLater ? "Disable upload later" : "Enable upload later"}
+                      className={`w-12 h-6 rounded-full transition-colors ${
+                        uploadLater ? 'bg-purple-500' : 'bg-white/20'
+                      } ${uploadedFile ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                        uploadLater ? 'translate-x-7' : 'translate-x-1'
+                      }`} />
+                    </button>
+                    <label className={`text-sm font-medium ${uploadedFile ? 'text-white/50' : 'text-purple-200'}`}>
+                      Upload Artwork Later
+                    </label>
+                  </div>
+                  {uploadLater && !uploadedFile && (
+                    <div className="mt-2 text-white/80 text-sm italic flex items-center">
+                      <span role="img" aria-label="caution" className="mr-1">
+                        ⚠️
+                      </span>
+                      Note: Please try to have your artwork submitted within 48hrs of placing an order.
                     </div>
                   )}
                 </div>
-              ) : (
-                <div className="border border-green-400/50 rounded-xl p-4 bg-green-500/10 backdrop-blur-md">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative z-10">
-                        <AIFileImage
-                          src={uploadedFile.secure_url}
-                          filename={uploadedFile.original_filename}
-                          alt={uploadedFile.original_filename}
-                          className="w-full h-full object-cover rounded-lg relative z-10"
-                          size="thumbnail"
-                          showFileType={false}
-                        />
-                      </div>
-                      <div>
-                        <p className="text-green-200 font-medium">{uploadedFile.original_filename}</p>
-                        <p className="text-green-300/80 text-sm">
-                          {(uploadedFile.bytes / 1024 / 1024).toFixed(2)} MB • {uploadedFile.format.toUpperCase()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
+
+                {/* Right Column - Options */}
+                <div className="space-y-4">
+                  {/* Proof Options */}
+                  <div>
+                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
+                      <span role="img" aria-label="proof">
+                        📋
+                      </span>
+                      Proof Options
+                    </h2>
+                    
+                    {/* Proof Toggle */}
+                    <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+                         style={{
+                           background: sendProof 
+                             ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(34, 197, 94, 0.15) 50%, rgba(34, 197, 94, 0.05) 100%)'
+                             : 'linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(239, 68, 68, 0.15) 50%, rgba(239, 68, 68, 0.05) 100%)',
+                           border: sendProof 
+                             ? '1px solid rgba(34, 197, 94, 0.4)'
+                             : '1px solid rgba(239, 68, 68, 0.4)',
+                           backdropFilter: 'blur(12px)'
+                         }}>
                       <button
-                        onClick={() => document.getElementById('file-input')?.click()}
-                        className="text-blue-300 hover:text-blue-200 p-2 hover:bg-blue-500/20 rounded-lg transition-colors cursor-pointer"
-                        title="Replace file"
+                        onClick={() => setSendProof(!sendProof)}
+                        title={sendProof ? "Don't send proof" : "Send free proof"}
+                        className={`w-12 h-6 rounded-full transition-colors ${
+                          sendProof ? 'bg-green-500' : 'bg-red-500'
+                        }`}
                       >
-                        🔄
+                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                          sendProof ? 'translate-x-1' : 'translate-x-7'
+                        }`} />
                       </button>
+                      <label className={`text-sm font-medium ${sendProof ? 'text-green-200' : 'text-red-200'}`}>
+                        {sendProof ? '✅ Send FREE Proof' : '❌ Don\'t Send Proof'}
+                      </label>
+                    </div>
+                    
+                    {!sendProof && (
+                      <div className="mt-4 text-sm text-red-200/80">
+                        <p>Your order will proceed directly to production without proof approval. This speeds up delivery time.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Rush Order Toggle */}
+                  <div>
+                    <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+                         style={{
+                           background: rushOrder 
+                             ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(239, 68, 68, 0.15) 50%, rgba(239, 68, 68, 0.05) 100%)'
+                             : 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.15) 50%, rgba(59, 130, 246, 0.05) 100%)',
+                           border: rushOrder 
+                             ? '1px solid rgba(239, 68, 68, 0.4)'
+                             : '1px solid rgba(59, 130, 246, 0.4)',
+                           backdropFilter: 'blur(12px)'
+                         }}>
                       <button
-                        onClick={removeUploadedFile}
-                        className="text-red-300 hover:text-red-200 p-2 hover:bg-red-500/20 rounded-lg transition-colors cursor-pointer"
-                        title="Remove file"
+                        onClick={() => setRushOrder(!rushOrder)}
+                        title={rushOrder ? "Switch to standard production" : "Enable rush order"}
+                        className={`w-12 h-6 rounded-full transition-colors ${
+                          rushOrder ? 'bg-red-500' : 'bg-blue-500'
+                        }`}
                       >
-                        🗑️
+                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                          rushOrder ? 'translate-x-7' : 'translate-x-1'
+                        }`} />
                       </button>
+                      <label className={`text-sm font-medium ${rushOrder ? 'text-red-200' : 'text-blue-200'}`}>
+                        {rushOrder ? '🚀 Rush Order (+40%)' : '🕒 Standard Production Time'}
+                      </label>
                     </div>
+                    
+                    {/* Rush Order Disclaimer - right under rush order toggle */}
+                    {rushOrder && (
+                      <div className="mt-3 text-xs text-white/70 leading-relaxed">
+                        *Rush Orders are put in front of the queue and normally completed within 24 hours, but not guaranteed. If you're concerned about your order being completed in time, please{" "}
+                        <a 
+                          href="/contact" 
+                          className="text-purple-300 hover:text-purple-200 underline"
+                        >
+                          reach out here
+                        </a>
+                        . Most orders under 3,000 stickers will be completed on time.
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
 
-              {uploadError && (
-                <div className="mt-3 p-3 bg-red-500/20 border border-red-400/50 rounded-lg">
-                  <p className="text-red-200 text-sm flex items-center gap-2">
-                    <span>⚠️</span>
-                    {uploadError}
-                  </p>
-                </div>
-              )}
-              
-              <div className="mt-4 flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
-                   style={{
-                     background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
-                     border: '1px solid rgba(147, 51, 234, 0.4)',
-                     backdropFilter: 'blur(12px)'
-                   }}>
-                <button
-                  onClick={() => setUploadLater(!uploadLater)}
-                  disabled={!!uploadedFile}
-                  title={uploadLater ? "Disable upload later" : "Enable upload later"}
-                  className={`w-12 h-6 rounded-full transition-colors ${
-                    uploadLater ? 'bg-purple-500' : 'bg-white/20'
-                  } ${uploadedFile ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                    uploadLater ? 'translate-x-7' : 'translate-x-1'
-                  }`} />
-                </button>
-                <label className={`text-sm font-medium ${uploadedFile ? 'text-white/50' : 'text-purple-200'}`}>
-                  Upload Artwork Later
-                </label>
-              </div>
-              {uploadLater && !uploadedFile && (
-                <div className="mt-2 text-white/80 text-sm italic flex items-center">
-                  <span role="img" aria-label="caution" className="mr-1">
-                    ⚠️
-                  </span>
-                  Note: Please try to have your artwork submitted within 48hrs of placing an order.
-                </div>
-              )}
-            </div>
-
-            {/* Proof Options */}
-            <div className="container-style p-6 transition-colors duration-200">
-              <div className="space-y-3">
-                <button
-                  onClick={() => setSendProof(true)}
-                  className={`button-interactive w-full px-4 py-3 rounded-xl flex items-center justify-center gap-3 transition-all border backdrop-blur-md
-                    ${
-                      sendProof
-                        ? "bg-green-500/20 text-green-200 font-medium border-green-400/50 button-selected animate-glow-green"
-                        : "hover:bg-white/10 border-white/20 text-white/80"
-                    }`}
-                                  >
-                   ✅ Send FREE Proof
-                  </button>
-                  <button
-                    onClick={() => setSendProof(false)}
-                    className={`button-interactive w-full px-4 py-3 rounded-xl flex items-center justify-center gap-3 transition-all border backdrop-blur-md
-                      ${
-                                              !sendProof
-                        ? "bg-red-500/20 text-red-200 font-medium border-red-400/50 button-selected animate-glow-red"
-                        : "hover:bg-white/10 border-white/20 text-white/80"
-                      }`}
-                  >
-                    ❌ Don't Send Proof (Faster)
-                  </button>
-                  <button
-                    onClick={() => setRushOrder(!rushOrder)}
-                    className={`button-interactive w-full px-4 py-3 rounded-xl flex items-center justify-center gap-3 transition-all border backdrop-blur-md
-                      ${
-                                              rushOrder
-                        ? "bg-red-500/20 text-red-200 font-medium border-red-400/50 button-selected animate-glow-red"
-                        : "hover:bg-white/10 border-white/20 text-white/80"
-                      }`}
-                  >
-                    🚀 Rush Order (+40%)
-                </button>
-                
-                {/* Rush Order Disclaimer - Fixed height to prevent layout shift */}
-                <div className="h-20 mt-3">
-                  <div 
-                    className={`overflow-hidden transition-all duration-700 ease-in-out ${
-                      rushOrder 
-                        ? 'max-h-20 opacity-100' 
-                        : 'max-h-0 opacity-0'
-                    }`}
-                  >
-                    <div className="text-xs text-white/70 leading-relaxed">
-                      *Rush Orders are put in front of the queue and normally completed within 24 hours, but not guaranteed. If you're concerned about your order being completed in time, please{" "}
-                      <a 
-                        href="/contact" 
-                        className="text-purple-300 hover:text-purple-200 underline"
+                  {/* Instagram Post Option */}
+                  <div>
+                    <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+                         style={{
+                           background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                           border: '1px solid rgba(147, 51, 234, 0.4)',
+                           backdropFilter: 'blur(12px)'
+                         }}>
+                      <button
+                        onClick={() => setPostToInstagram(!postToInstagram)}
+                        title={postToInstagram ? "Disable Instagram posting" : "Enable Instagram posting"}
+                        className={`w-12 h-6 rounded-full transition-colors ${
+                          postToInstagram ? 'bg-purple-500' : 'bg-white/20'
+                        }`}
                       >
-                        reach out here
-                      </a>
-                      . Most orders under 3,000 stickers will be completed on time.
+                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                          postToInstagram ? 'translate-x-7' : 'translate-x-1'
+                        }`} />
+                      </button>
+                      <label className="text-sm font-medium text-purple-200">
+                        Post my order to Instagram
+                      </label>
                     </div>
+                    
+                    {/* Instagram handle input - right under Instagram toggle */}
+                    {postToInstagram && (
+                      <div className="mt-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white text-xl">@</span>
+                          <div className="flex-grow p-3 rounded-lg backdrop-blur-md"
+                               style={{
+                                 background: 'rgba(255, 255, 255, 0.05)',
+                                 border: '1px solid rgba(255, 255, 255, 0.1)',
+                                 boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                               }}>
+                            <input
+                              type="text"
+                              placeholder="Enter your Instagram handle"
+                              value={instagramHandle}
+                              onChange={(e) => setInstagramHandle(e.target.value)}
+                              className="w-full bg-transparent text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-purple-400/50 transition-all border-0"
+                            />
+                          </div>
+                        </div>
+                        <div className="text-xs text-white/70 italic">
+                          *Most reels are posted within a week or two of your order being delivered. We may reach out to post it sooner.
+                        </div>
+                        <div className="text-xs">
+                          <a 
+                            href="https://www.instagram.com/stickershuttle/" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-purple-300 hover:text-purple-200 underline"
+                          >
+                            Follow @stickershuttle
+                          </a>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </div>
-            </div>
 
-            {/* Additional Instructions */}
-            <div className="container-style p-6 transition-colors duration-200">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
-                <span role="img" aria-label="pencil">
-                  ✏️
-                </span>
-                Additional Instructions:
-              </h2>
-              <textarea
-                value={additionalNotes}
-                onChange={(e) => setAdditionalNotes(e.target.value)}
-                className="w-full h-[100px] rounded-xl border border-white/20 p-3 resize-none bg-white/10 text-white placeholder-white/60 backdrop-blur-md focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition-all"
-                placeholder="Enter any additional instructions here..."
-              />
-
-              {/* Instagram Post Option */}
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
-                     style={{
-                       background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
-                       border: '1px solid rgba(147, 51, 234, 0.4)',
-                       backdropFilter: 'blur(12px)'
-                     }}>
-                  <button
-                    onClick={() => setPostToInstagram(!postToInstagram)}
-                    title={postToInstagram ? "Disable Instagram posting" : "Enable Instagram posting"}
-                    className={`w-12 h-6 rounded-full transition-colors ${
-                      postToInstagram ? 'bg-purple-500' : 'bg-white/20'
-                    }`}
-                  >
-                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                      postToInstagram ? 'translate-x-7' : 'translate-x-1'
-                    }`} />
-                  </button>
-                  <label className="text-sm font-medium text-purple-200">
-                    Post my order to Instagram
-                  </label>
-                </div>
-                {postToInstagram && (
-                  <div className="space-y-2">
-                    <div className="flex items-center">
-                      <span className="text-white text-xl mr-2">@</span>
-                      <input
-                        type="text"
-                        placeholder="Enter your Instagram handle"
-                        value={instagramHandle}
-                        onChange={(e) => setInstagramHandle(e.target.value)}
-                        className="flex-grow px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md"
+                  {/* Additional Instructions Section - moved here */}
+                  <div>
+                    <div className="p-3 rounded-xl backdrop-blur-md"
+                         style={{
+                           background: 'rgba(255, 255, 255, 0.05)',
+                           border: '1px solid rgba(255, 255, 255, 0.1)',
+                           boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                         }}>
+                      <textarea
+                        value={additionalNotes}
+                        onChange={(e) => {
+                          setAdditionalNotes(e.target.value);
+                          // Auto-expand functionality
+                          setTimeout(() => {
+                            e.target.style.height = 'auto';
+                            e.target.style.height = Math.max(50, e.target.scrollHeight) + 'px';
+                          }, 0);
+                        }}
+                        className="w-full min-h-[50px] rounded-xl border-0 p-3 resize-none bg-transparent text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-purple-400/50 transition-all appearance-none overflow-hidden"
+                        placeholder={isMobile ? "Additional instructions here..." : "Enter any additional instructions here..."}
+                        style={{ 
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'none',
+                          height: additionalNotes ? 'auto' : '50px',
+                          minHeight: '50px',
+                          lineHeight: '1.4'
+                        }}
                       />
                     </div>
-                    <div className="text-xs text-white/70 italic">
-                      *Most reels are posted within a week or two of your order being delivered. We may reach out to post it sooner.
-                    </div>
-                    <div className="text-xs">
-                      <a 
-                        href="https://www.instagram.com/stickershuttle/" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-purple-300 hover:text-purple-200 underline"
-                      >
-                        Follow @stickershuttle
-                      </a>
-                    </div>
                   </div>
-                )}
+                </div>
               </div>
             </div>
           </div>
