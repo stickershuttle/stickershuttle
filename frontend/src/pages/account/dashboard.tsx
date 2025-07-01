@@ -1694,12 +1694,28 @@ function Dashboard() {
   const handleSelectBannerTemplate = async (template: any) => {
     if (!user) return;
     
+    // Prevent multiple simultaneous requests
+    if (uploadingBanner) {
+      console.log('Banner update already in progress, skipping...');
+      return;
+    }
+    
+    // Check if this template is already selected
+    if (profile?.banner_template_id === template.id) {
+      console.log('Template already selected, skipping...');
+      setShowBannerTemplates(false);
+      return;
+    }
+    
     setUploadingBanner(true);
     setShowBannerTemplates(false);
     
     try {
       // Create a CSS string for the template
       const templateCSS = JSON.stringify(template.style);
+      
+      // Add delay to prevent rate limiting
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Update profile using GraphQL mutation
       const { data, errors } = await client.mutate({
@@ -1715,7 +1731,13 @@ function Dashboard() {
 
       if (errors || !data?.updateUserProfileBanner?.success) {
         console.error('GraphQL error updating banner template:', errors);
-        alert(data?.updateUserProfileBanner?.message || 'Failed to apply template');
+        const errorMessage = errors?.[0]?.message || data?.updateUserProfileBanner?.message || 'Failed to apply template';
+        
+        if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
+          alert('Too many requests. Please wait a moment and try again.');
+        } else {
+          alert(errorMessage);
+        }
         return;
       }
       
@@ -1733,7 +1755,13 @@ function Dashboard() {
       
     } catch (error) {
       console.error('Banner template application failed:', error);
-      alert('Failed to apply template. Please try again.');
+      const errorMessage = (error as any)?.message || 'Failed to apply template';
+      
+      if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
+        alert('Too many requests. Please wait a moment and try again.');
+      } else {
+        alert('Failed to apply template. Please try again in a moment.');
+      }
     } finally {
       setUploadingBanner(false);
     }
@@ -9477,8 +9505,16 @@ function Dashboard() {
                     {bannerTemplates.filter(template => template.category === 'cosmic').map((template) => (
                       <div
                         key={template.id}
-                        className="relative rounded-lg overflow-hidden cursor-pointer transform hover:scale-105 transition-all duration-200 border border-white/10 hover:border-purple-400/50"
-                        onClick={() => handleSelectBannerTemplate(template)}
+                        className={`relative rounded-lg overflow-hidden transform transition-all duration-200 border border-white/10 ${
+                          uploadingBanner 
+                            ? 'opacity-50 cursor-not-allowed' 
+                            : 'cursor-pointer hover:scale-105 hover:border-purple-400/50'
+                        }`}
+                        onClick={() => {
+                          if (!uploadingBanner) {
+                            handleSelectBannerTemplate(template);
+                          }
+                        }}
                       >
                         <div 
                           className="w-full relative"
@@ -9513,8 +9549,16 @@ function Dashboard() {
                     {bannerTemplates.filter(template => template.category === 'business').map((template) => (
                       <div
                         key={template.id}
-                        className="relative rounded-lg overflow-hidden cursor-pointer transform hover:scale-105 transition-all duration-200 border border-white/10 hover:border-yellow-400/50"
-                        onClick={() => handleSelectBannerTemplate(template)}
+                        className={`relative rounded-lg overflow-hidden transform transition-all duration-200 border border-white/10 ${
+                          uploadingBanner 
+                            ? 'opacity-50 cursor-not-allowed' 
+                            : 'cursor-pointer hover:scale-105 hover:border-yellow-400/50'
+                        }`}
+                        onClick={() => {
+                          if (!uploadingBanner) {
+                            handleSelectBannerTemplate(template);
+                          }
+                        }}
                       >
                         <div 
                           className="w-full relative"
@@ -9563,8 +9607,16 @@ function Dashboard() {
                     {bannerTemplates.filter(template => template.category === 'cyber').map((template) => (
                       <div
                         key={template.id}
-                        className="relative rounded-lg overflow-hidden cursor-pointer transform hover:scale-105 transition-all duration-200 border border-white/10 hover:border-cyan-400/50"
-                        onClick={() => handleSelectBannerTemplate(template)}
+                        className={`relative rounded-lg overflow-hidden transform transition-all duration-200 border border-white/10 ${
+                          uploadingBanner 
+                            ? 'opacity-50 cursor-not-allowed' 
+                            : 'cursor-pointer hover:scale-105 hover:border-cyan-400/50'
+                        }`}
+                        onClick={() => {
+                          if (!uploadingBanner) {
+                            handleSelectBannerTemplate(template);
+                          }
+                        }}
                       >
                         <div 
                           className="w-full relative"
