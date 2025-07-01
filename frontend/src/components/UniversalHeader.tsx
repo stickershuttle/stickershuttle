@@ -171,7 +171,7 @@ export default function UniversalHeader() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-base font-bold">
+                    <div className="w-full h-full aspect-square bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-base font-bold rounded-full">
                       {getUserDisplayName().charAt(0).toUpperCase()}
                     </div>
                   )}
@@ -502,7 +502,7 @@ export default function UniversalHeader() {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-base font-bold">
+                      <div className="w-full h-full aspect-square bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-base font-bold rounded-full">
                         {getUserDisplayName().charAt(0).toUpperCase()}
                       </div>
                     )}
@@ -540,7 +540,7 @@ export default function UniversalHeader() {
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-lg font-bold">
+                            <div className="w-full h-full aspect-square bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-lg font-bold rounded-full">
                               {getUserDisplayName().charAt(0).toUpperCase()}
                             </div>
                           )}
@@ -726,7 +726,7 @@ export default function UniversalHeader() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-lg font-bold">
+                  <div className="w-full h-full aspect-square bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-lg font-bold rounded-full">
                     {getUserDisplayName().charAt(0).toUpperCase()}
                   </div>
                 )}

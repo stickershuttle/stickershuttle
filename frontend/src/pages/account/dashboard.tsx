@@ -6366,7 +6366,7 @@ function Dashboard() {
                       </div>
                     </>
                   ) : (
-                    <div className="text-white text-2xl font-bold">
+                    <div className="w-full h-full aspect-square bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-2xl font-bold rounded-full">
                       {getUserDisplayName().charAt(0).toUpperCase()}
                     </div>
                   )}
@@ -8214,7 +8214,7 @@ function Dashboard() {
                           </div>
                         </>
                       ) : (
-                        <div className="text-white text-xl font-bold">
+                        <div className="w-full h-full aspect-square bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xl font-bold rounded-full">
                           {getUserDisplayName().charAt(0).toUpperCase()}
                         </div>
                       )}
