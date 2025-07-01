@@ -3,8 +3,10 @@ import { useRouter } from 'next/router';
 import AdminLayout from '@/components/AdminLayout';
 import ProofUpload from '@/components/ProofUpload';
 import AIFileImage from '@/components/AIFileImage';
+import EasyPostShipping from '@/components/EasyPostShipping';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { getSupabase } from '../../lib/supabase';
+import { CREATE_EASYPOST_SHIPMENT, BUY_EASYPOST_LABEL, GET_EASYPOST_LABEL } from '../../lib/easypost-mutations';
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
@@ -245,6 +247,11 @@ export default function AdminOrders() {
   const [showTrackingModal, setShowTrackingModal] = useState(false);
   const [copiedTracking, setCopiedTracking] = useState<string | null>(null);
 
+  const [showEasyPostModal, setShowEasyPostModal] = useState(false);
+  const [easyPostOrder, setEasyPostOrder] = useState<Order | null>(null);
+  const [ordersWithLabels, setOrdersWithLabels] = useState<Set<string>>(new Set());
+  const [orderLabelUrls, setOrderLabelUrls] = useState<Map<string, string>>(new Map());
+
   // Helper function to select an order and update URL
   const selectOrder = (order: Order) => {
     setSelectedOrder(order);
@@ -305,6 +312,7 @@ export default function AdminOrders() {
   }, [data, router.asPath, selectedOrder]);
   const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
   const [sendProofs] = useMutation(SEND_PROOFS);
+  const [getEasyPostLabel] = useMutation(GET_EASYPOST_LABEL);
 
   // Calculate customer statistics
   const getCustomerStats = (customerEmail: string | undefined) => {
@@ -795,189 +803,7 @@ export default function AdminOrders() {
     }
   };
 
-  // Print order slip - formatted for 4x6 label
-  const printOrderSlip = (order: Order) => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
 
-    // Build a compact items list for 4x6 format
-    const itemsHtml = order.items.map(item => {
-      const selections = item.calculatorSelections || {};
-      const size = selections.size || selections.sizePreset || {};
-
-      const specs = [];
-      if (selections.cut?.displayValue) specs.push(selections.cut.displayValue);
-      if (selections.material?.displayValue) specs.push(selections.material.displayValue);
-      if (size.width && size.height) {
-        specs.push(`${size.width}" × ${size.height}"`);
-      } else if (size.displayValue) {
-        specs.push(size.displayValue);
-      }
-
-      return `<div class="item-row">
-        <div class="item-name">${item.productName} (${item.quantity})</div>
-        <div class="item-specs">${specs.join(' • ')}</div>
-      </div>`;
-    }).join('');
-
-    const orderSlipHtml = `<!DOCTYPE html>
-<html>
-<head>
-  <title>Order Label - ${order.orderNumber || order.id}</title>
-  <style>
-    @page { 
-      size: 4in 6in; 
-      margin: 0.25in; 
-    }
-    body { 
-      font-family: Arial, sans-serif; 
-      font-size: 11px;
-      line-height: 1.3;
-      margin: 0;
-      padding: 0;
-      width: 3.5in;
-      height: 5.5in;
-      overflow: hidden;
-    }
-    .header { 
-      text-align: center; 
-      margin-bottom: 12px; 
-      border-bottom: 2px solid #000; 
-      padding-bottom: 8px; 
-    }
-    .logo { 
-      font-size: 16px; 
-      font-weight: bold; 
-      color: #000; 
-      margin-bottom: 4px; 
-    }
-    .order-number { 
-      font-size: 14px; 
-      font-weight: bold;
-      margin: 2px 0; 
-    }
-    .date { 
-      font-size: 9px; 
-      color: #666;
-    }
-    .section { 
-      margin-bottom: 10px; 
-      font-size: 10px;
-    }
-    .section-title { 
-      font-weight: bold; 
-      font-size: 11px; 
-      margin-bottom: 4px; 
-      color: #000; 
-      border-bottom: 1px solid #ccc;
-      padding-bottom: 2px;
-    }
-    .customer-info {
-      margin-bottom: 8px;
-    }
-    .customer-name {
-      font-weight: bold;
-      font-size: 12px;
-      margin-bottom: 2px;
-    }
-    .customer-email {
-      font-size: 9px;
-      color: #666;
-    }
-    .address-line {
-      margin: 1px 0;
-      font-size: 10px;
-    }
-    .item-row {
-      margin-bottom: 6px;
-      padding: 4px;
-      background: #f8f8f8;
-      border-radius: 3px;
-    }
-    .item-name {
-      font-weight: bold;
-      font-size: 10px;
-      margin-bottom: 2px;
-    }
-    .item-specs {
-      font-size: 9px;
-      color: #666;
-    }
-    .total-section { 
-      text-align: center; 
-      margin-top: 10px; 
-      font-size: 14px;
-      font-weight: bold;
-      border: 2px solid #000;
-      padding: 6px;
-      background: #f0f0f0;
-    }
-    .notes { 
-      font-size: 9px;
-      margin-top: 8px;
-      padding: 4px;
-      background: #fffbf0;
-      border: 1px solid #ddd;
-      border-radius: 3px;
-    }
-    .notes-title {
-      font-weight: bold;
-      margin-bottom: 2px;
-    }
-    @media print { 
-      body { 
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      } 
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div class="logo">STICKER SHUTTLE</div>
-    <div class="order-number">Order #${order.orderNumber || order.id.split('-')[0].toUpperCase()}</div>
-    <div class="date">${formatDate(order.orderCreatedAt)}</div>
-  </div>
-
-  <div class="section customer-info">
-    <div class="section-title">Customer</div>
-    <div class="customer-name">${order.customerFirstName} ${order.customerLastName}</div>
-    <div class="customer-email">${order.customerEmail}</div>
-    ${order.customerPhone ? `<div class="customer-email">${order.customerPhone}</div>` : ''}
-  </div>
-
-  ${order.shippingAddress ? `<div class="section">
-    <div class="section-title">Ship To</div>
-    <div class="address-line">${order.shippingAddress.first_name} ${order.shippingAddress.last_name}</div>
-    <div class="address-line">${order.shippingAddress.address1}</div>
-    ${order.shippingAddress.address2 ? `<div class="address-line">${order.shippingAddress.address2}</div>` : ''}
-    <div class="address-line">${order.shippingAddress.city}, ${order.shippingAddress.province} ${order.shippingAddress.zip}</div>
-  </div>` : ''}
-
-  <div class="section">
-    <div class="section-title">Items</div>
-    ${itemsHtml}
-  </div>
-
-  <div class="total-section">
-    Total: ${formatCurrency(order.totalPrice)}
-  </div>
-
-  ${order.orderNote ? `<div class="notes">
-    <div class="notes-title">Notes:</div>
-    <div>${order.orderNote}</div>
-  </div>` : ''}
-</body>
-</html>`;
-
-    printWindow.document.write(orderSlipHtml);
-    printWindow.document.close();
-
-    // Wait for content to load then print
-    printWindow.onload = () => {
-      printWindow.print();
-    };
-  };
 
   // Get filtered orders based on time range
   const getFilteredOrdersByTime = (orders: Order[], days: string) => {
@@ -1101,7 +927,7 @@ export default function AdminOrders() {
 
 
 
-  if (loading || !isAdmin) {
+    if (loading || !isAdmin) {
     return (
       <AdminLayout>
         <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#030140' }}>
@@ -1793,20 +1619,7 @@ export default function AdminOrders() {
                                       </span>
                                     </div>
                                     
-                                    {/* Print Action */}
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        printOrderSlip(order);
-                                      }}
-                                      className="p-2 rounded-lg hover:bg-white/10 transition-colors flex-shrink-0"
-                                      title="Print Order Slip"
-                                      aria-label="Print Order Slip"
-                                    >
-                                      <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                                      </svg>
-                                    </button>
+
                                   </div>
                                 </div>
                               </div>
@@ -2146,24 +1959,7 @@ export default function AdminOrders() {
                               {/* Actions */}
                               <td className="px-6 py-4 text-center">
                                 <div className="flex items-center justify-center gap-2">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      printOrderSlip(order);
-                                    }}
-                                    className="p-1.5 rounded-lg text-blue-300 transition-all"
-                                    style={{
-                                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                                      backdropFilter: 'blur(25px) saturate(180%)',
-                                      border: '1px solid rgba(59, 130, 246, 0.4)',
-                                      boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                                    }}
-                                    title="Print Order Slip"
-                                  >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                                    </svg>
-                                  </button>
+
                                   {order.trackingNumber ? (
                                     <button
                                       onClick={(e) => {
@@ -2253,9 +2049,22 @@ export default function AdminOrders() {
                     <div className="glass-container p-6">
                       <div className="flex justify-between items-start mb-6">
                         <h3 className="text-lg font-semibold text-white">Order Summary</h3>
-                        <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.financialStatus)}`}>
-                          {selectedOrder.financialStatus.charAt(0).toUpperCase() + selectedOrder.financialStatus.slice(1)}
-                        </span>
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className="rounded-full"
+                            style={{
+                              width: '8px',
+                              height: '8px',
+                              minWidth: '8px',
+                              minHeight: '8px',
+                              backgroundColor: getLEDGlowColor(getProofStatus(selectedOrder)),
+                              boxShadow: `0 0 12px ${getLEDGlowColor(getProofStatus(selectedOrder))}, 0 0 8px ${getLEDGlowColor(getProofStatus(selectedOrder))}`,
+                              position: 'relative',
+                              zIndex: 10
+                            }}
+                          ></div>
+                          <span className="text-xs font-medium text-gray-300">{getProofStatus(selectedOrder)}</span>
+                        </div>
                       </div>
 
                       {/* Order Items - Mobile Enhanced */}
@@ -2521,45 +2330,14 @@ export default function AdminOrders() {
                     </div>
                   </div>
 
-                  {/* Status Badge and Action Buttons */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <div
-                        className="rounded-full"
-                        style={{
-                          width: '8px',
-                          height: '8px',
-                          minWidth: '8px',
-                          minHeight: '8px',
-                          backgroundColor: getLEDGlowColor(getProofStatus(selectedOrder)),
-                          boxShadow: `0 0 12px ${getLEDGlowColor(getProofStatus(selectedOrder))}, 0 0 8px ${getLEDGlowColor(getProofStatus(selectedOrder))}`,
-                          position: 'relative',
-                          zIndex: 10
-                        }}
-                      ></div>
-                      <span className="text-xs font-medium text-gray-300">{getProofStatus(selectedOrder)}</span>
-                    </div>
+                  {/* Action Buttons */}
+                  <div className="flex items-center justify-center gap-3">
                     
-                    {/* Action Buttons */}
-                    <button
-                      onClick={() => printOrderSlip(selectedOrder)}
-                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105"
-                      style={{
-                        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: '1px solid rgba(59, 130, 246, 0.4)',
-                        boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                      }}
-                    >
-                      <svg className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                      </svg>
-                      Print Order Slip
-                    </button>
+                    {/* Tracking/Label Button */}
                     {selectedOrder.trackingNumber ? (
                       <button
                         onClick={() => handleViewTracking(selectedOrder)}
-                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105"
+                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105 h-[34px]"
                         style={{
                           background: 'linear-gradient(135deg, rgba(75, 85, 99, 0.4) 0%, rgba(75, 85, 99, 0.25) 50%, rgba(75, 85, 99, 0.1) 100%)',
                           backdropFilter: 'blur(25px) saturate(180%)',
@@ -2575,7 +2353,7 @@ export default function AdminOrders() {
                     ) : (
                       <button
                         onClick={() => router.push(`/admin/shipping-labels/${selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}`)}
-                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105"
+                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105 h-[34px]"
                         style={{
                           background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.4) 0%, rgba(234, 179, 8, 0.25) 50%, rgba(234, 179, 8, 0.1) 100%)',
                           backdropFilter: 'blur(25px) saturate(180%)',
@@ -2600,9 +2378,22 @@ export default function AdminOrders() {
                     <div className="hidden xl:block glass-container p-6">
                       <div className="flex justify-between items-start mb-6">
                         <h3 className="text-lg font-semibold text-white">Order Summary</h3>
-                        <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.financialStatus)}`}>
-                          {selectedOrder.financialStatus.charAt(0).toUpperCase() + selectedOrder.financialStatus.slice(1)}
-                        </span>
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className="rounded-full"
+                            style={{
+                              width: '8px',
+                              height: '8px',
+                              minWidth: '8px',
+                              minHeight: '8px',
+                              backgroundColor: getLEDGlowColor(getProofStatus(selectedOrder)),
+                              boxShadow: `0 0 12px ${getLEDGlowColor(getProofStatus(selectedOrder))}, 0 0 8px ${getLEDGlowColor(getProofStatus(selectedOrder))}`,
+                              position: 'relative',
+                              zIndex: 10
+                            }}
+                          ></div>
+                          <span className="text-xs font-medium text-gray-300">{getProofStatus(selectedOrder)}</span>
+                        </div>
                       </div>
 
                       {/* Shipping Choice Section - Inside Order Summary */}
@@ -3575,6 +3366,39 @@ export default function AdminOrders() {
               </div>
             </div>
           </div>
+        )}
+        
+        {/* EasyPost Shipping Modal */}
+        {showEasyPostModal && easyPostOrder && (
+          <EasyPostShipping
+            order={{
+              id: easyPostOrder.id,
+              orderNumber: easyPostOrder.orderNumber || '',
+              customerFirstName: easyPostOrder.customerFirstName || '',
+              customerLastName: easyPostOrder.customerLastName || '',
+              customerEmail: easyPostOrder.customerEmail || '',
+              shippingAddress: easyPostOrder.shippingAddress || {},
+              items: easyPostOrder.items || []
+            }}
+            onClose={() => {
+              setShowEasyPostModal(false);
+              setEasyPostOrder(null);
+            }}
+            onLabelCreated={(labelData) => {
+              console.log('Label created:', labelData);
+              // Close the modal and return to order details
+              setShowEasyPostModal(false);
+              setEasyPostOrder(null);
+              // Add this order to the set of orders with labels
+              setOrdersWithLabels(prev => new Set(prev).add(easyPostOrder!.id));
+              // Store the label URL for direct PDF access
+              if (labelData.postage_label?.label_url) {
+                setOrderLabelUrls(prev => new Map(prev).set(easyPostOrder!.id, labelData.postage_label.label_url));
+              }
+              // Refetch orders to update with tracking info
+              refetch();
+            }}
+          />
         )}
       </div>
     </AdminLayout>

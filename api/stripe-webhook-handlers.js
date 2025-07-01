@@ -4,6 +4,7 @@ const supabaseClient = require('./supabase-client');
 const notificationHelpers = require('./notification-helpers');
 const { discountManager } = require('./discount-manager');
 const { createGuestAccount, emailExists } = require('./guest-account-manager');
+const serverAnalytics = require('./business-analytics');
 
 const router = express.Router();
 
@@ -410,12 +411,12 @@ async function handleCheckoutSessionCompleted(session) {
       
       let updatedOrder;
       
-      // Try using the RPC function first to avoid RLS issues
-      console.log('📝 Attempting to update order with ID:', existingOrderId);
+      // Use database transaction for order updates to ensure data integrity
+      console.log('📝 Starting transaction to update order with ID:', existingOrderId);
       
       try {
-        // First, try the RPC function that bypasses RLS
-        const { data: rpcData, error: rpcError } = await client.rpc('update_order_payment_status', {
+        // Start transaction context for order update
+        const { data: transactionResult, error: transactionError } = await client.rpc('run_order_update_transaction', {
           p_order_id: existingOrderId,
           p_payment_intent_id: fullSession.payment_intent,
           p_session_id: session.id,
@@ -425,45 +426,74 @@ async function handleCheckoutSessionCompleted(session) {
           p_subtotal: parseFloat((fullSession.amount_subtotal / 100).toFixed(2)),
           p_tax: parseFloat(((fullSession.amount_total - fullSession.amount_subtotal) / 100).toFixed(2)),
           p_total: parseFloat((fullSession.amount_total / 100).toFixed(2)),
-          p_proof_status: proofStatus || null
+          p_proof_status: proofStatus || null,
+          p_shipping_address: JSON.stringify(updateData.shipping_address),
+          p_customer_data: JSON.stringify({
+            first_name: customer.name?.split(' ')[0] || '',
+            last_name: customer.name?.split(' ').slice(1).join(' ') || '',
+            email: customer.email,
+            phone: customer.phone
+          })
         });
         
-        if (!rpcError && rpcData && rpcData.length > 0) {
-          console.log('✅ Order updated successfully using RPC function');
-          updatedOrder = rpcData[0];
-          
-          // Update shipping address separately if needed
-          await client
-            .from('orders_main')
-            .update({ shipping_address: updateData.shipping_address })
-            .eq('id', existingOrderId);
+        if (!transactionError && transactionResult) {
+          console.log('✅ Order updated successfully in transaction');
+          updatedOrder = transactionResult;
         } else {
-          // Fallback to standard update if RPC function doesn't exist or fails
-          console.log('⚠️ RPC function not available or failed, trying standard update...');
-          if (rpcError) {
-            console.log('RPC error:', rpcError.message);
+          console.log('⚠️ Transaction function not available, falling back to individual operations...');
+          
+          // Fallback: Manual transaction using individual queries
+          // First, try the RPC function that bypasses RLS
+          const { data: rpcData, error: rpcError } = await client.rpc('update_order_payment_status', {
+            p_order_id: existingOrderId,
+            p_payment_intent_id: fullSession.payment_intent,
+            p_session_id: session.id,
+            p_order_status: orderStatus,
+            p_financial_status: 'paid',
+            p_order_number: orderNumber,
+            p_subtotal: parseFloat((fullSession.amount_subtotal / 100).toFixed(2)),
+            p_tax: parseFloat(((fullSession.amount_total - fullSession.amount_subtotal) / 100).toFixed(2)),
+            p_total: parseFloat((fullSession.amount_total / 100).toFixed(2)),
+            p_proof_status: proofStatus || null
+          });
+          
+          if (!rpcError && rpcData && rpcData.length > 0) {
+            console.log('✅ Order updated successfully using RPC function');
+            updatedOrder = rpcData[0];
+            
+            // Update shipping address separately if needed
+            await client
+              .from('orders_main')
+              .update({ shipping_address: updateData.shipping_address })
+              .eq('id', existingOrderId);
+          } else {
+            // Final fallback to standard update if RPC function doesn't exist or fails
+            console.log('⚠️ RPC function not available or failed, trying standard update...');
+            if (rpcError) {
+              console.log('RPC error:', rpcError.message);
+            }
+            
+            const { data, error: updateError } = await client
+              .from('orders_main')
+              .update(updateData)
+              .eq('id', existingOrderId)
+              .select()
+              .single();
+            
+            if (updateError) {
+              console.error('❌ Error updating order:', updateError);
+              console.error('❌ Error code:', updateError.code);
+              console.error('❌ Error details:', updateError.details);
+              console.error('❌ Error hint:', updateError.hint);
+              console.error('❌ Error message:', updateError.message);
+              throw updateError;
+            }
+            
+            updatedOrder = data;
           }
-          
-          const { data, error: updateError } = await client
-            .from('orders_main')
-            .update(updateData)
-            .eq('id', existingOrderId)
-            .select()
-            .single();
-          
-          if (updateError) {
-            console.error('❌ Error updating order:', updateError);
-            console.error('❌ Error code:', updateError.code);
-            console.error('❌ Error details:', updateError.details);
-            console.error('❌ Error hint:', updateError.hint);
-            console.error('❌ Error message:', updateError.message);
-            throw updateError;
-          }
-          
-          updatedOrder = data;
         }
       } catch (error) {
-        console.error('❌ Failed to update order:', error);
+        console.error('❌ Failed to update order in transaction:', error);
         throw error;
       }
       
@@ -474,6 +504,31 @@ async function handleCheckoutSessionCompleted(session) {
         financialStatus: updatedOrder?.financial_status,
         orderNumber: updatedOrder?.order_number
       });
+
+      // Track analytics for order completion
+      try {
+        if (updatedOrder && updatedOrder.financial_status === 'paid') {
+          console.log('📊 Tracking server-side analytics for completed order');
+          
+          // Get line items from Stripe session for product tracking
+          const lineItems = fullSession.line_items?.data || [];
+          
+          // Track order completion with product sales
+          serverAnalytics.trackOrderCompletedServer(updatedOrder, lineItems);
+          
+          // Track order status change
+          const previousStatus = 'Awaiting Payment';
+          serverAnalytics.trackOrderStatusChangeServer(
+            updatedOrder, 
+            updatedOrder.order_status, 
+            previousStatus
+          );
+          
+          console.log('📊 Server analytics tracking completed');
+        }
+      } catch (analyticsError) {
+        console.error('📊 Error tracking server analytics (non-blocking):', analyticsError);
+      }
       
       // Fetch complete order data since RPC function might not return all fields
       if (updatedOrder?.id) {
@@ -515,47 +570,33 @@ async function handleCheckoutSessionCompleted(session) {
         console.error('⚠️ Failed to send order update admin email (order still processed):', emailError);
       }
       
-      // NOW deduct credits when payment is successful
-      if (updatedOrder.credits_to_apply && parseFloat(updatedOrder.credits_to_apply) > 0 && metadata.userId !== 'guest') {
+      // Credits were already deducted at checkout time - just confirm transaction
+      if (updatedOrder.credits_applied && parseFloat(updatedOrder.credits_applied) > 0 && metadata.userId !== 'guest') {
         try {
-          const creditsToApply = parseFloat(updatedOrder.credits_to_apply);
-          console.log('💳 Deducting credits on successful payment:', creditsToApply);
+          const creditsApplied = parseFloat(updatedOrder.credits_applied);
+          console.log('💳 Confirming successful payment for pre-deducted credits:', creditsApplied);
           console.log('💳 Order ID:', updatedOrder.id);
           console.log('💳 User ID:', metadata.userId);
           
-          // Actually deduct the credits now
-          const creditHandlers = require('./credit-handlers');
-          const creditResult = await creditHandlers.applyCreditsToOrder(
-            updatedOrder.id,
-            creditsToApply,
-            metadata.userId
-          );
-          
-          if (creditResult.success) {
-            console.log('✅ Credits deducted successfully on payment completion:', creditResult.remainingBalance);
-            
-            // Update the order record to track credits used and clear credits_to_apply
-            await client
-              .from('orders_main')
-              .update({
-                credits_applied: creditsToApply,
-                credits_to_apply: null, // Clear the pending credit amount
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', updatedOrder.id);
-              
-            console.log('✅ Order updated with final credits tracking');
+          // Mark credit transaction as confirmed (payment successful)
+          if (updatedOrder.credit_transaction_id) {
+            const creditHandlers = require('./credit-handlers');
+            await creditHandlers.confirmTransaction(
+              updatedOrder.credit_transaction_id,
+              updatedOrder.id,
+              'Payment completed successfully'
+            );
+            console.log('✅ Credit transaction confirmed - payment successful');
           } else {
-            console.error('⚠️ Failed to deduct credits on payment completion:', creditResult.error);
-            // Don't fail the order processing, but log the issue
+            console.warn('⚠️ No credit transaction ID found for confirmation');
           }
         } catch (creditError) {
-          console.error('⚠️ Critical error deducting credits on payment completion:', creditError);
-          // Don't fail the order processing for credit errors
+          console.error('⚠️ Error confirming credit transaction (payment still successful):', creditError);
+          // Don't fail the order processing for credit confirmation errors
         }
       } else {
-        console.log('💳 No credits to deduct:', {
-          creditsToApply: updatedOrder.credits_to_apply,
+        console.log('💳 No pre-deducted credits to confirm:', {
+          creditsApplied: updatedOrder.credits_applied,
           userId: metadata.userId,
           isGuest: metadata.userId === 'guest'
         });
@@ -927,43 +968,28 @@ async function handleCheckoutSessionCompleted(session) {
       
       console.log('✅ New order created:', order?.id);
       
-      // Handle credits for new orders (fallback case)
+      // Credits were already handled at checkout time for new orders too
       if (cartMetadata?.creditsApplied && parseFloat(cartMetadata.creditsApplied) > 0 && metadata.userId !== 'guest' && order?.id) {
+        const creditsApplied = parseFloat(cartMetadata.creditsApplied);
+        console.log('💳 Confirming pre-deducted credits for new order:', creditsApplied);
+        console.log('💳 Order ID:', order.id);
+        console.log('💳 User ID:', metadata.userId);
+        
+        // Credits were already deducted at checkout - just confirm and track
         try {
-          const creditsToApply = parseFloat(cartMetadata.creditsApplied);
-          console.log('💳 Deducting credits for new order on successful payment:', creditsToApply);
-          console.log('💳 Order ID:', order.id);
-          console.log('💳 User ID:', metadata.userId);
-          
-          // Actually deduct the credits now
-          const creditHandlers = require('./credit-handlers');
-          const creditResult = await creditHandlers.applyCreditsToOrder(
-            order.id,
-            creditsToApply,
-            metadata.userId
-          );
-          
-          if (creditResult.success) {
-            console.log('✅ Credits deducted successfully for new order:', creditResult.remainingBalance);
+          const client = supabaseClient.getServiceClient();
+          await client
+            .from('orders_main')
+            .update({
+              credits_applied: creditsApplied,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', order.id);
             
-            // Update the order record to track credits used
-            const client = supabaseClient.getServiceClient();
-            await client
-              .from('orders_main')
-              .update({
-                credits_applied: creditsToApply,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', order.id);
-              
-            console.log('✅ New order updated with credits tracking');
-          } else {
-            console.error('⚠️ Failed to deduct credits for new order:', creditResult.error);
-            // Don't fail the order processing, but log the issue
-          }
+          console.log('✅ New order updated with pre-deducted credits confirmation');
         } catch (creditError) {
-          console.error('⚠️ Critical error deducting credits for new order:', creditError);
-          // Don't fail the order processing for credit errors
+          console.error('⚠️ Error updating new order with credit confirmation:', creditError);
+          // Don't fail the order processing for tracking errors
         }
       }
       
@@ -1060,28 +1086,51 @@ async function handlePaymentIntentFailed(paymentIntent) {
   if (paymentIntent.metadata?.customerOrderId && supabaseClient.isReady()) {
     const client = supabaseClient.getServiceClient();
     
-    // Get the failed order to check if credits were applied
+    // Get the failed order to check if credits were pre-deducted
     const { data: order } = await client
       .from('orders_main')
-      .select('id, user_id, credits_applied')
+      .select('id, user_id, credits_applied, credit_transaction_id')
       .eq('id', paymentIntent.metadata.customerOrderId)
       .single();
     
     if (order && order.credits_applied > 0 && order.user_id) {
       try {
-        console.log('💳 Reversing credits for failed payment:', order.credits_applied);
+        console.log('💳 Reversing pre-deducted credits for failed payment:', order.credits_applied);
+        console.log('💳 Transaction ID:', order.credit_transaction_id);
         
-        // Add back the credits that were deducted
         const creditHandlers = require('./credit-handlers');
-        await creditHandlers.addUserCredits({
-          userId: order.user_id,
-          amount: order.credits_applied,
-          reason: 'Credit reversal due to payment failure'
-        }, null);
         
-        console.log('✅ Credits reversed successfully');
+        // Use proper transaction reversal if we have the transaction ID
+        if (order.credit_transaction_id) {
+          await creditHandlers.reverseTransaction(
+            order.credit_transaction_id,
+            'Payment failed - reversing pre-deducted credits'
+          );
+          console.log('✅ Credits reversed using transaction ID');
+        } else {
+          // Fallback: manually add credits back
+          await creditHandlers.addUserCredits({
+            userId: order.user_id,
+            amount: order.credits_applied,
+            reason: 'Credit reversal due to payment failure (fallback method)'
+          }, null);
+          console.log('✅ Credits reversed using fallback method');
+        }
+        
+        // Clear the credit fields from the order
+        await client
+          .from('orders_main')
+          .update({
+            credits_applied: 0,
+            credit_transaction_id: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', order.id);
+          
+        console.log('✅ Order updated - credits cleared');
       } catch (creditError) {
-        console.error('⚠️ Failed to reverse credits:', creditError);
+        console.error('🚨 CRITICAL: Failed to reverse credits for failed payment:', creditError);
+        // This is critical - user paid nothing but lost credits
       }
     }
     

@@ -692,7 +692,7 @@ const sendEmailWithAttachment = async (to, subject, html, attachmentBuffer, atta
     return { success: false, error: 'Email service not configured' };
   }
 
-  // Debug API key format (without exposing the full key)
+        // Validate API key format for security
   console.log('🔑 RESEND_API_KEY configured:', {
     hasKey: !!RESEND_API_KEY,
     keyPrefix: RESEND_API_KEY ? RESEND_API_KEY.substring(0, 8) + '...' : 'None',

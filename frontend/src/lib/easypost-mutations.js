@@ -90,6 +90,18 @@ export const BUY_EASYPOST_LABEL = gql`
   }
 `;
 
+export const GET_EASYPOST_LABEL = gql`
+  mutation GetEasyPostLabel($trackingCode: String!) {
+    getEasyPostLabel(trackingCode: $trackingCode) {
+      success
+      error
+      labelUrl
+      trackingCode
+      carrier
+    }
+  }
+`;
+
 export const TRACK_EASYPOST_SHIPMENT = gql`
   mutation TrackEasyPostShipment($trackingCode: String!) {
     trackEasyPostShipment(trackingCode: $trackingCode) {

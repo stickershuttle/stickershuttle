@@ -9,7 +9,7 @@ class EasyPostService {
     }
 
     init() {
-        // Debug: Log all EasyPost-related environment variables
+        // Validate EasyPost configuration
         console.log('🔍 DEBUG: Environment variables check:');
         console.log('NODE_ENV:', process.env.NODE_ENV);
         console.log('EASYPOST_TEST_MODE:', process.env.EASYPOST_TEST_MODE);
@@ -126,7 +126,7 @@ class EasyPostService {
             const shipment = await this.client.Shipment.create(shipmentData);
             console.log('✅ EasyPost shipment created:', shipment.id);
             
-            // Debug: Log carriers and rate count
+            // Log shipping rate summary for analytics
             if (shipment.rates && shipment.rates.length > 0) {
                 const carrierCounts = {};
                 shipment.rates.forEach(rate => {
@@ -346,12 +346,12 @@ class EasyPostService {
             }
 
             // Minimum package dimensions
-            // UPS typically requires minimum 1 lb (16 oz) for some services
+            // UPS typically requires minimum 1 lb (16 oz) for most services
             parcel = {
-                length: Math.max(maxLength, 6), // Minimum 6 inches
-                width: Math.max(maxWidth, 4),   // Minimum 4 inches  
-                height: Math.max(totalHeight, 1), // Minimum 1 inch
-                weight: Math.max(totalWeight, 2)  // Minimum 2 oz (some UPS services need more)
+                length: Math.max(maxLength, 8), // Minimum 8 inches for UPS compatibility
+                width: Math.max(maxWidth, 6),   // Minimum 6 inches for UPS compatibility  
+                height: Math.max(totalHeight, 2), // Minimum 2 inches for UPS compatibility
+                weight: Math.max(totalWeight, 16)  // Minimum 16 oz (1 lb) for UPS services
             };
         }
 

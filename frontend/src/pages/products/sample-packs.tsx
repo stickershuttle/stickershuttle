@@ -5,9 +5,11 @@ import { useState } from "react";
 import { useCart } from "@/components/CartContext";
 import { ProductCategory } from "@/types/product";
 import Link from "next/link";
+import { useRouter } from "next/router";
 
 export default function SamplePacks() {
   const { addToCart } = useCart();
+  const router = useRouter();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   const handleAddToCart = async () => {
@@ -48,6 +50,9 @@ export default function SamplePacks() {
 
     addToCart(samplePackItem);
     setIsAddingToCart(false);
+    
+    // Redirect to cart page
+    router.push('/cart');
   };
 
   const stickerTypes = [
@@ -56,6 +61,12 @@ export default function SamplePacks() {
       description: 'Smooth, non-reflective finish',
       image: 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png',
       filter: 'drop-shadow(0 0 12px rgba(168, 242, 106, 0.35)) drop-shadow(0 0 24px rgba(168, 242, 106, 0.21))'
+    },
+    { 
+      name: 'Premium Gloss Sticker', 
+      description: 'High-gloss shiny finish',
+      image: 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png',
+      filter: 'drop-shadow(0 0 12px rgba(34, 197, 94, 0.35)) drop-shadow(0 0 24px rgba(34, 197, 94, 0.21))'
     },
     { 
       name: 'Holographic Sticker', 
@@ -80,12 +91,6 @@ export default function SamplePacks() {
       description: 'Metallic mirror finish',
       image: 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png',
       filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.28)) drop-shadow(0 0 12px rgba(180, 180, 180, 0.21)) drop-shadow(0 0 18px rgba(240, 240, 240, 0.14))'
-    },
-    { 
-      name: 'Premium Gloss Sticker', 
-      description: 'High-gloss shiny finish',
-      image: 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png',
-      filter: 'drop-shadow(0 0 12px rgba(34, 197, 94, 0.35)) drop-shadow(0 0 24px rgba(34, 197, 94, 0.21))'
     }
   ];
 

@@ -2715,7 +2715,7 @@ function Dashboard() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         ),
-        statuses: ['Proof Sent', 'Awaiting Approval']
+        statuses: ['Proof Sent', 'Awaiting Approval', 'Proof Review Needed']
       },
       { 
         id: 'printing', 
@@ -7947,7 +7947,7 @@ function Dashboard() {
           )}
           {/* Header Section */}
           <div className="pt-6 pb-6">
-            <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto">
+            <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
               {/* Header - Banner with Profile */}
               <div 
                 className={`relative rounded-xl p-4 md:p-6 shadow-xl mb-6 overflow-hidden cursor-pointer group ${

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { uploadToCloudinary, validateFile, CloudinaryUploadResult, UploadProgress } from '../utils/cloudinary';
 import { useMutation, gql } from '@apollo/client';
 
@@ -92,6 +92,9 @@ interface ProofFile {
   uploaded: boolean;
   cloudinaryResult?: CloudinaryUploadResult;
   error?: string;
+  retryCount?: number;
+  canRetry?: boolean;
+  abortController?: AbortController;
 }
 
 interface ProofUploadProps {
@@ -133,6 +136,78 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
   const [replaceProofFile] = useMutation(REPLACE_PROOF_FILE);
   const [removeProof] = useMutation(REMOVE_PROOF);
   const [addProofNotes] = useMutation(ADD_PROOF_NOTES);
+
+  // Enhanced cleanup on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      console.log('🧹 Cleaning up ProofUpload component');
+      
+      // Cancel all active uploads
+      proofFiles.forEach(proof => {
+        if (proof.abortController && proof.uploading) {
+          console.log('⏹️ Cancelling upload for:', proof.file.name);
+          proof.abortController.abort();
+        }
+        // Clean up preview URLs to prevent memory leaks
+        if (proof.preview) {
+          URL.revokeObjectURL(proof.preview);
+        }
+      });
+    };
+  }, []);
+
+  // Enhanced cleanup for specific files when they're removed
+  const cleanupProofFile = useCallback((proofFile: ProofFile) => {
+    if (proofFile.preview) {
+      URL.revokeObjectURL(proofFile.preview);
+    }
+    if (proofFile.abortController && proofFile.uploading) {
+      proofFile.abortController.abort();
+    }
+  }, []);
+
+  // Enhanced retry mechanism
+  const retryUpload = useCallback((proofId: string) => {
+    const proofFile = proofFiles.find(p => p.id === proofId);
+    if (!proofFile) return;
+
+    console.log('🔄 Retrying upload for:', proofFile.file.name);
+    
+    // Reset error state and increment retry count
+    setProofFiles(prev => prev.map(p => 
+      p.id === proofId ? { 
+        ...p, 
+        error: undefined, 
+        retryCount: (p.retryCount || 0) + 1,
+        uploading: false,
+        progress: 0
+      } : p
+    ));
+
+    // Re-upload the file
+    uploadProof(proofFile);
+  }, [proofFiles]);
+
+  // Enhanced cancel upload function
+  const cancelUpload = useCallback((proofId: string) => {
+    const proofFile = proofFiles.find(p => p.id === proofId);
+    if (!proofFile) return;
+
+    console.log('⏹️ Cancelling upload for:', proofFile.file.name);
+    
+    if (proofFile.abortController) {
+      proofFile.abortController.abort();
+    }
+
+    setProofFiles(prev => prev.map(p => 
+      p.id === proofId ? { 
+        ...p, 
+        uploading: false, 
+        error: 'Upload cancelled',
+        canRetry: true
+      } : p
+    ));
+  }, [proofFiles]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -183,7 +258,9 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
           uploading: false,
           progress: 0,
           uploaded: false,
-          error: validation.error
+          error: validation.error,
+          retryCount: 0,
+          canRetry: false
         };
       }
 
@@ -194,14 +271,17 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
         preview,
         uploading: false,
         progress: 0,
-        uploaded: false
+        uploaded: false,
+        retryCount: 0,
+        canRetry: true,
+        abortController: new AbortController()
       };
     });
 
     console.log('📦 New proof files created:', newProofFiles);
     setProofFiles(prev => [...prev, ...newProofFiles]);
     
-    // Auto-upload valid files
+    // Auto-upload valid files with enhanced error handling
     newProofFiles.forEach(proofFile => {
       if (!proofFile.error) {
         console.log('🚀 Auto-uploading file:', proofFile.file.name);
@@ -354,11 +434,18 @@ Please try re-uploading or contact support.`);
 
     } catch (error) {
       console.error('Error uploading proof:', error);
+      
+      const isAborted = error instanceof Error && error.name === 'AbortError';
+      const retryCount = proofFiles.find(p => p.id === proofId)?.retryCount || 0;
+      const maxRetries = 3;
+      
       setProofFiles(prev => prev.map(p => 
         p.id === proofId ? { 
           ...p, 
           uploading: false, 
-          error: 'Failed to upload proof' 
+          error: isAborted ? 'Upload cancelled' : `Failed to upload proof${retryCount > 0 ? ` (attempt ${retryCount + 1})` : ''}`,
+          canRetry: !isAborted && retryCount < maxRetries,
+          retryCount: retryCount
         } : p
       ));
     }
@@ -366,8 +453,9 @@ Please try re-uploading or contact support.`);
 
   const removeProofFile = (proofId: string) => {
     const proofFile = proofFiles.find(p => p.id === proofId);
-    if (proofFile?.preview) {
-      URL.revokeObjectURL(proofFile.preview);
+    if (proofFile) {
+      console.log('🗑️ Removing proof file:', proofFile.file.name);
+      cleanupProofFile(proofFile);
     }
     setProofFiles(prev => prev.filter(p => p.id !== proofId));
   };

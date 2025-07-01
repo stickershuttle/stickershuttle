@@ -55,6 +55,40 @@ class AuthenticationError extends GraphQLError {
     });
   }
 }
+
+// Admin authentication helper
+function requireAdminAuth(user) {
+  if (!user) {
+    throw new AuthenticationError('Authentication required');
+  }
+  
+  const ADMIN_EMAILS = ['justin@stickershuttle.com', 'admin@stickershuttle.com', 'orbit@stickershuttle.com'];
+  if (!ADMIN_EMAILS.includes(user.email)) {
+    throw new AuthenticationError('Admin access required');
+  }
+  
+  return true;
+}
+
+// Standardized error response helper
+function createErrorResponse(message, details = null) {
+  return {
+    success: false,
+    message,
+    error: details,
+    data: null
+  };
+}
+
+// Standardized success response helper
+function createSuccessResponse(message, data = null) {
+  return {
+    success: true,
+    message,
+    error: null,
+    data
+  };
+}
 const uploadRoutes = require('./upload-routes');
 const supabaseClient = require('./supabase-client');
 const stripeClient = require('./stripe-client');
@@ -80,47 +114,91 @@ console.log('  - EasyPost:', easyPostClient.isReady() ? '✅ Ready' : '❌ Not c
 // Initialize Express app
 const app = express();
 
-// Add CORS middleware
-// CORS configuration - restrict to production domains only
-const allowedOrigins = [
-  'https://stickershuttle.com',
-  'https://www.stickershuttle.com',
-  'https://stickershuttle.vercel.app',
-  ...(process.env.NODE_ENV !== 'production' ? [
-    'http://localhost:3000', 
-    'http://127.0.0.1:3000',
-    'http://localhost:3001',
-    'http://localhost:3002',
-    'https://localhost:3000',
-    'https://studio.apollographql.com'
-  ] : [])
-];
+// Enhanced CORS configuration with proper security and development support
+const corsConfig = {
+  // Define allowed origins with environment-specific logic
+  getOrigins() {
+    const baseOrigins = [
+      'https://stickershuttle.com',
+      'https://www.stickershuttle.com',
+      'https://stickershuttle.vercel.app'
+    ];
 
-app.use(cors({
+    // Add development origins only in non-production environments
+    const isDevelopment = process.env.NODE_ENV !== 'production';
+    const developmentOrigins = isDevelopment ? [
+      'http://localhost:3000',
+      'http://localhost:3001', 
+      'http://localhost:3002',
+      'http://127.0.0.1:3000',
+      'https://localhost:3000',
+      'https://studio.apollographql.com',
+      'http://localhost:4000' // Backend dev server
+    ] : [];
+
+    return [...baseOrigins, ...developmentOrigins];
+  },
+
+  // Origin validation with better security
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    const allowedOrigins = corsConfig.getOrigins();
+    const isDevelopment = process.env.NODE_ENV !== 'production';
     
-    const isProduction = process.env.NODE_ENV === 'production';
-    
-    // In development OR when NODE_ENV is undefined, be more lenient with localhost
-    if (!isProduction) {
-      if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('192.168.'))) {
-        console.log(`✅ CORS allowed development origin: ${origin}`);
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) {
+      console.log('✅ CORS: No origin header (mobile/native app) - allowed');
+      return callback(null, true);
+    }
+
+    // Check exact match first
+    if (allowedOrigins.includes(origin)) {
+      console.log(`✅ CORS: Exact match allowed - ${origin}`);
+      return callback(null, true);
+    }
+
+    // In development, be more flexible with localhost variations
+    if (isDevelopment) {
+      const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|0\.0\.0\.0)(:\d+)?$/.test(origin);
+      if (isLocalhost) {
+        console.log(`✅ CORS: Development localhost allowed - ${origin}`);
         return callback(null, true);
       }
     }
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      console.log(`✅ CORS allowed whitelisted origin: ${origin}`);
-      callback(null, true);
-    } else {
-      console.log(`🚫 CORS blocked origin: ${origin} (NODE_ENV: ${process.env.NODE_ENV || 'undefined'})`);
-      callback(new Error('Not allowed by CORS'));
-    }
+
+    // Reject all other origins
+    console.error(`🚫 CORS: Blocked origin - ${origin} (ENV: ${process.env.NODE_ENV || 'undefined'})`);
+    console.error(`🔍 CORS: Allowed origins:`, allowedOrigins);
+    callback(new Error(`CORS policy violation: Origin ${origin} not allowed`));
   },
-  credentials: true
-}));
+
+  // Enhanced credentials and headers configuration
+  credentials: true,
+  
+  // Allow common headers
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With', 
+    'Content-Type',
+    'Accept',
+    'Authorization',
+    'Cache-Control',
+    'X-HTTP-Method-Override',
+    'apollo-require-preflight'
+  ],
+  
+  // Allow common methods
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  
+  // Enable preflight for all routes
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+  
+  // Cache preflight for performance
+  maxAge: 86400 // 24 hours
+};
+
+// Apply CORS with enhanced configuration
+app.use(cors(corsConfig));
 
 // Add security headers with Helmet
 app.use(helmet({
@@ -432,6 +510,7 @@ const typeDefs = gql`
     createEasyPostShipment(orderId: ID!, packageDimensions: PackageDimensionsInput): EasyPostShipmentResult
     buyEasyPostLabel(shipmentId: String!, rateId: String!, orderId: ID!, insurance: String): EasyPostLabelResult
     trackEasyPostShipment(trackingCode: String!): EasyPostTrackingResult
+    getEasyPostLabel(trackingCode: String!): EasyPostLabelUrlResult
     
     # Manual tracking update mutation
     updateOrderTracking(orderId: ID!): CustomerOrder
@@ -1072,6 +1151,14 @@ const typeDefs = gql`
     error: String
   }
 
+  type EasyPostLabelUrlResult {
+    success: Boolean!
+    labelUrl: String
+    trackingCode: String
+    carrier: String
+    error: String
+  }
+
   input StripeCheckoutInput {
     lineItems: [StripeLineItemInput!]!
     successUrl: String!
@@ -1575,7 +1662,7 @@ const resolvers = {
           }
         }
         
-        // Debug: Log the first order's items to see the actual structure
+        // Log order structure for analytics (production-safe)
         if (paidOrders.length > 0 && paidOrders[0].items) {
           console.log('🔍 First paid order items structure:', JSON.stringify(paidOrders[0].items, null, 2));
         }
@@ -2364,6 +2451,14 @@ const resolvers = {
       }
 
       try {
+        // Validate inputs
+        if (!orderId) {
+          throw new Error('Order ID is required');
+        }
+        if (!user?.id) {
+          throw new Error('User ID is required');
+        }
+
         const client = supabaseClient.getServiceClient();
         
         // Check if user owns the order
@@ -2374,7 +2469,7 @@ const resolvers = {
           .eq('user_id', user.id)
           .single();
 
-        if (orderError) {
+        if (orderError || !order) {
           throw new Error('Order not found or access denied');
         }
 
@@ -2398,12 +2493,18 @@ const resolvers = {
           return null;
         }
 
+        // Safe property access with null checks
+        const safeUserMetadata = user.user_metadata || {};
+        const firstName = safeUserMetadata.first_name || '';
+        const lastName = safeUserMetadata.last_name || '';
+        const displayName = `${firstName} ${lastName}`.trim() || 'Anonymous User';
+
         return {
           ...review,
-          userEmail: review.users?.email || user.email,
-          userFirstName: user.user_metadata?.first_name || '',
-          userLastName: user.user_metadata?.last_name || '',
-          userDisplayName: `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || 'Anonymous User'
+          userEmail: review.users?.email || user.email || '',
+          userFirstName: firstName,
+          userLastName: lastName,
+          userDisplayName: displayName
         };
       } catch (error) {
         console.error('Error in getOrderReview:', error);
@@ -2571,11 +2672,13 @@ const resolvers = {
 
     getAllUsers: async (_, args, context) => {
       try {
-        // TODO: Add admin authentication check
         const { user } = context;
         if (!user) {
-          throw new Error('Authentication required');
+          throw new AuthenticationError('Authentication required');
         }
+
+        // Admin authentication required
+        requireAdminAuth(user);
 
         console.log('📋 Fetching all users using admin API...');
         const client = supabaseClient.getServiceClient();
@@ -4078,32 +4181,68 @@ const resolvers = {
         let customerOrder = null;
         let actualCreditsApplied = 0;
         let remainingCredits = 0;
-
+        let creditDeductionId = null; // Track the credit transaction for potential reversal
+        
         // Step 1: Calculate credits before creating order
         const cartSubtotal = input.cartItems.reduce((sum, item) => sum + item.totalPrice, 0);
         const discountAmount = input.discountAmount || 0;
         const creditsToApply = input.creditsToApply || 0;
         
-        // Apply credits if provided
-        if (creditsToApply > 0 && input.userId) {
+        // IMMEDIATELY deduct credits if provided (before payment processing)
+        if (creditsToApply > 0 && input.userId && input.userId !== 'guest') {
           try {
-            // Check user's credit balance
-            const creditBalance = await creditHandlers.getUserCreditBalance(input.userId);
-            remainingCredits = creditBalance.balance;
+            console.log('💳 Processing credit application for user:', input.userId);
+            
+            const creditHandlers = require('./credit-handlers');
+            const currentBalance = await creditHandlers.getUserCreditBalance(input.userId);
             
             // Calculate how much credit can be applied
             const afterDiscountTotal = cartSubtotal - discountAmount;
-            actualCreditsApplied = Math.min(creditsToApply, creditBalance.balance, afterDiscountTotal);
+            const maxCreditsToApply = Math.min(creditsToApply, currentBalance, afterDiscountTotal);
             
-            console.log('💳 Credit application:', {
+            if (maxCreditsToApply > 0) {
+              console.log('💳 Deducting credits immediately before payment...');
+              
+              // ACTUALLY deduct credits now (not in webhook)
+              const creditResult = await creditHandlers.deductUserCredits({
+                userId: input.userId,
+                amount: maxCreditsToApply,
+                reason: 'Applied to order (pre-payment)',
+                orderId: null, // Will be updated when order is created
+                transactionType: 'deduction_pending_payment'
+              });
+              
+              if (creditResult.success) {
+                actualCreditsApplied = maxCreditsToApply;
+                remainingCredits = creditResult.remainingBalance;
+                creditDeductionId = creditResult.transactionId;
+                
+                console.log('✅ Credits deducted successfully at checkout time');
+                console.log('💳 Applied:', actualCreditsApplied);
+                console.log('💳 Remaining balance:', remainingCredits);
+                console.log('💳 Transaction ID:', creditDeductionId);
+              } else {
+                console.error('❌ Failed to deduct credits:', creditResult.error);
+                errors.push(`Credit deduction failed: ${creditResult.error}`);
+                actualCreditsApplied = 0;
+                remainingCredits = currentBalance;
+              }
+            } else {
+              remainingCredits = currentBalance;
+              console.log('⚠️ No credits to apply (insufficient balance or amount)');
+            }
+            
+            console.log('💳 Credit processing summary:', {
               requested: creditsToApply,
-              available: creditBalance.balance,
+              available: currentBalance,
               applied: actualCreditsApplied,
-              afterDiscountTotal
+              afterDiscountTotal,
+              transactionId: creditDeductionId
             });
           } catch (creditError) {
-            console.error('Error checking credits:', creditError);
-            // Continue without credits if there's an error
+            console.error('❌ Critical error processing credits:', creditError);
+            errors.push(`Credit system error: ${creditError.message}`);
+            actualCreditsApplied = 0;
           }
         }
 
@@ -4167,32 +4306,63 @@ const resolvers = {
               await supabaseClient.createOrderItems(orderItems);
               console.log('✅ Order items created');
 
-              // Store credit info for webhook processing - DON'T deduct yet
-              if (actualCreditsApplied > 0 && input.userId) {
-                console.log('💳 Storing credit info for webhook processing:', actualCreditsApplied);
+              // Store credit confirmation - credits already deducted
+              if (actualCreditsApplied > 0 && input.userId && creditDeductionId) {
+                console.log('💳 Storing credit confirmation in order:', actualCreditsApplied);
                 console.log('💳 Order ID:', customerOrder.id);
-                console.log('💳 User ID:', input.userId);
+                console.log('💳 Transaction ID:', creditDeductionId);
                 
-                // Store the credit application info in the order for webhook processing
                 try {
                   const client = supabaseClient.getServiceClient();
                   const { error: creditUpdateError } = await client
                     .from('orders_main')
                     .update({
-                      credits_to_apply: actualCreditsApplied,
+                      credits_applied: actualCreditsApplied, // Actual applied (already deducted)
+                      credit_transaction_id: creditDeductionId, // For potential reversal
                       updated_at: new Date().toISOString()
                     })
                     .eq('id', customerOrder.id);
                   
                   if (creditUpdateError) {
-                    console.error('⚠️ Failed to store credit info in order:', creditUpdateError);
+                    console.error('⚠️ Failed to store credit confirmation in order:', creditUpdateError);
                     errors.push(`Credit tracking failed: ${creditUpdateError.message}`);
+                    
+                    // Critical: If we can't track the deduction, reverse it to prevent credit loss
+                    try {
+                      const creditHandlers = require('./credit-handlers');
+                      await creditHandlers.reverseTransaction(creditDeductionId, 'Order creation failed - tracking error');
+                      console.log('🔄 Credits reversed due to tracking failure');
+                      actualCreditsApplied = 0; // Reset since we reversed
+                    } catch (reverseError) {
+                      console.error('🚨 CRITICAL: Failed to reverse credits:', reverseError);
+                      errors.push('CRITICAL: Credit reversal failed - manual intervention required');
+                    }
                   } else {
-                    console.log('✅ Credit info stored in order for webhook processing');
+                    console.log('✅ Credit confirmation stored in order');
+                    
+                    // Update the credit transaction with the order ID
+                    try {
+                      const creditHandlers = require('./credit-handlers');
+                      await creditHandlers.updateTransactionOrderId(creditDeductionId, customerOrder.id);
+                    } catch (updateError) {
+                      console.warn('⚠️ Failed to update credit transaction with order ID:', updateError);
+                    }
                   }
                 } catch (creditStoreError) {
-                  console.error('⚠️ Critical error storing credit info:', creditStoreError);
+                  console.error('⚠️ Critical error storing credit confirmation:', creditStoreError);
                   errors.push(`Credit system error: ${creditStoreError.message}`);
+                  
+                  // Attempt to reverse the transaction since we can't track it properly
+                  if (creditDeductionId) {
+                    try {
+                      const creditHandlers = require('./credit-handlers');
+                      await creditHandlers.reverseTransaction(creditDeductionId, 'Order creation failed - critical error');
+                      console.log('🔄 Credits reversed due to critical error');
+                      actualCreditsApplied = 0;
+                    } catch (reverseError) {
+                      console.error('🚨 CRITICAL: Failed to reverse credits after critical error:', reverseError);
+                    }
+                  }
                 }
               }
             }
@@ -4661,6 +4831,86 @@ const resolvers = {
         };
       } catch (error) {
         console.error('Error tracking EasyPost shipment:', error);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+    },
+
+    getEasyPostLabel: async (_, { trackingCode }) => {
+      try {
+        if (!easyPostClient.isReady()) {
+          return {
+            success: false,
+            error: 'EasyPost service is not configured'
+          };
+        }
+
+        // Get order by tracking number to find the shipment reference
+        if (!supabaseClient.isReady()) {
+          return {
+            success: false,
+            error: 'Database service is not available'
+          };
+        }
+
+        const client = supabaseClient.getServiceClient();
+        const { data: order, error: orderError } = await client
+          .from('orders_main')
+          .select('id, order_number, tracking_number')
+          .eq('tracking_number', trackingCode)
+          .single();
+
+        if (orderError || !order) {
+          return {
+            success: false,
+            error: 'Order not found with this tracking number'
+          };
+        }
+
+        // Use order reference to find shipment in EasyPost
+        const orderReference = order.order_number || order.id;
+        console.log('🔍 Looking for EasyPost shipment with reference:', orderReference);
+
+        // Try to find the shipment by searching recent shipments
+        const easyPostApiClient = easyPostClient.getClient();
+        
+        try {
+          // Get recent shipments and find the one with matching reference
+          const shipments = await easyPostApiClient.Shipment.all({ 
+            page_size: 100 // Get last 100 shipments
+          });
+
+          const matchingShipment = shipments.shipments.find(shipment => 
+            shipment.reference === orderReference && shipment.tracking_code === trackingCode
+          );
+
+          if (matchingShipment && matchingShipment.postage_label && matchingShipment.postage_label.label_url) {
+            console.log('✅ Found shipment label URL:', matchingShipment.postage_label.label_url);
+            
+            return {
+              success: true,
+              labelUrl: matchingShipment.postage_label.label_url,
+              trackingCode: matchingShipment.tracking_code,
+              carrier: matchingShipment.selected_rate?.carrier || 'Unknown'
+            };
+          } else {
+            console.warn('⚠️ Shipment found but no label URL available');
+            return {
+              success: false,
+              error: 'Shipping label not found for this tracking number'
+            };
+          }
+        } catch (searchError) {
+          console.error('❌ Error searching for shipment:', searchError);
+          return {
+            success: false,
+            error: 'Failed to retrieve shipping label from EasyPost'
+          };
+        }
+      } catch (error) {
+        console.error('Error getting EasyPost label:', error);
         return {
           success: false,
           error: error.message
@@ -5196,10 +5446,8 @@ const resolvers = {
       try {
         console.log('🎫 Creating discount code:', input);
         
-        // TODO: Add admin authentication check here
-        // if (!context.user || !isAdmin(context.user)) {
-        //   throw new AuthenticationError('Admin access required');
-        // }
+        // Admin authentication required
+        requireAdminAuth(context.user);
         
         const code = await discountManager.createDiscountCode(input);
         
@@ -5229,7 +5477,8 @@ const resolvers = {
       try {
         console.log('📝 Updating discount code:', id, input);
         
-        // TODO: Add admin authentication check here
+        // Admin authentication required
+        requireAdminAuth(context.user);
         
         const code = await discountManager.updateDiscountCode(id, input);
         
@@ -5259,7 +5508,8 @@ const resolvers = {
       try {
         console.log('🗑️ Deleting discount code:', id);
         
-        // TODO: Add admin authentication check here
+        // Admin authentication required
+        requireAdminAuth(context.user);
         
         return await discountManager.deleteDiscountCode(id);
       } catch (error) {
@@ -5316,7 +5566,8 @@ const resolvers = {
           valid: false,
           discountCode: null,
           discountAmount: 0,
-          message: 'Error applying discount'
+          message: 'Error applying discount',
+          error: error.message
         };
       }
     },
@@ -5339,7 +5590,8 @@ const resolvers = {
         console.error('❌ Error removing discount session:', error);
         return {
           success: false,
-          message: 'Error removing discount session'
+          message: 'Error removing discount session',
+          error: error.message
         };
       }
     },
@@ -5356,8 +5608,9 @@ const resolvers = {
     
     addUserCredits: async (_, { input }, context) => {
       try {
-        // TODO: Add admin authentication check
-        const adminUserId = context.user?.id || null;
+        // Admin authentication required
+        requireAdminAuth(context.user);
+        const adminUserId = context.user.id;
         return await creditHandlers.addUserCredits(input, adminUserId);
       } catch (error) {
         console.error('❌ Error adding user credits:', error);
@@ -5367,8 +5620,9 @@ const resolvers = {
     
     addCreditsToAllUsers: async (_, { amount, reason }, context) => {
       try {
-        // TODO: Add admin authentication check
-        const adminUserId = context.user?.id || null;
+        // Admin authentication required
+        requireAdminAuth(context.user);
+        const adminUserId = context.user.id;
         return await creditHandlers.addCreditsToAllUsers(amount, reason, adminUserId);
       } catch (error) {
         console.error('❌ Error adding credits to all users:', error);
@@ -6632,17 +6886,47 @@ async function startServer() {
       }
       
       // Handle graceful shutdown
-      process.on('SIGTERM', () => {
+      process.on('SIGTERM', async () => {
         console.log('🛑 Received SIGTERM, shutting down gracefully');
-        discountManager.destroy();
-        process.exit(0);
+        await gracefulShutdown();
       });
       
-      process.on('SIGINT', () => {
+      process.on('SIGINT', async () => {
         console.log('🛑 Received SIGINT, shutting down gracefully');
-        discountManager.destroy();
-        process.exit(0);
+        await gracefulShutdown();
       });
+
+      // Graceful shutdown function
+      async function gracefulShutdown() {
+        try {
+          console.log('🧹 Starting graceful shutdown...');
+          
+          // Stop accepting new connections
+          if (server) {
+            console.log('⏹️ Stopping Apollo Server...');
+            await server.stop();
+          }
+
+          // Cleanup discount manager
+          console.log('💰 Cleaning up discount manager...');
+          discountManager.destroy();
+
+          // Cleanup analytics
+          console.log('📊 Cleaning up analytics...');
+          const serverAnalytics = require('./business-analytics');
+          await serverAnalytics.shutdown();
+
+          // Cleanup database connections
+          console.log('🗄️ Cleaning up database connections...');
+          await supabaseClient.cleanup();
+
+          console.log('✅ Graceful shutdown completed');
+          process.exit(0);
+        } catch (error) {
+          console.error('❌ Error during graceful shutdown:', error);
+          process.exit(1);
+        }
+      }
     });
   } catch (error) {
     console.error('❌ Failed to start Apollo Server:', error);

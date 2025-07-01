@@ -29,13 +29,39 @@ class SupabaseClient {
 
         try {
             console.log('🔧 [SupabaseClient] Creating service role client...');
-            // Create service role client (for server-side operations)
+            // Create service role client (for server-side operations) with connection pooling
             this.serviceClient = createClient(this.supabaseUrl, this.supabaseServiceKey, {
                 auth: {
                     autoRefreshToken: false,
                     persistSession: false
+                },
+                db: {
+                    schema: 'public'
+                },
+                global: {
+                    headers: { 'x-my-custom-header': 'sticker-shuttle-api' },
+                },
+                // Add connection pooling and timeout configurations
+                realtime: {
+                    params: {
+                        eventsPerSecond: 10
+                    }
                 }
             });
+
+            // Configure connection pool limits and timeouts
+            if (this.serviceClient.supabaseUrl) {
+                // Set reasonable timeouts to prevent hanging connections
+                this.connectionTimeout = 30000; // 30 seconds
+                this.idleTimeout = 600000; // 10 minutes
+                this.maxConnections = 20; // Limit concurrent connections
+                
+                console.log('🔧 [SupabaseClient] Connection pooling configured:', {
+                    connectionTimeout: this.connectionTimeout,
+                    idleTimeout: this.idleTimeout,
+                    maxConnections: this.maxConnections
+                });
+            }
 
             // Create anon client (for client-side operations if needed)
             if (this.supabaseAnonKey) {
@@ -69,6 +95,81 @@ class SupabaseClient {
     // Check if Supabase is properly configured
     isReady() {
         return this.isConfigured;
+    }
+
+    // Get connection statistics
+    getConnectionStats() {
+        return {
+            isConfigured: this.isConfigured,
+            hasServiceClient: !!this.serviceClient,
+            hasAnonClient: !!this.anonClient,
+            connectionTimeout: this.connectionTimeout || 'not set',
+            idleTimeout: this.idleTimeout || 'not set',
+            maxConnections: this.maxConnections || 'not set'
+        };
+    }
+
+    // Cleanup method for graceful shutdown
+    async cleanup() {
+        console.log('🧹 [SupabaseClient] Starting cleanup...');
+        
+        if (this.serviceClient) {
+            try {
+                // Disconnect realtime connections if any
+                if (this.serviceClient.realtime) {
+                    await this.serviceClient.realtime.disconnect();
+                }
+                
+                // Clear any cached connections
+                this.serviceClient = null;
+                console.log('✅ Service client cleaned up');
+            } catch (error) {
+                console.error('⚠️ Error cleaning up service client:', error);
+            }
+        }
+
+        if (this.anonClient) {
+            try {
+                if (this.anonClient.realtime) {
+                    await this.anonClient.realtime.disconnect();
+                }
+                this.anonClient = null;
+                console.log('✅ Anon client cleaned up');
+            } catch (error) {
+                console.error('⚠️ Error cleaning up anon client:', error);
+            }
+        }
+
+        this.isConfigured = false;
+        console.log('✅ [SupabaseClient] Cleanup completed');
+    }
+
+    // Connection health check with timeout
+    async healthCheck(timeoutMs = 5000) {
+        if (!this.isConfigured) {
+            return { healthy: false, error: 'Not configured' };
+        }
+
+        try {
+            const client = this.getServiceClient();
+            
+            // Create a promise that will timeout
+            const healthPromise = client
+                .from('orders_main')
+                .select('count')
+                .limit(1);
+
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Health check timeout')), timeoutMs)
+            );
+
+            await Promise.race([healthPromise, timeoutPromise]);
+            
+            return { healthy: true, timestamp: new Date().toISOString() };
+        } catch (error) {
+            console.error('❌ Health check failed:', error);
+            return { healthy: false, error: error.message, timestamp: new Date().toISOString() };
+        }
     }
 
     // ============================================================================

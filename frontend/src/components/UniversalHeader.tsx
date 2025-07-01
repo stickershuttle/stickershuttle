@@ -33,66 +33,137 @@ export default function UniversalHeader() {
 
   useEffect(() => {
     let isMounted = true;
+    let authSubscription: any = null;
     
-    // Only check user on client-side
-    if (typeof window !== 'undefined') {
-      const loadUser = async () => {
-        try {
-          const supabase = await getSupabase();
-          const { data: { session }, error } = await supabase.auth.getSession();
+    // Enhanced authentication state management with subscription
+    const initializeAuth = async () => {
+      if (typeof window === 'undefined') return;
+      
+      try {
+        const supabase = await getSupabase();
+        
+        // Set up auth state listener first
+        authSubscription = supabase.auth.onAuthStateChange(async (event, session) => {
+          if (!isMounted) return;
           
-          if (error) {
-            console.error('Error checking user session:', error);
-            if (isMounted) {
-              setUser(null);
-              setAuthError(true);
-            }
-          } else {
-            if (isMounted) {
-              setUser(session?.user || null);
-              // Check if user is admin
-              if (session?.user?.email && ADMIN_EMAILS.includes(session.user.email)) {
-                setIsAdmin(true);
+          console.log('🔐 Auth state changed:', event, session?.user?.email);
+          
+          // Handle different auth events
+          switch (event) {
+            case 'SIGNED_IN':
+            case 'TOKEN_REFRESHED':
+              await handleUserSession(session, supabase);
+              break;
+            case 'SIGNED_OUT':
+              handleSignOut();
+              break;
+            default:
+              // For initial session or other events
+              if (session) {
+                await handleUserSession(session, supabase);
+              } else {
+                handleSignOut();
               }
-              
-              // Fetch profile data if user exists
-              if (session?.user) {
-                try {
-                  const { data: profileData } = await supabase
-                    .from('user_profiles')
-                    .select('*')
-                    .eq('user_id', session.user.id)
-                    .single();
-                  
-                  if (profileData) {
-                    setProfile(profileData);
-                  }
-                } catch (profileError) {
-                  console.error('Error fetching profile:', profileError);
-                }
-              }
-            }
           }
-        } catch (error) {
-          console.error('Error checking user:', error);
+        });
+
+        // Get initial session
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting initial session:', error);
           if (isMounted) {
-            setUser(null);
             setAuthError(true);
-          }
-        } finally {
-          // Only update state if component is still mounted
-          if (isMounted) {
             setLoading(false);
           }
+          return;
         }
-      };
-      
-      loadUser();
-    }
+
+        // Handle initial session if it exists
+        if (session && isMounted) {
+          await handleUserSession(session, supabase);
+        } else if (isMounted) {
+          setLoading(false);
+        }
+
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        if (isMounted) {
+          setAuthError(true);
+          setLoading(false);
+        }
+      }
+    };
+
+    // Handle user session data
+    const handleUserSession = async (session: any, supabase: any) => {
+      if (!isMounted || !session?.user) return;
+
+      try {
+        setUser(session.user);
+        setAuthError(false);
+
+        // Check admin status with safe email access
+        const userEmail = session.user.email;
+        if (userEmail && ADMIN_EMAILS.includes(userEmail)) {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
+
+        // Fetch profile data asynchronously
+        fetchUserProfile(session.user.id, supabase);
+
+      } catch (error) {
+        console.error('Error handling user session:', error);
+        if (isMounted) {
+          setAuthError(true);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    // Separate profile fetching to avoid blocking main auth flow
+    const fetchUserProfile = async (userId: string, supabase: any) => {
+      try {
+        const { data: profileData, error } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        if (isMounted && !error && profileData) {
+          setProfile(profileData);
+        }
+      } catch (profileError) {
+        // Profile errors shouldn't affect auth state
+        console.warn('Profile fetch failed (non-critical):', profileError);
+      }
+    };
+
+    // Handle sign out state
+    const handleSignOut = () => {
+      if (!isMounted) return;
+      setUser(null);
+      setProfile(null);
+      setIsAdmin(false);
+      setAuthError(false);
+      setLoading(false);
+      setShowProfileDropdown(false);
+    };
+
+    // Initialize authentication
+    initializeAuth();
     
-    // Cleanup function to prevent state updates after unmount
+    // Cleanup function
     return () => {
       isMounted = false;
+      if (authSubscription?.data?.subscription) {
+        authSubscription.data.subscription.unsubscribe();
+      }
     };
   }, []);
 
@@ -126,11 +197,7 @@ export default function UniversalHeader() {
     }, 100);
   };
 
-  // Debug: Log current route
-  useEffect(() => {
-    console.log('Current router.pathname:', router.pathname);
-    console.log('Current router.asPath:', router.asPath);
-  }, [router.pathname, router.asPath]);
+  // Route debugging removed for production
 
   // Add body class for admin/non-admin pages
   useEffect(() => {
@@ -277,7 +344,7 @@ export default function UniversalHeader() {
           ) : (
             <div className={`hidden lg:flex flex-1 items-center relative search-dropdown-container mx-4`}>
               <button 
-                className="headerButton flex-1 px-4 py-2 pr-12 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 text-left"
+                className="headerButton flex-1 px-4 py-2 pr-12 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-[1.005] text-left"
                 onClick={() => setIsSearchDropdownOpen(!isSearchDropdownOpen)}
                 onBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 300)}
               >
@@ -317,7 +384,7 @@ export default function UniversalHeader() {
                     {/* Vinyl Stickers */}
                     <Link 
                       href="/products/vinyl-stickers" 
-                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200 group block no-underline" 
+                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline" 
                       onClick={(e) => {
                         e.preventDefault();
                         handleLinkClick('/products/vinyl-stickers');
@@ -343,7 +410,7 @@ export default function UniversalHeader() {
                     {/* Holographic Stickers */}
                     <Link 
                       href="/products/holographic-stickers" 
-                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200 group block no-underline"
+                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
                       onClick={(e) => {
                         e.preventDefault();
                         handleLinkClick('/products/holographic-stickers');
@@ -365,10 +432,12 @@ export default function UniversalHeader() {
                         <p 
                           className="text-xs transition-colors duration-200 group-hover:text-gray-700" 
                           style={{ 
-                            background: 'linear-gradient(45deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3)',
+                            background: 'linear-gradient(45deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3, #ff0000, #ff7f00)',
+                            backgroundSize: '200% 200%',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text'
+                            backgroundClip: 'text',
+                            animation: 'holographicShimmer 3s ease-in-out infinite'
                           }}
                         >
                           Rainbow Holographic Effect
@@ -379,7 +448,7 @@ export default function UniversalHeader() {
                     {/* Chrome Stickers */}
                     <Link 
                       href="/products/chrome-stickers" 
-                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200 group block no-underline"
+                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
                       onClick={(e) => {
                         e.preventDefault();
                         handleLinkClick('/products/chrome-stickers');
@@ -415,7 +484,7 @@ export default function UniversalHeader() {
                     {/* Glitter Stickers */}
                     <Link 
                       href="/products/glitter-stickers" 
-                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200 group block no-underline"
+                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
                       onClick={(e) => {
                         e.preventDefault();
                         handleLinkClick('/products/glitter-stickers');
@@ -441,7 +510,7 @@ export default function UniversalHeader() {
                     {/* Clear Stickers */}
                     <Link 
                       href="/products/clear-stickers" 
-                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200 group block no-underline"
+                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
                       onClick={(e) => {
                         e.preventDefault();
                         handleLinkClick('/products/clear-stickers');
@@ -467,7 +536,7 @@ export default function UniversalHeader() {
                     {/* Sticker Sheets */}
                     <Link 
                       href="/products/sticker-sheets" 
-                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200 group block no-underline"
+                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
                       onClick={(e) => {
                         e.preventDefault();
                         handleLinkClick('/products/sticker-sheets');
@@ -493,7 +562,7 @@ export default function UniversalHeader() {
                     {/* Vinyl Banners */}
                     <Link 
                       href="/products/vinyl-banners" 
-                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 cursor-pointer transition-all duration-200 group block no-underline"
+                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
                       onClick={(e) => {
                         e.preventDefault();
                         handleLinkClick('/products/vinyl-banners');

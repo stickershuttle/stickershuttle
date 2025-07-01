@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useQuery, useLazyQuery } from '@apollo/client';
 import { GET_USER_ORDERS } from '../lib/order-mutations';
 import { getSupabase } from '../lib/supabase';
+import { trackOrderCompleted, trackCustomerValue, trackCustomerPurchasePattern } from '../lib/business-analytics';
 
 export const useOrderCompletion = () => {
   const [isMonitoring, setIsMonitoring] = useState(false);
@@ -94,6 +95,52 @@ export const useOrderCompletion = () => {
                 financialStatus: newPaidOrder.financialStatus,
                 totalPrice: newPaidOrder.totalPrice
               });
+
+              // Track analytics for order completion
+              try {
+                // Track order completion
+                trackOrderCompleted(newPaidOrder, currentUser.current);
+
+                // Calculate customer metrics for LTV and repeat purchase tracking
+                const customerEmail = newPaidOrder.customerEmail || currentUser.current?.email;
+                if (customerEmail) {
+                  // Get customer order history to determine if this is a repeat customer
+                  const customerOrders = currentData.getUserOrders.filter(order => 
+                    (order.customerEmail || order.customer_email) === customerEmail ||
+                    (currentUser.current && order.userId === currentUser.current.id)
+                  );
+                  
+                  const totalOrders = customerOrders.length;
+                  const isRepeatCustomer = totalOrders > 1;
+                  const totalSpent = customerOrders.reduce((sum, order) => 
+                    sum + parseFloat(order.totalPrice || order.total_price || 0), 0
+                  );
+                  
+                  // Track customer value metrics
+                  trackCustomerValue(customerEmail, newPaidOrder.totalPrice, isRepeatCustomer, totalOrders);
+                  
+                  // Track customer purchase pattern
+                  const firstOrder = customerOrders.sort((a, b) => 
+                    new Date(a.orderCreatedAt || a.created_at) - new Date(b.orderCreatedAt || b.created_at)
+                  )[0];
+                  
+                  const customerData = {
+                    totalOrders,
+                    totalSpent,
+                    firstOrderDate: firstOrder?.orderCreatedAt || firstOrder?.created_at,
+                    lastOrderDate: newPaidOrder.orderCreatedAt || newPaidOrder.created_at,
+                    averageOrderValue: totalSpent / totalOrders,
+                    daysSinceFirstOrder: firstOrder ? 
+                      Math.floor((new Date() - new Date(firstOrder.orderCreatedAt || firstOrder.created_at)) / (1000 * 60 * 60 * 24)) : 0
+                  };
+                  
+                  trackCustomerPurchasePattern(customerEmail, customerData);
+                }
+                
+                console.log('📊 Analytics tracked for order completion');
+              } catch (analyticsError) {
+                console.error('📊 Error tracking analytics:', analyticsError);
+              }
 
               // Stop monitoring
               stopMonitoring();

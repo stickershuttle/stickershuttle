@@ -89,7 +89,16 @@ const EasyPostShipping: React.FC<EasyPostShippingProps> = ({ order, onClose, onL
       if (data.buyEasyPostLabel.success) {
         setLabelData(data.buyEasyPostLabel.shipment);
         setStep('complete');
-        onLabelCreated?.(data.buyEasyPostLabel.shipment);
+        
+        // Open the label PDF immediately
+        if (data.buyEasyPostLabel.shipment.postage_label?.label_url) {
+          window.open(data.buyEasyPostLabel.shipment.postage_label.label_url, '_blank');
+        }
+        
+        // Close modal and notify parent immediately
+        setTimeout(() => {
+          onLabelCreated?.(data.buyEasyPostLabel.shipment);
+        }, 1000);
       } else {
         setError(data.buyEasyPostLabel.error || 'Failed to purchase label');
         setStep('error');

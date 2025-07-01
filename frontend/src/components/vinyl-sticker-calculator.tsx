@@ -276,10 +276,10 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
 
   // Calculate area based on size
   const calculateArea = (size: string, customW = "", customH = "") => {
-    // Defensive check for SSR
+    // Comprehensive defensive checks
     if (!size || typeof size !== 'string') {
       console.warn('calculateArea: size is undefined or not a string, using default Medium', size);
-      return PRESET_SIZES.medium.sqInches; // Default to 9 sq in
+      return PRESET_SIZES?.medium?.sqInches || 9; // Default to 9 sq in with null safety
     }
     
     if (size === "Custom size") {
@@ -290,11 +290,11 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
       return area
     }
     
-    // Use preset sizes for accurate square inch calculation
-    if (size.includes('Small')) return PRESET_SIZES.small.sqInches // 4 sq in (2" × 2")
-    if (size.includes('Medium')) return PRESET_SIZES.medium.sqInches // 9 sq in (3" × 3")
-    if (size.includes('Large') && !size.includes('X-Large')) return PRESET_SIZES.large.sqInches // 16 sq in (4" × 4")
-    if (size.includes('X-Large')) return PRESET_SIZES.xlarge.sqInches // 25 sq in (5" × 5")
+    // Use preset sizes for accurate square inch calculation with null safety
+    if (size.includes('Small')) return PRESET_SIZES?.small?.sqInches || 4 // 4 sq in (2" × 2")
+    if (size.includes('Medium')) return PRESET_SIZES?.medium?.sqInches || 9 // 9 sq in (3" × 3")
+    if (size.includes('Large') && !size.includes('X-Large')) return PRESET_SIZES?.large?.sqInches || 16 // 16 sq in (4" × 4")
+    if (size.includes('X-Large')) return PRESET_SIZES?.xlarge?.sqInches || 25 // 25 sq in (5" × 5")
     
     // Fallback calculation
     const sizeInches = getSizeInInches(size)
@@ -493,7 +493,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
       id: generateCartItemId(),
       product: {
         id: "vinyl-stickers",
-        sku: "SS-VS-001",
+        sku: "SS-VS-CUSTOM",
         name: "Vinyl Stickers",
         category: "vinyl-stickers" as const,
         description: "Premium custom vinyl stickers with durable, weatherproof material",

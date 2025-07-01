@@ -220,6 +220,16 @@ export default function ShippingLabels() {
       if (data.buyEasyPostLabel.success) {
         setLabelData(data.buyEasyPostLabel.shipment);
         setShippingStep('complete');
+        
+        // Open the label PDF immediately
+        if (data.buyEasyPostLabel.shipment.postage_label?.label_url) {
+          window.open(data.buyEasyPostLabel.shipment.postage_label.label_url, '_blank');
+        }
+        
+        // Automatically redirect back to order details after a short delay
+        setTimeout(() => {
+          router.push(`/admin/orders/${orderNumber}`);
+        }, 1500);
       } else {
         setShippingError(data.buyEasyPostLabel.error || 'Failed to purchase label');
         setShippingStep('error');

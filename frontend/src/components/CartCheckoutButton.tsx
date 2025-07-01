@@ -7,6 +7,7 @@ import { useCart } from '@/components/CartContext';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_USER_CREDIT_BALANCE } from '@/lib/credit-mutations';
 import { TRACK_KLAVIYO_EVENT } from '@/lib/klaviyo-mutations';
+import { trackCartEvent, trackUserEngagement } from '@/lib/business-analytics';
 
 interface CartCheckoutButtonProps {
   cartItems: any[];
@@ -146,6 +147,19 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
     onCheckoutStart?.();
 
     try {
+      // Track checkout initiated
+      const cartTotal = cartItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+      trackCartEvent('checkout_initiated', { 
+        totalPrice: cartTotal, 
+        items: cartItems 
+      }, user);
+      
+      trackUserEngagement('checkout_started', {
+        cart_value: cartTotal,
+        items_count: cartItems.length,
+        user_type: user ? 'registered' : 'guest'
+      });
+
       // Check if user is logged in or we have guest data
       if (!user && !guestCheckoutData && !guestEmail) {
         setShowGuestEmailModal(true);
@@ -248,7 +262,7 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
         shippingAddress,
         null, // billing address
         '', // No automatic order note
-        discountCode || undefined,
+        discountCode ? discountCode : undefined,
         discountAmount || undefined,
         creditsToApply || 0 // Pass credits to apply
       );
