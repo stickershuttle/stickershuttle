@@ -1309,12 +1309,27 @@ function Dashboard() {
   };
 
   const bannerTemplates = [
-    // New Perfect Default Template
+    // New Perfect Default Template - Galactic Vista
     {
       id: 1,
-      name: 'Stellar Void (Default)',
+      name: 'Galactic Vista (Default)',
       category: 'cosmic',
       isDefault: true,
+      style: {
+        backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750883615/261355a9-3a2b-48d8-ad79-08ce1407d61b.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        animation: 'none'
+      }
+    },
+
+    // Stellar Void - Second Option
+    {
+      id: 2,
+      name: 'Stellar Void',
+      category: 'cosmic',
+      isDefault: false,
       style: {
         background: 'linear-gradient(135deg, #0a0a2e 0%, #1a1a4a 25%, #2d1b6b 50%, #4c1d95 75%, #7c3aed 100%)',
         backgroundImage: `
@@ -1333,7 +1348,7 @@ function Dashboard() {
 
     // Business Themed Templates with Emojis
     {
-      id: 2,
+      id: 3,
       name: 'Bakery Vibes',
       category: 'business',
       style: {
@@ -1342,7 +1357,7 @@ function Dashboard() {
       emojis: ['🧁', '🍰', '🥖', '🥐', '🍪', '🎂']
     },
     {
-      id: 3,
+      id: 4,
       name: 'Barber Shop',
       category: 'business',
       style: {
@@ -1351,7 +1366,7 @@ function Dashboard() {
       emojis: ['✂️', '💈', '🪒', '👨‍🦲', '💇‍♂️', '🧔']
     },
     {
-      id: 4,
+      id: 5,
       name: 'Fashion Store',
       category: 'business',
       style: {
@@ -1360,7 +1375,7 @@ function Dashboard() {
       emojis: ['👗', '👔', '👠', '👜', '💄', '👑']
     },
     {
-      id: 5,
+      id: 6,
       name: 'Candle Shop',
       category: 'business',
       style: {
@@ -1369,7 +1384,7 @@ function Dashboard() {
       emojis: ['🕯️', '🔥', '✨', '🌙', '💫', '🌟']
     },
     {
-      id: 6,
+      id: 7,
       name: 'Flower Shop',
       category: 'business',
       style: {
@@ -1378,7 +1393,7 @@ function Dashboard() {
       emojis: ['🌸', '🌺', '🌻', '🌹', '🌷', '💐']
     },
     {
-      id: 7,
+      id: 8,
       name: 'Coffee Shop',
       category: 'business',
       style: {
@@ -1387,7 +1402,7 @@ function Dashboard() {
       emojis: ['☕', '🧁', '🥐', '📚', '💻', '🎵']
     },
     {
-      id: 8,
+      id: 9,
       name: 'Gym & Fitness',
       category: 'business',
       style: {
@@ -1396,7 +1411,7 @@ function Dashboard() {
       emojis: ['💪', '🏋️‍♀️', '🏃‍♂️', '⚡', '🔥', '🏆']
     },
     {
-      id: 9,
+      id: 10,
       name: 'Pet Care',
       category: 'business',
       style: {
@@ -1405,7 +1420,7 @@ function Dashboard() {
       emojis: ['🐕', '🐈', '🐾', '❤️', '🦴', '🎾']
     },
     {
-      id: 10,
+      id: 11,
       name: 'Tech Startup',
       category: 'business',
       style: {
@@ -1418,7 +1433,7 @@ function Dashboard() {
 
     // Space/NASA Templates
     {
-      id: 11,
+      id: 12,
       name: 'ISS Space Station View',
       category: 'cosmic',
       style: {
@@ -1429,7 +1444,7 @@ function Dashboard() {
       }
     },
     {
-      id: 12,
+      id: 13,
       name: 'Earth from Space',
       category: 'cosmic',
       style: {
@@ -1440,7 +1455,7 @@ function Dashboard() {
       }
     },
     {
-      id: 13,
+      id: 14,
       name: 'Orbital Station',
       category: 'cosmic',
       style: {
@@ -1451,7 +1466,7 @@ function Dashboard() {
       }
     },
     {
-      id: 18,
+      id: 15,
       name: 'Cosmic Nebula',
       category: 'cosmic',
       style: {
@@ -1462,7 +1477,7 @@ function Dashboard() {
       }
     },
     {
-      id: 19,
+      id: 16,
       name: 'Deep Space Field',
       category: 'cosmic',
       style: {
@@ -1473,7 +1488,7 @@ function Dashboard() {
       }
     },
     {
-      id: 28,
+      id: 17,
       name: 'Stellar Portal',
       category: 'cosmic',
       style: {
@@ -1485,7 +1500,7 @@ function Dashboard() {
       }
     },
     {
-      id: 27,
+      id: 18,
       name: 'Home Sweet Home',
       category: 'cosmic',
       style: {
@@ -1497,19 +1512,7 @@ function Dashboard() {
       }
     },
     {
-      id: 29,
-      name: 'Galactic Vista',
-      category: 'cosmic',
-      style: {
-        backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750883615/261355a9-3a2b-48d8-ad79-08ce1407d61b.png)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        animation: 'none'
-      }
-    },
-    {
-      id: 30,
+      id: 19,
       name: 'Cosmic Horizon',
       category: 'cosmic',
       style: {
@@ -1523,7 +1526,7 @@ function Dashboard() {
 
     // Additional Business Templates  
     {
-      id: 14,
+      id: 20,
       name: 'Music Studio',
       category: 'business',
       style: {
@@ -1532,7 +1535,7 @@ function Dashboard() {
       emojis: ['🎵', '🎤', '🎸', '🥁', '🎹', '🎧']
     },
     {
-      id: 15,
+      id: 21,
       name: 'Restaurant',
       category: 'business',
       style: {
@@ -1541,7 +1544,7 @@ function Dashboard() {
       emojis: ['🍕', '🍔', '🍜', '🥗', '🍷', '👨‍🍳']
     },
     {
-      id: 16,
+      id: 22,
       name: 'Spa & Wellness',
       category: 'business',
       style: {
@@ -1550,7 +1553,7 @@ function Dashboard() {
       emojis: ['🧘‍♀️', '💆‍♀️', '🌿', '🕯️', '🛁', '✨']
     },
     {
-      id: 17,
+      id: 23,
       name: 'Auto Repair',
       category: 'business',
       style: {
@@ -1559,7 +1562,7 @@ function Dashboard() {
       emojis: ['🔧', '🚗', '⚙️', '🛠️', '🔩', '🚙']
     },
     {
-      id: 15,
+      id: 24,
       name: 'Photography',
       category: 'business',
       style: {
@@ -1568,7 +1571,7 @@ function Dashboard() {
       emojis: ['📸', '📷', '🌅', '💡', '🎭', '✨']
     },
     {
-      id: 16,
+      id: 25,
       name: 'Real Estate',
       category: 'business',
       style: {
@@ -1577,7 +1580,7 @@ function Dashboard() {
       emojis: ['🏠', '🏢', '🔑', '📋', '💼', '🏘️']
     },
     {
-      id: 17,
+      id: 26,
       name: 'Education',
       category: 'business',
       style: {
@@ -1586,7 +1589,7 @@ function Dashboard() {
       emojis: ['📚', '🎓', '✏️', '📝', '🍎', '🧑‍🏫']
     },
     {
-      id: 18,
+      id: 27,
       name: 'Travel Agency',
       category: 'business',
       style: {
@@ -1595,7 +1598,7 @@ function Dashboard() {
       emojis: ['✈️', '🌍', '🗺️', '🏖️', '🎒', '📍']
     },
     {
-      id: 19,
+      id: 28,
       name: 'Legal Services',
       category: 'business',
       style: {
@@ -1606,7 +1609,7 @@ function Dashboard() {
 
     // Neon Cyber Effects
     {
-      id: 20,
+      id: 29,
       name: 'Neon Grid',
       category: 'cyber',
       style: {
@@ -1620,7 +1623,7 @@ function Dashboard() {
       }
     },
     {
-      id: 21,
+      id: 30,
       name: 'Deep Space',
       category: 'cyber',
       style: {
@@ -1637,7 +1640,7 @@ function Dashboard() {
       }
     },
     {
-      id: 22,
+      id: 31,
       name: 'Nebula Cloud',
       category: 'cyber',
       style: {
@@ -1652,7 +1655,7 @@ function Dashboard() {
     },
 
     {
-      id: 24,
+      id: 32,
       name: 'Galactic Dust',
       category: 'cyber',
       style: {
@@ -1669,7 +1672,7 @@ function Dashboard() {
       }
     },
     {
-      id: 25,
+      id: 33,
       name: 'Cosmic Galaxy',
       category: 'cyber',
       style: {
@@ -2018,6 +2021,14 @@ function Dashboard() {
     const whiteOptionValue = selections.whiteOption?.value || 'color-only';
     const whiteOptionMultiplier = whiteOptionModifiers[whiteOptionValue as keyof typeof whiteOptionModifiers] || 1.0;
 
+    // Apply 15% price increase for specialty sticker types
+    let specialtyMultiplier = 1.0;
+    const itemName = item.name?.toLowerCase() || '';
+    if (itemName.includes('holographic') || itemName.includes('chrome') || 
+        itemName.includes('glitter') || itemName.includes('clear')) {
+      specialtyMultiplier = 1.15;
+    }
+
     // Use real pricing data if available, otherwise fallback
     if (pricingData && pricingData.basePricing && pricingData.quantityDiscounts) {
       const realResult = calculateRealPrice(
@@ -2028,9 +2039,9 @@ function Dashboard() {
         rushOrder
       );
       
-      // Apply white option modifier
-      const adjustedTotal = realResult.totalPrice * whiteOptionMultiplier;
-      const adjustedPerSticker = realResult.finalPricePerSticker * whiteOptionMultiplier;
+      // Apply white option modifier and specialty sticker price increase
+      const adjustedTotal = realResult.totalPrice * whiteOptionMultiplier * specialtyMultiplier;
+      const adjustedPerSticker = realResult.finalPricePerSticker * whiteOptionMultiplier * specialtyMultiplier;
       
       return {
         total: adjustedTotal,
@@ -7864,11 +7875,11 @@ function Dashboard() {
           )}
           {/* Header Section */}
           <div className="pt-6 pb-6">
-            <div className="w-[90%] sm:w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto">
+            <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto">
               {/* Header - Banner with Profile */}
               <div 
-                className={`relative rounded-xl p-4 md:p-6 shadow-xl mb-6 overflow-hidden cursor-pointer group banner-gradient ${
-                  profile?.banner_template_id === 1 || !profile?.banner_template ? 'stellar-void-animation' : ''
+                className={`relative rounded-xl p-4 md:p-6 shadow-xl mb-6 overflow-hidden cursor-pointer group ${
+                  (profile?.banner_template_id === 2 || !profile?.banner_template) ? 'banner-gradient stellar-void-animation' : ''
                 }`}
                 style={{
                   aspectRatio: '5.2/1', // Increased height by 15% (6/1.15 ≈ 5.2/1)
@@ -7876,49 +7887,36 @@ function Dashboard() {
                   width: '100%', // Ensure banner stays within container
                   maxWidth: '100%', // Prevent overflow
                   boxSizing: 'border-box', // Include padding in width calculation
-                  ...(profile?.banner_image_url 
-                    ? {
-                        backgroundImage: `url(${profile.banner_image_url})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        backgroundRepeat: 'no-repeat',
-                        border: '1px solid rgba(255, 255, 255, 0.15)'
-                      }
-                    : profile?.banner_template
+                  ...(profile?.banner_template
                       ? {
                           ...JSON.parse(profile.banner_template),
                           border: '1px solid rgba(255, 255, 255, 0.15)',
-                          // Only add animation for specific templates (not NASA images or new static templates)
-                          ...(profile?.banner_template_id === 1 
-                            ? { animation: 'stellar-drift 8s ease-in-out infinite' }
-                            : profile?.banner_template_id && ![11, 12, 13, 18, 19, 27, 28, 29, 30, 31].includes(profile.banner_template_id)
-                            ? { animation: 'stellar-drift 10s ease-in-out infinite' }
-                            : {})
+                          // Only add animation for Stellar Void template (ID 2)
+                          animation: profile?.banner_template_id === 2 
+                            ? 'stellar-drift 8s ease-in-out infinite'
+                            : 'none'
                         }
                       : {
-                          background: 'linear-gradient(135deg, #0a0a2e 0%, #1a1a4a 25%, #2d1b6b 50%, #4c1d95 75%, #7c3aed 100%)',
-                          backgroundImage: `
-                            radial-gradient(ellipse at 25% 30%, rgba(139, 92, 246, 0.5) 0%, transparent 60%),
-                            radial-gradient(ellipse at 75% 70%, rgba(124, 58, 237, 0.4) 0%, transparent 50%),
-                            radial-gradient(ellipse at 50% 20%, rgba(147, 51, 234, 0.3) 0%, transparent 40%),
-                            radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15) 1px, transparent 1px),
-                            radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.12) 1px, transparent 1px),
-                            radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.18) 1px, transparent 1px)
-                          `,
-                          backgroundSize: '200% 200%, 200% 200%, 200% 200%, 100px 100px, 150px 150px, 80px 80px',
-                          backgroundPosition: '0% 0%, 20% 20%, 40% 60%, 60% 40%, 80% 80%, 10% 30%',
+                          // Default Galactic Vista template
+                          backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750883615/261355a9-3a2b-48d8-ad79-08ce1407d61b.png)',
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          backgroundRepeat: 'no-repeat',
                           border: '1px solid rgba(255, 255, 255, 0.15)',
-                          animation: 'stellar-drift 8s ease-in-out infinite'
+                          animation: 'none'
                         })
                 }}
-                onClick={handleBannerClick}
-                title="Click to change banner image"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowBannerTemplates(!showBannerTemplates);
+                }}
+                title="Click to choose banner template"
               >
                 
-                {/* Grain texture overlay for default gradient */}
-                {!profile?.banner_image_url && (
+                {/* Grain texture overlay for Stellar Void template */}
+                {profile?.banner_template_id === 2 && (
                   <div 
-                    className={`absolute inset-0 ${profile?.banner_template_id === 1 || !profile?.banner_template ? 'opacity-40 bg-noise' : 'opacity-30'}`}
+                    className="absolute inset-0 opacity-40 bg-noise"
                     style={{
                       backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='7' cy='7' r='1'/%3E%3Ccircle cx='27' cy='7' r='1'/%3E%3Ccircle cx='47' cy='7' r='1'/%3E%3Ccircle cx='17' cy='17' r='1'/%3E%3Ccircle cx='37' cy='17' r='1'/%3E%3Ccircle cx='7' cy='27' r='1'/%3E%3Ccircle cx='27' cy='27' r='1'/%3E%3Ccircle cx='47' cy='27' r='1'/%3E%3Ccircle cx='17' cy='37' r='1'/%3E%3Ccircle cx='37' cy='37' r='1'/%3E%3Ccircle cx='7' cy='47' r='1'/%3E%3Ccircle cx='27' cy='47' r='1'/%3E%3Ccircle cx='47' cy='47' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
                       backgroundSize: '60px 60px'
@@ -7927,7 +7925,7 @@ function Dashboard() {
                 )}
                 
                 {/* Additional animated stars layer for Stellar Void */}
-                {(profile?.banner_template_id === 1 || !profile?.banner_template) && !profile?.banner_image_url && (
+                {profile?.banner_template_id === 2 && (
                   <div className="absolute inset-0 pointer-events-none">
                     <div 
                       className="absolute w-1 h-1 bg-white rounded-full opacity-50"
@@ -8116,27 +8114,13 @@ function Dashboard() {
                           </div>
                 )}
                 
-                {/* Hover overlay with action icons */}
+                {/* Hover overlay with template selection */}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center z-20 pointer-events-none">
                   <div className="flex gap-4">
-                    {/* Upload/Change Banner Icon */}
-                    <div 
-                      className="p-3 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-200 cursor-pointer pointer-events-auto" 
-                      title="Change Banner"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleBannerClick();
-                      }}
-                    >
-                      <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                    </div>
-                    
-                    {/* Template Icon */}
+                    {/* Template Selection Icon */}
                     <div 
                       className="p-3 rounded-full bg-purple-500/20 backdrop-blur-sm border border-purple-400/30 hover:bg-purple-500/30 transition-all duration-200 cursor-pointer pointer-events-auto relative" 
-                      title="Choose Template"
+                      title="Choose Banner Template"
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowBannerTemplates(!showBannerTemplates);
@@ -8147,34 +8131,20 @@ function Dashboard() {
                       </svg>
                     </div>
                     
-                    {/* Replace Banner Icon */}
-                    <div 
-                      className="p-3 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-200 cursor-pointer pointer-events-auto" 
-                      title="Replace Banner"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleBannerClick();
-                      }}
-                    >
-                      <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    
-                    {/* Remove Banner Icon (only show if custom banner exists) */}
-                    {(profile?.banner_image_url || profile?.banner_template) && (
+                    {/* Reset to Default Banner Icon (only show if custom template is selected) */}
+                    {profile?.banner_template_id && profile?.banner_template_id !== 1 && (
                       <div 
-                        className="p-3 rounded-full bg-red-500/20 backdrop-blur-sm border border-red-400/30 hover:bg-red-500/30 transition-all duration-200 cursor-pointer pointer-events-auto" 
-                        title="Remove Banner"
+                        className="p-3 rounded-full bg-blue-500/20 backdrop-blur-sm border border-blue-400/30 hover:bg-blue-500/30 transition-all duration-200 cursor-pointer pointer-events-auto" 
+                        title="Reset to Default Banner"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm('Are you sure you want to remove your banner?')) {
-                            handleRemoveBanner();
+                          if (confirm('Reset to default Galactic Vista banner?')) {
+                            handleSelectBannerTemplate(bannerTemplates[0]); // Reset to first template (Galactic Vista)
                           }
                         }}
                       >
-                        <svg className="w-6 h-6 text-red-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16a2 2 0 002-2V5a2 2 0 00-2-2H4a2 2 0 00-2 2v2" />
+                        <svg className="w-6 h-6 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                       </div>
                     )}
@@ -8228,9 +8198,14 @@ function Dashboard() {
                           style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif' }}>
                         Greetings, {getUserDisplayName()}
                       </h1>
-                      <p className="text-xs md:text-sm text-gray-200 mb-1 md:mb-2">
-                        Mission Control Dashboard
-                      </p>
+                      <div className="flex items-center gap-2 mb-1 md:mb-2">
+                        <p className="text-xs md:text-sm text-gray-200">
+                          Mission Control Dashboard
+                        </p>
+                        <span className="hidden lg:inline-block holographic-v3 text-sm px-3 py-1 rounded-full">
+                          v3.0
+                        </span>
+                      </div>
                       
                       {/* Terminal Section - Below greeting, doesn't affect profile pic position */}
                       {showTerminalLoader && (

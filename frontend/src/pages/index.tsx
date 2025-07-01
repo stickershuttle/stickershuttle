@@ -78,9 +78,9 @@ export default function Home() {
             <div 
               className="rounded-2xl p-12 relative overflow-hidden min-h-[400px]"
               style={{
-                backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591772/StickerShuttle_Banner_Main_1_bntyjg.webp)',
+                backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751382016/StickerShuttle_Banner_Main_nlzoro.png)',
                 backgroundSize: 'cover',
-                backgroundPosition: 'center',
+                backgroundPosition: 'center bottom',
                 backgroundRepeat: 'no-repeat',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
                 boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
@@ -120,7 +120,7 @@ export default function Home() {
                       boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 3px rgba(0, 0, 0, 0.1)'
                     }}
                   >
-                    EASY ONLINE ORDERING, PRINTED IN 24 HRS, FREE SHIPPING
+                    EASY ONLINE ORDERING, PRINTED IN 24 HRS
                   </div>
                 </div>
               </div>
@@ -135,9 +135,10 @@ export default function Home() {
               <div 
                 className="px-4 py-1.5 rounded-full text-center text-sm text-gray-300"
                 style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
                 }}
               >
                 Brands we print for:
@@ -210,7 +211,7 @@ export default function Home() {
                       alt="Vinyl Stickers" 
                       className="w-full h-full object-contain"
                       style={{
-                        filter: 'drop-shadow(0 0 12px rgba(168, 242, 106, 0.35)) drop-shadow(0 0 24px rgba(168, 242, 106, 0.21))'
+                        filter: 'none'
                       }}
                     />
                   </div>
@@ -237,7 +238,7 @@ export default function Home() {
                       alt="Holographic Stickers" 
                       className="w-full h-full object-contain"
                       style={{
-                        filter: 'drop-shadow(0 0 12px rgba(168, 85, 247, 0.35)) drop-shadow(0 0 24px rgba(168, 85, 247, 0.21))'
+                        filter: 'none'
                       }}
                     />
                   </div>
@@ -264,7 +265,7 @@ export default function Home() {
                       alt="Glitter Stickers" 
                       className="w-full h-full object-contain"
                       style={{
-                        filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.35)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.21))'
+                        filter: 'none'
                       }}
                     />
                   </div>
@@ -291,7 +292,7 @@ export default function Home() {
                       alt="Chrome Stickers" 
                       className="w-full h-full object-contain"
                       style={{
-                        filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.28)) drop-shadow(0 0 12px rgba(180, 180, 180, 0.21)) drop-shadow(0 0 18px rgba(240, 240, 240, 0.14))'
+                        filter: 'none'
                       }}
                     />
                   </div>
@@ -318,7 +319,7 @@ export default function Home() {
                       alt="Clear Stickers" 
                       className="w-full h-full object-contain"
                       style={{
-                        filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.35)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.21))'
+                        filter: 'none'
                       }}
                     />
                   </div>
@@ -344,9 +345,9 @@ export default function Home() {
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749847809/StickerShuttle_StickerSheetsIcon_2_g61dty.svg" 
                       alt="Sticker Sheets" 
                       className="w-full h-full object-contain"
-                      style={{
-                        filter: 'drop-shadow(0 0 12px rgba(196, 181, 253, 0.35)) drop-shadow(0 0 24px rgba(196, 181, 253, 0.21))'
-                      }}
+                                              style={{
+                          filter: 'none'
+                        }}
                     />
                   </div>
                   <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Sticker Sheets →</h3>
@@ -376,7 +377,7 @@ export default function Home() {
                         alt="Vinyl Stickers" 
                         className="w-full h-full object-contain"
                         style={{
-                          filter: 'drop-shadow(0 0 12px rgba(168, 242, 106, 0.35)) drop-shadow(0 0 24px rgba(168, 242, 106, 0.21))'
+                          filter: 'none'
                         }}
                       />
                     </div>
@@ -401,7 +402,7 @@ export default function Home() {
                         alt="Holographic Stickers" 
                         className="w-full h-full object-contain"
                         style={{
-                          filter: 'drop-shadow(0 0 12px rgba(168, 85, 247, 0.5)) drop-shadow(0 0 24px rgba(168, 85, 247, 0.3))'
+                          filter: 'none'
                         }}
                       />
                     </div>
@@ -426,7 +427,7 @@ export default function Home() {
                         alt="Glitter Stickers" 
                         className="w-full h-full object-contain"
                         style={{
-                          filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.5)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.3))'
+                          filter: 'none'
                         }}
                       />
                     </div>
@@ -451,7 +452,7 @@ export default function Home() {
                         alt="Chrome Stickers" 
                         className="w-full h-full object-contain"
                         style={{
-                          filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.28)) drop-shadow(0 0 12px rgba(180, 180, 180, 0.21)) drop-shadow(0 0 18px rgba(240, 240, 240, 0.14))'
+                          filter: 'none'
                         }}
                       />
                     </div>
@@ -476,7 +477,7 @@ export default function Home() {
                         alt="Clear Stickers" 
                         className="w-full h-full object-contain"
                         style={{
-                          filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.5)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.3))'
+                          filter: 'none'
                         }}
                       />
                     </div>
@@ -501,7 +502,7 @@ export default function Home() {
                         alt="Sticker Sheets" 
                         className="w-full h-full object-contain"
                         style={{
-                          filter: 'drop-shadow(0 0 12px rgba(196, 181, 253, 0.5)) drop-shadow(0 0 24px rgba(196, 181, 253, 0.3))'
+                          filter: 'none'
                         }}
                       />
                     </div>
@@ -532,9 +533,6 @@ export default function Home() {
                 <div className="flex items-center">
                   <div 
                     className="text-4xl mr-4"
-                    style={{
-                      filter: 'drop-shadow(0 0 10px rgba(255, 215, 19, 0.35)) drop-shadow(0 0 20px rgba(255, 215, 19, 0.21))'
-                    }}
                   >
                     📦
                   </div>
@@ -558,9 +556,6 @@ export default function Home() {
                 <div className="flex items-center">
                   <div 
                     className="text-4xl mr-4 spin-slow"
-                    style={{
-                      filter: 'drop-shadow(0 0 10px rgba(34, 197, 94, 0.5)) drop-shadow(0 0 20px rgba(34, 197, 94, 0.3))'
-                    }}
                   >
                     🌍
                   </div>
@@ -584,9 +579,6 @@ export default function Home() {
                 <div className="flex items-center">
                   <div 
                     className="text-4xl mr-4"
-                    style={{
-                      filter: 'drop-shadow(0 0 10px rgba(168, 85, 247, 0.5)) drop-shadow(0 0 20px rgba(168, 85, 247, 0.3))'
-                    }}
                   >
                     🖼️
                   </div>
@@ -648,9 +640,6 @@ export default function Home() {
                 <div className="flex items-center mb-6">
                   <div 
                     className="text-4xl mr-4"
-                    style={{
-                      filter: 'drop-shadow(0 0 10px rgba(255, 215, 19, 0.5)) drop-shadow(0 0 20px rgba(255, 215, 19, 0.3))'
-                    }}
                   >
                     📦
                   </div>
@@ -728,8 +717,12 @@ export default function Home() {
                 <h3 className="text-white font-semibold mb-1">Certified Garbage Rat</h3>
                 <p className="text-gray-400 text-sm mb-3">Matte Stickers & Vinyl Banners</p>
                 
-                <div className="flex mb-4">
-                  <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
+                <div className="flex gap-1 mb-4">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <svg key={star} className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  ))}
                 </div>
                 
                 <p className="text-gray-300 text-sm leading-relaxed flex-grow">
@@ -763,8 +756,12 @@ export default function Home() {
                 <h3 className="text-white font-semibold mb-1">Panda Reaper</h3>
                 <p className="text-gray-400 text-sm mb-3">Matte Vinyl Stickers</p>
                 
-                <div className="flex mb-4">
-                  <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
+                <div className="flex gap-1 mb-4">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <svg key={star} className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  ))}
                 </div>
                 
                 <p className="text-gray-300 text-sm leading-relaxed flex-grow">
@@ -798,8 +795,12 @@ export default function Home() {
                 <h3 className="text-white font-semibold mb-1">Anita J</h3>
                 <p className="text-gray-400 text-sm mb-3">Matte Vinyl Stickers</p>
                 
-                <div className="flex mb-4">
-                  <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
+                <div className="flex gap-1 mb-4">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <svg key={star} className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  ))}
                 </div>
                 
                 <p className="text-gray-300 text-sm leading-relaxed flex-grow">
@@ -833,8 +834,12 @@ export default function Home() {
                 <h3 className="text-white font-semibold mb-1">Rach Plants</h3>
                 <p className="text-gray-400 text-sm mb-3">Matte Stickers& Vinyl Banners</p>
                 
-                <div className="flex mb-4">
-                  <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
+                <div className="flex gap-1 mb-4">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <svg key={star} className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  ))}
                 </div>
                 
                 <p className="text-gray-300 text-sm leading-relaxed flex-grow">
@@ -845,9 +850,8 @@ export default function Home() {
 
             {/* Mobile Swipeable Reviews */}
             <div className="md:hidden overflow-x-auto pb-4 relative">
-              {/* Fade effects */}
+              {/* Left fade only */}
               <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#030140] to-transparent pointer-events-none z-10"></div>
-              <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#030140] to-transparent pointer-events-none z-10"></div>
               
               <div className="flex space-x-4 w-max" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                 {/* Review 1 - Certified Garbage Rat Mobile */}
@@ -876,8 +880,12 @@ export default function Home() {
                   <h3 className="text-white font-semibold mb-1">Certified Garbage Rat</h3>
                   <p className="text-gray-400 text-sm mb-3">Matte Stickers & Vinyl Banners</p>
                   
-                  <div className="flex mb-4">
-                    <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
+                  <div className="flex gap-1 mb-4">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <svg key={star} className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
                   </div>
                   
                   <p className="text-gray-300 text-sm leading-relaxed flex-grow">
@@ -911,8 +919,12 @@ export default function Home() {
                   <h3 className="text-white font-semibold mb-1">Panda Reaper</h3>
                   <p className="text-gray-400 text-sm mb-3">Matte Vinyl Stickers</p>
                   
-                  <div className="flex mb-4">
-                    <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
+                  <div className="flex gap-1 mb-4">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <svg key={star} className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
                   </div>
                   
                   <p className="text-gray-300 text-sm leading-relaxed flex-grow">
@@ -946,8 +958,12 @@ export default function Home() {
                   <h3 className="text-white font-semibold mb-1">Anita J</h3>
                   <p className="text-gray-400 text-sm mb-3">Matte Vinyl Stickers</p>
                   
-                  <div className="flex mb-4">
-                    <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
+                  <div className="flex gap-1 mb-4">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <svg key={star} className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
                   </div>
                   
                   <p className="text-gray-300 text-sm leading-relaxed flex-grow">
@@ -981,8 +997,12 @@ export default function Home() {
                   <h3 className="text-white font-semibold mb-1">Rach Plants</h3>
                   <p className="text-gray-400 text-sm mb-3">Matte Stickers& Vinyl Banners</p>
                   
-                  <div className="flex mb-4">
-                    <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
+                  <div className="flex gap-1 mb-4">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <svg key={star} className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
                   </div>
                   
                   <p className="text-gray-300 text-sm leading-relaxed flex-grow">

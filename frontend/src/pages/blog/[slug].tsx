@@ -258,7 +258,7 @@ export default function BlogPost() {
         {/* Related Posts */}
         {relatedData?.blog_posts?.length > 0 && (
           <section className="py-12 bg-black/20">
-            <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
+            <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
               <h2 className="text-3xl font-bold text-white mb-8">Related Posts</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {relatedData.blog_posts.map((relatedPost: any) => (

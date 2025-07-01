@@ -192,13 +192,16 @@ export default function UniversalFooter() {
           {/* Footer Bottom */}
           <div className="mt-12 pt-8" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
             <div className="flex flex-col md:flex-row items-center justify-between">
-              {/* Logo */}
-              <div className="mb-4 md:mb-0">
+              {/* Logo with v3.0 */}
+              <div className="mb-4 md:mb-0 flex items-center gap-3">
                 <img 
                   src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
                   alt="Sticker Shuttle Logo" 
                   className="h-10 w-auto object-contain footer-logo-hover cursor-pointer"
                 />
+                <span className="holographic-v3 text-sm px-3 py-1 rounded-full">
+                  v3.0
+                </span>
               </div>
               
               {/* Built with Love and Copyright */}
@@ -234,6 +237,28 @@ export default function UniversalFooter() {
           60% { transform: scale(1.17) rotate(-2deg); }
           75% { transform: scale(1.18) rotate(-4deg); }
           100% { transform: scale(1.15) rotate(-3deg); }
+        }
+
+        .holographic-v3 {
+          background: linear-gradient(45deg, 
+            #ff0080, #ff8000, #ffff00, #80ff00, 
+            #00ff80, #0080ff, #8000ff, #ff0080);
+          background-size: 400% 400%;
+          animation: holographic-shift 3s ease-in-out infinite;
+          color: transparent;
+          background-clip: text;
+          -webkit-background-clip: text;
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          backdrop-filter: blur(10px);
+          box-shadow: 0 0 20px rgba(255, 255, 255, 0.3), 
+                      inset 0 0 20px rgba(255, 255, 255, 0.1);
+          font-weight: normal;
+        }
+
+        @keyframes holographic-shift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
         }
       `}</style>
     </>

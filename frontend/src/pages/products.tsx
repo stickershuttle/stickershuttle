@@ -16,7 +16,7 @@ export default function Products() {
   return (
     <Layout title="Products - Sticker Shuttle">
         {/* Main Content */}
-        <main className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto py-12 px-6 md:px-4">
+        <main className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto py-12 px-4">
           {/* Hero */}
           <div className="text-center mb-8 relative">
             {/* Background Grid - Enhanced visibility */}
@@ -103,7 +103,7 @@ export default function Products() {
                     alt="Vinyl Stickers" 
                     className="w-full h-full object-contain"
                     style={{
-                      filter: 'drop-shadow(0 0 12px rgba(168, 242, 106, 0.35)) drop-shadow(0 0 24px rgba(168, 242, 106, 0.21))'
+                      filter: 'none'
                     }}
                   />
                 </div>
@@ -140,7 +140,7 @@ export default function Products() {
                     alt="Holographic Stickers" 
                     className="w-full h-full object-contain"
                     style={{
-                      filter: 'drop-shadow(0 0 12px rgba(168, 85, 247, 0.5)) drop-shadow(0 0 24px rgba(168, 85, 247, 0.3))'
+                      filter: 'none'
                     }}
                   />
                 </div>
@@ -177,7 +177,7 @@ export default function Products() {
                     alt="Glitter Stickers" 
                     className="w-full h-full object-contain"
                     style={{
-                      filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.35)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.21))'
+                      filter: 'none'
                     }}
                   />
                 </div>
@@ -214,7 +214,7 @@ export default function Products() {
                     alt="Chrome Stickers" 
                     className="w-full h-full object-contain"
                     style={{
-                      filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.28)) drop-shadow(0 0 12px rgba(180, 180, 180, 0.21)) drop-shadow(0 0 18px rgba(240, 240, 240, 0.14))'
+                      filter: 'none'
                     }}
                   />
                 </div>
@@ -251,7 +251,7 @@ export default function Products() {
                     alt="Clear Stickers" 
                     className="w-full h-full object-contain"
                     style={{
-                      filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.35)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.21))'
+                      filter: 'none'
                     }}
                   />
                 </div>
@@ -288,7 +288,7 @@ export default function Products() {
                     alt="Sticker Sheets" 
                     className="w-full h-full object-contain"
                     style={{
-                      filter: 'drop-shadow(0 0 12px rgba(196, 181, 253, 0.35)) drop-shadow(0 0 24px rgba(196, 181, 253, 0.21))'
+                      filter: 'none'
                     }}
                   />
                 </div>
@@ -350,7 +350,7 @@ export default function Products() {
                     alt="Vinyl Stickers"
                     className="w-full h-full object-contain"
                     style={{
-                      filter: 'drop-shadow(0 0 12px rgba(168, 242, 106, 0.35)) drop-shadow(0 0 24px rgba(168, 242, 106, 0.21))'
+                      filter: 'none'
                     }}
                   />
                 </div>
@@ -375,7 +375,7 @@ export default function Products() {
                     alt="Holographic Stickers"
                     className="w-full h-full object-contain"
                     style={{
-                      filter: 'drop-shadow(0 0 12px rgba(168, 85, 247, 0.5)) drop-shadow(0 0 24px rgba(168, 85, 247, 0.3))'
+                      filter: 'none'
                     }}
                   />
                 </div>
@@ -400,7 +400,7 @@ export default function Products() {
                     alt="Glitter Stickers"
                     className="w-full h-full object-contain"
                     style={{
-                      filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.5)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.3))'
+                      filter: 'none'
                     }}
                   />
                 </div>
@@ -425,7 +425,7 @@ export default function Products() {
                     alt="Chrome Stickers"
                     className="w-full h-full object-contain"
                     style={{
-                      filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.28)) drop-shadow(0 0 12px rgba(180, 180, 180, 0.21)) drop-shadow(0 0 18px rgba(240, 240, 240, 0.14))'
+                      filter: 'none'
                     }}
                   />
                 </div>
@@ -450,7 +450,7 @@ export default function Products() {
                     alt="Clear Stickers"
                     className="w-full h-full object-contain"
                     style={{
-                      filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.5)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.3))'
+                      filter: 'none'
                     }}
                   />
                 </div>
@@ -476,7 +476,7 @@ export default function Products() {
                     alt="Sticker Sheets"
                     className="w-full h-full object-contain"
                     style={{
-                      filter: 'drop-shadow(0 0 12px rgba(196, 181, 253, 0.5)) drop-shadow(0 0 24px rgba(196, 181, 253, 0.3))'
+                      filter: 'none'
                     }}
                   />
                 </div>
@@ -515,7 +515,7 @@ export default function Products() {
                       alt="Vinyl Banners" 
                       className="w-full h-full object-contain"
                       style={{
-                        filter: 'drop-shadow(0 0 12px rgba(196, 181, 253, 0.35)) drop-shadow(0 0 24px rgba(196, 181, 253, 0.21))'
+                        filter: 'none'
                       }}
                     />
                   </div>
@@ -562,7 +562,7 @@ export default function Products() {
                         alt="Vinyl Banners"
                         className="w-full h-full object-contain"
                         style={{
-                          filter: 'drop-shadow(0 0 12px rgba(196, 181, 253, 0.5)) drop-shadow(0 0 24px rgba(196, 181, 253, 0.3))'
+                          filter: 'none'
                         }}
                       />
                     </div>

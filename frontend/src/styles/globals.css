@@ -577,3 +577,27 @@ h1 {
     transform-origin: left top;
   }
 }
+
+/* Holographic v3.0 pill styling (same as footer) */
+.holographic-v3 {
+  background: linear-gradient(45deg, 
+    #ff0080, #ff8000, #ffff00, #80ff00, 
+    #00ff80, #0080ff, #8000ff, #ff0080);
+  background-size: 400% 400%;
+  animation: holographic-shift 3s ease-in-out infinite;
+  color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.3), 
+              inset 0 0 20px rgba(255, 255, 255, 0.1);
+  font-weight: normal;
+}
+
+@keyframes holographic-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}

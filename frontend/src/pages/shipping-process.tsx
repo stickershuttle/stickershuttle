@@ -69,7 +69,7 @@ export default function ShippingProcess() {
 
       {/* Hero Section with Banner Background */}
       <section className="pt-[20px] pb-2 md:pb-4">
-        <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           <div 
             className="bg-white bg-opacity-5 backdrop-blur-sm rounded-2xl pt-12 pb-8 px-8 md:px-12 md:p-12 relative overflow-hidden"
             style={{
@@ -176,7 +176,7 @@ export default function ShippingProcess() {
 
       {/* Map Section */}
       <section className="py-8">
-        <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           <div className="container-style p-6 md:p-8">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
               {/* Map */}
@@ -241,7 +241,7 @@ export default function ShippingProcess() {
 
       {/* Shipping Carriers Section */}
       <section className="py-8">
-        <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           <div className="text-center mb-6">
             <h2 className="text-xl md:text-2xl font-bold text-white mb-2">
               Trusted Shipping Partners
@@ -309,7 +309,7 @@ export default function ShippingProcess() {
 
       {/* FAQ Section */}
       <section className="py-8">
-        <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           <div className="container-style p-6 md:p-8">
             <h2 className="text-2xl md:text-3xl font-bold text-white mb-6 text-center">
               Common Questions
@@ -349,7 +349,7 @@ export default function ShippingProcess() {
 
       {/* Brands Section */}
       <section className="pt-7 pb-4">
-        <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           <div className="flex justify-center mb-6">
             <div 
               className="px-6 py-2 rounded-full text-center text-lg text-gray-300"

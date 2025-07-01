@@ -228,22 +228,9 @@ export default function UniversalHeader() {
             </Link>
           </div>
 
-          {/* Mobile/Tablet Right Side - Cart/Logout */}
+          {/* Mobile/Tablet Right Side - Cart */}
           <div className="lg:hidden flex items-center gap-3">
-            {showAccountDashboard ? (
-              <>
-                {!isAdminPage && <CartIndicator />}
-                <button
-                  onClick={handleSignOut}
-                  className="text-white transition-all duration-200 transform hover:scale-105 text-sm font-medium"
-                  aria-label="Sign Out"
-                >
-                  Sign Out
-                </button>
-              </>
-            ) : (
-              !isAdminPage && <CartIndicator />
-            )}
+            {!isAdminPage && <CartIndicator />}
           </div>
 
           {/* Desktop Search Bar */}
@@ -281,14 +268,14 @@ export default function UniversalHeader() {
             <div className={`hidden lg:flex flex-1 items-center relative search-dropdown-container mx-4`}>
               <input 
                 type="text"
-                placeholder="Go on.. create your universe 🧑‍🚀"
+                placeholder="Select sticker type..."
                 className="headerButton flex-1 px-4 py-2 pr-12 rounded-lg font-medium text-white transition-all duration-200 transform focus:scale-101 focus:outline-none placeholder-gray-400"
                 onFocus={() => setIsSearchDropdownOpen(true)}
                 onBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 300)}
               />
               <button 
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white transition-all duration-200 hover:scale-110"
-                aria-label="Search"
+                aria-label="Select Type"
               >
                 <svg 
                   xmlns="http://www.w3.org/2000/svg" 
@@ -301,7 +288,7 @@ export default function UniversalHeader() {
                   <path 
                     strokeLinecap="round" 
                     strokeLinejoin="round" 
-                    d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 15.803a7.5 7.5 0 0 0 10.607 0Z" 
+                    d="M19.5 8.25l-7.5 7.5-7.5-7.5" 
                   />
                 </svg>
               </button>
@@ -833,6 +820,19 @@ export default function UniversalHeader() {
                 </svg>
                 <span>Settings</span>
               </Link>
+
+              {!isAdminPage && (
+                <Link 
+                  href="/deals"
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#fbbf24' }}>
+                    <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinejoin="round" strokeLinecap="round" />
+                  </svg>
+                  <span>Deals</span>
+                </Link>
+              )}
 
               <hr className="border-white/10 my-2" />
 

@@ -154,7 +154,7 @@ export default function Login() {
         ></div>
       </div>
       
-      <div className="min-h-screen flex items-start justify-center px-6 md:px-4 relative z-10 pt-8" style={{ backgroundColor: 'transparent' }}>
+      <div className="min-h-screen flex items-start justify-center px-4 relative z-10 pt-8" style={{ backgroundColor: 'transparent' }}>
         {/* Mobile Layout */}
         <div className="lg:hidden max-w-md mx-auto w-full">
           {/* Header */}

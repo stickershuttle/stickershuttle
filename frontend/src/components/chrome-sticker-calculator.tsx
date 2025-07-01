@@ -331,9 +331,10 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
         rushOrder
       );
       
-      // Apply white option modifier
-      const adjustedTotal = realResult.totalPrice * whiteOptionMultiplier;
-      const adjustedPerSticker = realResult.finalPricePerSticker * whiteOptionMultiplier;
+      // Apply 15% price increase for chrome stickers
+      const chromeMultiplier = 1.15;
+      const adjustedTotal = realResult.totalPrice * whiteOptionMultiplier * chromeMultiplier;
+      const adjustedPerSticker = realResult.finalPricePerSticker * whiteOptionMultiplier * chromeMultiplier;
       
       console.log(`Real Pricing - Quantity: ${qty}, Area: ${area}, White Option: ${selectedWhiteOption} (${whiteOptionMultiplier}x), Total: $${adjustedTotal.toFixed(2)}, Per sticker: $${adjustedPerSticker.toFixed(2)}`);
       
@@ -666,9 +667,9 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
           {/* Main Container */}
         <div className="rounded-3xl">
           {/* Top Section */}
-          <div className="grid grid-cols-1 md:grid-cols-18 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-18 gap-4 lg:gap-6 mb-4 lg:mb-6">
             {/* Cut Selection */}
-            <div className="md:col-span-4 container-style p-6 transition-colors duration-200">
+            <div className="md:col-span-1 lg:col-span-4 container-style p-4 lg:p-6 transition-colors duration-200">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
                 <span className="text-purple-400">✂️</span>
                 Select a Cut
@@ -695,7 +696,7 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
             </div>
 
             {/* Material Selection */}
-            <div className="md:col-span-4 container-style p-6 transition-colors duration-200">
+            <div className="md:col-span-1 lg:col-span-4 container-style p-4 lg:p-6 transition-colors duration-200">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
                 <span role="img" aria-label="material" className="text-green-400">
                   🧻
@@ -726,7 +727,7 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
             </div>
 
             {/* Size Selection */}
-            <div className="md:col-span-4 container-style p-6 transition-colors duration-200">
+            <div className="md:col-span-1 lg:col-span-4 container-style p-4 lg:p-6 transition-colors duration-200">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
                 <span role="img" aria-label="ruler" className="text-purple-400">
                   📏
@@ -775,7 +776,7 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
             </div>
 
             {/* Quantity Selection */}
-            <div className="md:col-span-6 container-style p-6 transition-colors duration-200">
+            <div className="md:col-span-3 lg:col-span-6 container-style p-4 lg:p-6 transition-colors duration-200">
               <h2 className="text-lg font-semibold mb-4 flex items-center justify-between text-white">
                 <span className="flex items-center gap-2">
                   <span className="text-green-400">#️⃣</span>
@@ -924,16 +925,12 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
                         {/* Gold Tier Message - Animated Flip Overlay */}
                         {showGoldMessage && (
                           <div className="absolute inset-0 bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-600 rounded-xl flex items-center justify-center backdrop-blur-md border border-yellow-400/60 z-50">
-                            <div className="text-center px-1 sm:px-2">
-                              <div className="text-xs sm:text-sm font-bold text-yellow-100 mb-1 flex items-center justify-center gap-1 sm:gap-2">
+                            <div className="text-center px-1 sm:px-2 md:px-4 lg:px-6">
+                              <div className="text-xs sm:text-sm font-bold text-yellow-100 flex items-center justify-center gap-1 sm:gap-2">
                                 <span>🎉</span>
                                 <span className="hidden sm:inline">FREE Overnight Shipping!</span>
                                 <span className="sm:hidden">FREE Overnight!</span>
                                 <span>🎉</span>
-                              </div>
-                              <div className="text-[10px] sm:text-xs text-yellow-200/90 leading-tight">
-                                <span className="hidden sm:inline">All orders 1,000+ stickers get upgraded to Overnight Shipping</span>
-                                <span className="sm:hidden">1,000+ stickers get Overnight Shipping</span>
                               </div>
                             </div>
                           </div>
@@ -958,16 +955,12 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
                   {/* Custom Quantity Gold Message */}
                   {showCustomGoldMessage && (
                     <div className="absolute inset-0 bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-600 rounded-lg flex items-center justify-center backdrop-blur-md border border-yellow-400/60 z-50">
-                      <div className="text-center px-1 sm:px-2 flex-1">
-                        <div className="text-xs sm:text-sm font-bold text-yellow-100 mb-1 flex items-center justify-center gap-1 sm:gap-2">
+                      <div className="text-center px-1 sm:px-2 md:px-4 lg:px-6 flex-1">
+                        <div className="text-xs sm:text-sm font-bold text-yellow-100 flex items-center justify-center gap-1 sm:gap-2">
                           <span>🎉</span>
                           <span className="hidden sm:inline">FREE Overnight Shipping!</span>
                           <span className="sm:hidden">FREE Overnight!</span>
                           <span>🎉</span>
-                        </div>
-                        <div className="text-[10px] sm:text-xs text-yellow-200/90 leading-tight">
-                          <span className="hidden sm:inline">All orders 1,000+ stickers get upgraded to Overnight Shipping</span>
-                          <span className="sm:hidden">1,000+ stickers get Overnight Shipping</span>
                         </div>
                       </div>
                       <button

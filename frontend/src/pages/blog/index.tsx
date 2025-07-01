@@ -107,7 +107,7 @@ export default function Blog() {
 
       {/* Hero Section with Stellar Void Template */}
       <section className="pt-[20px] pb-8">
-        <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           <div 
             className="rounded-2xl p-12 text-center stellar-void-animation"
             style={{
@@ -216,7 +216,7 @@ export default function Blog() {
 
       {/* Blog Posts Grid */}
       <section className="pb-12">
-        <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           {postsLoading ? (
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>

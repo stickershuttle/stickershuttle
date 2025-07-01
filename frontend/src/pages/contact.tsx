@@ -143,7 +143,7 @@ export default function Contact() {
     <Layout title="Contact - Sticker Shuttle">
       <div className="min-h-screen py-12"
            style={{ backgroundColor: '#030140' }}>
-        <div className="max-w-4xl mx-auto px-6 md:px-4">
+        <div className="max-w-4xl mx-auto px-4">
           {/* Header */}
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4"

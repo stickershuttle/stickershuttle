@@ -129,6 +129,14 @@ const calculateItemPricing = (
   const whiteOptionValue = item.customization.selections?.whiteOption?.value || 'color-only';
   const whiteOptionMultiplier = whiteOptionModifiers[whiteOptionValue as keyof typeof whiteOptionModifiers] || 1.0;
 
+  // Apply 15% price increase for specialty sticker types
+  let specialtyMultiplier = 1.0;
+  const productName = item.product?.name?.toLowerCase() || '';
+  if (productName.includes('holographic') || productName.includes('chrome') || 
+      productName.includes('glitter') || productName.includes('clear')) {
+    specialtyMultiplier = 1.15;
+  }
+
   if (pricingData && pricingData.basePricing && pricingData.quantityDiscounts) {
     const realResult = calculateRealPrice(
       pricingData.basePricing,
@@ -172,9 +180,9 @@ const calculateItemPricing = (
       }
     }
     
-    // Apply white option modifier for holographic stickers
-    const adjustedTotal = realResult.totalPrice * whiteOptionMultiplier;
-    const adjustedPerSticker = realResult.finalPricePerSticker * whiteOptionMultiplier;
+    // Apply white option modifier and specialty sticker price increase
+    const adjustedTotal = realResult.totalPrice * whiteOptionMultiplier * specialtyMultiplier;
+    const adjustedPerSticker = realResult.finalPricePerSticker * whiteOptionMultiplier * specialtyMultiplier;
     
     return {
       total: adjustedTotal,
@@ -912,7 +920,7 @@ export default function CartPage() {
   return (
     <Layout title="Your Cart - Sticker Shuttle">
       <section className="pt-7 pb-8">
-        <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           {/* Login Recommendation - Mobile Banner */}
           {showLoginBanner && (
             <div className="mb-6 p-4 rounded-lg backdrop-blur-md md:hidden" style={{

@@ -329,7 +329,7 @@ export default function ProofsPage() {
       return (
         <Layout title="Order Proofs - Sticker Shuttle">
           <div className="min-h-screen" style={{ backgroundColor: '#030140' }}>
-            <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4 py-8">
+            <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4 py-8">
               <div className="mb-6">
                 <h1 className="text-3xl font-bold text-white mb-2">
                   Order {selectedOrder.orderNumber || `#${selectedOrder.id.split('-')[0].toUpperCase()}`}
@@ -391,7 +391,7 @@ export default function ProofsPage() {
             }
           `}</style>
           
-          <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4 py-8">
+          <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4 py-8">
             {/* Header */}
             <div className="mb-6">
               {!orderId && (
@@ -817,7 +817,7 @@ export default function ProofsPage() {
   return (
     <Layout title="Your Proofs - Sticker Shuttle">
       <div className="min-h-screen" style={{ backgroundColor: '#030140' }}>
-        <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4 py-8">
+        <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4 py-8">
           {/* Orders List */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">Your Proofs</h1>

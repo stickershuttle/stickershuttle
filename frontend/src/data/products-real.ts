@@ -226,7 +226,7 @@ export const PRODUCTS: Product[] = [
     description: 'Eye-catching holographic stickers with prismatic rainbow effects.',
     shortDescription: 'Holographic stickers with rainbow effects',
     category: 'holographic-stickers',
-    basePrice: 0.85,
+    basePrice: 0.98,
     pricingModel: 'per-square-inch',
     images: [
       'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png'
@@ -267,7 +267,7 @@ export const PRODUCTS: Product[] = [
     description: 'Premium chrome stickers with mirror-like metallic finish.',
     shortDescription: 'Mirror-finish chrome stickers',
     category: 'chrome-stickers',
-    basePrice: 0.95,
+    basePrice: 1.09,
     pricingModel: 'per-square-inch',
     images: [
       'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png'
@@ -308,7 +308,7 @@ export const PRODUCTS: Product[] = [
     description: 'Dazzling glitter stickers that catch and reflect light beautifully.',
     shortDescription: 'Sparkly glitter stickers',
     category: 'glitter-stickers',
-    basePrice: 0.75,
+    basePrice: 0.86,
     pricingModel: 'per-square-inch',
     images: [
       'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png'
@@ -349,7 +349,7 @@ export const PRODUCTS: Product[] = [
     description: 'Crystal clear transparent stickers perfect for windows and glass.',
     shortDescription: 'Clear transparent stickers',
     category: 'clear-stickers',
-    basePrice: 0.70,
+    basePrice: 0.81,
     pricingModel: 'per-square-inch',
     images: [
       'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png'

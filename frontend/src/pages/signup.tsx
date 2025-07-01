@@ -364,7 +364,7 @@ export default function SignUp() {
           <div className="absolute inset-0 bg-black/60"></div>
         </div>
         
-        <div className="min-h-screen py-4 px-6 md:px-4 relative z-10 flex items-center justify-center">
+        <div className="min-h-screen py-4 px-4 relative z-10 flex items-center justify-center">
           <div className="max-w-md w-full">
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-white mb-2">Check Your Email</h1>
@@ -524,7 +524,7 @@ export default function SignUp() {
         ></div>
       </div>
       
-      <div className="min-h-screen py-4 px-6 md:px-4 relative z-10" style={{ backgroundColor: 'transparent' }}>
+      <div className="min-h-screen py-4 px-4 relative z-10" style={{ backgroundColor: 'transparent' }}>
         {/* Mobile Layout */}
         <div className="lg:hidden max-w-md mx-auto">
           {/* Header */}

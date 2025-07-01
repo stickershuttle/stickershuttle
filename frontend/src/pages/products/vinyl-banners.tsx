@@ -40,9 +40,9 @@ export default function VinylBanners() {
       `}</style>
               {/* Hero Section with Banner Background */}
         <section className="py-8">
-        <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           <div 
-            className="bg-white bg-opacity-5 backdrop-blur-sm rounded-2xl pt-12 pb-4 px-6 md:px-4 md:p-12 relative overflow-hidden"
+            className="bg-white bg-opacity-5 backdrop-blur-sm rounded-2xl pt-12 pb-4 px-4 md:p-12 relative overflow-hidden"
             style={{
               backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749652827/StickerShuttle_VinylBanner_VinylBanner_chvbfs.png)',
               backgroundSize: 'cover',
@@ -210,14 +210,14 @@ export default function VinylBanners() {
 
       {/* Calculator Section */}
       <section className="py-4">
-        <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           <VinylBannerCalculator />
         </div>
       </section>
 
       {/* Three-Column Benefits Section */}
       <section className="pt-4 pb-8">
-        <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
+        <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
             {/* Free Online Proof */}
@@ -269,7 +269,7 @@ export default function VinylBanners() {
       {/* Login/Signup Section - Only show when user is logged out */}
       {!loading && !user && (
         <section className="py-8">
-          <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-6 md:px-4">
+          <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
             <div 
               className="text-center p-8 md:p-12 rounded-2xl relative overflow-hidden"
               style={{
