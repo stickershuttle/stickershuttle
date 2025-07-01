@@ -393,7 +393,7 @@ const typeDefs = gql`
   type Mutation {
     # Customer order mutations
     createCustomerOrder(input: CustomerOrderInput!): CustomerOrder
-    updateOrderStatus(orderId: String!, statusUpdate: OrderStatusInput!): CustomerOrder
+    updateOrderStatus(orderId: ID!, statusUpdate: OrderStatusInput!): CustomerOrder
     claimGuestOrders(userId: ID!, email: String!): ClaimResult
     
     # Proof mutations
@@ -430,7 +430,7 @@ const typeDefs = gql`
     
     # EasyPost shipping mutations
     createEasyPostShipment(orderId: ID!, packageDimensions: PackageDimensionsInput): EasyPostShipmentResult
-    buyEasyPostLabel(shipmentId: String!, rateId: String!, orderId: String!, insurance: String): EasyPostLabelResult
+    buyEasyPostLabel(shipmentId: String!, rateId: String!, orderId: ID!, insurance: String): EasyPostLabelResult
     trackEasyPostShipment(trackingCode: String!): EasyPostTrackingResult
     
     # Manual tracking update mutation
@@ -447,7 +447,7 @@ const typeDefs = gql`
     markCreditNotificationsRead(userId: String!): MutationResult!
     addUserCredits(input: AddUserCreditsInput!): AddUserCreditsResult!
     addCreditsToAllUsers(amount: Float!, reason: String!): AddCreditsToAllUsersResult!
-    applyCreditsToOrder(orderId: String!, amount: Float!): ApplyCreditsResult!
+    applyCreditsToOrder(orderId: ID!, amount: Float!): ApplyCreditsResult!
 
     
     # User Profile mutations
@@ -4133,7 +4133,7 @@ const resolvers = {
               shipping_address: input.shippingAddress,
               billing_address: input.billingAddress || input.shippingAddress,
               order_tags: generateOrderTags(input.cartItems).split(','),
-              order_note: input.orderNote,
+              order_note: generateOrderNote(input.cartItems),
               order_created_at: new Date().toISOString(),
               order_updated_at: new Date().toISOString()
             };
@@ -4230,8 +4230,8 @@ const resolvers = {
               customerEmail: input.customerInfo.email,
               userId: input.userId,
               customerOrderId: customerOrder?.id,
-              // Simplified order note for Stripe metadata (under 500 chars)
-              orderNote: `${input.cartItems.length} items - $${cartTotal.toFixed(2)}${discountAmount > 0 ? ` (Discount: -$${discountAmount.toFixed(2)})` : ''}${actualCreditsApplied > 0 ? ` (Credits: -$${actualCreditsApplied.toFixed(2)})` : ''}`,
+              // Generate detailed order note with all selections including white options
+              orderNote: generateOrderNote(input.cartItems),
               cartMetadata: {
                 itemCount: input.cartItems.length,
                 subtotalAmount: cartSubtotal.toFixed(2),

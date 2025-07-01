@@ -118,7 +118,7 @@ export const GET_ALL_USERS = gql`
 
 // Apply credits at checkout
 export const APPLY_CREDITS_TO_ORDER = gql`
-  mutation ApplyCreditsToOrder($orderId: String!, $amount: Float!) {
+  mutation ApplyCreditsToOrder($orderId: ID!, $amount: Float!) {
     applyCreditsToOrder(orderId: $orderId, amount: $amount) {
       success
       remainingBalance

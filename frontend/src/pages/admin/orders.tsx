@@ -85,7 +85,7 @@ const GET_ALL_ORDERS = gql`
 
 // Mutation to update order status
 const UPDATE_ORDER_STATUS = gql`
-  mutation UpdateOrderStatus($orderId: String!, $statusUpdate: OrderStatusInput!) {
+  mutation UpdateOrderStatus($orderId: ID!, $statusUpdate: OrderStatusInput!) {
     updateOrderStatus(orderId: $orderId, statusUpdate: $statusUpdate) {
       id
       orderStatus
@@ -100,7 +100,7 @@ const UPDATE_ORDER_STATUS = gql`
 
 // Mutation to send proofs
 const SEND_PROOFS = gql`
-  mutation SendProofs($orderId: String!) {
+  mutation SendProofs($orderId: ID!) {
     sendProofs(orderId: $orderId) {
       id
       proof_status
@@ -465,7 +465,7 @@ export default function AdminOrders() {
 
       await updateOrderStatus({
         variables: {
-          orderId: String(orderId),
+          orderId: orderId,
           statusUpdate
         }
       });
@@ -775,7 +775,7 @@ export default function AdminOrders() {
     setSendingProofs(true);
     try {
       await sendProofs({
-        variables: { orderId: String(orderId) }
+        variables: { orderId: orderId }
       });
       
       // Update state to show proofs were sent
@@ -2261,9 +2261,38 @@ export default function AdminOrders() {
                       {/* Order Items - Mobile Enhanced */}
                       <div className="space-y-4 mb-6">
                         {selectedOrder.items.map((item, idx) => {
-                          const selections = item.calculatorSelections || {};
+                          let selections = item.calculatorSelections || {};
                           const size = selections.size || selections.sizePreset || {};
                           const itemImage = getProductImage(item);
+                          
+                          // Fallback: If white option is missing but order note exists, parse it from order note
+                          if (!selections.whiteOption && selectedOrder.orderNote) {
+                            const whiteOptionMatch = selectedOrder.orderNote.match(/⚪ White Option: (.+?)(?:\n|$)/);
+                            if (whiteOptionMatch) {
+                              selections = {
+                                ...selections,
+                                whiteOption: {
+                                  type: 'white-base',
+                                  value: whiteOptionMatch[1].trim(),
+                                  displayValue: whiteOptionMatch[1].trim(),
+                                  priceImpact: 0
+                                }
+                              };
+                            }
+                          }
+                          
+                          // Debug: Log what we have in selections to find missing white options
+                          console.log('🔍 Admin mobile view - calculator selections debug:', {
+                            itemId: item.id,
+                            itemName: item.productName,
+                            hasCalculatorSelections: !!item.calculatorSelections,
+                            selections,
+                            hasWhiteOption: !!selections.whiteOption,
+                            whiteOptionValue: selections.whiteOption?.value,
+                            whiteOptionDisplay: selections.whiteOption?.displayValue,
+                            allKeys: Object.keys(selections),
+                            parsedFromOrderNote: !item.calculatorSelections?.whiteOption && !!selections.whiteOption
+                          });
 
                           return (
                             <div key={idx} className="py-4 border-b border-gray-700 border-opacity-30 last:border-b-0">
@@ -2296,6 +2325,19 @@ export default function AdminOrders() {
                                       </div>
                                     )}
                                   </div>
+                                  
+                                  {/* Download Button */}
+                                  {itemImage && (
+                                    <button
+                                      onClick={() => handleDownloadFile(itemImage, item.productName + '_design.jpg')}
+                                      className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-6 h-6 flex items-center justify-center text-blue-400 hover:text-blue-300 hover:scale-110 transition-all duration-200"
+                                      title="Download original file"
+                                    >
+                                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                                      </svg>
+                                    </button>
+                                  )}
                                 </div>
 
                                 {/* Product Details */}
@@ -2333,6 +2375,12 @@ export default function AdminOrders() {
                                         </span>
                                       </div>
                                     ) : null}
+                                    {selections.whiteOption?.displayValue && (
+                                      <div className="flex">
+                                        <span className="text-gray-500 w-20">White Ink:</span>
+                                        <span className="text-gray-300">{selections.whiteOption.displayValue}</span>
+                                      </div>
+                                    )}
                                   </div>
 
                                   {/* Additional Details */}
@@ -2574,9 +2622,38 @@ export default function AdminOrders() {
                       {/* Order Items - Enhanced */}
                       <div className="space-y-4 mb-6">
                         {selectedOrder.items.map((item, idx) => {
-                          const selections = item.calculatorSelections || {};
+                          let selections = item.calculatorSelections || {};
                           const size = selections.size || selections.sizePreset || {};
                           const itemImage = getProductImage(item);
+                          
+                          // Fallback: If white option is missing but order note exists, parse it from order note
+                          if (!selections.whiteOption && selectedOrder.orderNote) {
+                            const whiteOptionMatch = selectedOrder.orderNote.match(/⚪ White Option: (.+?)(?:\n|$)/);
+                            if (whiteOptionMatch) {
+                              selections = {
+                                ...selections,
+                                whiteOption: {
+                                  type: 'white-base',
+                                  value: whiteOptionMatch[1].trim(),
+                                  displayValue: whiteOptionMatch[1].trim(),
+                                  priceImpact: 0
+                                }
+                              };
+                            }
+                          }
+                          
+                          // Debug: Log what we have in selections to find missing white options
+                          console.log('🔍 Admin desktop view - calculator selections debug:', {
+                            itemId: item.id,
+                            itemName: item.productName,
+                            hasCalculatorSelections: !!item.calculatorSelections,
+                            selections,
+                            hasWhiteOption: !!selections.whiteOption,
+                            whiteOptionValue: selections.whiteOption?.value,
+                            whiteOptionDisplay: selections.whiteOption?.displayValue,
+                            allKeys: Object.keys(selections),
+                            parsedFromOrderNote: !item.calculatorSelections?.whiteOption && !!selections.whiteOption
+                          });
 
                           return (
                             <div key={idx} className="py-4 border-b border-gray-700 border-opacity-30 last:border-b-0">
@@ -2612,6 +2689,19 @@ export default function AdminOrders() {
                                     )}
                                   </div>
                                   
+                                  {/* Download Button */}
+                                  {itemImage && (
+                                    <button
+                                      onClick={() => handleDownloadFile(itemImage, item.productName + '_design.jpg')}
+                                      className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-6 h-6 flex items-center justify-center text-blue-400 hover:text-blue-300 hover:scale-110 transition-all duration-200"
+                                      title="Download original file"
+                                    >
+                                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                  
                                   {/* Customer Replacement Indicator */}
                                   {item.customerReplacementFile && (
                                     <div className="absolute -top-2 -right-2 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
@@ -2636,7 +2726,7 @@ export default function AdminOrders() {
                                   </div>
 
                                   {/* Specifications Grid */}
-                                  <div className="grid grid-cols-3 gap-3 mt-3">
+                                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-3">
                                     {selections.cut?.displayValue && (
                                       <div className="flex flex-col">
                                         <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Shape</span>
@@ -2664,6 +2754,15 @@ export default function AdminOrders() {
                                         </span>
                                       </div>
                                     ) : null}
+                                    {selections.whiteOption?.displayValue && (
+                                      <div className="flex flex-col">
+                                        <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">White Ink</span>
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-cyan-300"
+                                          style={{ backgroundColor: 'rgba(6, 182, 212, 0.2)', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
+                                          {selections.whiteOption.displayValue}
+                                        </span>
+                                      </div>
+                                    )}
                                   </div>
 
                                   {/* Additional Details */}
@@ -3093,18 +3192,7 @@ export default function AdminOrders() {
 
 
 
-                    {/* Order Notes */}
-                    {selectedOrder.orderNote && (
-                      <div className="glass-container p-6">
-                        <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                          <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                          </svg>
-                          Order Notes
-                        </h3>
-                        <p className="text-sm text-gray-300 whitespace-pre-wrap">{selectedOrder.orderNote}</p>
-                      </div>
-                    )}
+
 
                     {/* Order Timeline */}
                     <div className="glass-container p-6">

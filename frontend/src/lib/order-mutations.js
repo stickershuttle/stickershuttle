@@ -223,7 +223,7 @@ export const CLAIM_GUEST_ORDERS = gql`
 
 // Mutation to update order status
 export const UPDATE_ORDER_STATUS = gql`
-  mutation UpdateOrderStatus($orderId: String!, $statusUpdate: OrderStatusInput!) {
+  mutation UpdateOrderStatus($orderId: ID!, $statusUpdate: OrderStatusInput!) {
     updateOrderStatus(orderId: $orderId, statusUpdate: $statusUpdate) {
       id
       orderStatus

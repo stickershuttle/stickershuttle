@@ -40,7 +40,10 @@ export default function SitewideAlert() {
     <div 
       className="w-full py-3 px-4 text-center font-semibold text-sm relative z-50"
       style={{
-        backgroundColor: alert.backgroundColor,
+        background: `rgba(${parseInt(alert.backgroundColor.slice(1, 3), 16)}, ${parseInt(alert.backgroundColor.slice(3, 5), 16)}, ${parseInt(alert.backgroundColor.slice(5, 7), 16)}, 0.15)`,
+        border: `1px solid rgba(${parseInt(alert.backgroundColor.slice(1, 3), 16)}, ${parseInt(alert.backgroundColor.slice(3, 5), 16)}, ${parseInt(alert.backgroundColor.slice(5, 7), 16)}, 0.3)`,
+        boxShadow: `rgba(${parseInt(alert.backgroundColor.slice(1, 3), 16)}, ${parseInt(alert.backgroundColor.slice(3, 5), 16)}, ${parseInt(alert.backgroundColor.slice(5, 7), 16)}, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset`,
+        backdropFilter: 'blur(12px)',
         color: alert.textColor
       }}
     >

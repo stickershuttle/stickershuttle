@@ -516,7 +516,14 @@ export default function ClearStickerCalculator({ initialBasePricing, realPricing
             displayValue: selectedSize === "Custom size" ? `${customWidth}"x${customHeight}"` : selectedSize,
             priceImpact: 0 
           },
-          whiteOption: { type: "white-base" as const, value: selectedWhiteOption, displayValue: selectedWhiteOption, priceImpact: 0 },
+          whiteOption: { 
+            type: "white-base" as const, 
+            value: selectedWhiteOption, 
+            displayValue: selectedWhiteOption === "color-only" ? "Color Only" : 
+                         selectedWhiteOption === "partial-white" ? "Partial White Ink" : 
+                         selectedWhiteOption === "full-white" ? "Full White Ink" : selectedWhiteOption, 
+            priceImpact: 0 
+          },
           proof: { type: "finish" as const, value: sendProof, displayValue: sendProof ? "Send Proof" : "No Proof", priceImpact: 0 },
           rush: { type: "finish" as const, value: rushOrder, displayValue: rushOrder ? "Rush Order" : "Standard", priceImpact: rushOrder ? total * 0.4 : 0 }
         },

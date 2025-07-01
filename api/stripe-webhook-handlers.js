@@ -1216,7 +1216,7 @@ function parseCalculatorSelectionsFromOrderNote(orderNote) {
   }
   
   // Parse white option if present (for clear/chrome/glitter stickers)
-  const whiteMatch = orderNote.match(/✨ White Option: (.+?)(?:\n|$)/);
+  const whiteMatch = orderNote.match(/⚪ White Option: (.+?)(?:\n|$)/);
   if (whiteMatch) {
     selections.whiteOption = {
       type: 'white-base',

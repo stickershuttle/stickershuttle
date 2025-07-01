@@ -112,4 +112,10 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   console.log('🧹 Apollo cache cleared for development');
 }
 
+// Add a method to clear the cache
+export const clearApolloCache = () => {
+  console.log('🧹 Clearing Apollo cache...');
+  client.clearStore();
+};
+
 export default client; 

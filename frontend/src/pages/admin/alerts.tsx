@@ -76,6 +76,33 @@ interface Alert {
   createdBy: string;
 }
 
+// Predefined color options
+const COLOR_OPTIONS = [
+  { name: 'Gold', value: '#FFD700', description: 'Classic gold' },
+  { name: 'Blue', value: '#3B82F6', description: 'Bright blue' },
+  { name: 'Green', value: '#22C55E', description: 'Success green' },
+  { name: 'Red', value: '#EF4444', description: 'Alert red' },
+  { name: 'Purple', value: '#8B5CF6', description: 'Royal purple' },
+  { name: 'Orange', value: '#F97316', description: 'Vibrant orange' },
+  { name: 'Pink', value: '#EC4899', description: 'Hot pink' },
+  { name: 'Cyan', value: '#06B6D4', description: 'Electric cyan' },
+  { name: 'Indigo', value: '#6366F1', description: 'Deep indigo' },
+  { name: 'Emerald', value: '#10B981', description: 'Rich emerald' }
+];
+
+const TEXT_COLOR_OPTIONS = [
+  { name: 'Dark Blue', value: '#030140', description: 'Primary dark' },
+  { name: 'White', value: '#FFFFFF', description: 'Pure white' },
+  { name: 'Black', value: '#000000', description: 'Pure black' },
+  { name: 'Dark Gray', value: '#374151', description: 'Charcoal gray' },
+  { name: 'Light Gray', value: '#9CA3AF', description: 'Light gray' },
+  { name: 'Navy', value: '#1E3A8A', description: 'Navy blue' },
+  { name: 'Dark Green', value: '#14532D', description: 'Forest green' },
+  { name: 'Dark Red', value: '#7F1D1D', description: 'Deep red' },
+  { name: 'Dark Purple', value: '#581C87', description: 'Deep purple' },
+  { name: 'Dark Orange', value: '#9A3412', description: 'Burnt orange' }
+];
+
 const ADMIN_EMAILS = ['justin@stickershuttle.com'];
 
 export default function AlertsManagement() {
@@ -248,7 +275,7 @@ export default function AlertsManagement() {
               style={{
                 background: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
                 backdropFilter: 'blur(12px)'
               }}
             >
@@ -297,22 +324,42 @@ export default function AlertsManagement() {
                 <div className="grid grid-cols-3 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Background Color</label>
-                    <input
-                      type="color"
+                    <select
                       value={formData.backgroundColor}
                       onChange={(e) => setFormData({ ...formData, backgroundColor: e.target.value })}
-                      className="w-full h-12 rounded-lg border border-white/20 bg-white/10 cursor-pointer"
-                    />
+                      className="w-full px-4 py-3 rounded-lg border border-white/20 bg-white/10 text-white focus:outline-none focus:border-blue-400"
+                      aria-label="Select background color"
+                    >
+                      {COLOR_OPTIONS.map((color) => (
+                        <option key={color.value} value={color.value} className="bg-gray-800 text-white">
+                          {color.name} - {color.description}
+                        </option>
+                      ))}
+                    </select>
+                    <div 
+                      className="w-full h-4 rounded-lg mt-2 border border-white/20"
+                      style={{ backgroundColor: formData.backgroundColor }}
+                    ></div>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Text Color</label>
-                    <input
-                      type="color"
+                    <select
                       value={formData.textColor}
                       onChange={(e) => setFormData({ ...formData, textColor: e.target.value })}
-                      className="w-full h-12 rounded-lg border border-white/20 bg-white/10 cursor-pointer"
-                    />
+                      className="w-full px-4 py-3 rounded-lg border border-white/20 bg-white/10 text-white focus:outline-none focus:border-blue-400"
+                      aria-label="Select text color"
+                    >
+                      {TEXT_COLOR_OPTIONS.map((color) => (
+                        <option key={color.value} value={color.value} className="bg-gray-800 text-white">
+                          {color.name} - {color.description}
+                        </option>
+                      ))}
+                    </select>
+                    <div 
+                      className="w-full h-4 rounded-lg mt-2 border border-white/20"
+                      style={{ backgroundColor: formData.textColor }}
+                    ></div>
                   </div>
 
                   <div>
@@ -345,7 +392,10 @@ export default function AlertsManagement() {
                   <div 
                     className="rounded-lg p-4 text-center font-semibold"
                     style={{
-                      backgroundColor: formData.backgroundColor,
+                      background: `rgba(${parseInt(formData.backgroundColor.slice(1, 3), 16)}, ${parseInt(formData.backgroundColor.slice(3, 5), 16)}, ${parseInt(formData.backgroundColor.slice(5, 7), 16)}, 0.15)`,
+                      border: `1px solid rgba(${parseInt(formData.backgroundColor.slice(1, 3), 16)}, ${parseInt(formData.backgroundColor.slice(3, 5), 16)}, ${parseInt(formData.backgroundColor.slice(5, 7), 16)}, 0.3)`,
+                      boxShadow: `rgba(${parseInt(formData.backgroundColor.slice(1, 3), 16)}, ${parseInt(formData.backgroundColor.slice(3, 5), 16)}, ${parseInt(formData.backgroundColor.slice(5, 7), 16)}, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset`,
+                      backdropFilter: 'blur(12px)',
                       color: formData.textColor
                     }}
                   >

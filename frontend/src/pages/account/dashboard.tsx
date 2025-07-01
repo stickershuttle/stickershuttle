@@ -761,6 +761,7 @@ function Dashboard() {
   useEffect(() => {
     // Get the requested view from URL
     const requestedView = router.query.view as string;
+    const orderNumber = router.query.orderNumber as string;
     
     // If no view in URL, set to default
     if (!requestedView && currentView !== 'default') {
@@ -774,9 +775,22 @@ function Dashboard() {
       
       if (validViews.includes(requestedView as DashboardView)) {
         setCurrentView(requestedView as DashboardView);
+        
+        // If it's order-details view with orderNumber, find and set the order
+        if (requestedView === 'order-details' && orderNumber && orders.length > 0) {
+          const foundOrder = orders.find((o: any) => 
+            o.orderNumber === orderNumber || o.id === orderNumber
+          );
+          if (foundOrder) {
+            console.log('📋 Loading order from URL:', orderNumber);
+            setSelectedOrderForInvoice(foundOrder);
+          } else {
+            console.log('⚠️ Order not found for number:', orderNumber);
+          }
+        }
       }
     }
-  }, [router.query.view]);
+  }, [router.query.view, router.query.orderNumber, orders]);
 
   // Helper function to update view and URL
   const updateCurrentView = (view: DashboardView) => {
@@ -786,8 +800,24 @@ function Dashboard() {
     // Update state immediately
     setCurrentView(view);
     
-    // Update URL to reflect the current view
-    const url = view === 'default' ? '/account/dashboard' : `/account/dashboard?view=${view}`;
+    // Build URL with query parameters
+    let url = '/account/dashboard';
+    const params = new URLSearchParams();
+    
+    if (view !== 'default') {
+      params.set('view', view);
+    }
+    
+    // Preserve orderNumber if we're on order-details view
+    if (view === 'order-details' && selectedOrderForInvoice) {
+      params.set('orderNumber', selectedOrderForInvoice.orderNumber || selectedOrderForInvoice.id);
+    }
+    
+    const queryString = params.toString();
+    if (queryString) {
+      url += `?${queryString}`;
+    }
+    
     router.push(url, undefined, { shallow: true });
     
     // Load saved support form draft when switching to support view
@@ -801,6 +831,11 @@ function Dashboard() {
           console.error('Error loading draft:', e);
         }
       }
+    }
+    
+    // Clear selected order if leaving order-details view
+    if (view !== 'order-details') {
+      setSelectedOrderForInvoice(null);
     }
   };
 

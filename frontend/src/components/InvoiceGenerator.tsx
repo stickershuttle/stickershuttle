@@ -58,6 +58,22 @@ interface InvoiceData {
 const useInvoiceGenerator = (invoiceData: InvoiceData) => {
   
   const generatePDF = async (action: 'print' | 'download') => {
+    console.log('🧾 Starting PDF generation:', action);
+    console.log('🧾 Invoice data:', invoiceData);
+    
+    // Validate invoice data
+    if (!invoiceData.orderNumber) {
+      console.error('❌ Missing order number in invoice data');
+      alert('Error: Order number is missing. Please refresh the page and try again.');
+      return;
+    }
+    
+    if (!invoiceData.items || invoiceData.items.length === 0) {
+      console.error('❌ No items found in invoice data');
+      alert('Error: No order items found. Please refresh the page and try again.');
+      return;
+    }
+    
     // Create a hidden div for the invoice
     const invoiceElement = document.createElement('div');
     invoiceElement.style.position = 'absolute';
@@ -327,11 +343,21 @@ const useInvoiceGenerator = (invoiceData: InvoiceData) => {
       }
 
     } catch (error) {
-      console.error('Error generating PDF:', error);
-      alert('Error generating PDF. Please try again.');
+      console.error('❌ Error generating PDF:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      const errorStack = error instanceof Error ? error.stack : 'No stack trace available';
+      console.error('❌ Error details:', errorMessage);
+      console.error('❌ Error stack:', errorStack);
+      alert(`Error generating PDF: ${errorMessage}. Please try again or contact support.`);
     } finally {
       // Clean up
-      document.body.removeChild(invoiceElement);
+      try {
+        if (invoiceElement && document.body.contains(invoiceElement)) {
+          document.body.removeChild(invoiceElement);
+        }
+      } catch (cleanupError) {
+        console.error('❌ Error during cleanup:', cleanupError);
+      }
     }
   };
 
