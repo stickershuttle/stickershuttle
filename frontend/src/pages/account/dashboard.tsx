@@ -6336,7 +6336,7 @@ function Dashboard() {
               <label className="block text-sm font-medium text-gray-300 mb-3">Profile Photo</label>
               <div className="flex items-center gap-6">
                 <div 
-                  className="w-24 h-24 rounded-full cursor-pointer transition-all duration-200 transform hover:scale-105 flex items-center justify-center relative group"
+                  className="w-24 h-24 aspect-square rounded-full cursor-pointer transition-all duration-200 transform hover:scale-105 flex items-center justify-center relative group"
                   style={{
                     backgroundColor: 'rgba(255, 255, 255, 0.1)',
                     backdropFilter: 'blur(10px)',
@@ -8183,7 +8183,7 @@ function Dashboard() {
                   <div className="flex items-start gap-3 md:gap-4">
                     {/* Profile Picture Circle - Fixed position */}
                     <div 
-                      className="w-12 h-12 md:w-16 md:h-16 rounded-full cursor-pointer transition-all duration-200 transform hover:scale-105 flex items-center justify-center relative pointer-events-auto flex-shrink-0"
+                      className="w-12 h-12 md:w-16 md:h-16 aspect-square rounded-full cursor-pointer transition-all duration-200 transform hover:scale-105 flex items-center justify-center relative pointer-events-auto flex-shrink-0"
                       style={{
                         backgroundColor: 'rgba(255, 255, 255, 0.1)',
                         backdropFilter: 'blur(10px)',

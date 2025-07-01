@@ -163,7 +163,7 @@ export default function UniversalHeader() {
                 style={{ background: 'transparent', border: 'none' }}
               >
                 {/* Profile Avatar */}
-                <div className="w-10 h-10 rounded-full overflow-hidden border border-white/20 transition-all duration-200 hover:border-white/40">
+                <div className="w-10 h-10 aspect-square rounded-full overflow-hidden border border-white/20 transition-all duration-200 hover:border-white/40">
                   {profile?.profile_photo_url ? (
                     <img 
                       src={profile.profile_photo_url} 
@@ -494,7 +494,7 @@ export default function UniversalHeader() {
                   onBlur={() => setTimeout(() => setShowProfileDropdown(false), 200)}
                 >
                   {/* Profile Picture */}
-                  <div className="w-10 h-10 rounded-full overflow-hidden border border-white/15 transition-all duration-200 hover:border-white/40 hover:brightness-75">
+                  <div className="w-10 h-10 aspect-square rounded-full overflow-hidden border border-white/15 transition-all duration-200 hover:border-white/40 hover:brightness-75">
                     {profile?.profile_photo_url ? (
                       <img 
                         src={profile.profile_photo_url} 
@@ -532,7 +532,7 @@ export default function UniversalHeader() {
                     <div className="p-4">
                       {/* Profile Header */}
                       <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/10">
-                        <div className="w-12 h-12 rounded-full overflow-hidden">
+                        <div className="w-12 h-12 aspect-square rounded-full overflow-hidden">
                           {profile?.profile_photo_url ? (
                             <img 
                               src={profile.profile_photo_url} 
@@ -718,7 +718,7 @@ export default function UniversalHeader() {
           <div className="p-4">
             {/* Profile Header */}
             <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/10">
-              <div className="w-12 h-12 rounded-full overflow-hidden">
+              <div className="w-12 h-12 aspect-square rounded-full overflow-hidden">
                 {profile?.profile_photo_url ? (
                   <img 
                     src={profile.profile_photo_url} 
