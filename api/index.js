@@ -145,7 +145,22 @@ app.get('/test', (req, res) => {
     status: 'alive',
     time: new Date().toISOString(),
     env: process.env.NODE_ENV || 'not set',
-    port: process.env.PORT || 4000
+    port: process.env.PORT || 4000,
+    railway: {
+      environment: process.env.RAILWAY_ENVIRONMENT || 'not set',
+      project_id: process.env.RAILWAY_PROJECT_ID || 'not set',
+      service_id: process.env.RAILWAY_SERVICE_ID || 'not set',
+      replica_id: process.env.RAILWAY_REPLICA_ID || 'not set'
+    },
+    services: {
+      supabase: supabaseClient.isReady() ? 'ready' : 'not configured',
+      stripe: stripeClient.isReady() ? 'ready' : 'not configured',
+      easypost: easyPostClient.isReady() ? 'ready' : 'not configured'
+    },
+    memory: {
+      used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + ' MB',
+      total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + ' MB'
+    }
   });
 });
 
