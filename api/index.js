@@ -6,7 +6,10 @@ console.log('🔌 PORT:', process.env.PORT || 'not set (will use 4000)');
 console.log('🏭 Railway environment:', process.env.RAILWAY_ENVIRONMENT || 'not set');
 
 // Load environment variables - Railway provides them directly
-require('dotenv').config();
+// Only load dotenv in development (Railway provides env vars directly in production)
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
 
 // Initialize Sentry error monitoring (must be first)
 const Sentry = require("@sentry/node");
@@ -190,13 +193,23 @@ app.use((req, res, next) => {
 process.on('uncaughtException', (error) => {
   console.error('💥 Uncaught Exception:', error);
   console.error('Stack:', error.stack);
-  // Keep the process alive but log the error
+  // In production, exit to let Railway restart the container
+  if (process.env.NODE_ENV === 'production') {
+    console.error('🚨 Exiting process due to uncaught exception in production');
+    process.exit(1);
+  }
+  // Keep the process alive but log the error in development
   Sentry.captureException(error);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
-  // Keep the process alive but log the error
+  // In production, exit to let Railway restart the container
+  if (process.env.NODE_ENV === 'production') {
+    console.error('🚨 Exiting process due to unhandled rejection in production');
+    process.exit(1);
+  }
+  // Keep the process alive but log the error in development
   Sentry.captureException(new Error(`Unhandled Rejection: ${reason}`));
 });
 
