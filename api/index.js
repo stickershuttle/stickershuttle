@@ -95,6 +95,10 @@ console.log('  - EasyPost:', easyPostClient.isReady() ? '✅ Ready' : '❌ Not c
 
 // Initialize Express app
 const app = express();
+
+// Trust proxy headers (required for Railway and other proxied environments)
+app.set('trust proxy', true);
+
 console.log('✅ Express app initialized');
 
 // Add immediate health check - before any middleware
