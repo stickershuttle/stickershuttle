@@ -5813,7 +5813,7 @@ function Dashboard() {
                           <p className="text-gray-400 text-sm">${(item.unitPrice || (item.price / item.quantity)).toFixed(2)} each</p>
                         </div>
                       </div>
-                      {/* Calculator Selections - Detailed View */}
+                      {/* Calculator Selections - Enhanced View */}
                       {calculatorSelections && (
                         <div className="bg-black/20 rounded-lg p-4 border border-white/5 mb-4">
                           <h5 className="text-sm font-semibold text-purple-400 mb-3">Product Specifications</h5>
@@ -5831,7 +5831,11 @@ function Dashboard() {
                                   'cutToShape': 'Cut to Shape',
                                   'weatherproofLaminate': 'Weatherproof Laminate',
                                   'grommets': 'Grommets',
-                                  'poleHem': 'Pole Hem'
+                                  'poleHem': 'Pole Hem',
+                                  'whiteOption': 'White Ink',
+                                  'rush': 'Rush Order',
+                                  'instagram': 'Instagram',
+                                  'proof': 'Proof Preference'
                                 };
                                 return keyMap[key] || key.split(/(?=[A-Z])/).join(' ').replace(/^\w/, c => c.toUpperCase());
                               };
@@ -5841,7 +5845,19 @@ function Dashboard() {
                                   if (value.displayValue) return value.displayValue;
                                   if (value.label) return value.label;
                                   if (value.width && value.height) return `${value.width}" × ${value.height}"`;
-                                  if (value.value) return value.value;
+                                  if (value.value) {
+                                    // Special formatting for specific fields
+                                    if (key === 'rush' && value.value === 'rush-order') {
+                                      return '🚀 24-hour production (+40%)';
+                                    }
+                                    if (key === 'instagram' && value.value) {
+                                      return `@${value.value} 📸`;
+                                    }
+                                    if (key === 'proof' && typeof value.value === 'boolean') {
+                                      return value.value ? '📧 Send proof for approval' : '⚡ Skip proof - direct to production';
+                                    }
+                                    return value.value;
+                                  }
                                 }
                                 if (typeof value === 'boolean') return value ? 'Yes' : 'No';
                                 return String(value);
@@ -5855,6 +5871,93 @@ function Dashboard() {
                               );
                             })}
                           </div>
+
+                          {/* Additional Details Section */}
+                          {(() => {
+                            // Parse additional data from order note or item data
+                            const orderNote = selectedOrderForInvoice.orderNote || '';
+                            
+                            // Parse fallback data from order note if not in calculator selections
+                            const instagramFromString = orderNote.match(/📸 Instagram: @([^\\n]+)/);
+                            const instagramHandle = itemData.instagramHandle || calculatorSelections.instagram?.value || calculatorSelections.instagramHandle?.value || 
+                              (instagramFromString ? instagramFromString[1] : null);
+                            const instagramOptIn = itemData.instagramOptIn || !!calculatorSelections.instagram;
+                            
+                            const rushFromString = orderNote.includes('🚀 Rush Order') || orderNote.includes('Rush: Rush Order');
+                            const rushOrder = calculatorSelections.rush?.value || (selectedOrderForInvoice as any).is_rush_order || rushFromString;
+                            
+                            const whiteOptionFromString = orderNote.match(/⚪ White Option: (.+?)(?:\n|$)/);
+                            const whiteOption = calculatorSelections.whiteOption?.displayValue || (whiteOptionFromString ? whiteOptionFromString[1].trim() : null);
+                            
+                            const proofFromString = orderNote.includes('📧') ? true : orderNote.includes('❌ No Proof') ? false : null;
+                            const hasProofData = calculatorSelections.proof?.value !== undefined || proofFromString !== null;
+                            const proofValue = calculatorSelections.proof?.value !== undefined ? calculatorSelections.proof.value : 
+                              proofFromString !== null ? proofFromString : true;
+                            
+                            // Show additional section if ANY additional data exists
+                            const showAdditionalSection = itemData.customerNotes || instagramHandle || instagramOptIn || 
+                              itemData.customerReplacementFile || rushOrder || whiteOption || hasProofData;
+                            
+                            return showAdditionalSection ? (
+                              <div className="mt-4 pt-4 border-t border-white/10">
+                                <h6 className="text-xs text-gray-500 uppercase tracking-wide mb-3">Additional Details</h6>
+                                <div className="space-y-3">
+                                  {whiteOption && (
+                                    <div className="flex items-start gap-3">
+                                      <span className="text-xs text-gray-400 w-20">White Ink:</span>
+                                      <span className="text-white font-medium text-sm flex-1">{whiteOption}</span>
+                                    </div>
+                                  )}
+                                  {rushOrder && (
+                                    <div className="flex items-start gap-3">
+                                      <span className="text-xs text-gray-400 w-20">Rush Order:</span>
+                                      <span className="text-orange-300 font-medium text-sm flex-1">🚀 24-hour production (+40%)</span>
+                                    </div>
+                                  )}
+                                  {(instagramHandle || instagramOptIn) && (
+                                    <div className="flex items-start gap-3">
+                                      <span className="text-xs text-gray-400 w-20">Instagram:</span>
+                                      <span className="text-pink-300 font-medium text-sm flex-1">
+                                        {instagramHandle ? `@${instagramHandle}` : 'Opted in for posting'} 📸
+                                        {instagramOptIn && instagramHandle && (
+                                          <span className="ml-2 text-xs text-green-400">(Marketing opt-in)</span>
+                                        )}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {hasProofData && (
+                                    <div className="flex items-start gap-3">
+                                      <span className="text-xs text-gray-400 w-20">Proof:</span>
+                                      <span className={`font-medium text-sm flex-1 ${proofValue ? 'text-blue-300' : 'text-gray-300'}`}>
+                                        {proofValue ? '📧 Send proof for approval' : '⚡ Skip proof - direct to production'}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {itemData.customerNotes && (
+                                    <div className="flex items-start gap-3">
+                                      <span className="text-xs text-gray-400 w-20">Notes:</span>
+                                      <span className="text-gray-300 font-medium text-sm flex-1">{itemData.customerNotes}</span>
+                                    </div>
+                                  )}
+                                  {itemData.customerReplacementFile && (
+                                    <div className="flex items-start gap-3">
+                                      <span className="text-xs text-gray-400 w-20">Updated File:</span>
+                                      <div className="flex-1">
+                                        <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-500/30">
+                                          <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                          </svg>
+                                          <span className="text-orange-300 text-sm font-medium">
+                                            {itemData.customerReplacementFileName || 'Customer uploaded file'}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
                       )}
 
