@@ -119,7 +119,8 @@ const corsConfig = {
     const baseOrigins = [
       'https://stickershuttle.com',
       'https://www.stickershuttle.com',
-      'https://stickershuttle.vercel.app'
+      'https://stickershuttle.vercel.app',
+      'https://stickershuttle-production.up.railway.app' // Add Railway URL just in case
     ];
 
     // Add development origins only in non-production environments
@@ -141,6 +142,9 @@ const corsConfig = {
   origin: function (origin, callback) {
     const allowedOrigins = corsConfig.getOrigins();
     const isDevelopment = process.env.NODE_ENV !== 'production';
+    
+    // Log the request for debugging
+    console.log(`🔍 CORS Check - Origin: ${origin || 'no-origin'}, ENV: ${process.env.NODE_ENV || 'undefined'}`);
     
     // Allow requests with no origin (mobile apps, curl, Postman)
     if (!origin) {
@@ -211,11 +215,38 @@ app.use((req, res, next) => {
   if (origin && allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, X-HTTP-Method-Override, apollo-require-preflight');
   }
   next();
 });
 
-// Add security headers with Helmet
+// Special CORS handling for GraphQL endpoint
+app.use('/graphql', (req, res, next) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = corsConfig.getOrigins();
+  
+  console.log(`🚀 GraphQL Request - Method: ${req.method}, Origin: ${origin || 'no-origin'}`);
+  
+  // Always set CORS headers for allowed origins on GraphQL endpoint
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, apollo-require-preflight');
+    res.setHeader('Access-Control-Max-Age', '86400');
+  }
+  
+  // Handle preflight requests immediately
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+  
+  next();
+});
+
+// Add security headers with Helmet (but don't override CORS)
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -232,7 +263,11 @@ app.use(helmet({
     maxAge: 31536000,
     includeSubDomains: true,
     preload: true
-  }
+  },
+  // Don't let Helmet override CORS headers
+  crossOriginResourcePolicy: false,
+  crossOriginOpenerPolicy: false,
+  crossOriginEmbedderPolicy: false
 }));
 
 // Rate limiting configuration
@@ -344,12 +379,23 @@ app.get('/health', (req, res) => {
 app.get('/cors-test', (req, res) => {
   const origin = req.headers.origin || 'No origin header';
   const allowedOrigins = corsConfig.getOrigins();
+  const headers = res.getHeaders();
+  
+  // Manually set CORS headers for this test endpoint
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  
   res.json({
     message: 'CORS test endpoint',
     requestOrigin: origin,
+    isOriginAllowed: origin ? allowedOrigins.includes(origin) : 'no-origin',
     allowedOrigins: allowedOrigins,
     environment: process.env.NODE_ENV || 'development',
-    corsHeaders: res.getHeaders()
+    corsHeaders: headers,
+    nodeEnv: process.env.NODE_ENV,
+    railwayEnv: process.env.RAILWAY_ENVIRONMENT
   });
 });
 
