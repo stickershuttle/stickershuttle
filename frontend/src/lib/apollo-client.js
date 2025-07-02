@@ -10,24 +10,23 @@ const PRODUCTION_API_URL = 'https://stickershuttle-production.up.railway.app';
 
 // Use production URL by default, fallback to localhost in development
 const getApiUrl = () => {
-  // If explicit environment variable is set, use it
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  
-  // TEMPORARY: Test if Railway backend is responding, fallback to localhost
-  // This will help us determine if Railway is the issue
-  
-  // If in development mode, use localhost
-  if (process.env.NODE_ENV === 'development') {
-    return 'http://localhost:4000';
-  }
-  
-  // TEMPORARY FIX: Railway backend is down (502 error), use localhost temporarily
-  // Once Railway is fixed, change this back to PRODUCTION_API_URL
-  console.log('🚨 TEMPORARY: Using localhost because Railway backend is down (502 error)');
+  // EMERGENCY FIX: Force localhost because Railway is down (502 error)
+  // Comment out the environment variable check temporarily
+  console.log('🚨 EMERGENCY FIX: Forcing localhost because Railway backend is down (502 error)');
   console.log('🔧 Railway backend URL that is failing:', PRODUCTION_API_URL);
+  console.log('🔧 Environment variable being ignored:', process.env.NEXT_PUBLIC_API_URL);
   return 'http://localhost:4000';
+
+  // ORIGINAL CODE (commented out while Railway is down):
+  // if (process.env.NEXT_PUBLIC_API_URL) {
+  //   return process.env.NEXT_PUBLIC_API_URL;
+  // }
+  // 
+  // if (process.env.NODE_ENV === 'development') {
+  //   return 'http://localhost:4000';
+  // }
+  // 
+  // return PRODUCTION_API_URL;
 };
 
 const httpLink = createHttpLink({
