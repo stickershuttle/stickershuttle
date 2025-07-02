@@ -5,7 +5,7 @@ import { from } from '@apollo/client';
 import { getSupabase } from './supabase';
 
 // Production API URL on Railway
-const PRODUCTION_API_URL = 'https://pure-renewal-production.up.railway.app';
+const PRODUCTION_API_URL = 'https://ss-beyond.up.railway.app';
 
 // Use production URL by default, fallback to localhost in development
 const getApiUrl = () => {
