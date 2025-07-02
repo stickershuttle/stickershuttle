@@ -396,9 +396,7 @@ const deductUserCredits = async ({ userId, amount, reason, orderId, transactionT
       .rpc('use_credits_for_order', {
         p_user_id: userId,
         p_order_id: orderId,
-        p_amount: safeAmount,
-        p_reason: reason || 'Credits applied to order',
-        p_transaction_type: transactionType || 'deduction'
+        p_amount: safeAmount
       });
     
     if (error) throw error;

@@ -8,15 +8,35 @@ The credit system error you're seeing is because the database functions haven't 
 2. Select your project
 3. Click on **SQL Editor** in the left sidebar
 
-## Step 2: Run the Credit System SQL
+## Step 2: Complete Reset and Setup (RECOMMENDED)
+
+Since you have existing credit functions with different signatures, run this first:
 
 1. Click **New query**
-2. Copy ALL the contents from `docs/CREATE_CREDITS_SYSTEM.sql`
+2. Copy ALL the contents from `docs/CREDIT_SYSTEM_FULL_RESET.sql`
 3. Paste it into the SQL editor
 4. Click **Run** button
 5. You should see "Success. No rows returned" message
 
-## Step 3: Add Credits Column to Orders
+This script will:
+- Drop all existing credit-related functions
+- Add any missing columns to existing tables
+- Create tables if they don't exist
+- Set up proper views and permissions
+
+## Step 3: Create All Credit Functions
+
+After the reset is complete:
+
+1. Click **New query** (create a new query tab)
+2. Copy ALL the contents from `docs/CREDIT_SYSTEM_FUNCTIONS.sql`
+3. Paste it into the SQL editor
+4. Click **Run** button
+5. You should see "Success. No rows returned" message
+
+## Step 4: Add Credits Column to Orders
+
+Finally, add the credits tracking to orders:
 
 1. Click **New query** again
 2. Copy ALL the contents from `docs/ADD_CREDITS_APPLIED_COLUMN.sql`
@@ -24,7 +44,7 @@ The credit system error you're seeing is because the database functions haven't 
 4. Click **Run** button
 5. You should see "Success. No rows returned" message
 
-## Step 4: Verify Setup
+## Step 5: Verify Setup
 
 1. In Supabase Dashboard, go to **Table Editor**
 2. You should see these new tables:
@@ -33,7 +53,7 @@ The credit system error you're seeing is because the database functions haven't 
    - `user_credit_balance` (view)
 3. Check that `orders_main` table has a new column: `credits_applied`
 
-## Step 5: Refresh Your Application
+## Step 6: Refresh Your Application
 
 1. Go back to your Sticker Shuttle website
 2. Hard refresh the page (Ctrl+F5 or Cmd+Shift+R)
