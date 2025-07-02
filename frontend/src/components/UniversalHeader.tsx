@@ -742,7 +742,7 @@ export default function UniversalHeader() {
                         </Link>
 
                         <Link 
-                          href="/account/support"
+                          href="/account/dashboard?view=support"
                           className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white w-full text-left"
                           onClick={() => setShowProfileDropdown(false)}
                         >
@@ -928,7 +928,7 @@ export default function UniversalHeader() {
               </Link>
 
               <Link 
-                href="/account/support"
+                href="/account/dashboard?view=support"
                 className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white w-full text-left"
                 onClick={() => setIsMobileMenuOpen(false)}
               >

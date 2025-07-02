@@ -247,7 +247,7 @@ export default function AlertsManagement() {
   return (
     <AdminLayout>
       <div className="min-h-screen" style={{ backgroundColor: '#030140' }}>
-        <div className="w-full py-6 xl:py-8 px-4 sm:px-6 xl:px-8">
+                  <div className="w-full py-6 xl:py-8 pl-2 pr-4 sm:pr-6 xl:pr-8"> {/* Reduced left padding, keep right padding */}
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div>

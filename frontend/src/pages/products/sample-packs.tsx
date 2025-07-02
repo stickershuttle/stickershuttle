@@ -59,38 +59,32 @@ export default function SamplePacks() {
     { 
       name: 'Premium Matte Sticker', 
       description: 'Smooth, non-reflective finish',
-      image: 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png',
-      filter: 'drop-shadow(0 0 12px rgba(168, 242, 106, 0.35)) drop-shadow(0 0 24px rgba(168, 242, 106, 0.21))'
+      image: 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png'
     },
     { 
       name: 'Premium Gloss Sticker', 
       description: 'High-gloss shiny finish',
-      image: 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png',
-      filter: 'drop-shadow(0 0 12px rgba(34, 197, 94, 0.35)) drop-shadow(0 0 24px rgba(34, 197, 94, 0.21))'
+      image: 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png'
     },
     { 
       name: 'Holographic Sticker', 
       description: 'Rainbow holographic effect',
-      image: 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png',
-      filter: 'drop-shadow(0 0 12px rgba(168, 85, 247, 0.35)) drop-shadow(0 0 24px rgba(168, 85, 247, 0.21))'
+      image: 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png'
     },
     { 
       name: 'Glitter Sticker', 
       description: 'Sparkly glitter finish',
-      image: 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png',
-      filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.35)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.21))'
+      image: 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png'
     },
     { 
       name: 'Clear Sticker', 
       description: 'Transparent background',
-      image: 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749849590/StickerShuttle_ClearIcon_zxjnqc.svg',
-      filter: 'drop-shadow(0 0 12px rgba(59, 130, 246, 0.5)) drop-shadow(0 0 24px rgba(59, 130, 246, 0.3))'
+      image: 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749849590/StickerShuttle_ClearIcon_zxjnqc.svg'
     },
     { 
       name: 'Chrome Sticker', 
       description: 'Metallic mirror finish',
-      image: 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png',
-      filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.28)) drop-shadow(0 0 12px rgba(180, 180, 180, 0.21)) drop-shadow(0 0 18px rgba(240, 240, 240, 0.14))'
+      image: 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png'
     }
   ];
 
@@ -203,65 +197,49 @@ export default function SamplePacks() {
                 {isAddingToCart ? 'Adding to Cart...' : 'Add to cart'}
               </button>
 
-              {/* Pickup Info */}
+              {/* What's In Your Sample Pack - Compact */}
               <div className="border-t border-white/10 pt-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-white font-medium">Pickup available at Denver HQ</span>
+                <h3 className="text-lg font-bold text-white mb-4 text-center">
+                  What's In Your Sample Pack
+                </h3>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  {stickerTypes.map((type, index) => (
+                    <div key={index} className="flex items-center gap-3 p-2 rounded-lg" style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)'
+                    }}>
+                      <div className="w-10 h-10 flex-shrink-0">
+                        <img 
+                          src={type.image}
+                          alt={type.name}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-white font-medium text-sm">
+                          {type.name}
+                        </h4>
+                        <p className="text-gray-400 text-xs">
+                          {type.description}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <p className="text-gray-300 text-sm mb-2 ml-7">
-                  Usually ready in 24 hours
-                </p>
-                <button className="text-purple-300 hover:text-purple-200 underline text-sm ml-7">
-                  View store information
-                </button>
+
+                <div className="text-center mt-4">
+                  <p className="text-purple-300 text-sm">
+                    Perfect for testing quality before placing larger orders! 🎯
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* What's Included Section */}
-      <section className="py-8">
-        <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
-          <div className="container-style p-6 md:p-8">
-            <h2 className="text-2xl md:text-3xl font-bold text-white mb-6 text-center">
-              What's In Your Sample Pack
-            </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {stickerTypes.map((type, index) => (
-                <div key={index} className="container-style p-4 flex items-center gap-4">
-                  <div className="w-16 h-16 flex-shrink-0">
-                    <img 
-                      src={type.image}
-                      alt={type.name}
-                      className="w-full h-full object-contain"
-                      style={{ filter: type.filter }}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-white font-semibold text-lg mb-2">
-                      {type.name}
-                    </h3>
-                    <p className="text-gray-300 text-sm">
-                      {type.description}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
 
-            <div className="text-center mt-6">
-              <p className="text-purple-300 text-lg">
-                Perfect for testing quality before placing larger orders! 🎯
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
 
 
 

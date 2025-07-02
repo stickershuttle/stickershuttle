@@ -738,6 +738,9 @@ const typeDefs = gql`
     customerPhone: String
     shippingAddress: JSON
     billingAddress: JSON
+    shipping_method: String
+    is_express_shipping: Boolean
+    is_rush_order: Boolean
     orderTags: [String]
     orderNote: String
     orderCreatedAt: String
@@ -3499,7 +3502,7 @@ const resolvers = {
        // Get current order
        const { data: currentOrder, error: fetchError } = await client
          .from('orders_main')
-         .select('proofs, customer_email, customer_first_name, order_number')
+         .select('proofs, customer_email, customer_first_name, order_number, proof_status')
          .eq('id', orderId)
          .single();
          
@@ -3507,12 +3510,40 @@ const resolvers = {
          throw new Error(`Failed to fetch order: ${fetchError.message}`);
        }
        
-       // Update all proofs to 'sent' status
-       const updatedProofs = (currentOrder.proofs || []).map(proof => ({
-         ...proof,
-         status: 'sent',
-         sentAt: new Date().toISOString()
-       }));
+       let updatedProofs;
+       
+       // Check if this is after changes were requested
+       if (currentOrder.proof_status === 'changes_requested') {
+         // Archive old proofs and only send new ones
+         updatedProofs = (currentOrder.proofs || []).map(proof => {
+           if (proof.status === 'pending') {
+             // New proofs get sent
+             return {
+               ...proof,
+               status: 'sent',
+               sentAt: new Date().toISOString()
+             };
+           } else if (proof.status === 'sent' || proof.status === 'changes_requested') {
+             // Old proofs get archived
+             return {
+               ...proof,
+               status: 'archived',
+               archivedAt: new Date().toISOString(),
+               archiveReason: 'superseded_by_revision'
+             };
+           } else {
+             // Keep other statuses as-is
+             return proof;
+           }
+         });
+       } else {
+         // Normal flow - update all proofs to 'sent' status
+         updatedProofs = (currentOrder.proofs || []).map(proof => ({
+           ...proof,
+           status: 'sent',
+           sentAt: new Date().toISOString()
+         }));
+       }
        
        // Generate proof approval link
        const baseUrl = process.env.FRONTEND_URL || 'https://stickershuttle.com';

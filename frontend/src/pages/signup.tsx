@@ -8,7 +8,6 @@ import { SYNC_CUSTOMER_TO_KLAVIYO } from '../lib/klaviyo-mutations';
 
 export default function SignUp() {
   const router = useRouter();
-  const [signupMethod, setSignupMethod] = useState<'email' | 'phone'>('email');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -24,7 +23,6 @@ export default function SignUp() {
 
   const [formData, setFormData] = useState({
     email: router.query.email ? decodeURIComponent(router.query.email as string) : '',
-    phone: '',
     password: '',
     confirmPassword: '',
     firstName: '',
@@ -121,14 +119,13 @@ export default function SignUp() {
       const metadataToSend = {
         first_name: directFirstName,
         last_name: directLastName,
-        full_name: `${directFirstName} ${directLastName}`,
-        phone: signupMethod === 'phone' ? formData.phone : null
+        full_name: `${directFirstName} ${directLastName}`
       };
       console.log('📦 Metadata being sent:', metadataToSend);
       
       // Sign up with modern Supabase API
       const { data, error: authError } = await supabase.auth.signUp({
-        email: signupMethod === 'email' ? directEmail : `${formData.phone}@temp.com`,
+        email: directEmail,
         password: directPassword,
         options: {
           data: metadataToSend
@@ -420,42 +417,14 @@ export default function SignUp() {
 
               <div className="mt-6 text-center">
                 <p className="text-gray-400 text-sm mb-2">Didn't receive the code?</p>
-                <div className="flex gap-4 justify-center">
-                  <button
-                    type="button"
-                    onClick={handleResendOtp}
-                    disabled={loading}
-                    className="text-blue-400 hover:text-blue-300 text-sm font-semibold transition-colors disabled:opacity-50"
-                  >
-                    Send New Code
-                  </button>
-                  
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        const supabase = await getSupabase();
-                        const { error } = await supabase.auth.signInWithOtp({
-                          email: userEmail,
-                          options: {
-                            emailRedirectTo: `${window.location.origin}/account/dashboard`
-                          }
-                        });
-                        if (!error) {
-                          setError('Magic link sent! Check your email for a clickable link.');
-                        } else {
-                          setError(error.message);
-                        }
-                      } catch (err: any) {
-                        setError(err.message);
-                      }
-                    }}
-                    disabled={loading}
-                    className="text-green-400 hover:text-green-300 text-sm font-semibold transition-colors disabled:opacity-50"
-                  >
-                    Send Magic Link Instead
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={loading}
+                  className="text-blue-400 hover:text-blue-300 text-sm font-semibold transition-colors disabled:opacity-50"
+                >
+                  Send New Code
+                </button>
               </div>
 
               <div className="mt-4 text-center">
@@ -570,47 +539,7 @@ export default function SignUp() {
 
 
 
-            {/* Method Toggle */}
-            <div className="flex gap-2 mb-6">
-              <button
-                type="button"
-                onClick={() => setSignupMethod('email')}
-                className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${
-                  signupMethod === 'email' ? 'text-white' : 'text-gray-300 hover:text-white'
-                }`}
-                style={signupMethod === 'email' ? {
-                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                  backdropFilter: 'blur(25px) saturate(180%)',
-                  border: '1px solid rgba(59, 130, 246, 0.4)',
-                  boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                } : {
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(12px)'
-                }}
-              >
-                📧 Email
-              </button>
-              <button
-                type="button"
-                onClick={() => setSignupMethod('phone')}
-                className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${
-                  signupMethod === 'phone' ? 'text-white' : 'text-gray-300 hover:text-white'
-                }`}
-                style={signupMethod === 'phone' ? {
-                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                  backdropFilter: 'blur(25px) saturate(180%)',
-                  border: '1px solid rgba(59, 130, 246, 0.4)',
-                  boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                } : {
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(12px)'
-                }}
-              >
-                📱 Phone
-              </button>
-            </div>
+
 
             {/* Sign Up Form */}
             <form onSubmit={handleSubmit} className="space-y-4 mobile-signup-form">
@@ -648,40 +577,22 @@ export default function SignUp() {
                 </div>
               </div>
 
-              {/* Email or Phone Field */}
-              {signupMethod === 'email' ? (
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                    placeholder="john@example.com"
-                    required
-                  />
-                </div>
-              ) : (
-                <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-300 mb-2">
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    id="phone"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                    placeholder="+1 (555) 123-4567"
-                    required
-                  />
-                </div>
-              )}
+              {/* Email Field */}
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                  placeholder="john@example.com"
+                  required
+                />
+              </div>
 
               {/* Password Fields */}
               <div className="grid grid-cols-1 gap-4">
@@ -730,11 +641,11 @@ export default function SignUp() {
                 />
                 <label htmlFor="agreeToTerms" className="text-sm text-gray-300">
                   I agree to the{' '}
-                  <Link href="/terms" className="text-purple-400 hover:text-purple-300 underline">
+                  <Link href="/terms-and-conditions" className="text-purple-400 hover:text-purple-300 underline">
                     Terms of Service
                   </Link>{' '}
                   and{' '}
-                  <Link href="/privacy" className="text-purple-400 hover:text-purple-300 underline">
+                  <Link href="/privacy-policy" className="text-purple-400 hover:text-purple-300 underline">
                     Privacy Policy
                   </Link>
                 </label>
@@ -858,47 +769,7 @@ export default function SignUp() {
                 <div>
 
 
-                  {/* Method Toggle */}
-                  <div className="flex gap-2 mb-4">
-                    <button
-                      type="button"
-                      onClick={() => setSignupMethod('email')}
-                      className={`flex-1 py-3 px-6 rounded-xl text-sm font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${
-                        signupMethod === 'email' ? 'text-white' : 'text-gray-300 hover:text-white'
-                      }`}
-                      style={signupMethod === 'email' ? {
-                        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: '1px solid rgba(59, 130, 246, 0.4)',
-                        boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                      } : {
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        backdropFilter: 'blur(12px)'
-                      }}
-                    >
-                      📧 Email
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSignupMethod('phone')}
-                      className={`flex-1 py-3 px-6 rounded-xl text-sm font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${
-                        signupMethod === 'phone' ? 'text-white' : 'text-gray-300 hover:text-white'
-                      }`}
-                      style={signupMethod === 'phone' ? {
-                        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: '1px solid rgba(59, 130, 246, 0.4)',
-                        boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                      } : {
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        backdropFilter: 'blur(12px)'
-                      }}
-                    >
-                      📱 Phone
-                    </button>
-                  </div>
+
 
                   {/* Sign Up Form */}
                   <form onSubmit={handleSubmit} className="space-y-4 desktop-signup-form">
@@ -936,40 +807,22 @@ export default function SignUp() {
                       </div>
                     </div>
 
-                    {/* Email or Phone Field */}
-                    {signupMethod === 'email' ? (
-                      <div>
-                        <label htmlFor="email-desktop" className="block text-sm font-medium text-gray-300 mb-2">
-                          Email Address
-                        </label>
-                        <input
-                          type="email"
-                          id="email-desktop"
-                          name="email"
-                          value={formData.email}
-                          onChange={handleInputChange}
-                          className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                          placeholder="john@example.com"
-                          required
-                        />
-                      </div>
-                    ) : (
-                      <div>
-                        <label htmlFor="phone-desktop" className="block text-sm font-medium text-gray-300 mb-2">
-                          Phone Number
-                        </label>
-                        <input
-                          type="tel"
-                          id="phone-desktop"
-                          name="phone"
-                          value={formData.phone}
-                          onChange={handleInputChange}
-                          className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                          placeholder="+1 (555) 123-4567"
-                          required
-                        />
-                      </div>
-                    )}
+                    {/* Email Field */}
+                    <div>
+                      <label htmlFor="email-desktop" className="block text-sm font-medium text-gray-300 mb-2">
+                        Email Address
+                      </label>
+                      <input
+                        type="email"
+                        id="email-desktop"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                        placeholder="john@example.com"
+                        required
+                      />
+                    </div>
 
                     {/* Password Fields */}
                     <div className="grid grid-cols-1 gap-4">
@@ -1018,11 +871,11 @@ export default function SignUp() {
                       />
                       <label htmlFor="agreeToTerms-desktop" className="text-sm text-gray-300">
                         I agree to the{' '}
-                        <Link href="/terms" className="text-purple-400 hover:text-purple-300 underline">
+                        <Link href="/terms-and-conditions" className="text-purple-400 hover:text-purple-300 underline">
                           Terms of Service
                         </Link>{' '}
                         and{' '}
-                        <Link href="/privacy" className="text-purple-400 hover:text-purple-300 underline">
+                        <Link href="/privacy-policy" className="text-purple-400 hover:text-purple-300 underline">
                           Privacy Policy
                         </Link>
                       </label>

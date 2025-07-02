@@ -256,7 +256,7 @@ export default function FileUploadToEmail({ userData, onUploadComplete }: FileUp
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-green-200 font-medium truncate">{uploadedFile.name}</p>
+                  <p className="text-green-200 font-medium break-words">{uploadedFile.name}</p>
                   <p className="text-green-300/80 text-sm">
                     {formatFileSize(uploadedFile.size)} • {uploadedFile.cloudinaryResult.format.toUpperCase()}
                   </p>

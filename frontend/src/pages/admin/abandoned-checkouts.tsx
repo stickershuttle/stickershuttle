@@ -400,7 +400,7 @@ export default function AbandonedCheckouts() {
       <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#030140' }}>
         {/* Main Content */}
         <div className="pt-8 pb-8">
-          <div className="w-full px-8">
+          <div className="w-full pl-2 pr-8"> {/* Reduced left padding, keep right padding */}
             {/* Analytics Cards - Hidden on mobile, shown on desktop */}
             <div className="hidden xl:grid grid-cols-4 gap-4 mb-6">
               <div className="rounded-2xl p-6 transition-all duration-200 hover:scale-[1.02] glass-container">
@@ -503,94 +503,146 @@ export default function AbandonedCheckouts() {
             </div>
 
             {/* Mobile/Tablet Filters */}
-            <div className="xl:hidden mb-4">
-              {/* Filter pills */}
-              <div className="flex gap-2 overflow-x-auto pb-2 filter-pills-container">
-                <button 
-                  onClick={() => setSelectedTimeRange('all')}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
-                    selectedTimeRange === 'all' 
-                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' 
-                      : 'bg-transparent text-gray-400 border-gray-600'
-                  }`}
-                >
-                  All Time
-                </button>
-                <button 
-                  onClick={() => setSelectedTimeRange('24h')}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
-                    selectedTimeRange === '24h' 
-                      ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' 
-                      : 'bg-transparent text-gray-400 border-gray-600'
-                  }`}
-                >
-                  Last 24h
-                </button>
-                <button 
-                  onClick={() => setSelectedTimeRange('7d')}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
-                    selectedTimeRange === '7d' 
-                      ? 'bg-orange-500/20 text-orange-300 border-orange-500/40' 
-                      : 'bg-transparent text-gray-400 border-gray-600'
-                  }`}
-                >
-                  Last 7 Days
-                </button>
-                <button 
-                  onClick={() => setSelectedTimeRange('30d')}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
-                    selectedTimeRange === '30d' 
-                      ? 'bg-red-500/20 text-red-300 border-red-500/40' 
-                      : 'bg-transparent text-gray-400 border-gray-600'
-                  }`}
-                >
-                  Last 30 Days
-                </button>
+            <div className="xl:hidden mb-4 px-4">
+              <div 
+                className="p-4 rounded-lg"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                  backdropFilter: 'blur(12px)',
+                }}
+              >
+                {/* Filter pills */}
+                <div className="flex gap-2 overflow-x-auto pb-2 filter-pills-container">
+                  <button 
+                    onClick={() => setSelectedTimeRange('all')}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                      selectedTimeRange === 'all' 
+                        ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' 
+                        : 'bg-transparent text-gray-400 border-gray-600'
+                    }`}
+                  >
+                    All Time
+                  </button>
+                  <button 
+                    onClick={() => setSelectedTimeRange('24h')}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                      selectedTimeRange === '24h' 
+                        ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' 
+                        : 'bg-transparent text-gray-400 border-gray-600'
+                    }`}
+                  >
+                    Last 24h
+                  </button>
+                  <button 
+                    onClick={() => setSelectedTimeRange('7d')}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                      selectedTimeRange === '7d' 
+                        ? 'bg-orange-500/20 text-orange-300 border-orange-500/40' 
+                        : 'bg-transparent text-gray-400 border-gray-600'
+                    }`}
+                  >
+                    Last 7 Days
+                  </button>
+                  <button 
+                    onClick={() => setSelectedTimeRange('30d')}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                      selectedTimeRange === '30d' 
+                        ? 'bg-red-500/20 text-red-300 border-red-500/40' 
+                        : 'bg-transparent text-gray-400 border-gray-600'
+                    }`}
+                  >
+                    Last 30 Days
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* Desktop Compact Filters */}
             <div className="hidden xl:flex justify-end items-center gap-3 mb-4">
-              {/* Filter Dropdown */}
-              <div className="relative">
-                <select
-                  value="all"
-                  onChange={() => {}}
-                  className="bg-gray-800 border border-gray-600 rounded px-3 py-1 text-sm"
-                  aria-label="Filter checkouts by status"
-                >
-                  <option value="all">All Checkouts</option>
-                  <option value="recent">Recent</option>
-                  <option value="old">Old</option>
-                </select>
-                <svg className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </div>
-
-              {/* Date Range Dropdown */}
-              <div className="relative">
-                <select
-                  aria-label="Filter checkouts by date range"
-                  value={selectedTimeRange}
-                  onChange={(e) => setSelectedTimeRange(e.target.value)}
-                  className="appearance-none bg-transparent border border-white/20 rounded-xl px-4 py-2 pl-10 text-white text-sm font-medium focus:outline-none focus:border-purple-400 transition-all cursor-pointer hover:scale-105"
+              {/* Filter Buttons */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSelectedTimeRange('all')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    selectedTimeRange === 'all'
+                      ? 'text-white'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
                   style={{
-                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 8px center',
-                    backgroundSize: '16px',
-                    paddingRight: '32px'
+                    background: selectedTimeRange === 'all' 
+                      ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                      : 'rgba(255, 255, 255, 0.05)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: `1px solid ${selectedTimeRange === 'all' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                    boxShadow: selectedTimeRange === 'all' 
+                      ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                      : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
                   }}
                 >
-                  <option value="all" style={{ backgroundColor: '#030140' }}>All Time</option>
-                  <option value="24h" style={{ backgroundColor: '#030140' }}>Last 24 Hours</option>
-                  <option value="7d" style={{ backgroundColor: '#030140' }}>Last 7 Days</option>
-                  <option value="30d" style={{ backgroundColor: '#030140' }}>Last 30 Days</option>
-                </select>
-                <svg className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
+                  All Time
+                </button>
+                <button
+                  onClick={() => setSelectedTimeRange('24h')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    selectedTimeRange === '24h'
+                      ? 'text-white'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                  style={{
+                    background: selectedTimeRange === '24h' 
+                      ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                      : 'rgba(255, 255, 255, 0.05)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: `1px solid ${selectedTimeRange === '24h' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                    boxShadow: selectedTimeRange === '24h' 
+                      ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                      : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                  }}
+                >
+                  Last 24h
+                </button>
+                <button
+                  onClick={() => setSelectedTimeRange('7d')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    selectedTimeRange === '7d'
+                      ? 'text-white'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                  style={{
+                    background: selectedTimeRange === '7d' 
+                      ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                      : 'rgba(255, 255, 255, 0.05)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: `1px solid ${selectedTimeRange === '7d' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                    boxShadow: selectedTimeRange === '7d' 
+                      ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                      : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                  }}
+                >
+                  Last 7 Days
+                </button>
+                <button
+                  onClick={() => setSelectedTimeRange('30d')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    selectedTimeRange === '30d'
+                      ? 'text-white'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                  style={{
+                    background: selectedTimeRange === '30d' 
+                      ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                      : 'rgba(255, 255, 255, 0.05)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: `1px solid ${selectedTimeRange === '30d' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                    boxShadow: selectedTimeRange === '30d' 
+                      ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                      : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                  }}
+                >
+                  Last 30 Days
+                </button>
               </div>
 
               {/* Search Input */}

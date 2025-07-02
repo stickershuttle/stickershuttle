@@ -417,6 +417,26 @@ function Dashboard() {
         50% { filter: blur(0px); opacity: 0.8; }
       }
 
+      @keyframes slideDown {
+        0% {
+          transform: translateY(-20px);
+          opacity: 0;
+        }
+        100% {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      @keyframes glow {
+        0% {
+          box-shadow: 0 0 5px rgba(34, 197, 94, 0.2), inset 0 0 10px rgba(34, 197, 94, 0.05);
+        }
+        100% {
+          box-shadow: 0 0 40px rgba(34, 197, 94, 0.6), inset 0 0 30px rgba(34, 197, 94, 0.2);
+        }
+      }
+
       .container-style {
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -4504,6 +4524,70 @@ function Dashboard() {
                         Printed within {order.items.reduce((sum: number, item: any) => sum + item.quantity, 0) <= 2000 ? '24' : '48'}-hrs of Approval
                       </span>
                     </div>
+                    
+                    {/* Instagram Handle */}
+                    {(() => {
+                      const firstItem = order.items[0];
+                      const instagramHandle = firstItem?._fullOrderData?.instagramHandle;
+                      const instagramOptIn = firstItem?._fullOrderData?.instagramOptIn;
+                      
+                      if (instagramHandle || instagramOptIn) {
+                        return (
+                          <div className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <span className="text-white text-xs">
+                              {instagramHandle ? `@${instagramHandle}` : 'Opted in for Instagram posting'}
+                              {instagramOptIn && instagramHandle && (
+                                <span className="ml-1 text-green-400">(Marketing)</span>
+                              )}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                    
+                    {/* Rush Order Status */}
+                    {(() => {
+                      const firstItem = order.items[0];
+                      const rushOrder = firstItem?._fullOrderData?.calculatorSelections?.rush;
+                      
+                      if (rushOrder?.value && rushOrder.displayValue !== 'Standard') {
+                        return (
+                          <div className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            <span className="text-orange-300 text-xs font-medium">🚀 24-hour production (+40%)</span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                    
+                    {/* Proof Preference */}
+                    {(() => {
+                      const firstItem = order.items[0];
+                      const proofOption = firstItem?._fullOrderData?.calculatorSelections?.proof;
+                      
+                      if (proofOption?.value !== undefined) {
+                        return (
+                          <div className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="text-white text-xs">
+                              {proofOption.value ? '📧 Send proof for approval' : '⚡ Skip proof - direct to production'}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                    
                     {(() => {
                       // Get cut line selection from the first item's calculator selections
                       const firstItem = order.items[0];
@@ -6077,23 +6161,7 @@ function Dashboard() {
               ) : 'Submit Request'}
             </button>
             
-            <button
-              type="button"
-              onClick={() => {
-                // Save form data to localStorage for later
-                localStorage.setItem('supportFormDraft', JSON.stringify(contactFormData));
-                setActionNotification({ message: 'Support request saved for later', type: 'info' });
-                setTimeout(() => setActionNotification(null), 3000);
-              }}
-              className="px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:bg-white/10"
-              style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                color: 'white'
-              }}
-            >
-              Save for Later
-            </button>
+
           </div>
         </form>
 
@@ -6125,46 +6193,56 @@ function Dashboard() {
       try {
         const supabase = await getSupabase();
         
-        // Update user_profiles table
-        const { error: profileError } = await supabase
+        // First check if profile exists
+        const { data: existingProfile, error: checkError } = await supabase
           .from('user_profiles')
-          .upsert({
-            user_id: (user as any).id,
-            first_name: settingsData.firstName,
-            last_name: settingsData.lastName,
-            display_name: `${settingsData.firstName} ${settingsData.lastName}`.trim(),
-            company_name: settingsData.companyName,
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'user_id'
-          });
+          .select('id')
+          .eq('user_id', (user as any).id)
+          .single();
+
+        if (checkError && checkError.code !== 'PGRST116') {
+          console.error('Error checking profile:', checkError);
+          throw new Error('Failed to access profile data');
+        }
+
+        // Use update if profile exists, insert if it doesn't
+        let profileError;
+        if (existingProfile) {
+          // Profile exists - update it
+          const { error } = await supabase
+            .from('user_profiles')
+            .update({
+              first_name: settingsData.firstName,
+              last_name: settingsData.lastName,
+              display_name: `${settingsData.firstName} ${settingsData.lastName}`.trim(),
+              company_name: settingsData.companyName,
+              updated_at: new Date().toISOString()
+            })
+            .eq('user_id', (user as any).id);
+          profileError = error;
+        } else {
+          // Profile doesn't exist - create it
+          const { error } = await supabase
+            .from('user_profiles')
+            .insert({
+              user_id: (user as any).id,
+              first_name: settingsData.firstName,
+              last_name: settingsData.lastName,
+              display_name: `${settingsData.firstName} ${settingsData.lastName}`.trim(),
+              company_name: settingsData.companyName,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+          profileError = error;
+        }
 
         if (profileError) {
-          throw profileError;
+          console.error('Profile operation error:', profileError);
+          throw new Error(`Failed to save profile: ${profileError.message}`);
         }
 
-        // Update user metadata (first name, last name) and email if changed
-        const updates: any = {};
-        
-        // Check if email changed
-        if (settingsData.email !== (user as any).email) {
-          updates.email = settingsData.email;
-        }
-        
-        // Always update user metadata with names
-        updates.data = {
-          first_name: settingsData.firstName,
-          last_name: settingsData.lastName
-        };
-        
-        // Only call updateUser if there are updates
-        if (Object.keys(updates).length > 0) {
-          const { error: updateError } = await supabase.auth.updateUser(updates);
-          
-          if (updateError) {
-            throw updateError;
-          }
-        }
+        // Skip auth updates entirely to avoid permission issues
+        console.log('Skipping auth metadata updates to prevent permission issues');
 
         // Update local profile state
         setProfile((prev: any) => ({
@@ -6257,15 +6335,20 @@ function Dashboard() {
           type: 'success'
         });
         
+        // Clear the notification after 8 seconds for success, 5 seconds for error
+        setTimeout(() => setSettingsNotification(null), 8000);
+        
       } catch (error: any) {
         console.error('Error updating password:', error);
         setSettingsNotification({
           message: error.message || 'Failed to update password',
           type: 'error'
         });
+        
+        // Clear error notifications faster
+        setTimeout(() => setSettingsNotification(null), 5000);
       } finally {
         setIsUpdatingPassword(false);
-        setTimeout(() => setSettingsNotification(null), 5000);
       }
     };
 
@@ -6286,36 +6369,67 @@ function Dashboard() {
           </button>
         </div>
 
-        {/* Notification Banner */}
+        {/* Enhanced Notification Banner */}
         {settingsNotification && (
           <div 
-            className={`p-4 rounded-lg flex items-center justify-between ${
-              settingsNotification.type === 'success' ? 'bg-green-500/20 border border-green-500/30' :
-              settingsNotification.type === 'error' ? 'bg-red-500/20 border border-red-500/30' :
-              'bg-blue-500/20 border border-blue-500/30'
+            className={`p-6 rounded-xl flex items-center justify-between transform transition-all duration-500 ease-out animate-pulse ${
+              settingsNotification.type === 'success' ? 'bg-green-500/30 border-2 border-green-400/60' :
+              settingsNotification.type === 'error' ? 'bg-red-500/30 border-2 border-red-400/60' :
+              'bg-blue-500/30 border-2 border-blue-400/60'
             }`}
+            style={{
+              boxShadow: settingsNotification.type === 'success' 
+                ? '0 0 30px rgba(34, 197, 94, 0.4), inset 0 0 20px rgba(34, 197, 94, 0.1)' 
+                : settingsNotification.type === 'error'
+                ? '0 0 30px rgba(239, 68, 68, 0.4), inset 0 0 20px rgba(239, 68, 68, 0.1)'
+                : '0 0 30px rgba(59, 130, 246, 0.4), inset 0 0 20px rgba(59, 130, 246, 0.1)',
+              backdropFilter: 'blur(20px) saturate(180%)',
+              animation: 'slideDown 0.5s ease-out, glow 2s ease-in-out infinite alternate'
+            }}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4">
               {settingsNotification.type === 'success' && (
-                <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
+                <div className="w-12 h-12 rounded-full bg-green-500/40 flex items-center justify-center animate-bounce">
+                  <svg className="w-8 h-8 text-green-300" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                </div>
               )}
-              <span className={`${
-                settingsNotification.type === 'success' ? 'text-green-300' :
-                settingsNotification.type === 'error' ? 'text-red-300' :
-                'text-blue-300'
-              }`}>
-                {settingsNotification.message}
-              </span>
+              {settingsNotification.type === 'error' && (
+                <div className="w-12 h-12 rounded-full bg-red-500/40 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-red-300" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              )}
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  {settingsNotification.type === 'success' && <span className="text-2xl">🎉</span>}
+                  <span className={`font-bold text-lg ${
+                    settingsNotification.type === 'success' ? 'text-green-200' :
+                    settingsNotification.type === 'error' ? 'text-red-200' :
+                    'text-blue-200'
+                  }`}>
+                    {settingsNotification.type === 'success' ? 'Success!' : 
+                     settingsNotification.type === 'error' ? 'Error!' : 'Info'}
+                  </span>
+                </div>
+                <span className={`text-base ${
+                  settingsNotification.type === 'success' ? 'text-green-100' :
+                  settingsNotification.type === 'error' ? 'text-red-100' :
+                  'text-blue-100'
+                }`}>
+                  {settingsNotification.message}
+                </span>
+              </div>
             </div>
             <button
               onClick={() => setSettingsNotification(null)}
-              className="text-gray-400 hover:text-white transition-colors"
+              className="text-gray-300 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"
               title="Close notification"
               aria-label="Close notification"
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
             </button>
@@ -6722,7 +6836,7 @@ function Dashboard() {
             <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            Send File to Support
+            Send File To Admin
           </h3>
           
           <div className="mb-4">

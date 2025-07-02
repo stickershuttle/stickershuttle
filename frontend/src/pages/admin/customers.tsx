@@ -309,7 +309,7 @@ export default function AdminCustomers() {
       <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#030140' }}>
         {/* Main Content */}
         <div className="pt-8 pb-8">
-          <div className="w-full px-8">
+          <div className="w-full pl-2 pr-8"> {/* Reduced left padding, keep right padding */}
             {/* Analytics Cards - Hidden on mobile, shown on desktop */}
             <div className="hidden xl:grid grid-cols-4 gap-4 mb-6">
               <div className="rounded-2xl p-6 transition-all duration-200 hover:scale-[1.02] glass-container">

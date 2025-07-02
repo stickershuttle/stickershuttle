@@ -281,7 +281,7 @@ export default function DiscountManagement() {
         }
       `}</style>
       <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#030140' }}>
-        <div className="w-full py-6 xl:py-8 px-4 sm:px-6 xl:px-8">
+        <div className="w-full py-6 xl:py-8 pl-2 pr-4 sm:pr-6 xl:pr-8"> {/* Reduced left padding, keep right padding */}
           {/* Stats Cards - Mobile and Desktop */}
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6 xl:mb-8">
             <div className="glass-container rounded-xl p-4 xl:p-6">

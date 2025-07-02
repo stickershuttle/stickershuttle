@@ -38,6 +38,9 @@ const GET_ALL_ORDERS = gql`
       customerPhone
       shippingAddress
       billingAddress
+      shipping_method
+      is_express_shipping
+      is_rush_order
       orderTags
       orderNote
       orderCreatedAt
@@ -170,6 +173,9 @@ interface Order {
   customerPhone?: string;
   shippingAddress?: any;
   billingAddress?: any;
+  shipping_method?: string;
+  is_express_shipping?: boolean;
+  is_rush_order?: boolean;
   orderCreatedAt?: string;
   createdAt?: string;
   orderNote?: string;
@@ -1018,7 +1024,7 @@ export default function AdminOrders() {
       <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#030140' }}>
         {/* Main Content */}
         <div className="pt-8 pb-8">
-          <div className="w-full pl-2 pr-8 lg:pl-2 lg:pr-8"> {/* Keep original right padding, reduce left */}
+          <div className="w-full pl-2 pr-6"> {/* Reduced left padding, keep right padding */}
             {!selectedOrder ? (
               // Orders List View
               <>
@@ -1170,24 +1176,22 @@ export default function AdminOrders() {
                   </div>
                 </div>
 
-                {/* Analytics & Sales Overview Container - Mobile Wall-to-Wall */}
-                <div className="lg:glass-container lg:p-6 mb-6 -mx-8 lg:mx-0 lg:rounded-2xl">
-                  {/* Analytics Cards - Mobile: 2x2 Grid, Desktop: 1x4 Grid */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-4 mb-4 lg:mb-6 px-4 lg:px-0">
+                {/* Analytics Cards - Mobile: 2x2 Grid, Desktop: 1x4 Grid */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-4 mb-4">
                     <div 
                       className="p-2 lg:p-4 rounded-lg transition-all hover:scale-105 cursor-pointer"
                       style={{
-                        background: 'rgba(255, 255, 255, 0.08)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        boxShadow: 'rgba(0, 0, 0, 0.2) 0px 4px 16px, rgba(255, 255, 255, 0.05) 0px 1px 0px inset',
-                        backdropFilter: 'blur(8px)'
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
                       }}
                     >
                       <div className="flex items-center justify-between mb-1 lg:mb-2">
                         <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Total Sales</span>
                         <div className="p-1 lg:p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(34, 197, 94, 0.2)' }}>
                           <svg className="w-2 h-2 lg:w-3 lg:h-3 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                         </div>
                       </div>
@@ -1200,10 +1204,10 @@ export default function AdminOrders() {
                     <div 
                       className="p-2 lg:p-4 rounded-lg transition-all hover:scale-105 cursor-pointer"
                       style={{
-                        background: 'rgba(255, 255, 255, 0.08)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        boxShadow: 'rgba(0, 0, 0, 0.2) 0px 4px 16px, rgba(255, 255, 255, 0.05) 0px 1px 0px inset',
-                        backdropFilter: 'blur(8px)'
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
                       }}
                     >
                       <div className="flex items-center justify-between mb-1 lg:mb-2">
@@ -1223,17 +1227,17 @@ export default function AdminOrders() {
                     <div 
                       className="p-2 lg:p-4 rounded-lg transition-all hover:scale-105 cursor-pointer"
                       style={{
-                        background: 'rgba(255, 255, 255, 0.08)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        boxShadow: 'rgba(0, 0, 0, 0.2) 0px 4px 16px, rgba(255, 255, 255, 0.05) 0px 1px 0px inset',
-                        backdropFilter: 'blur(8px)'
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
                       }}
                     >
                       <div className="flex items-center justify-between mb-1 lg:mb-2">
                         <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Orders</span>
                         <div className="p-1 lg:p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(147, 51, 234, 0.2)' }}>
                           <svg className="w-2 h-2 lg:w-3 lg:h-3 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                           </svg>
                         </div>
                       </div>
@@ -1246,10 +1250,10 @@ export default function AdminOrders() {
                     <div 
                       className="p-2 lg:p-4 rounded-lg transition-all hover:scale-105 cursor-pointer"
                       style={{
-                        background: 'rgba(255, 255, 255, 0.08)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        boxShadow: 'rgba(0, 0, 0, 0.2) 0px 4px 16px, rgba(255, 255, 255, 0.05) 0px 1px 0px inset',
-                        backdropFilter: 'blur(8px)'
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
                       }}
                     >
                       <div className="flex items-center justify-between mb-1 lg:mb-2">
@@ -1267,76 +1271,8 @@ export default function AdminOrders() {
                     </div>
                   </div>
 
-                  {/* Sales Chart - Hidden on mobile to save space */}
-                  {timeFilteredAnalytics?.chartData && timeFilteredAnalytics.chartData.length > 0 && (
-                    <div className="border-t border-gray-700 border-opacity-30 pt-4 hidden lg:block px-0">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-base font-semibold text-white">Sales Overview</h3>
-                        <div className="text-sm text-gray-400">{getTimeFilterLabel(timeFilter)}</div>
-                      </div>
-                      <div className="h-16">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={timeFilteredAnalytics.chartData}>
-                            <defs>
-                              <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid 
-                              strokeDasharray="3 3" 
-                              stroke="rgba(255, 255, 255, 0.1)" 
-                              vertical={false}
-                            />
-                            <XAxis 
-                              dataKey="date" 
-                              stroke="rgba(255, 255, 255, 0.4)"
-                              fontSize={11}
-                              tick={{ fill: 'rgba(255, 255, 255, 0.7)' }}
-                              axisLine={{ stroke: 'rgba(255, 255, 255, 0.1)' }}
-                              tickLine={false}
-                            />
-                            <YAxis 
-                              stroke="rgba(255, 255, 255, 0.4)"
-                              fontSize={11}
-                              tick={{ fill: 'rgba(255, 255, 255, 0.7)' }}
-                              axisLine={{ stroke: 'rgba(255, 255, 255, 0.1)' }}
-                              tickLine={false}
-                              tickFormatter={(value) => `$${value}`}
-                            />
-                            <Tooltip 
-                              contentStyle={{ 
-                                backgroundColor: 'rgba(3, 1, 64, 0.95)',
-                                border: '1px solid rgba(255, 255, 255, 0.15)',
-                                borderRadius: '12px',
-                                backdropFilter: 'blur(12px)',
-                                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
-                              }}
-                              labelStyle={{ color: 'rgba(255, 255, 255, 0.7)', marginBottom: '4px' }}
-                              itemStyle={{ color: '#fff' }}
-                              formatter={(value: number, name: string) => {
-                                if (name === 'sales') return [`$${value.toFixed(2)}`, 'Sales'];
-                                if (name === 'orders') return [value, 'Orders'];
-                                return [value, name];
-                              }}
-                            />
-                            <Area 
-                              type="monotone" 
-                              dataKey="sales" 
-                              stroke="#3b82f6" 
-                              strokeWidth={2}
-                              fillOpacity={1} 
-                              fill="url(#salesGradient)" 
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
                 {/* Mobile/Tablet Filters */}
-                <div className="xl:hidden mb-4 px-4">
+                <div className="xl:hidden mb-3">
                   <div 
                     className="p-4 rounded-lg"
                     style={{
@@ -1433,72 +1369,89 @@ export default function AdminOrders() {
                 </div>
 
                 {/* Desktop Compact Filters */}
-                <div className="hidden xl:flex justify-end items-center gap-3 mb-4">
-                  {/* Filter Dropdown */}
-                  <div className="relative">
-                    <select
-                      value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value)}
-                      className="appearance-none bg-transparent border border-white/20 rounded-xl px-4 py-2 pl-10 text-white text-sm font-medium focus:outline-none focus:border-purple-400 transition-all cursor-pointer hover:scale-105"
+                <div className="hidden xl:flex justify-end items-center gap-3 mb-3">
+                  {/* Status Filter Buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setFilterStatus('all')}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                        filterStatus === 'all'
+                          ? 'text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
                       style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                        backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                        backgroundRepeat: 'no-repeat',
-                        backgroundPosition: 'right 8px center',
-                        backgroundSize: '16px',
-                        paddingRight: '32px'
-                      }}
-                      aria-label="Filter orders by status"
-                    >
-                      <option value="all" style={{ backgroundColor: '#030140' }}>All Orders</option>
-                      <option value="building" style={{ backgroundColor: '#030140' }}>Building</option>
-                      <option value="awaiting" style={{ backgroundColor: '#030140' }}>Awaiting Approval</option>
-                      <option value="approved" style={{ backgroundColor: '#030140' }}>Approved</option>
-                      <option value="label-printed" style={{ backgroundColor: '#030140' }}>Label Printed</option>
-                      <option value="shipped" style={{ backgroundColor: '#030140' }}>Shipped</option>
-                      <option value="out-for-delivery" style={{ backgroundColor: '#030140' }}>Out for Delivery</option>
-                      <option value="delivered" style={{ backgroundColor: '#030140' }}>Delivered</option>
-                    </select>
-                    <svg className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                    </svg>
-                  </div>
-
-                  {/* Date Range Dropdown */}
-                  <div className="relative">
-                    <select
-                      aria-label="Filter orders by date range"
-                      value={dateRange}
-                      onChange={(e) => {
-                        setDateRange(e.target.value);
-                        if (e.target.value === 'custom') {
-                          setShowDatePicker(true);
-                        }
-                      }}
-                      className="appearance-none bg-transparent border border-white/20 rounded-xl px-4 py-2 pl-10 text-white text-sm font-medium focus:outline-none focus:border-purple-400 transition-all cursor-pointer hover:scale-105"
-                      style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                        backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                        backgroundRepeat: 'no-repeat',
-                        backgroundPosition: 'right 8px center',
-                        backgroundSize: '16px',
-                        paddingRight: '32px'
+                        background: filterStatus === 'all' 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: `1px solid ${filterStatus === 'all' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                        boxShadow: filterStatus === 'all' 
+                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
                       }}
                     >
-                      <option value="all" style={{ backgroundColor: '#030140' }}>All Time</option>
-                      <option value="today" style={{ backgroundColor: '#030140' }}>Today</option>
-                      <option value="week" style={{ backgroundColor: '#030140' }}>This Week</option>
-                      <option value="month" style={{ backgroundColor: '#030140' }}>This Month</option>
-                      <option value="quarter" style={{ backgroundColor: '#030140' }}>This Quarter</option>
-                      <option value="year" style={{ backgroundColor: '#030140' }}>Year to Date</option>
-                      <option value="last90" style={{ backgroundColor: '#030140' }}>Last 90 Days</option>
-                      <option value="custom" style={{ backgroundColor: '#030140' }}>Custom Range...</option>
-                    </select>
-                    <svg className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
+                      All
+                    </button>
+                    <button
+                      onClick={() => setFilterStatus('building')}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                        filterStatus === 'building'
+                          ? 'text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      style={{
+                        background: filterStatus === 'building' 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: `1px solid ${filterStatus === 'building' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                        boxShadow: filterStatus === 'building' 
+                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                      }}
+                    >
+                      Building
+                    </button>
+                    <button
+                      onClick={() => setFilterStatus('awaiting')}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                        filterStatus === 'awaiting'
+                          ? 'text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      style={{
+                        background: filterStatus === 'awaiting' 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: `1px solid ${filterStatus === 'awaiting' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                        boxShadow: filterStatus === 'awaiting' 
+                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                      }}
+                    >
+                      Awaiting
+                    </button>
+                    <button
+                      onClick={() => setFilterStatus('shipped')}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                        filterStatus === 'shipped'
+                          ? 'text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      style={{
+                        background: filterStatus === 'shipped' 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: `1px solid ${filterStatus === 'shipped' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                        boxShadow: filterStatus === 'shipped' 
+                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                      }}
+                    >
+                      Shipped
+                    </button>
                   </div>
 
                   {/* Search Input */}
@@ -1509,11 +1462,7 @@ export default function AdminOrders() {
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="bg-transparent border border-white/20 rounded-xl px-4 py-2 pl-10 text-white text-sm placeholder-white/60 focus:outline-none focus:border-purple-400 transition-all"
-                      style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                        minWidth: '200px'
-                      }}
+                      style={{ minWidth: '200px' }}
                     />
                     <svg className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -2107,7 +2056,7 @@ export default function AdminOrders() {
                             <div key={idx} className="py-4 border-b border-gray-700 border-opacity-30 last:border-b-0">
                               <div className="flex gap-4">
                                 {/* Product Image */}
-                                <div className="relative">
+                                <div className="relative mb-3">
                                   <div
                                     className="rounded-lg overflow-hidden flex-shrink-0"
                                     style={{
@@ -2139,7 +2088,7 @@ export default function AdminOrders() {
                                   {itemImage && (
                                     <button
                                       onClick={() => handleDownloadFile(itemImage, item.productName + '_design.jpg')}
-                                      className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-6 h-6 flex items-center justify-center text-blue-400 hover:text-blue-300 hover:scale-110 transition-all duration-200"
+                                      className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-6 flex items-center justify-center text-blue-400 hover:text-blue-300 hover:scale-110 transition-all duration-200"
                                       title="Download original file"
                                     >
                                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -2193,22 +2142,93 @@ export default function AdminOrders() {
                                   </div>
 
                                   {/* Additional Details */}
-                                  {(item.customerNotes || item.instagramHandle) && (
-                                    <div className="mt-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
-                                      {item.customerNotes && (
-                                        <div className="text-sm">
-                                          <span className="text-gray-500">Note:</span>
-                                          <span className="text-gray-300 ml-2">{item.customerNotes}</span>
-                                        </div>
-                                      )}
-                                      {item.instagramHandle && (
-                                        <div className="text-sm mt-1">
-                                          <span className="text-gray-500">Instagram:</span>
-                                          <span className="text-gray-300 ml-2">@{item.instagramHandle}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
+                                  {(() => {
+                                    // Debug logging to see what data we have (mobile)
+                                    console.log('📱 Admin order debug (mobile) - Item data:', {
+                                      itemId: item.id,
+                                      itemName: item.productName,
+                                      instagramHandle: item.instagramHandle,
+                                      instagramOptIn: item.instagramOptIn,
+                                      customerNotes: item.customerNotes,
+                                      calculatorSelections: selections,
+                                      orderNote: selectedOrder.orderNote?.substring(0, 200),
+                                      isRushOrder: (selectedOrder as any).is_rush_order,
+                                      isExpressShipping: (selectedOrder as any).is_express_shipping
+                                    });
+                                    
+                                    // Parse data from order note string format
+                                    const itemString = selectedOrder.orderNote || '';
+                                    
+                                    // Enhanced fallback logic for Instagram  
+                                    const instagramFromString = itemString.match(/📸 Instagram: @([^\\n]+)/);
+                                    const instagramOptInFromString = itemString.includes('📸 Instagram') && itemString.includes('marketing');
+                                    const instagramHandle = item.instagramHandle || selections.instagram?.value || selections.instagramHandle?.value || 
+                                      (instagramFromString ? instagramFromString[1] : null);
+                                    const instagramOptIn = item.instagramOptIn || !!selections.instagram || instagramOptInFromString;
+                                    
+                                    // Enhanced fallback logic for rush order
+                                    const rushFromString = itemString.includes('🚀 Rush Order') || itemString.includes('Rush: Rush Order');
+                                    const rushOrder = selections.rush?.value || (selectedOrder as any).is_rush_order || rushFromString;
+                                    
+                                    // Enhanced fallback logic for proof preference
+                                    const proofFromString = itemString.includes('📧') ? true : itemString.includes('❌ No Proof') ? false : null;
+                                    const hasProofData = selections.proof?.value !== undefined || proofFromString !== null;
+                                    const proofValue = selections.proof?.value !== undefined ? selections.proof.value : 
+                                      proofFromString !== null ? proofFromString : true;
+                                    
+                                    // Parse Instagram and proof data from order note text since it's not in calculator selections
+                                    
+                                    // Parse Instagram from order note text
+                                    const instagramMatch = itemString.match(/Instagram: @([^\s\n,]+)/i);
+                                    const updatedInstagramHandle = instagramMatch ? instagramMatch[1] : instagramHandle;
+                                    const updatedInstagramOptIn = !!updatedInstagramHandle || instagramOptIn;
+                                    
+                                    // Parse proof preference from order note text  
+                                    const sendProofMatch = itemString.includes('Send FREE Proof') || itemString.includes('Send proof');
+                                    const noProofMatch = itemString.includes("Don't Send Proof") || itemString.includes('Skip proof');
+                                    const updatedHasProofData = sendProofMatch || noProofMatch || hasProofData;
+                                    const updatedProofValue = sendProofMatch ? true : noProofMatch ? false : proofValue;
+                                    
+                                    // Show section if ANY data exists
+                                    const showSection = item.customerNotes || updatedInstagramHandle || updatedInstagramOptIn || rushOrder || updatedHasProofData;
+                                    
+                                    return showSection ? (
+                                      <div className="mt-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
+                                        {item.customerNotes && (
+                                          <div className="text-sm">
+                                            <span className="text-gray-500">Note:</span>
+                                            <span className="text-gray-300 ml-2">{item.customerNotes}</span>
+                                          </div>
+                                        )}
+                                        {(instagramHandle || instagramOptIn) && (
+                                          <div className="text-sm mt-1">
+                                            <span className="text-gray-500">Instagram:</span>
+                                            <span className="text-gray-300 ml-2">
+                                              {instagramHandle ? `@${instagramHandle}` : 'Opted in for posting'}
+                                              <span className="text-pink-400 ml-2">📸</span>
+                                              {instagramOptIn && instagramHandle && (
+                                                <span className="ml-2 text-xs text-green-400">(Marketing opt-in)</span>
+                                              )}
+                                            </span>
+                                          </div>
+                                        )}
+                                        {rushOrder && (
+                                          <div className="text-sm mt-1">
+                                            <span className="text-gray-500">Rush Order:</span>
+                                            <span className="text-orange-300 ml-2 font-medium">🚀 24-hour production (+40%)</span>
+                                          </div>
+                                        )}
+                                        {updatedHasProofData && (
+                                          <div className="text-sm mt-1">
+                                            <span className="text-gray-500">Proof Preference:</span>
+                                            <span className={`ml-2 ${updatedProofValue ? 'text-blue-300' : 'text-gray-300'}`}>
+                                              {updatedProofValue ? '📧 Send proof for approval' : '⚡ Skip proof - direct to production'}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : null;
+                                  })()}
                                 </div>
                               </div>
                             </div>
@@ -2397,6 +2417,36 @@ export default function AdminOrders() {
                       </div>
 
                       {/* Shipping Choice Section - Inside Order Summary */}
+                      {/* Urgent Order Alerts */}
+                      {((selectedOrder as any).is_express_shipping || (selectedOrder as any).is_rush_order) && (
+                        <div className="mb-6 p-4 rounded-lg animate-pulse" style={{
+                          backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                          border: '2px solid rgba(239, 68, 68, 0.4)',
+                          boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                          backdropFilter: 'blur(12px)'
+                        }}>
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-red-500/20">
+                              <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                              </svg>
+                            </div>
+                            <span className="text-base font-bold text-red-300">
+                              {((selectedOrder as any).is_express_shipping && (selectedOrder as any).is_rush_order) ? '🚀⚡ RUSH + EXPRESS ALERT'
+                               : (selectedOrder as any).is_express_shipping ? '⚡ EXPRESS SHIPPING ALERT'
+                               : '🚀 RUSH ORDER ALERT'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-red-200 ml-11 font-medium">
+                            {((selectedOrder as any).is_express_shipping && (selectedOrder as any).is_rush_order) 
+                              ? `🚨 CRITICAL URGENT: Rush production (24hr) + Express shipping (${(selectedOrder as any).shipping_method}) - highest priority!`
+                              : (selectedOrder as any).is_express_shipping 
+                              ? `🚨 This order requires URGENT processing - ${(selectedOrder as any).shipping_method || 'Express shipping'} selected!`
+                              : '🚨 This order requires URGENT production - Rush order (24hr processing) selected!'}
+                          </p>
+                        </div>
+                      )}
+
                       <div className="mb-6 p-4 rounded-lg" style={{
                         backgroundColor: 'rgba(255, 255, 255, 0.03)',
                         border: '1px solid rgba(255, 255, 255, 0.08)'
@@ -2407,7 +2457,21 @@ export default function AdminOrders() {
                           </svg>
                           <span className="text-sm font-medium text-white">Shipping Choice</span>
                         </div>
-                        <p className="text-sm text-gray-300 ml-6">UPS Ground (2-3 Days)</p>
+                        <p className="text-sm text-gray-300 ml-6">
+                          {(selectedOrder as any).shipping_method || 'UPS Ground (2-3 Days)'}
+                          <div className="flex gap-2 mt-1">
+                            {(selectedOrder as any).is_express_shipping && (
+                              <span className="px-2 py-1 text-xs font-bold bg-red-500/20 text-red-300 rounded-full border border-red-400/30">
+                                EXPRESS
+                              </span>
+                            )}
+                            {(selectedOrder as any).is_rush_order && (
+                              <span className="px-2 py-1 text-xs font-bold bg-orange-500/20 text-orange-300 rounded-full border border-orange-400/30">
+                                RUSH
+                              </span>
+                            )}
+                          </div>
+                        </p>
                       </div>
 
                       {/* Order Items - Enhanced */}
@@ -2433,24 +2497,13 @@ export default function AdminOrders() {
                             }
                           }
                           
-                          // Debug: Log what we have in selections to find missing white options
-                          console.log('🔍 Admin desktop view - calculator selections debug:', {
-                            itemId: item.id,
-                            itemName: item.productName,
-                            hasCalculatorSelections: !!item.calculatorSelections,
-                            selections,
-                            hasWhiteOption: !!selections.whiteOption,
-                            whiteOptionValue: selections.whiteOption?.value,
-                            whiteOptionDisplay: selections.whiteOption?.displayValue,
-                            allKeys: Object.keys(selections),
-                            parsedFromOrderNote: !item.calculatorSelections?.whiteOption && !!selections.whiteOption
-                          });
+                          // Enhanced desktop order details view
 
                           return (
                             <div key={idx} className="py-4 border-b border-gray-700 border-opacity-30 last:border-b-0">
                               <div className="flex gap-4">
                                 {/* Product Image */}
-                                <div className="relative">
+                                <div className="relative mb-3">
                                   <div
                                     className={`rounded-lg overflow-hidden flex-shrink-0 ${item.customerReplacementFile ? 'ring-2 ring-orange-400 ring-opacity-60' : ''}`}
                                     style={{
@@ -2484,7 +2537,7 @@ export default function AdminOrders() {
                                   {itemImage && (
                                     <button
                                       onClick={() => handleDownloadFile(itemImage, item.productName + '_design.jpg')}
-                                      className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-6 h-6 flex items-center justify-center text-blue-400 hover:text-blue-300 hover:scale-110 transition-all duration-200"
+                                      className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-6 flex items-center justify-center text-blue-400 hover:text-blue-300 hover:scale-110 transition-all duration-200"
                                       title="Download original file"
                                     >
                                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -2557,52 +2610,103 @@ export default function AdminOrders() {
                                   </div>
 
                                   {/* Additional Details */}
-                                  {(item.customerNotes || item.instagramHandle || item.customerReplacementFile) && (
-                                    <div className="mt-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
-                                      {item.customerNotes && (
-                                        <div className="text-sm">
-                                          <span className="text-gray-500">Customer Note:</span>
-                                          <span className="text-gray-300 ml-2">{item.customerNotes}</span>
-                                        </div>
-                                      )}
-                                      {item.instagramHandle && (
-                                        <div className="text-sm mt-1">
-                                          <span className="text-gray-500">Instagram:</span>
-                                          <span className="text-gray-300 ml-2">@{item.instagramHandle}</span>
-                                          {item.instagramOptIn && (
-                                            <span className="ml-2 text-xs text-green-400">(Opted in for marketing)</span>
-                                          )}
-                                        </div>
-                                      )}
-                                      {item.customerReplacementFile && (
-                                        <div className="text-sm mt-1 p-2 rounded-lg bg-orange-500/10 border border-orange-500/30">
-                                          <div className="flex items-center gap-2 mb-1">
-                                            <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                            </svg>
-                                            <span className="text-orange-400 font-medium">Customer Replacement File</span>
+                                  {(() => {
+                                    // Parse Instagram and proof data from order note text
+                                    
+                                    // Parse data from order note string format
+                                    const itemString = selectedOrder.orderNote || '';
+                                    
+                                    // Enhanced fallback logic for Instagram  
+                                    const instagramFromString = itemString.match(/📸 Instagram: @([^\\n]+)/);
+                                    const instagramOptInFromString = itemString.includes('📸 Instagram') && itemString.includes('marketing');
+                                    const instagramHandle = item.instagramHandle || selections.instagram?.value || selections.instagramHandle?.value || 
+                                      (instagramFromString ? instagramFromString[1] : null);
+                                    const instagramOptIn = item.instagramOptIn || !!selections.instagram || instagramOptInFromString;
+                                    
+                                    // Enhanced fallback logic for rush order
+                                    const rushFromString = itemString.includes('🚀 Rush Order') || itemString.includes('Rush: Rush Order');
+                                    const rushOrder = selections.rush?.value || (selectedOrder as any).is_rush_order || rushFromString;
+                                    
+                                    // Enhanced fallback logic for proof preference
+                                    const proofFromString = itemString.includes('📧') ? true : itemString.includes('❌ No Proof') ? false : null;
+                                    const hasProofData = selections.proof?.value !== undefined || proofFromString !== null;
+                                    const proofValue = selections.proof?.value !== undefined ? selections.proof.value : 
+                                      proofFromString !== null ? proofFromString : true;
+                                    
+                                    // Parse proof preference from order note text  
+                                    const sendProofMatch = itemString.includes('Send FREE Proof') || itemString.includes('Send proof');
+                                    const noProofMatch = itemString.includes("Don't Send Proof") || itemString.includes('Skip proof');
+                                    const updatedHasProofData = sendProofMatch || noProofMatch || hasProofData;
+                                    const updatedProofValue = sendProofMatch ? true : noProofMatch ? false : proofValue;
+                                    
+                                    // Show section if ANY data exists
+                                    const showSection = item.customerNotes || instagramHandle || instagramOptIn || item.customerReplacementFile || 
+                                      rushOrder || updatedHasProofData;
+                                    
+                                    return showSection ? (
+                                      <div className="mt-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
+                                        {item.customerNotes && (
+                                          <div className="text-sm">
+                                            <span className="text-gray-500">Customer Note:</span>
+                                            <span className="text-gray-300 ml-2">{item.customerNotes}</span>
                                           </div>
-                                          <div className="ml-6 space-y-1">
-                                            <div className="text-xs text-gray-300">
-                                              <span className="text-gray-500">File:</span>
-                                              <button
-                                                onClick={() => handleDownloadFile(item.customerReplacementFile!, item.customerReplacementFileName)}
-                                                className="ml-2 text-orange-400 hover:text-orange-300 underline"
-                                              >
-                                                {item.customerReplacementFileName || 'Download'}
-                                              </button>
+                                        )}
+                                        {(instagramHandle || instagramOptIn) && (
+                                          <div className="text-sm mt-1">
+                                            <span className="text-gray-500">Instagram:</span>
+                                            <span className="text-gray-300 ml-2">
+                                              {instagramHandle ? `@${instagramHandle}` : 'Opted in for posting'}
+                                              <span className="text-pink-400 ml-2">📸</span>
+                                              {instagramOptIn && instagramHandle && (
+                                                <span className="ml-2 text-xs text-green-400">(Marketing opt-in)</span>
+                                              )}
+                                            </span>
+                                          </div>
+                                        )}
+                                        {rushOrder && (
+                                          <div className="text-sm mt-1">
+                                            <span className="text-gray-500">Rush Order:</span>
+                                            <span className="text-orange-300 ml-2 font-medium">🚀 24-hour production (+40%)</span>
+                                          </div>
+                                        )}
+                                        {updatedHasProofData && (
+                                          <div className="text-sm mt-1">
+                                            <span className="text-gray-500">Proof Preference:</span>
+                                            <span className={`ml-2 ${updatedProofValue ? 'text-blue-300' : 'text-gray-300'}`}>
+                                              {updatedProofValue ? '📧 Send proof for approval' : '⚡ Skip proof - direct to production'}
+                                            </span>
+                                          </div>
+                                        )}
+                                        {item.customerReplacementFile && (
+                                          <div className="text-sm mt-1 p-2 rounded-lg bg-orange-500/10 border border-orange-500/30">
+                                            <div className="flex items-center gap-2 mb-1">
+                                              <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                              </svg>
+                                              <span className="text-orange-400 font-medium">Customer Replacement File</span>
                                             </div>
-                                            {item.customerReplacementAt && (
-                                              <div className="text-xs text-gray-400">
-                                                <span className="text-gray-500">Uploaded:</span>
-                                                <span className="ml-2">{formatDate(item.customerReplacementAt)}</span>
+                                            <div className="ml-6 space-y-1">
+                                              <div className="text-xs text-gray-300">
+                                                <span className="text-gray-500">File:</span>
+                                                <button
+                                                  onClick={() => handleDownloadFile(item.customerReplacementFile!, item.customerReplacementFileName)}
+                                                  className="ml-2 text-orange-400 hover:text-orange-300 underline"
+                                                >
+                                                  {item.customerReplacementFileName || 'Download'}
+                                                </button>
                                               </div>
-                                            )}
+                                              {item.customerReplacementAt && (
+                                                <div className="text-xs text-gray-400">
+                                                  <span className="text-gray-500">Uploaded:</span>
+                                                  <span className="ml-2">{formatDate(item.customerReplacementAt)}</span>
+                                                </div>
+                                              )}
+                                            </div>
                                           </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
+                                        )}
+                                      </div>
+                                    ) : null;
+                                  })()}
                                 </div>
                               </div>
                             </div>
@@ -2610,79 +2714,163 @@ export default function AdminOrders() {
                         })}
                       </div>
 
-                      {/* Order Summary Actions */}
+                                            {/* Order Summary Actions */}
                       <div className="grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-gray-700 border-opacity-30">
-                        {/* Hide proof actions for sample packs */}
-                        {!isSamplePackOrder(selectedOrder) && (
+                        {/* Left Column - Proof Actions (Hide for sample packs) */}
+                        {!isSamplePackOrder(selectedOrder) ? (
                           <>
-                            {/* Show Send Proofs if proofs haven't been sent, otherwise show View Proofs */}
-                            {!selectedOrder.proof_sent_at && selectedOrder.proofs && selectedOrder.proofs.length > 0 ? (
-                          <button
-                            onClick={async () => {
-                              setSendingProofs(true);
-                              try {
-                                await handleSendProofs(selectedOrder.id);
-                                setProofsSent(prev => ({ ...prev, [selectedOrder.id]: true }));
-                                setNewProofsCount(prev => ({ ...prev, [selectedOrder.id]: 0 }));
-                              } catch (error) {
-                                console.error('Failed to send proofs:', error);
-                              } finally {
-                                setSendingProofs(false);
-                              }
-                            }}
-                            disabled={sendingProofs}
-                            className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                            style={{
-                              backgroundColor: 'rgba(34, 197, 94, 0.2)',
-                              border: '1px solid rgba(34, 197, 94, 0.4)'
-                            }}
-                          >
-                            {sendingProofs ? (
-                              <>
-                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Sending...
-                              </>
-                            ) : (
-                              <>
-                                <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                                </svg>
-                                Send Proofs
-                              </>
+                            {/* Customer requested changes - Show alert */}
+                            {selectedOrder.proof_status === 'changes_requested' && (
+                              <div className="col-span-2 mb-4 p-4 rounded-lg border border-amber-500/40 bg-amber-500/10">
+                                <div className="flex items-center gap-3">
+                                  <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 15.5c-.77.833.192 2.5 1.732 2.5z" />
+                                  </svg>
+                                  <div>
+                                    <p className="text-amber-300 font-medium">Customer Requested Changes</p>
+                                    <p className="text-amber-200 text-sm">Please upload a new revised proof and send again</p>
+                                  </div>
+                                </div>
+                              </div>
                             )}
-                          </button>
-                        ) : (
-                          <button
-                            onClick={async () => {
-                              if (selectedOrder.proofs && selectedOrder.proofs.length > 0) {
-                                // Open proof viewer/gallery
-                                window.open(selectedOrder.proofs[0].proofUrl, '_blank');
-                              }
-                            }}
-                            disabled={!selectedOrder.proofs || selectedOrder.proofs.length === 0}
-                            className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                            style={{
-                              background: selectedOrder.proofs && selectedOrder.proofs.length > 0 
-                                ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
-                                : 'linear-gradient(135deg, rgba(75, 85, 99, 0.4) 0%, rgba(75, 85, 99, 0.25) 50%, rgba(75, 85, 99, 0.1) 100%)',
-                              backdropFilter: 'blur(25px) saturate(180%)',
-                              border: `1px solid ${selectedOrder.proofs && selectedOrder.proofs.length > 0 ? 'rgba(59, 130, 246, 0.4)' : 'rgba(75, 85, 99, 0.4)'}`,
-                              boxShadow: selectedOrder.proofs && selectedOrder.proofs.length > 0 
-                                ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                                : 'rgba(75, 85, 99, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                            }}
-                          >
-                            <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                            View Proofs
-                          </button>
-                        )}
 
+                            {/* Proof Action Button */}
+                            {selectedOrder.proofs && selectedOrder.proofs.length > 0 ? (
+                              /* Show appropriate button based on proof status */
+                              selectedOrder.proof_status === 'changes_requested' ? (
+                                /* Changes requested - Show Send Proofs Again button (if new proofs uploaded) */
+                                selectedOrder.proofs.filter(p => p.status === 'pending').length > 0 ? (
+                                  <button
+                                    onClick={async () => {
+                                      setSendingProofs(true);
+                                      try {
+                                        await handleSendProofs(selectedOrder.id);
+                                        setProofsSent(prev => ({ ...prev, [selectedOrder.id]: true }));
+                                        setNewProofsCount(prev => ({ ...prev, [selectedOrder.id]: 0 }));
+                                      } catch (error) {
+                                        console.error('Failed to send proofs:', error);
+                                      } finally {
+                                        setSendingProofs(false);
+                                      }
+                                    }}
+                                    disabled={sendingProofs}
+                                    className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                    style={{
+                                      backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                                      border: '1px solid rgba(34, 197, 94, 0.4)'
+                                    }}
+                                  >
+                                    {sendingProofs ? (
+                                      <>
+                                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Sending...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                        Send Proofs Again
+                                      </>
+                                    )}
+                                  </button>
+                                ) : (
+                                  /* No new proofs yet - Show greyed out button */
+                                  <button
+                                    disabled
+                                    className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-gray-500 transition-all cursor-not-allowed"
+                                    style={{
+                                      backgroundColor: 'rgba(75, 85, 99, 0.3)',
+                                      border: '1px solid rgba(75, 85, 99, 0.4)'
+                                    }}
+                                  >
+                                    <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
+                                    </svg>
+                                    Upload New Proof First
+                                  </button>
+                                )
+                              ) : !selectedOrder.proof_sent_at ? (
+                                /* Normal flow - Show Send Proofs */
+                                <button
+                                  onClick={async () => {
+                                    setSendingProofs(true);
+                                    try {
+                                      await handleSendProofs(selectedOrder.id);
+                                      setProofsSent(prev => ({ ...prev, [selectedOrder.id]: true }));
+                                      setNewProofsCount(prev => ({ ...prev, [selectedOrder.id]: 0 }));
+                                    } catch (error) {
+                                      console.error('Failed to send proofs:', error);
+                                    } finally {
+                                      setSendingProofs(false);
+                                    }
+                                  }}
+                                  disabled={sendingProofs}
+                                  className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-white transition-all hover:bg-opacity-80 cursor-pointer hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                  style={{
+                                    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                                    border: '1px solid rgba(34, 197, 94, 0.4)'
+                                  }}
+                                >
+                                  {sendingProofs ? (
+                                    <>
+                                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                      </svg>
+                                      Sending...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                      </svg>
+                                      Send Proofs
+                                    </>
+                                  )}
+                                </button>
+                              ) : (
+                                /* Proofs already sent - Show View Proofs */
+                                <button
+                                  onClick={() => window.open(`/proofs?orderId=${selectedOrder.id}`, '_blank')}
+                                  className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105"
+                                  style={{
+                                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                                    backdropFilter: 'blur(25px) saturate(180%)',
+                                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                                    boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                  }}
+                                >
+                                  <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </svg>
+                                  View Proofs
+                                </button>
+                              )
+                            ) : (
+                              /* No proofs exist - Show greyed out button */
+                              <button
+                                disabled
+                                className="inline-flex items-center justify-center px-4 py-3 text-sm font-medium rounded-lg text-gray-500 transition-all cursor-not-allowed"
+                                style={{
+                                  backgroundColor: 'rgba(75, 85, 99, 0.3)',
+                                  border: '1px solid rgba(75, 85, 99, 0.4)'
+                                }}
+                              >
+                                <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
+                                </svg>
+                                Upload Proof First
+                              </button>
+                            )}
+                          </>
+                        ) : null}
+
+                        {/* Right Column - Tracking/Shipping Actions */}
                         {selectedOrder.trackingNumber ? (
                           <button
                             onClick={() => handleViewTracking(selectedOrder)}
@@ -2715,8 +2903,6 @@ export default function AdminOrders() {
                             </svg>
                             Create Shipping Label
                           </button>
-                        )}
-                            </>
                         )}
 
                         {/* Always show tracking for sample packs */}
@@ -2799,12 +2985,11 @@ export default function AdminOrders() {
                           {selectedOrder.proofs.filter((p: any) => p.status === 'approved').map((proof: any) => (
                             <div key={proof.id} className="space-y-2">
                               <div 
-                                className="rounded-lg overflow-hidden aspect-square p-2 cursor-pointer hover:opacity-80 transition-opacity"
+                                className="rounded-lg overflow-hidden aspect-square p-2"
                                 style={{
                                   backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                   border: '1px solid rgba(255, 255, 255, 0.1)'
                                 }}
-                                onClick={() => window.open(proof.proofUrl, '_blank')}
                               >
                                 <img 
                                   src={proof.proofUrl} 
@@ -2812,6 +2997,22 @@ export default function AdminOrders() {
                                   className="w-full h-full object-contain"
                                 />
                               </div>
+                              <button
+                                onClick={() => window.open(proof.proofUrl, '_blank')}
+                                className="w-full px-3 py-2 text-xs font-medium rounded-lg text-white transition-all hover:scale-105"
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                                  backdropFilter: 'blur(25px) saturate(180%)',
+                                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                                  boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                }}
+                              >
+                                <svg className="w-3 h-3 mr-1 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                View
+                              </button>
                               <div>
                                 <p className="text-sm font-medium text-white truncate">{proof.proofTitle}</p>
                                 <p className="text-xs text-green-400">✓ Approved</p>
@@ -2853,6 +3054,22 @@ export default function AdminOrders() {
                                   className="w-full h-full object-contain"
                                 />
                               </div>
+                              <button
+                                onClick={() => window.open(proof.proofUrl, '_blank')}
+                                className="w-full px-3 py-2 text-xs font-medium rounded-lg text-white transition-all hover:scale-105"
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                                  backdropFilter: 'blur(25px) saturate(180%)',
+                                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                                  boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                }}
+                              >
+                                <svg className="w-3 h-3 mr-1 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                View
+                              </button>
                               <div>
                                 <p className="text-sm font-medium text-white truncate">{proof.proofTitle}</p>
                                 <p className="text-xs text-gray-400">Approved</p>
@@ -2863,6 +3080,75 @@ export default function AdminOrders() {
                                               </details>
                       </div>
                       )}
+
+                    {/* Archived Proofs Display - Collapsible - Show superseded/rejected proofs (not for sample packs) */}
+                    {!isSamplePackOrder(selectedOrder) && selectedOrder.proofs && selectedOrder.proofs.filter((p: any) => p.status === 'archived' || p.status === 'rejected' || p.status === 'superseded').length > 0 && (
+                      <details className="glass-container p-6">
+                        <summary className="flex items-center justify-between cursor-pointer -m-6 p-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gray-500/20 flex items-center justify-center">
+                              <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8l14 14M19 8l-14 14M3 9h18" />
+                              </svg>
+                            </div>
+                            <h3 className="text-lg font-semibold text-white">Archived Proofs</h3>
+                            <span className="text-xs text-gray-500 bg-gray-700/50 px-2 py-1 rounded">
+                              {selectedOrder.proofs.filter((p: any) => p.status === 'archived' || p.status === 'rejected' || p.status === 'superseded').length}
+                            </span>
+                          </div>
+                        </summary>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-6">
+                          {selectedOrder.proofs.filter((p: any) => p.status === 'archived' || p.status === 'rejected' || p.status === 'superseded').map((proof: any) => (
+                            <div key={proof.id} className="space-y-2 opacity-75">
+                              <div 
+                                className="rounded-lg overflow-hidden aspect-square p-2 relative"
+                                style={{
+                                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                                }}
+                              >
+                                <img 
+                                  src={proof.proofUrl} 
+                                  alt={proof.proofTitle}
+                                  className="w-full h-full object-contain grayscale"
+                                />
+                                <div className="absolute top-1 right-1 bg-gray-600/80 text-white text-xs px-1.5 py-0.5 rounded">
+                                  Archived
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => window.open(proof.proofUrl, '_blank')}
+                                className="w-full px-3 py-2 text-xs font-medium rounded-lg text-white transition-all hover:scale-105"
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(75, 85, 99, 0.4) 0%, rgba(75, 85, 99, 0.25) 50%, rgba(75, 85, 99, 0.1) 100%)',
+                                  backdropFilter: 'blur(25px) saturate(180%)',
+                                  border: '1px solid rgba(75, 85, 99, 0.4)',
+                                  boxShadow: 'rgba(75, 85, 99, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                }}
+                              >
+                                <svg className="w-3 h-3 mr-1 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                View
+                              </button>
+                              <div>
+                                <p className="text-sm font-medium text-white truncate">{proof.proofTitle}</p>
+                                <p className="text-xs text-gray-500">
+                                  {proof.status === 'superseded' ? '↻ Superseded' : 
+                                   proof.status === 'rejected' ? '✗ Rejected' : 
+                                   '📁 Archived'}
+                                </p>
+                                <p className="text-xs text-gray-600">
+                                  {formatDate(proof.uploadedAt)}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
                   </div>
 
                   {/* Right Column - Customer Info */}
@@ -3032,6 +3318,16 @@ export default function AdminOrders() {
                               </div>
                             )}
                             
+                            {selectedOrder.proof_status === 'changes_requested' && (
+                              <div className="flex items-start gap-3">
+                                <div className="w-2 h-2 rounded-full bg-amber-400 mt-1.5 animate-pulse"></div>
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-white">Customer requested changes</p>
+                                  <p className="text-xs text-gray-400">Design revision needed based on feedback</p>
+                                </div>
+                              </div>
+                            )}
+
                             {selectedOrder.proof_status === 'approved' && (
                               <div className="flex items-start gap-3">
                                 <div className="w-2 h-2 rounded-full bg-green-400 mt-1.5"></div>

@@ -424,7 +424,7 @@ export default function Deals() {
                                 </div>
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="text-green-200 font-medium truncate">{uploadedFile.original_filename}</p>
+                                <p className="text-green-200 font-medium break-words">{uploadedFile.original_filename}</p>
                                 <p className="text-green-300/80 text-sm">
                                   {(uploadedFile.bytes / 1024 / 1024).toFixed(2)} MB • {uploadedFile.format.toUpperCase()}
                                 </p>

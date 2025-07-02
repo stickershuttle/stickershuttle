@@ -546,11 +546,20 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
             priceImpact: 0 
           },
           proof: { type: "finish" as const, value: sendProof, displayValue: sendProof ? "Send Proof" : "No Proof", priceImpact: 0 },
-          rush: { type: "finish" as const, value: rushOrder, displayValue: rushOrder ? "Rush Order" : "Standard", priceImpact: rushOrder ? total * 0.4 : 0 }
+          rush: { type: "finish" as const, value: rushOrder, displayValue: rushOrder ? "Rush Order" : "Standard", priceImpact: rushOrder ? total * 0.4 : 0 },
+          ...(postToInstagram && {
+            instagram: { 
+              type: "finish" as const, 
+              value: instagramHandle, 
+              displayValue: instagramHandle ? `@${instagramHandle}` : "Instagram Opt-in", 
+              priceImpact: 0 
+            }
+          })
         },
         totalPrice: total,
         customFiles: uploadedFile ? [uploadedFile.secure_url] : [],
         notes: additionalNotes.trim(),
+        instagramOptIn: postToInstagram,
         additionalInfo: {
           instagramHandle: postToInstagram ? instagramHandle : undefined,
           uploadLater: uploadLater
@@ -1163,7 +1172,7 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Left Column - Artwork Upload & Additional Instructions */}
                 <div>
-                  <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">📁 Artwork Upload *</h2>
+      
                   
                   {/* Hidden file input - always present */}
                   <input
@@ -1229,7 +1238,7 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                             />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-green-200 font-medium truncate">{uploadedFile.original_filename}</p>
+                            <p className="text-green-200 font-medium break-words">{uploadedFile.original_filename}</p>
                             <p className="text-green-300/80 text-sm">
                               {(uploadedFile.bytes / 1024 / 1024).toFixed(2)} MB • {uploadedFile.format.toUpperCase()}
                             </p>
@@ -1300,12 +1309,7 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                 <div className="space-y-4">
                   {/* Proof Options */}
                   <div>
-                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
-                      <span role="img" aria-label="proof">
-                        📋
-                      </span>
-                      Proof Options
-                    </h2>
+
                     
                     {/* Proof Toggle */}
                     <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
@@ -1326,7 +1330,7 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                         }`}
                       >
                         <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                          sendProof ? 'translate-x-1' : 'translate-x-7'
+                          sendProof ? 'translate-x-7' : 'translate-x-1'
                         }`} />
                       </button>
                       <label className={`text-sm font-medium ${sendProof ? 'text-green-200' : 'text-red-200'}`}>

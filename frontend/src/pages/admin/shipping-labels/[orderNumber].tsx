@@ -11,14 +11,14 @@ const ADMIN_EMAILS = ['justin@stickershuttle.com']; // Add all admin emails here
 // Preset package dimensions (from your image)
 const PACKAGE_PRESETS = [
   { id: '10x6x4', name: '10 × 6 × 4', dimensions: '10 × 6 × 4 in, 5 lb', length: 10, width: 6, height: 4, weight: 5, suggested: true },
-  { id: '4x4x4', name: '4 × 4 × 4', dimensions: '4 × 4 × 4 in, 1 lb', length: 4, width: 4, height: 4, weight: 1, default: true },
+  { id: '4x4x4', name: '4 × 4 × 4', dimensions: '4 × 4 × 4 in, 1 lb', length: 4, width: 4, height: 4, weight: 1 },
   { id: '12x12x4', name: '12 × 12 × 4', dimensions: '12 × 12 × 4 in, 0.25 lb', length: 12, width: 12, height: 4, weight: 0.25 },
   { id: '14x12x8', name: '14 × 12 × 8', dimensions: '14 × 12 × 8 in, 15 lb', length: 14, width: 12, height: 8, weight: 15 },
   { id: '4x4x36', name: '4 × 4 × 36', dimensions: '4 × 4 × 36 in, 5 lb', length: 4, width: 4, height: 36, weight: 5 },
   { id: '5x5x5', name: '5 × 5 × 5', dimensions: '5 × 5 × 5 in, 3 lb', length: 5, width: 5, height: 5, weight: 3 },
   { id: '6x4x4', name: '6 × 4 × 4', dimensions: '6 × 4 × 4 in, 3 lb', length: 6, width: 4, height: 4, weight: 3 },
   { id: '6x6x6', name: '6 × 6 × 6', dimensions: '6 × 6 × 6 in, 4 lb', length: 6, width: 6, height: 6, weight: 4 },
-  { id: 'bubble-mailer', name: '7.5" × 10.5" (Bubble Mailer)', dimensions: '9.5 × 6.5 in, 0.5 lb', length: 9.5, width: 6.5, height: 1, weight: 0.5 },
+  { id: 'bubble-mailer', name: '7.5" × 10.5" (Bubble Mailer)', dimensions: '9.5 × 6.5 in, 0.5 lb', length: 9.5, width: 6.5, height: 1, weight: 0.5, default: true },
   { id: '8x6x4', name: '8 × 6 × 4', dimensions: '8 × 6 × 4 in, 5 lb', length: 8, width: 6, height: 4, weight: 5 },
   { id: '9x9x4', name: '9 × 9 × 4', dimensions: '9 × 9 × 4 in, 10 lb', length: 9, width: 9, height: 4, weight: 10 }
 ];
@@ -100,7 +100,7 @@ export default function ShippingLabels() {
   
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [selectedPackage, setSelectedPackage] = useState(PACKAGE_PRESETS[0]);
+  const [selectedPackage, setSelectedPackage] = useState(PACKAGE_PRESETS.find(p => p.default) || PACKAGE_PRESETS[0]);
   const [customWeight, setCustomWeight] = useState('');
   const [shippingStep, setShippingStep] = useState<'package' | 'loading' | 'rates' | 'purchasing' | 'complete' | 'error'>('package');
   const [shipmentData, setShipmentData] = useState<any>(null);

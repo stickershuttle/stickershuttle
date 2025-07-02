@@ -497,7 +497,7 @@ const VinylBannerCalculator: React.FC = () => {
         <div className="space-y-6">
           {/* File Upload */}
           <div className="container-style p-6 transition-colors duration-200">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">📁 Artwork Upload *</h2>
+
             
             {/* Hidden file input - always present */}
             <input
@@ -558,8 +558,8 @@ const VinylBannerCalculator: React.FC = () => {
                         showFileType={false}
                       />
                     </div>
-                    <div>
-                      <p className="text-green-200 font-medium">{uploadedFile.original_filename}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-green-200 font-medium break-words">{uploadedFile.original_filename}</p>
                       <p className="text-green-300/80 text-sm">
                         {(uploadedFile.bytes / 1024 / 1024).toFixed(2)} MB • {uploadedFile.format.toUpperCase()}
                       </p>

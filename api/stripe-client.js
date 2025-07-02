@@ -113,7 +113,7 @@ class StripeClient {
                 amount: 0, // Free shipping - adjust as needed
                 currency: 'usd',
               },
-              display_name: 'UPS Ground (2-3 business days)',
+              display_name: 'UPS Ground',
               delivery_estimate: {
                 minimum: {
                   unit: 'business_day',
@@ -130,10 +130,30 @@ class StripeClient {
             shipping_rate_data: {
               type: 'fixed_amount',
               fixed_amount: {
-                amount: 1500, // $15.00
+                amount: 2000, // $20.00
                 currency: 'usd',
               },
-              display_name: 'UPS Next Day Air (1 business day)',
+              display_name: 'UPS 2nd Day Air',
+              delivery_estimate: {
+                minimum: {
+                  unit: 'business_day',
+                  value: 2,
+                },
+                maximum: {
+                  unit: 'business_day',
+                  value: 2,
+                },
+              },
+            },
+          },
+          {
+            shipping_rate_data: {
+              type: 'fixed_amount',
+              fixed_amount: {
+                amount: 4000, // $40.00
+                currency: 'usd',
+              },
+              display_name: 'UPS Next Day Air',
               delivery_estimate: {
                 minimum: {
                   unit: 'business_day',

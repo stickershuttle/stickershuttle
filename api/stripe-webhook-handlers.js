@@ -133,6 +133,49 @@ async function handleCheckoutSessionCompleted(session) {
     // Get customer info and shipping address
     const customer = fullSession.customer_details || {};
     const shippingAddress = fullSession.shipping_details?.address || fullSession.customer_details?.address || {};
+    const shippingOption = fullSession.shipping_cost?.shipping_rate || null;
+    
+    // Determine if this is express shipping
+    let isExpressShipping = false;
+    let shippingMethodName = 'Standard Shipping';
+    
+    if (shippingOption && shippingOption.display_name) {
+      shippingMethodName = shippingOption.display_name;
+      isExpressShipping = shippingMethodName.includes('Next Day Air') || shippingMethodName.includes('2nd Day Air');
+    }
+    
+    // Check for rush orders in line items
+    let isRushOrder = false;
+    if (fullSession.line_items?.data) {
+      for (const lineItem of fullSession.line_items.data) {
+        const itemMetadata = lineItem.price.product.metadata || {};
+        
+        // Parse calculator selections to check for rush order
+        let calculatorSelections = {};
+        
+        // Try to rebuild from metadata and order note
+        if (metadata.orderNote) {
+          const orderNoteSelections = parseCalculatorSelectionsFromOrderNote(metadata.orderNote);
+          calculatorSelections = { ...calculatorSelections, ...orderNoteSelections };
+        }
+        
+        // Check for rush order
+        if (calculatorSelections.rush && calculatorSelections.rush.value === true) {
+          isRushOrder = true;
+          break;
+        }
+      }
+    }
+    
+    console.log('🚚 Shipping details:', {
+      shippingMethodName,
+      isExpressShipping,
+      shippingCost: fullSession.shipping_cost?.amount_total || 0
+    });
+    
+    console.log('🚀 Rush order details:', {
+      isRushOrder
+    });
     
     // Handle guest checkout - just store the email, no account creation
     console.log('🔍 Checking for guest checkout - userId:', metadata.userId, 'customer email:', customer.email);
@@ -400,6 +443,9 @@ async function handleCheckoutSessionCompleted(session) {
           postal_code: shippingAddress.postal_code,
           country: shippingAddress.country,
         },
+        shipping_method: shippingMethodName,
+        is_express_shipping: isExpressShipping,
+        is_rush_order: isRushOrder,
         order_updated_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -684,7 +730,7 @@ async function handleCheckoutSessionCompleted(session) {
           customerEmailSource: updatedOrder.customer_email ? 'order' : 'stripe_session'
         });
         
-        const emailResult = await emailNotifications.sendOrderStatusNotification(orderForEmail, updatedOrder.order_status);
+        const emailResult = await emailNotifications.sendOrderStatusNotificationEnhanced(orderForEmail, updatedOrder.order_status);
         
         if (emailResult.success) {
           console.log('✅ Order status email notification sent successfully');
@@ -881,6 +927,9 @@ async function handleCheckoutSessionCompleted(session) {
         country: shippingAddress.country,
       },
       billing_address: fullSession.customer_details?.address || shippingAddress,
+      shipping_method: shippingMethodName,
+      is_express_shipping: isExpressShipping,
+      is_rush_order: isRushOrder,
       order_note: metadata.orderNote || '',
       order_created_at: new Date().toISOString(),
       order_updated_at: new Date().toISOString(),
@@ -1042,8 +1091,8 @@ async function handleCheckoutSessionCompleted(session) {
             orderStatus: orderForEmail.order_status
           });
           
-          // Send customer notification
-          const emailResult = await emailNotifications.sendOrderStatusNotification(orderForEmail, order.order_status || 'Building Proof');
+          // Send customer notification (enhanced for first-time customers)
+          const emailResult = await emailNotifications.sendOrderStatusNotificationEnhanced(orderForEmail, order.order_status || 'Building Proof');
           
           if (emailResult.success) {
             console.log('✅ New order customer email notification sent successfully');

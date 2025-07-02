@@ -34,124 +34,139 @@ export default function UniversalFooter() {
     <>
       <footer className="py-12 mt-8" style={{ backgroundColor: '#030140', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
         <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {/* Quick Links */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
+            
+            {/* Products */}
             <div>
               <h3 className="text-white font-semibold text-lg mb-4 flex items-center">
-                <span className="mr-2">🔗</span>
-                Quick links
+                <span className="mr-2">🏷️</span>
+                Products
               </h3>
-              <ul className="space-y-3">
+              <ul className="space-y-1">
                 <li>
-                  <Link href="/shipping-process" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
+                  <Link href="/products/vinyl-stickers" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
+                    Vinyl Stickers
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/products/holographic-stickers" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
+                    Holographic Stickers
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/products/chrome-stickers" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
+                    Chrome Stickers
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/products/glitter-stickers" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
+                    Glitter Stickers
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/products/clear-stickers" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
+                    Clear Stickers
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/products/sticker-sheets" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
+                    Sticker Sheets
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/products/vinyl-banners" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
+                    Vinyl Banners
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Company */}
+            <div>
+              <h3 className="text-white font-semibold text-lg mb-4 flex items-center">
+                <span className="mr-2">🏢</span>
+                Company
+              </h3>
+              <ul className="space-y-1">
+                <li>
+                  <Link href="/shipping-process" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center text-sm">
                     <span className="mr-2">🚚</span>
                     Shipping Process
                   </Link>
                 </li>
                 <li>
-                  <Link href="/blog" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
+                  <Link href="/blog" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center text-sm">
                     <span className="mr-2">📝</span>
                     Blog Posts
                   </Link>
                 </li>
-                {!user && (
-                  <li>
-                    <Link href="/contact-us" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center">
-                      <span className="mr-2">📞</span>
-                      Contact Us
-                    </Link>
-                  </li>
-                )}
               </ul>
             </div>
 
-            {/* Shop */}
+            {/* Support */}
             <div>
-              <h3 className="text-white font-semibold text-lg mb-4">
+              <h3 className="text-white font-semibold text-lg mb-4 flex items-center">
+                <span className="mr-2">🎧</span>
+                Support
+              </h3>
+              <ul className="space-y-1">
+                <li>
+                  <Link href="/contact-us" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center text-sm">
+                    <span className="mr-2">💬</span>
+                    Help
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/returns" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center text-sm">
+                    <span className="mr-2">🔄</span>
+                    Returns
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Account/Shop */}
+            <div>
+              <h3 className="text-white font-semibold text-lg mb-4 flex items-center">
+                <span className="mr-2">🛍️</span>
                 Shop
               </h3>
-              <ul className="space-y-3">
+              <ul className="space-y-1">
                 <li>
-                  <Link href="/deals" className="text-gray-300 hover:text-white transition-colors duration-200">
+                  <Link href="/deals" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
                     ⚡ Deals
                   </Link>
                 </li>
                 <li>
-                  <a href="/products" className="text-gray-300 hover:text-white transition-colors duration-200">
+                  <a href="/products" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
                     Start Your Order →
                   </a>
                 </li>
                 {user ? (
-                  /* Logged In - Show Account Dashboard and Sign Out */
-                  <>
-                    <li>
-                      <Link href="/account/dashboard" className="text-gray-300 hover:text-white transition-colors duration-200">
-                        👨‍🚀 Account Dashboard
-                      </Link>
-                    </li>
-                    <li>
-                      <button 
-                        onClick={handleSignOut}
-                        className="text-gray-300 hover:text-white transition-colors duration-200 text-left"
-                      >
-                        Sign Out
-                      </button>
-                    </li>
-                  </>
+                  /* Logged In - Show Sign Out */
+                  <li>
+                    <button 
+                      onClick={handleSignOut}
+                      className="text-gray-300 hover:text-white transition-colors duration-200 text-left text-sm"
+                    >
+                      Sign Out
+                    </button>
+                  </li>
                 ) : (
                   /* Not Logged In - Show Login and Signup */
                   <>
                     <li>
-                      <Link href="/login" className="text-gray-300 hover:text-white transition-colors duration-200">
+                      <Link href="/login" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
                         Log in
                       </Link>
                     </li>
                     <li>
-                      <Link href="/signup" className="text-gray-300 hover:text-white transition-colors duration-200">
+                      <Link href="/signup" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
                         Signup
                       </Link>
                     </li>
                   </>
                 )}
-                <li>
-                  <Link href="/cart" className="text-gray-300 hover:text-white transition-colors duration-200">
-                    🛒 Cart
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            {/* Legal & Info */}
-            <div>
-              <h3 className="text-white font-semibold text-lg mb-4">
-                Legal & Info
-              </h3>
-              <ul className="space-y-3">
-                <li>
-                  <Link href="/terms-and-conditions" className="text-gray-300 hover:text-white transition-colors duration-200">
-                    Terms & Conditions
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/returns" className="text-gray-300 hover:text-white transition-colors duration-200">
-                    Returns & Refunds
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/privacy-policy" className="text-gray-300 hover:text-white transition-colors duration-200">
-                    Privacy Policy
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/cookie-policy" className="text-gray-300 hover:text-white transition-colors duration-200">
-                    Cookie Policy
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/dmca-copyright" className="text-gray-300 hover:text-white transition-colors duration-200">
-                    DMCA Copyright
-                  </Link>
-                </li>
               </ul>
             </div>
 
@@ -159,9 +174,9 @@ export default function UniversalFooter() {
             <div>
               <h3 className="text-white font-semibold text-lg mb-4 flex items-center">
                 <span className="mr-2">🚀</span>
-                Our mission
+                Our Mission
               </h3>
-              <p className="text-gray-300 text-sm leading-relaxed mb-4">
+              <p className="text-gray-300 text-sm leading-relaxed mb-6">
                 We're called Sticker Shuttle, what do you think our mission is? To get your stickers to you as fast as humanly possible. At no extra cost.
               </p>
               
@@ -206,11 +221,28 @@ export default function UniversalFooter() {
                 </span>
               </div>
               
+              {/* Legal Links */}
+              <div className="flex flex-wrap items-center gap-4 mb-4 md:mb-0">
+                <Link href="/terms-and-conditions" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
+                  Terms
+                </Link>
+                <span className="text-gray-500">•</span>
+                <Link href="/privacy-policy" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
+                  Privacy
+                </Link>
+                <span className="text-gray-500">•</span>
+                <Link href="/cookie-policy" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
+                  Cookies
+                </Link>
+                <span className="text-gray-500">•</span>
+                <Link href="/dmca-copyright" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
+                  DMCA
+                </Link>
+              </div>
+              
               {/* Built with Love and Copyright */}
-              <div className="flex flex-col md:flex-row items-center gap-4">
-                <div className="text-gray-300 text-sm flex items-center">
-                  Built with ❤️ by © Sticker Shuttle
-                </div>
+              <div className="text-gray-300 text-sm flex items-center">
+                Built with ❤️ by © Sticker Shuttle
               </div>
             </div>
           </div>

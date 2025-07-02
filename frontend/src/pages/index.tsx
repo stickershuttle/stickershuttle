@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Layout from "../components/Layout";
+import SEOHead from "../components/SEOHead";
 import SitewideAlert from "../components/SitewideAlert";
 import { useRouter } from "next/router";
 import { getSupabase } from "../lib/supabase";
@@ -67,8 +68,77 @@ export default function Home() {
     setIsPlaying(false);
   };
 
+  // Enhanced structured data for homepage
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Sticker Shuttle",
+    "url": "https://stickershuttle.com",
+    "logo": "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png",
+    "description": "Professional custom sticker printing with fast shipping and high quality materials. Trusted by brands like Amazon, Nike, and thousands of businesses worldwide.",
+    "foundingDate": "2024",
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "telephone": "+1-555-STICKER",
+      "contactType": "customer service",
+      "email": "orbit@stickershuttle.com"
+    },
+    "sameAs": [
+      "https://twitter.com/stickershuttle",
+      "https://instagram.com/stickershuttle"
+    ],
+    "address": {
+      "@type": "PostalAddress",
+      "addressCountry": "US"
+    },
+    "hasOfferCatalog": {
+      "@type": "OfferCatalog",
+      "name": "Custom Sticker Products",
+      "itemListElement": [
+        {
+          "@type": "Offer",
+          "itemOffered": {
+            "@type": "Product",
+            "name": "Custom Vinyl Stickers",
+            "description": "High-quality custom vinyl stickers with fast 24-hour printing"
+          }
+        },
+        {
+          "@type": "Offer", 
+          "itemOffered": {
+            "@type": "Product",
+            "name": "Holographic Stickers",
+            "description": "Eye-catching holographic custom stickers"
+          }
+        },
+        {
+          "@type": "Offer",
+          "itemOffered": {
+            "@type": "Product", 
+            "name": "Clear Stickers",
+            "description": "Professional transparent custom stickers"
+          }
+        }
+      ]
+    }
+  };
+
   return (
-    <Layout title="Sticker Shuttle - Custom Stickers & Vinyl Signs">
+    <>
+      <SEOHead
+        title="Sticker Shuttle - Custom Stickers & Vinyl Signs | Fast 24hr Printing"
+        description="Professional custom stickers, vinyl banners, and decals with fast 24-hour printing. Trusted by Amazon, Nike, and thousands of businesses. Free shipping, high quality materials."
+        keywords="custom stickers, vinyl stickers, holographic stickers, clear stickers, chrome stickers, glitter stickers, custom decals, vinyl banners, business stickers, promotional stickers, logo stickers"
+        canonical="https://stickershuttle.com"
+        ogImage="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751382016/StickerShuttle_Banner_Main_nlzoro.png"
+        structuredData={structuredData}
+        preconnect={[
+          "https://res.cloudinary.com",
+          "https://fonts.googleapis.com",
+          "https://api.stripe.com"
+        ]}
+      />
+      <Layout title="Sticker Shuttle - Custom Stickers & Vinyl Signs | Fast 24hr Printing">
         {/* Sitewide Alert Banner */}
         <SitewideAlert />
         
@@ -99,7 +169,7 @@ export default function Home() {
                 <div className="flex flex-col items-center gap-4 mb-4">
                   <a 
                     href="/products"
-                    className="primaryButton px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-105 inline-block rounded-lg"
+                    className="primaryButton px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-[1.004] inline-block rounded-lg"
                   >
                     Start Here →
                   </a>
@@ -593,7 +663,7 @@ export default function Home() {
         </section>
 
         {/* Video Section */}
-        <section className="py-4">
+        <section className="py-4 md:hidden">
           <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
             <div className="flex flex-col space-y-6 lg:grid lg:grid-cols-2 lg:gap-8 lg:space-y-0 lg:items-stretch">
               {/* Video */}
@@ -602,7 +672,8 @@ export default function Home() {
                   ref={videoRef}
                   className="w-full rounded-xl"
                   style={{ 
-                    minHeight: '400px',
+                    height: '400px',
+                    width: '100%',
                     objectFit: 'cover'
                   }}
                   onEnded={handleVideoEnded}
@@ -656,19 +727,21 @@ export default function Home() {
                   </p>
                 </div>
 
-                <button 
-                  className="px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-105 rounded-lg mt-auto"
-                  style={{
-                    backgroundColor: '#ffd713',
-                    color: '#030140',
-                    boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
-                    border: 'solid',
-                    borderWidth: '0.03125rem',
-                    borderColor: '#8d9912'
-                  }}
-                >
-                  Order your stickers today →
-                </button>
+                <Link href="/products">
+                  <button 
+                    className="px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-105 rounded-lg mt-auto"
+                    style={{
+                      backgroundColor: '#ffd713',
+                      color: '#030140',
+                      boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
+                      border: 'solid',
+                      borderWidth: '0.03125rem',
+                      borderColor: '#8d9912'
+                    }}
+                  >
+                    Order your stickers today →
+                  </button>
+                </Link>
               </div>
             </div>
           </div>
@@ -1324,6 +1397,7 @@ export default function Home() {
           }
 
         `}</style>
-    </Layout>
+      </Layout>
+    </>
   );
 }

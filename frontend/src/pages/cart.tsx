@@ -522,7 +522,12 @@ export default function CartPage() {
   }, [cart, pricingData]);
 
   // Helper function to get quantity increment
-  const getQuantityIncrement = (currentQuantity: number): number => {
+  const getQuantityIncrement = (currentQuantity: number, item?: CartItem): number => {
+    // Sample packs should increment by 1
+    if (item && item.product.name === 'Sample Pack by Sticker Shuttle') {
+      return 1;
+    }
+    // Regular products increment by 50 or 250
     return currentQuantity < 750 ? 50 : 250;
   };
 
@@ -1032,12 +1037,6 @@ export default function CartPage() {
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <h1 className="text-3xl font-bold text-white">Your Cart</h1>
-            <Link 
-              href="/products/vinyl-stickers"
-              className="px-6 md:px-4 py-2 bg-purple-500/20 border border-purple-400/30 rounded-lg text-purple-200 hover:bg-purple-500/30 transition-colors flex items-center gap-2 text-sm font-medium"
-            >
-              ➕ Add More Designs
-            </Link>
           </div>
           
           {updatedCart.length === 0 ? (
@@ -1464,17 +1463,6 @@ export default function CartPage() {
                             </div>
                             <div className="flex items-center gap-2">
                               <button 
-                                onClick={() => toggleWishlist(item.id)}
-                                className={`p-2 rounded-lg transition-colors ${
-                                  wishlistItems.includes(item.id)
-                                    ? 'text-red-400 hover:text-red-300'
-                                    : 'text-gray-400 hover:text-red-400'
-                                }`}
-                                title="Add to wishlist"
-                              >
-                                {wishlistItems.includes(item.id) ? '❤️' : '🤍'}
-                              </button>
-                              <button 
                                 onClick={() => removeFromCart(item.id)} 
                                 className="text-gray-400 hover:text-red-400 p-2 rounded-lg transition-colors"
                               >
@@ -1697,7 +1685,7 @@ export default function CartPage() {
                                 <div className="flex items-center gap-2">
                                   <button
                                     onClick={() => {
-                                      const increment = getQuantityIncrement(item.quantity);
+                                      const increment = getQuantityIncrement(item.quantity, item);
                                       const newQty = Math.max(1, item.quantity - increment);
                                       handleQuantityChange(item.id, newQty);
                                     }}
@@ -1737,7 +1725,7 @@ export default function CartPage() {
                                   </div>
                                   <button
                                     onClick={() => {
-                                      const increment = getQuantityIncrement(item.quantity);
+                                      const increment = getQuantityIncrement(item.quantity, item);
                                       handleQuantityChange(item.id, item.quantity + increment);
                                     }}
                                     className="w-10 h-10 flex items-center justify-center text-white rounded-lg transition-colors"

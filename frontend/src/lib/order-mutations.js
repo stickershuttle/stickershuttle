@@ -26,6 +26,9 @@ export const GET_USER_ORDERS = gql`
       customerPhone
       shippingAddress
       billingAddress
+      shipping_method
+      is_express_shipping
+      is_rush_order
       orderTags
       orderNote
       orderCreatedAt
@@ -96,6 +99,9 @@ export const GET_ORDER_BY_NUMBER = gql`
       customerPhone
       shippingAddress
       billingAddress
+      shipping_method
+      is_express_shipping
+      is_rush_order
       orderTags
       orderNote
       orderCreatedAt
@@ -166,6 +172,9 @@ export const GET_ORDER_BY_ID = gql`
       customerPhone
       shippingAddress
       billingAddress
+      shipping_method
+      is_express_shipping
+      is_rush_order
       orderTags
       orderNote
       orderCreatedAt

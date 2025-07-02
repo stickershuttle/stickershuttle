@@ -7,13 +7,11 @@ import { getSupabase } from '../lib/supabase';
 
 export default function Login() {
   const router = useRouter();
-  const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('email');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
-    phone: '',
     password: '',
   });
 
@@ -47,7 +45,7 @@ export default function Login() {
       
       // Sign in with modern Supabase API
       const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: loginMethod === 'email' ? formData.email : `${formData.phone}@temp.com`,
+        email: formData.email,
         password: formData.password,
       });
 
@@ -200,84 +198,24 @@ export default function Login() {
 
 
 
-            {/* Method Toggle */}
-            <div className="flex gap-2 mb-4">
-              <button
-                type="button"
-                onClick={() => setLoginMethod('email')}
-                className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${
-                  loginMethod === 'email' ? 'text-white' : 'text-gray-300 hover:text-white'
-                }`}
-                style={loginMethod === 'email' ? {
-                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                  backdropFilter: 'blur(25px) saturate(180%)',
-                  border: '1px solid rgba(59, 130, 246, 0.4)',
-                  boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                } : {
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(12px)'
-                }}
-              >
-                📧 Email
-              </button>
-              <button
-                type="button"
-                onClick={() => setLoginMethod('phone')}
-                className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${
-                  loginMethod === 'phone' ? 'text-white' : 'text-gray-300 hover:text-white'
-                }`}
-                style={loginMethod === 'phone' ? {
-                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                  backdropFilter: 'blur(25px) saturate(180%)',
-                  border: '1px solid rgba(59, 130, 246, 0.4)',
-                  boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                } : {
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(12px)'
-                }}
-              >
-                📱 Phone
-              </button>
-            </div>
-
             {/* Login Form */}
             <form onSubmit={handleSubmit} className="space-y-3">
-              {/* Email or Phone Field */}
-              {loginMethod === 'email' ? (
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className="w-full px-6 md:px-4 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                    placeholder="john@example.com"
-                    required
-                  />
-                </div>
-              ) : (
-                <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-300 mb-1">
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    id="phone"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    className="w-full px-6 md:px-4 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                    placeholder="+1 (555) 123-4567"
-                    required
-                  />
-                </div>
-              )}
+              {/* Email Field */}
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  className="w-full px-6 md:px-4 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                  placeholder="john@example.com"
+                  required
+                />
+              </div>
 
               {/* Password Field */}
               <div>
@@ -298,9 +236,9 @@ export default function Login() {
 
               {/* Forgot Password Link */}
               <div className="text-right">
-                <a href="#" className="text-sm text-purple-400 hover:text-purple-300 transition-colors duration-200">
+                <Link href="/forgot-password" className="text-sm text-purple-400 hover:text-purple-300 transition-colors duration-200">
                   Forgot your password?
-                </a>
+                </Link>
               </div>
 
               {/* Error Display */}
@@ -409,84 +347,24 @@ export default function Login() {
               >
 
 
-                {/* Method Toggle */}
-                <div className="flex gap-2 mb-6">
-                  <button
-                    type="button"
-                    onClick={() => setLoginMethod('email')}
-                    className={`flex-1 py-3 px-6 rounded-xl text-sm font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${
-                      loginMethod === 'email' ? 'text-white' : 'text-gray-300 hover:text-white'
-                    }`}
-                    style={loginMethod === 'email' ? {
-                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                      backdropFilter: 'blur(25px) saturate(180%)',
-                      border: '1px solid rgba(59, 130, 246, 0.4)',
-                      boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                    } : {
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      backdropFilter: 'blur(12px)'
-                    }}
-                  >
-                    📧 Email
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLoginMethod('phone')}
-                    className={`flex-1 py-3 px-6 rounded-xl text-sm font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${
-                      loginMethod === 'phone' ? 'text-white' : 'text-gray-300 hover:text-white'
-                    }`}
-                    style={loginMethod === 'phone' ? {
-                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                      backdropFilter: 'blur(25px) saturate(180%)',
-                      border: '1px solid rgba(59, 130, 246, 0.4)',
-                      boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                    } : {
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      backdropFilter: 'blur(12px)'
-                    }}
-                  >
-                    📱 Phone
-                  </button>
-                </div>
-
                 {/* Login Form */}
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Email or Phone Field */}
-                  {loginMethod === 'email' ? (
-                    <div>
-                      <label htmlFor="email-desktop" className="block text-sm font-medium text-gray-300 mb-2">
-                        Email Address
-                      </label>
-                      <input
-                        type="email"
-                        id="email-desktop"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                        placeholder="john@example.com"
-                        required
-                      />
-                    </div>
-                  ) : (
-                    <div>
-                      <label htmlFor="phone-desktop" className="block text-sm font-medium text-gray-300 mb-2">
-                        Phone Number
-                      </label>
-                      <input
-                        type="tel"
-                        id="phone-desktop"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleInputChange}
-                        className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                        placeholder="+1 (555) 123-4567"
-                        required
-                      />
-                    </div>
-                  )}
+                  {/* Email Field */}
+                  <div>
+                    <label htmlFor="email-desktop" className="block text-sm font-medium text-gray-300 mb-2">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      id="email-desktop"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                      placeholder="john@example.com"
+                      required
+                    />
+                  </div>
 
                   {/* Password Field */}
                   <div>
@@ -507,9 +385,9 @@ export default function Login() {
 
                   {/* Forgot Password Link */}
                   <div className="text-right">
-                    <a href="#" className="text-sm text-purple-400 hover:text-purple-300 transition-colors duration-200">
+                    <Link href="/forgot-password" className="text-sm text-purple-400 hover:text-purple-300 transition-colors duration-200">
                       Forgot your password?
-                    </a>
+                    </Link>
                   </div>
 
                   {/* Error Display */}

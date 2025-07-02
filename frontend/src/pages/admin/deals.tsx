@@ -224,7 +224,7 @@ export default function AdminDeals() {
   if (loading) {
     return (
       <AdminLayout title="Deals Management - Admin">
-        <div className="flex-1 px-8 py-6">
+                      <div className="flex-1 pl-2 pr-8 py-6"> {/* Reduced left padding, keep right padding */}
           <div className="flex items-center justify-center h-64">
             <div className="text-gray-400">Loading...</div>
           </div>
@@ -278,7 +278,7 @@ export default function AdminDeals() {
         }
       `}</style>
       <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#030140' }}>
-        <div className="flex-1 px-4 sm:px-6 xl:px-8 py-6">
+                  <div className="flex-1 pl-2 pr-4 sm:pr-6 xl:pr-8 py-6"> {/* Reduced left padding, keep right padding */}
           {/* Stats Cards */}
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6 xl:mb-8">
             <div className="glass-container rounded-xl p-4 xl:p-6">
