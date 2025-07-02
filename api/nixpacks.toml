@@ -2,7 +2,7 @@
 nixPkgs = ["nodejs_18"]
 
 [phases.install]
-cmds = ["cd api && npm ci --omit=dev"]
+cmds = ["npm ci --omit=dev"]
 
 [start]
-cmd = "cd api && node --max-old-space-size=2048 index.js" 
+cmd = "node --max-old-space-size=2048 index.js" 
