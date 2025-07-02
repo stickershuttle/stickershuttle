@@ -1,0 +1,8 @@
+node_modules
+.git
+.env*
+*.log
+uploads/*
+!uploads/.gitkeep
+test-*.js
+minimal-*.js 

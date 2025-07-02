@@ -1,10 +1,12 @@
 [build]
-builder = "DOCKERFILE"
-dockerfilePath = "api/Containerfile"
+builder = "NIXPACKS"
 
 [deploy]
-startCommand = "cd api && node index.js"
+startCommand = "cd api && node --max-old-space-size=1024 index.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 10 
+restartPolicyMaxRetries = 10
+
+[environments.production]
+NODE_ENV = "production" 
