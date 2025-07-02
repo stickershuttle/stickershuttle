@@ -4,9 +4,8 @@ import { onError } from '@apollo/client/link/error';
 import { from } from '@apollo/client';
 import { getSupabase } from './supabase';
 
-// TEMPORARY: Use local API until Railway environment variables are configured
-// Production API URL on Railway (currently down due to missing env vars)
-const PRODUCTION_API_URL = 'https://stickershuttle-production.up.railway.app';
+// Production API URL on Railway
+const PRODUCTION_API_URL = 'https://pure-renewal-production.up.railway.app';
 
 // Use production URL by default, fallback to localhost in development
 const getApiUrl = () => {
