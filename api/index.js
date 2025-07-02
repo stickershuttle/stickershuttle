@@ -135,6 +135,16 @@ app.get('/', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'API is running' });
 });
 
+// Add a super simple test endpoint that bypasses everything
+app.get('/test', (req, res) => {
+  res.status(200).json({ 
+    status: 'alive',
+    time: new Date().toISOString(),
+    env: process.env.NODE_ENV || 'not set',
+    port: process.env.PORT || 4000
+  });
+});
+
 // Add request logging middleware with response time tracking
 app.use((req, res, next) => {
   const start = Date.now();
