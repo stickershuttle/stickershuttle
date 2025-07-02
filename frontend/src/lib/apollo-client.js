@@ -15,13 +15,19 @@ const getApiUrl = () => {
     return process.env.NEXT_PUBLIC_API_URL;
   }
   
+  // TEMPORARY: Test if Railway backend is responding, fallback to localhost
+  // This will help us determine if Railway is the issue
+  
   // If in development mode, use localhost
   if (process.env.NODE_ENV === 'development') {
     return 'http://localhost:4000';
   }
   
-  // Otherwise use production URL (your Railway backend)
-  return PRODUCTION_API_URL;
+  // TEMPORARY FIX: Railway backend is down (502 error), use localhost temporarily
+  // Once Railway is fixed, change this back to PRODUCTION_API_URL
+  console.log('🚨 TEMPORARY: Using localhost because Railway backend is down (502 error)');
+  console.log('🔧 Railway backend URL that is failing:', PRODUCTION_API_URL);
+  return 'http://localhost:4000';
 };
 
 const httpLink = createHttpLink({
