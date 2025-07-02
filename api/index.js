@@ -8,40 +8,14 @@ console.log('🏭 Railway environment:', process.env.RAILWAY_ENVIRONMENT || 'not
 // Load environment variables - Railway provides them directly
 // Only load dotenv in development (Railway provides env vars directly in production)
 if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config();
+require('dotenv').config();
 }
 
 // Initialize Sentry error monitoring (must be first)
-const Sentry = require("@sentry/node");
-const { nodeProfilingIntegration } = require("@sentry/profiling-node");
+// TEMPORARILY DISABLED FOR DEBUGGING
+let Sentry = { captureException: () => {} }; // Mock Sentry
 
-// Initialize Sentry
-Sentry.init({
-  dsn: process.env.SENTRY_DSN || "https://your-sentry-dsn-here.ingest.sentry.io/project-id",
-  environment: process.env.NODE_ENV || 'development',
-  integrations: [
-    // Performance monitoring
-    nodeProfilingIntegration(),
-  ],
-  // Performance monitoring
-  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
-  // Profiling
-  profilesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
-  // Error filtering
-  beforeSend(event) {
-    // Don't send errors in development unless explicitly enabled
-    if (process.env.NODE_ENV === 'development' && !process.env.SENTRY_DEBUG) {
-      return null;
-    }
-    return event;
-  },
-});
-
-console.log('🔍 Sentry error monitoring initialized:', {
-  environment: process.env.NODE_ENV || 'development',
-  dsn_configured: !!process.env.SENTRY_DSN,
-  monitoring: process.env.NODE_ENV === 'production' ? 'enabled' : 'development mode'
-});
+console.log('🔍 Sentry temporarily disabled for debugging');
 
 const { ApolloServer } = require('@apollo/server');
 const { expressMiddleware } = require('@apollo/server/express4');
