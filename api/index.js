@@ -166,7 +166,8 @@ const corsConfig = {
     // Reject all other origins
     console.error(`🚫 CORS: Blocked origin - ${origin} (ENV: ${process.env.NODE_ENV || 'undefined'})`);
     console.error(`🔍 CORS: Allowed origins:`, allowedOrigins);
-    callback(new Error(`CORS policy violation: Origin ${origin} not allowed`));
+    // Important: Return false instead of error to properly handle CORS rejection
+    callback(null, false);
   },
 
   // Enhanced credentials and headers configuration
@@ -197,6 +198,22 @@ const corsConfig = {
 
 // Apply CORS with enhanced configuration
 app.use(cors(corsConfig));
+
+// Explicitly handle OPTIONS requests for all routes
+app.options('*', cors(corsConfig));
+
+// Ensure CORS headers are sent even on errors
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = corsConfig.getOrigins();
+  
+  // If origin is allowed, ensure headers are set
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+  next();
+});
 
 // Add security headers with Helmet
 app.use(helmet({
@@ -320,6 +337,19 @@ app.get('/health', (req, res) => {
     service: 'Sticker Shuttle API',
     environment: process.env.NODE_ENV || 'development',
     easypostConfigured: easyPostClient.isReady() // Added EasyPost status check
+  });
+});
+
+// Add CORS diagnostic endpoint
+app.get('/cors-test', (req, res) => {
+  const origin = req.headers.origin || 'No origin header';
+  const allowedOrigins = corsConfig.getOrigins();
+  res.json({
+    message: 'CORS test endpoint',
+    requestOrigin: origin,
+    allowedOrigins: allowedOrigins,
+    environment: process.env.NODE_ENV || 'development',
+    corsHeaders: res.getHeaders()
   });
 });
 
@@ -6854,7 +6884,7 @@ async function startServer() {
     // Apply Apollo middleware with context function
     app.use(
       '/graphql',
-      cors(),
+      cors(corsConfig), // Use the same CORS configuration
       json(),
       expressMiddleware(server, {
         context: async ({ req }) => {
