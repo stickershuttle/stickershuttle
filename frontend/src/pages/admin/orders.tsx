@@ -41,6 +41,7 @@ const GET_ALL_ORDERS = gql`
       shipping_method
       is_express_shipping
       is_rush_order
+      is_blind_shipment
       orderTags
       orderNote
       orderCreatedAt
@@ -2354,6 +2355,28 @@ export default function AdminOrders() {
                   {/* Action Buttons */}
                   <div className="flex items-center justify-center gap-3">
                     
+                    {/* Download File Button */}
+                    {(() => {
+                      const firstItemWithFile = selectedOrder.items.find(item => getProductImage(item));
+                      return firstItemWithFile ? (
+                        <button
+                          onClick={() => handleDownloadFile(getProductImage(firstItemWithFile)!, firstItemWithFile.productName + '_design.jpg')}
+                          className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105 h-[34px]"
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                            backdropFilter: 'blur(25px) saturate(180%)',
+                            border: '1px solid rgba(59, 130, 246, 0.4)',
+                            boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          }}
+                        >
+                          <svg className="h-3 w-3 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                          Download File
+                        </button>
+                      ) : null;
+                    })()}
+
                     {/* Tracking/Label Button */}
                     {selectedOrder.trackingNumber ? (
                       <button
@@ -2544,19 +2567,6 @@ export default function AdminOrders() {
                                       </div>
                                     )}
                                   </div>
-                                  
-                                  {/* Download Button */}
-                                  {itemImage && (
-                                    <button
-                                      onClick={() => handleDownloadFile(itemImage, item.productName + '_design.jpg')}
-                                      className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-6 flex items-center justify-center text-blue-400 hover:text-blue-300 hover:scale-110 transition-all duration-200"
-                                      title="Download original file"
-                                    >
-                                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                                      </svg>
-                                    </button>
-                                  )}
                                   
                                   {/* Customer Replacement Indicator */}
                                   {item.customerReplacementFile && (
