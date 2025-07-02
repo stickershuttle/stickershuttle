@@ -221,30 +221,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Special CORS handling for GraphQL endpoint
-app.use('/graphql', (req, res, next) => {
-  const origin = req.headers.origin;
-  const allowedOrigins = corsConfig.getOrigins();
-  
-  console.log(`🚀 GraphQL Request - Method: ${req.method}, Origin: ${origin || 'no-origin'}`);
-  
-  // Always set CORS headers for allowed origins on GraphQL endpoint
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, apollo-require-preflight');
-    res.setHeader('Access-Control-Max-Age', '86400');
-  }
-  
-  // Handle preflight requests immediately
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(204);
-    return;
-  }
-  
-  next();
-});
+// Special CORS handling for GraphQL endpoint (moved after basic routes to avoid conflicts)
 
 // Add security headers with Helmet (but don't override CORS)
 app.use(helmet({
@@ -465,6 +442,31 @@ app.get('/easypost/status', (req, res) => {
   }
 
   res.json(diagnostics);
+});
+
+// Special CORS handling for GraphQL endpoint
+app.use('/graphql', (req, res, next) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = corsConfig.getOrigins();
+  
+  console.log(`🚀 GraphQL Request - Method: ${req.method}, Origin: ${origin || 'no-origin'}`);
+  
+  // Always set CORS headers for allowed origins on GraphQL endpoint
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, apollo-require-preflight');
+    res.setHeader('Access-Control-Max-Age', '86400');
+  }
+  
+  // Handle preflight requests immediately
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+  
+  next();
 });
 
 // Add Sentry error handler middleware (temporarily commented out)
@@ -6931,7 +6933,7 @@ async function startServer() {
     app.use(
       '/graphql',
       cors(corsConfig), // Use the same CORS configuration
-      json(),
+      json({ limit: '50mb' }),
       expressMiddleware(server, {
         context: async ({ req }) => {
           // Extract auth token from header
@@ -7050,5 +7052,22 @@ async function startServer() {
 
 startServer().catch(error => {
   console.error('❌ Complete server startup failed:', error);
-  process.exit(1);
+  console.error('Stack trace:', error.stack);
+  
+  // Try to start a basic Express server without Apollo
+  const PORT = process.env.PORT || 4000;
+  const HOST = '0.0.0.0';
+  
+  app.get('/emergency-status', (req, res) => {
+    res.json({
+      status: 'emergency-mode',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  });
+  
+  app.listen(PORT, HOST, () => {
+    console.log(`🚨 Emergency server running at http://localhost:${PORT}`);
+    console.log(`🚨 Apollo GraphQL failed to start - only basic endpoints available`);
+  });
 });
