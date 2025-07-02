@@ -112,6 +112,20 @@ console.log('  - EasyPost:', easyPostClient.isReady() ? '✅ Ready' : '❌ Not c
 // Initialize Express app
 const app = express();
 
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('💥 Uncaught Exception:', error);
+  console.error('Stack:', error.stack);
+  // Keep the process alive but log the error
+  Sentry.captureException(error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+  // Keep the process alive but log the error
+  Sentry.captureException(new Error(`Unhandled Rejection: ${reason}`));
+});
+
 // Enhanced CORS configuration with proper security and development support
 const corsConfig = {
   // Define allowed origins with environment-specific logic
@@ -343,11 +357,13 @@ app.post('/webhooks/easypost', express.raw({ type: 'application/json' }), async 
 
 // Add health check before Apollo setup
 app.get('/health', (req, res) => {
-  res.json({ 
+  console.log('💚 Health check requested');
+  res.status(200).json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
     service: 'Sticker Shuttle API',
     environment: process.env.NODE_ENV || 'development',
+    port: process.env.PORT || 4000,
     easypostConfigured: easyPostClient.isReady() // Added EasyPost status check
   });
 });
@@ -483,6 +499,17 @@ app.use((error, req, res, next) => {
   res.status(500).json({
     error: 'Internal server error',
     message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
+  });
+});
+
+// Catch-all route for debugging
+app.use('*', (req, res) => {
+  console.log(`⚠️ Unhandled route: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({
+    error: 'Not found',
+    path: req.originalUrl,
+    method: req.method,
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -6969,12 +6996,13 @@ async function startServer() {
     const PORT = process.env.PORT || 4000;
     const HOST = '0.0.0.0'; // Required for Railway deployment
     
-    app.listen(PORT, HOST, () => {
-      console.log(`🚀 Server running at http://localhost:${PORT}`);
-      console.log(`🚀 GraphQL Playground: http://localhost:${PORT}/graphql`);
-      console.log(`📁 File upload endpoint: http://localhost:${PORT}/api/upload`);
-      console.log(`💚 Health check: http://localhost:${PORT}/health`);
-      console.log(`💳 Stripe webhooks: http://localhost:${PORT}/webhooks/stripe`);
+    const httpServer = app.listen(PORT, HOST, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`🚀 GraphQL Playground: http://${HOST}:${PORT}/graphql`);
+      console.log(`📁 File upload endpoint: http://${HOST}:${PORT}/api/upload`);
+      console.log(`💚 Health check: http://${HOST}:${PORT}/health`);
+      console.log(`💳 Stripe webhooks: http://${HOST}:${PORT}/webhooks/stripe`);
+      console.log(`🌍 Binding to HOST: ${HOST}, PORT: ${PORT}`);
       
       // Initialize discount manager
       discountManager.init();
@@ -7042,10 +7070,11 @@ async function startServer() {
     // Start basic Express server even if Apollo fails
     const PORT = process.env.PORT || 4000;
     const HOST = '0.0.0.0'; // Required for Railway deployment
-    app.listen(PORT, HOST, () => {
-      console.log(`🚀 Basic server running at http://localhost:${PORT}`);
-      console.log(`💚 Health check: http://localhost:${PORT}/health`);
+    const httpServer = app.listen(PORT, HOST, () => {
+      console.log(`🚀 Basic server running on port ${PORT}`);
+      console.log(`💚 Health check: http://${HOST}:${PORT}/health`);
       console.log('⚠️  GraphQL is not available due to configuration issues');
+      console.log(`🌍 Binding to HOST: ${HOST}, PORT: ${PORT}`);
     });
   }
 }
@@ -7066,8 +7095,10 @@ startServer().catch(error => {
     });
   });
   
-  app.listen(PORT, HOST, () => {
-    console.log(`🚨 Emergency server running at http://localhost:${PORT}`);
+  const emergencyServer = app.listen(PORT, HOST, () => {
+    console.log(`🚨 Emergency server running on port ${PORT}`);
     console.log(`🚨 Apollo GraphQL failed to start - only basic endpoints available`);
+    console.log(`🌍 Binding to HOST: ${HOST}, PORT: ${PORT}`);
+    console.log(`💚 Health check available at: http://${HOST}:${PORT}/health`);
   });
 });

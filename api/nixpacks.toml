@@ -1,5 +1,5 @@
 [start]
-cmd = "node --max-old-space-size=1024 index.js"
+cmd = "node --max-old-space-size=2048 index.js"
 
 [variables]
 NODE_ENV = "production"
