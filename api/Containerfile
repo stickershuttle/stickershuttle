@@ -8,5 +8,5 @@ RUN npm install
 
 COPY . .
 
-EXPOSE 4000
+# Railway will assign PORT via environment variable
 CMD ["node", "index.js"] 

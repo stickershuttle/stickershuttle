@@ -6891,8 +6891,9 @@ async function startServer() {
     );
 
     const PORT = process.env.PORT || 4000;
+    const HOST = '0.0.0.0'; // Required for Railway deployment
     
-    app.listen(PORT, () => {
+    app.listen(PORT, HOST, () => {
       console.log(`🚀 Server running at http://localhost:${PORT}`);
       console.log(`🚀 GraphQL Playground: http://localhost:${PORT}/graphql`);
       console.log(`📁 File upload endpoint: http://localhost:${PORT}/api/upload`);
@@ -6964,7 +6965,8 @@ async function startServer() {
     
     // Start basic Express server even if Apollo fails
     const PORT = process.env.PORT || 4000;
-    app.listen(PORT, () => {
+    const HOST = '0.0.0.0'; // Required for Railway deployment
+    app.listen(PORT, HOST, () => {
       console.log(`🚀 Basic server running at http://localhost:${PORT}`);
       console.log(`💚 Health check: http://localhost:${PORT}/health`);
       console.log('⚠️  GraphQL is not available due to configuration issues');
