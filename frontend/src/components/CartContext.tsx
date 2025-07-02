@@ -45,7 +45,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
               localStorage.removeItem("guest_cart");
             } else if (event === 'SIGNED_IN' && newUser) {
               // User logged in - load their saved cart if any
-              console.log('🔐 User logged in - loading user cart');
+              // console.log('🔐 User logged in - loading user cart');
               const userCartKey = `cart_user_${newUser.id}`;
               const storedUserCart = localStorage.getItem(userCartKey);
               if (storedUserCart) {

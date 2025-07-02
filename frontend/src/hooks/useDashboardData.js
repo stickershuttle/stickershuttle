@@ -4,7 +4,7 @@ import { getSupabase } from '../lib/supabase';
 import { GET_USER_ORDERS, CLAIM_GUEST_ORDERS } from '../lib/order-mutations';
 
 export const useDashboardData = () => {
-  console.log('🚀 DASHBOARD HOOK LOADED - VERSION 2.0'); // Debug to ensure hook is reloaded
+  // console.log('🚀 DASHBOARD HOOK LOADED - VERSION 2.0'); // Debug to ensure hook is reloaded
   
   const [user, setUser] = useState(null);
   const [userLoading, setUserLoading] = useState(true);
@@ -37,17 +37,17 @@ export const useDashboardData = () => {
           const { data: { session } } = await supabase.auth.getSession();
           const currentUser = session?.user || null;
           
-          console.log('🔍 User session check:', {
-            hasSession: !!session,
-            hasUser: !!currentUser,
-            userId: currentUser?.id,
-            userEmail: currentUser?.email
-          });
+          // console.log('🔍 User session check:', {
+          //   hasSession: !!session,
+          //   hasUser: !!currentUser,
+          //   userId: currentUser?.id,
+          //   userEmail: currentUser?.email
+          // });
           
           setUser(currentUser);
 
           if (currentUser) {
-            console.log('🔍 Phase 2: Fetching real orders for user:', currentUser.email);
+            // console.log('🔍 Phase 2: Fetching real orders for user:', currentUser.email);
             
             // Try to claim any guest orders made with this email
             try {

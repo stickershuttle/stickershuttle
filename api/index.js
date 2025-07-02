@@ -250,7 +250,7 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com", "https://checkout.stripe.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://js.stripe.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://js.stripe.com", "https://*.stripe.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       connectSrc: ["'self'", "https://api.stripe.com", "https://checkout.stripe.com"],
       frameSrc: ["'self'", "https://checkout.stripe.com", "https://js.stripe.com"],

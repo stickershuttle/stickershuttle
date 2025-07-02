@@ -74,7 +74,7 @@ const nextConfig = {
               `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com https://app.posthog.com https://fonts.googleapis.com${isDev ? ' https://us-assets.i.posthog.com' : ''}`,
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
               "img-src 'self' data: blob: https: http:",
-              "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com",
+              "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com https://*.stripe.com",
               `connect-src 'self' https: wss: https://api.stripe.com https://app.posthog.com https://api.resend.com https://ss-beyond.up.railway.app https://*.railway.app https://*.supabase.co https://api.cloudinary.com https://res.cloudinary.com https://api.easypost.com${isDev ? ' http://localhost:4000 ws://localhost:4000 ws://localhost:3000' : ''}`,
               "media-src 'self' https: data:",
               "object-src 'none'",

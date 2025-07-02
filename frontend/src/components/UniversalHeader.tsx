@@ -46,7 +46,7 @@ export default function UniversalHeader() {
         authSubscription = supabase.auth.onAuthStateChange(async (event, session) => {
           if (!isMounted) return;
           
-          console.log('🔐 Auth state changed:', event, session?.user?.email);
+          // console.log('🔐 Auth state changed:', event, session?.user?.email);
           
           // Handle different auth events
           switch (event) {
