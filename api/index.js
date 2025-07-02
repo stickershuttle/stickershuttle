@@ -25,6 +25,7 @@ const { json } = require('body-parser');
 const { GraphQLError } = require('graphql');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
+const cors = require('cors');
 
 // Create custom AuthenticationError
 class AuthenticationError extends GraphQLError {
@@ -192,7 +193,51 @@ process.on('unhandledRejection', (reason, promise) => {
   Sentry.captureException(new Error(`Unhandled Rejection: ${reason}`));
 });
 
-// CORS has been removed - API will now accept requests from any origin
+// CORS configuration for both local and production
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      // Local development
+      'http://localhost:3000',
+      'http://localhost:3001',
+      
+      // Production domains
+      'https://stickershuttle.com',
+      'https://www.stickershuttle.com',
+      'https://stickershuttle.vercel.app',
+      
+      // Vercel preview deployments
+      /^https:\/\/stickershuttle-[\w-]+\.vercel\.app$/,
+      /^https:\/\/[\w-]+\.vercel\.app$/
+    ];
+    
+    // Check if origin matches any allowed origin
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (allowed instanceof RegExp) {
+        return allowed.test(origin);
+      }
+      return allowed === origin;
+    });
+    
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.warn('⚠️ CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-client-info', 'apikey'],
+  exposedHeaders: ['Content-Length', 'X-Request-Id'],
+  maxAge: 86400 // 24 hours
+};
+
+// Apply CORS middleware
+app.use(cors(corsOptions));
 
 // Add security headers with Helmet
 app.use(helmet({
