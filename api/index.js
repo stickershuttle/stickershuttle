@@ -1,3 +1,10 @@
+// Immediate startup logging
+console.log('🚀 Starting Sticker Shuttle API...');
+console.log('📍 Current directory:', process.cwd());
+console.log('🌍 Environment:', process.env.NODE_ENV || 'not set');
+console.log('🔌 PORT:', process.env.PORT || 'not set (will use 4000)');
+console.log('🏭 Railway environment:', process.env.RAILWAY_ENVIRONMENT || 'not set');
+
 // Load environment variables - Railway provides them directly
 require('dotenv').config();
 
@@ -111,6 +118,24 @@ console.log('  - EasyPost:', easyPostClient.isReady() ? '✅ Ready' : '❌ Not c
 
 // Initialize Express app
 const app = express();
+console.log('✅ Express app initialized');
+
+// Add immediate health check - before any middleware
+app.get('/health', (req, res) => {
+  console.log('💚 Health check requested (early handler)');
+  res.status(200).send('OK');
+});
+
+// Add a super simple root endpoint
+app.get('/', (req, res) => {
+  res.send('API is running');
+});
+
+// Add request logging middleware
+app.use((req, res, next) => {
+  console.log(`📨 ${new Date().toISOString()} - ${req.method} ${req.path}`);
+  next();
+});
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
@@ -355,9 +380,9 @@ app.post('/webhooks/easypost', express.raw({ type: 'application/json' }), async 
   }
 });
 
-// Add health check before Apollo setup
-app.get('/health', (req, res) => {
-  console.log('💚 Health check requested');
+// Health check with more details (overrides the simple one)
+app.get('/health/detailed', (req, res) => {
+  console.log('💚 Detailed health check requested');
   res.status(200).json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
@@ -392,12 +417,13 @@ app.get('/cors-test', (req, res) => {
   });
 });
 
-// Add a simple test endpoint
-app.get('/', (req, res) => {
+// API info endpoint
+app.get('/info', (req, res) => {
   res.json({ 
     message: 'Sticker Shuttle API is running',
     graphql: '/graphql',
-    health: '/health'
+    health: '/health',
+    detailedHealth: '/health/detailed'
   });
 });
 
@@ -6951,7 +6977,7 @@ const server = new ApolloServer({
   resolvers
 });
 
-// 4. Start server with Express + Apollo
+// 4. Setup Apollo middleware (no longer starts the server)
 async function startServer() {
   try {
     await server.start();
@@ -6993,112 +7019,114 @@ async function startServer() {
       })
     );
 
-    const PORT = process.env.PORT || 4000;
-    const HOST = '0.0.0.0'; // Required for Railway deployment
+    console.log(`🚀 GraphQL endpoint configured at /graphql`);
     
-    const httpServer = app.listen(PORT, HOST, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`🚀 GraphQL Playground: http://${HOST}:${PORT}/graphql`);
-      console.log(`📁 File upload endpoint: http://${HOST}:${PORT}/api/upload`);
-      console.log(`💚 Health check: http://${HOST}:${PORT}/health`);
-      console.log(`💳 Stripe webhooks: http://${HOST}:${PORT}/webhooks/stripe`);
-      console.log(`🌍 Binding to HOST: ${HOST}, PORT: ${PORT}`);
-      
-      // Initialize discount manager
-      discountManager.init();
-      
-      // Check Stripe configuration
-      if (stripeClient.isReady()) {
-        console.log('✅ Stripe payment system is configured');
-      } else {
-        console.log('⚠️  Stripe is not configured - payment features will not work');
-      }
-      
-      // Check Supabase configuration  
-      if (supabaseClient.isReady()) {
-        console.log('✅ Supabase database is configured');
-      } else {
-        console.log('⚠️  Supabase is not configured - order tracking will not work');
-      }
-      
-      // Handle graceful shutdown
-      process.on('SIGTERM', async () => {
-        console.log('🛑 Received SIGTERM, shutting down gracefully');
-        await gracefulShutdown();
-      });
-      
-      process.on('SIGINT', async () => {
-        console.log('🛑 Received SIGINT, shutting down gracefully');
-        await gracefulShutdown();
-      });
-
-      // Graceful shutdown function
-      async function gracefulShutdown() {
-        try {
-          console.log('🧹 Starting graceful shutdown...');
-          
-          // Stop accepting new connections
-          if (server) {
-            console.log('⏹️ Stopping Apollo Server...');
-            await server.stop();
-          }
-
-          // Cleanup discount manager
-          console.log('💰 Cleaning up discount manager...');
-          discountManager.destroy();
-
-          // Cleanup analytics
-          console.log('📊 Cleaning up analytics...');
-          const serverAnalytics = require('./business-analytics');
-          await serverAnalytics.shutdown();
-
-          // Cleanup database connections
-          console.log('🗄️ Cleaning up database connections...');
-          await supabaseClient.cleanup();
-
-          console.log('✅ Graceful shutdown completed');
-          process.exit(0);
-        } catch (error) {
-          console.error('❌ Error during graceful shutdown:', error);
-          process.exit(1);
-        }
-      }
-    });
+    // Initialize discount manager
+    discountManager.init();
+    
+    // Check Stripe configuration
+    if (stripeClient.isReady()) {
+      console.log('✅ Stripe payment system is configured');
+    } else {
+      console.log('⚠️  Stripe is not configured - payment features will not work');
+    }
+    
+    // Check Supabase configuration  
+    if (supabaseClient.isReady()) {
+      console.log('✅ Supabase database is configured');
+    } else {
+      console.log('⚠️  Supabase is not configured - order tracking will not work');
+    }
   } catch (error) {
-    console.error('❌ Failed to start Apollo Server:', error);
-    
-    // Start basic Express server even if Apollo fails
-    const PORT = process.env.PORT || 4000;
-    const HOST = '0.0.0.0'; // Required for Railway deployment
-    const httpServer = app.listen(PORT, HOST, () => {
-      console.log(`🚀 Basic server running on port ${PORT}`);
-      console.log(`💚 Health check: http://${HOST}:${PORT}/health`);
-      console.log('⚠️  GraphQL is not available due to configuration issues');
-      console.log(`🌍 Binding to HOST: ${HOST}, PORT: ${PORT}`);
-    });
+    console.error('❌ Failed to configure Apollo Server:', error);
+    throw error; // Re-throw to be caught by the caller
   }
 }
 
-startServer().catch(error => {
-  console.error('❌ Complete server startup failed:', error);
-  console.error('Stack trace:', error.stack);
+// Start the server immediately with basic endpoints, then add Apollo
+const PORT = process.env.PORT || 4000;
+const HOST = '0.0.0.0';
+
+console.log(`🔧 Starting server on ${HOST}:${PORT}...`);
+
+const httpServer = app.listen(PORT, HOST, () => {
+  console.log(`✅ Server is listening on ${HOST}:${PORT}`);
+  console.log(`💚 Health check: http://${HOST}:${PORT}/health`);
+  console.log(`📍 Root endpoint: http://${HOST}:${PORT}/`);
   
-  // Try to start a basic Express server without Apollo
-  const PORT = process.env.PORT || 4000;
-  const HOST = '0.0.0.0';
-  
-  app.get('/emergency-status', (req, res) => {
-    res.json({
-      status: 'emergency-mode',
-      error: error.message,
-      timestamp: new Date().toISOString()
+  // Now try to start Apollo after the server is already listening
+  startServer().then(() => {
+    console.log('✅ Apollo GraphQL started successfully');
+  }).catch(error => {
+    console.error('❌ Apollo startup failed:', error);
+    console.error('Stack trace:', error.stack);
+    console.log('⚠️ Server is still running with basic endpoints only');
+    
+    app.get('/emergency-status', (req, res) => {
+      res.json({
+        status: 'emergency-mode',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
     });
   });
-  
-  const emergencyServer = app.listen(PORT, HOST, () => {
-    console.log(`🚨 Emergency server running on port ${PORT}`);
-    console.log(`🚨 Apollo GraphQL failed to start - only basic endpoints available`);
-    console.log(`🌍 Binding to HOST: ${HOST}, PORT: ${PORT}`);
-    console.log(`💚 Health check available at: http://${HOST}:${PORT}/health`);
-  });
 });
+
+// Handle graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('🛑 Received SIGTERM, shutting down gracefully');
+  await gracefulShutdown();
+});
+
+process.on('SIGINT', async () => {
+  console.log('🛑 Received SIGINT, shutting down gracefully');
+  await gracefulShutdown();
+});
+
+// Graceful shutdown function
+async function gracefulShutdown() {
+  try {
+    console.log('🧹 Starting graceful shutdown...');
+    
+    // Stop accepting new connections
+    if (httpServer) {
+      console.log('⏹️ Stopping HTTP server...');
+      httpServer.close();
+    }
+    
+    // Stop Apollo if it's running
+    if (server) {
+      console.log('⏹️ Stopping Apollo Server...');
+      await server.stop();
+    }
+
+    // Cleanup discount manager
+    console.log('💰 Cleaning up discount manager...');
+    if (typeof discountManager !== 'undefined' && discountManager.destroy) {
+      discountManager.destroy();
+    }
+
+    // Cleanup analytics
+    console.log('📊 Cleaning up analytics...');
+    try {
+      const serverAnalytics = require('./business-analytics');
+      if (serverAnalytics && serverAnalytics.shutdown) {
+        await serverAnalytics.shutdown();
+      }
+    } catch (e) {
+      console.log('⚠️ Analytics cleanup skipped');
+    }
+
+    // Cleanup database connections
+    console.log('🗄️ Cleaning up database connections...');
+    if (supabaseClient && supabaseClient.cleanup) {
+      await supabaseClient.cleanup();
+    }
+
+    console.log('✅ Graceful shutdown completed');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Error during graceful shutdown:', error);
+    process.exit(1);
+  }
+}
