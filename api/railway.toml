@@ -1,9 +1,8 @@
 [build]
-builder = "DOCKERFILE"
-dockerfilePath = "Containerfile"
+builder = "NIXPACKS"
 
 [deploy]
-startCommand = "node index.js"
+startCommand = "node --max-old-space-size=1024 index.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
