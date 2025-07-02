@@ -135,9 +135,27 @@ app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 
-// Add a super simple root endpoint
+// Add a super simple root endpoint that returns HTML for browser testing
 app.get('/', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'API is running' });
+  res.setHeader('Content-Type', 'text/html');
+  res.status(200).send(`
+    <html>
+      <head><title>Sticker Shuttle API</title></head>
+      <body>
+        <h1>Sticker Shuttle API is running</h1>
+        <p>Status: OK</p>
+        <p>Environment: ${process.env.NODE_ENV || 'not set'}</p>
+        <p>Railway: ${process.env.RAILWAY_ENVIRONMENT || 'not set'}</p>
+        <p>Endpoints:</p>
+        <ul>
+          <li><a href="/health">/health</a> - Health check</li>
+          <li><a href="/test">/test</a> - Test endpoint</li>
+          <li><a href="/cors-test">/cors-test</a> - CORS test</li>
+          <li>/graphql - GraphQL API</li>
+        </ul>
+      </body>
+    </html>
+  `);
 });
 
 // Add a super simple test endpoint that bypasses everything
