@@ -123,17 +123,29 @@ console.log('✅ Express app initialized');
 // Add immediate health check - before any middleware
 app.get('/health', (req, res) => {
   console.log('💚 Health check requested (early handler)');
+  // Set a timeout to ensure response is sent
+  res.setTimeout(5000, () => {
+    console.log('⚠️ Health check timeout!');
+  });
   res.status(200).send('OK');
 });
 
 // Add a super simple root endpoint
 app.get('/', (req, res) => {
-  res.send('API is running');
+  res.status(200).json({ status: 'ok', message: 'API is running' });
 });
 
-// Add request logging middleware
+// Add request logging middleware with response time tracking
 app.use((req, res, next) => {
+  const start = Date.now();
   console.log(`📨 ${new Date().toISOString()} - ${req.method} ${req.path}`);
+  
+  // Log when response is sent
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`✅ Response sent for ${req.method} ${req.path} - ${res.statusCode} in ${duration}ms`);
+  });
+  
   next();
 });
 
@@ -7049,10 +7061,24 @@ const HOST = '0.0.0.0';
 
 console.log(`🔧 Starting server on ${HOST}:${PORT}...`);
 
+// Add a test endpoint that bypasses all middleware
+app.get('/ping', (req, res) => {
+  res.end('pong');
+});
+
 const httpServer = app.listen(PORT, HOST, () => {
   console.log(`✅ Server is listening on ${HOST}:${PORT}`);
   console.log(`💚 Health check: http://${HOST}:${PORT}/health`);
   console.log(`📍 Root endpoint: http://${HOST}:${PORT}/`);
+  console.log(`🏓 Ping endpoint: http://${HOST}:${PORT}/ping`);
+  
+  // Log all Railway environment variables
+  console.log('🚂 Railway Environment Variables:');
+  Object.keys(process.env).forEach(key => {
+    if (key.startsWith('RAILWAY')) {
+      console.log(`  ${key}: ${process.env[key]}`);
+    }
+  });
   
   // Now try to start Apollo after the server is already listening
   startServer().then(() => {

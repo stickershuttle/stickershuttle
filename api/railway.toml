@@ -2,11 +2,6 @@
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "node --max-old-space-size=2048 index.js"
-healthcheckPath = "/health"
-healthcheckTimeout = 300
+startCommand = "node index.js"
 restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 10
-
-[environments.production]
-NODE_ENV = "production" 
+restartPolicyMaxRetries = 10 
