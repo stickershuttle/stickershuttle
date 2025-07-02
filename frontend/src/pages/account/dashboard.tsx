@@ -181,6 +181,7 @@ function Dashboard() {
   const [proofComments, setProofComments] = useState('');
   const [showApprovalConfirm, setShowApprovalConfirm] = useState(false);
   const [highlightComments, setHighlightComments] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, boolean>>({});
   const [actionNotification, setActionNotification] = useState<{
     message: string;
     type: 'success' | 'error' | 'info' | 'warning';
@@ -2402,6 +2403,22 @@ function Dashboard() {
 
     console.log(`🔄 Processing proof action: ${action} for order ${orderId}, proof ${proofId}`);
 
+    // Validation for request_changes - require either comments or uploaded file
+    if (action === 'request_changes') {
+      const hasComments = proofComments.trim().length > 0;
+      const proofKey = `${orderId}-${proofId}`;
+      const hasUploadedFile = uploadedFiles[proofKey];
+      
+      if (!hasComments && !hasUploadedFile) {
+        setActionNotification({ 
+          message: 'Please either add comments describing the changes needed or upload a revised file before requesting changes.', 
+          type: 'error' 
+        });
+        setTimeout(() => setActionNotification(null), 4000);
+        return;
+      }
+    }
+
     try {
       setProofAction(action);
       
@@ -2564,6 +2581,9 @@ function Dashboard() {
       // Mark replacement as sent for this proof
       const proofKey = `${stagedFile.orderId}-${stagedFile.proofId}`;
       setReplacementSent(prev => ({ ...prev, [proofKey]: true }));
+      
+      // Track that a file has been uploaded for this proof
+      setUploadedFiles(prev => ({ ...prev, [proofKey]: true }));
 
       // Clean up staged file
       URL.revokeObjectURL(stagedFile.preview);
@@ -4849,12 +4869,20 @@ function Dashboard() {
                         )}
 
                         {/* Feedback Textarea */}
-                        <textarea
-                          value={proofComments}
-                          onChange={(e) => setProofComments(e.target.value)}
-                          placeholder="Add feedback or notes (optional)..."
-                          className="w-full h-20 p-3 rounded-lg text-white placeholder-gray-400 text-sm resize-none bg-white/5 border border-white/10 focus:border-white/20 focus:outline-none transition-colors"
-                        />
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                            Add feedback or notes
+                          </label>
+                          <textarea
+                            value={proofComments}
+                            onChange={(e) => setProofComments(e.target.value)}
+                            placeholder="Share any feedback about this proof..."
+                            className="w-full h-20 p-3 rounded-lg text-white placeholder-gray-400 text-sm resize-none bg-white/5 border border-white/10 focus:border-white/20 focus:outline-none transition-colors"
+                          />
+                          <p className="text-xs text-gray-400 mt-1">
+                            <span className="text-yellow-400">*</span> When requesting changes, you must provide either written feedback or upload a revised file
+                          </p>
+                        </div>
                       </div>
                     </div>
                   )}

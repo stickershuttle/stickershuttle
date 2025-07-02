@@ -3423,6 +3423,16 @@ const resolvers = {
          throw new Error('Order service is currently unavailable');
        }
        
+       // Validation for request_changes - require either comments or uploaded file
+       if (status === 'changes_requested') {
+         const hasComments = customerNotes && customerNotes.trim().length > 0;
+         // Note: File upload validation would require additional tracking in the database
+         // For now, we'll validate that they have comments when requesting changes
+         if (!hasComments) {
+           throw new Error('Please provide comments describing the changes needed when requesting changes to a proof.');
+         }
+       }
+       
        const client = supabaseClient.getServiceClient();
        
        // Get current order

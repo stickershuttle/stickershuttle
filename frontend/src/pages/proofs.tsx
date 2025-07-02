@@ -116,6 +116,7 @@ export default function ProofsPage() {
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [currentProofId, setCurrentProofId] = useState<string | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, boolean>>({});
 
   // Query for all user orders
   const { data, loading: ordersLoading, refetch } = useQuery(GET_USER_ORDERS_WITH_PROOFS, {
@@ -187,6 +188,17 @@ export default function ProofsPage() {
   const handleProofAction = async (action: 'approve' | 'request_changes', proofId: string) => {
     if (!selectedOrder) return;
 
+    // Validation for request_changes - require either comments or uploaded file
+    if (action === 'request_changes') {
+      const hasComments = customerNotes.trim().length > 0;
+      const hasUploadedFile = uploadedFiles[proofId];
+      
+      if (!hasComments && !hasUploadedFile) {
+        alert('Please either add comments describing the changes needed or upload a revised file before requesting changes.');
+        return;
+      }
+    }
+
     try {
       await updateProofStatus({
         variables: {
@@ -224,6 +236,12 @@ export default function ProofsPage() {
         undefined,
         'customer-files'
       );
+
+      // Track that a file has been uploaded for this proof
+      setUploadedFiles(prev => ({
+        ...prev,
+        [currentProofId]: true
+      }));
 
       // Here you would typically call a mutation to save the customer's revised file
       // For now, we'll just show success
@@ -491,30 +509,42 @@ export default function ProofsPage() {
                       
                       {/* Replace File Button */}
                       {(proof.status === 'pending' || proof.status === 'sent') && (
-                        <div
-                          className="relative group cursor-pointer rounded-xl border-2 border-dashed transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-                          style={{
-                            backgroundColor: 'rgba(59, 130, 246, 0.05)',
-                            borderColor: 'rgba(59, 130, 246, 0.3)',
-                            padding: '16px'
-                          }}
-                          onClick={() => {
-                            setCurrentProofId(proof.id);
-                            setShowFileUpload(true);
-                          }}
-                        >
-                          <div className="flex flex-col items-center text-center">
-                            <div 
-                              className="w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-transform group-hover:scale-110"
-                              style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)' }}
-                            >
-                              <svg className="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                              </svg>
+                        <div className="space-y-3">
+                          <div
+                            className="relative group cursor-pointer rounded-xl border-2 border-dashed transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+                            style={{
+                              backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                              borderColor: 'rgba(59, 130, 246, 0.3)',
+                              padding: '16px'
+                            }}
+                            onClick={() => {
+                              setCurrentProofId(proof.id);
+                              setShowFileUpload(true);
+                            }}
+                          >
+                            <div className="flex flex-col items-center text-center">
+                              <div 
+                                className="w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-transform group-hover:scale-110"
+                                style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)' }}
+                              >
+                                <svg className="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                              </div>
+                              <h3 className="text-white font-semibold mb-1">Replace File</h3>
+                              <p className="text-blue-300 text-sm">Click to upload a new design file</p>
                             </div>
-                            <h3 className="text-white font-semibold mb-1">Replace File</h3>
-                            <p className="text-blue-300 text-sm">Click to upload a new design file</p>
                           </div>
+                          
+                          {/* File Upload Status */}
+                          {uploadedFiles[proof.id] && (
+                            <div className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: 'rgba(34, 197, 94, 0.1)' }}>
+                              <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              <span className="text-sm text-green-300">Revised file uploaded</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -660,7 +690,7 @@ export default function ProofsPage() {
                           {/* Notes Input */}
                           <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Add feedback or notes (optional)
+                              Add feedback or notes
                             </label>
                             <textarea
                               value={customerNotes}
@@ -673,6 +703,9 @@ export default function ProofsPage() {
                               placeholder="Share any feedback about this proof..."
                               rows={4}
                             />
+                            <p className="text-xs text-gray-400 mt-1">
+                              <span className="text-yellow-400">*</span> When requesting changes, you must provide either written feedback or upload a revised file
+                            </p>
                           </div>
 
                           {/* Action Buttons - Calculator Style */}
