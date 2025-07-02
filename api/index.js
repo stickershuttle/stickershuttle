@@ -456,16 +456,7 @@ app.use((error, req, res, next) => {
   });
 });
 
-// Catch-all route for debugging
-app.use('*', (req, res) => {
-  console.log(`⚠️ Unhandled route: ${req.method} ${req.originalUrl}`);
-  res.status(404).json({
-    error: 'Not found',
-    path: req.originalUrl,
-    method: req.method,
-    timestamp: new Date().toISOString()
-  });
-});
+
 
 // 1. Schema
 const typeDefs = gql`
@@ -6998,6 +6989,17 @@ const httpServer = app.listen(PORT, HOST, () => {
   // Now try to start Apollo after the server is already listening
   startServer().then(() => {
     console.log('✅ Apollo GraphQL started successfully');
+    
+    // Add catch-all route AFTER all other routes are defined
+    app.use('*', (req, res) => {
+      console.log(`⚠️ Unhandled route: ${req.method} ${req.originalUrl}`);
+      res.status(404).json({
+        error: 'Not found',
+        path: req.originalUrl,
+        method: req.method,
+        timestamp: new Date().toISOString()
+      });
+    });
   }).catch(error => {
     console.error('❌ Apollo startup failed:', error);
     console.error('Stack trace:', error.stack);
