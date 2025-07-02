@@ -1,9 +1,10 @@
 [build]
 builder = "NIXPACKS"
+buildCommand = "cd api && npm ci"
 
 [deploy]
 # TEMPORARY: Using debug server to diagnose Railway issues
-startCommand = "node debug-server.js"
-# Original: startCommand = "node --max-old-space-size=2048 index.js"
+startCommand = "cd api && node debug-server.js"
+# Original: startCommand = "cd api && node --max-old-space-size=2048 index.js"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10 
