@@ -3232,22 +3232,37 @@ export default function AdminOrders() {
 
                     {/* Shipping Address */}
                     {selectedOrder.shippingAddress && (
-                      <div className="glass-container p-6">
-                        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                          <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <div className={`glass-container p-6 ${selectedOrder.is_blind_shipment ? 'border-2 border-blue-400 bg-blue-500/10' : ''}`}>
+                        {/* Blind Shipping Notice */}
+                        {selectedOrder.is_blind_shipment && (
+                          <div className="mb-4 p-3 rounded-lg border border-blue-400 bg-blue-500/20">
+                            <div className="flex items-center gap-2 text-blue-300">
+                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.16 6.16a5 5 0 017.68 7.68l-7.68-7.68zM6.16 13.16a5 5 0 007.68 7.68l-7.68-7.68zM6.16 6.16L13.84 13.84" />
+                              </svg>
+                              <span className="font-semibold text-sm">🚚 This order requested Blind Shipping!</span>
+                            </div>
+                            <p className="text-xs text-blue-200 mt-1">
+                              Do not include any Sticker Shuttle branding on the package or shipping label
+                            </p>
+                          </div>
+                        )}
+                        
+                        <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${selectedOrder.is_blind_shipment ? 'text-blue-200' : 'text-white'}`}>
+                          <svg className={`w-5 h-5 ${selectedOrder.is_blind_shipment ? 'text-blue-400' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                           </svg>
-                          Shipping Address
+                          {selectedOrder.is_blind_shipment ? 'Shipping Address (BLIND SHIPPING)' : 'Shipping Address'}
                         </h3>
-                        <div className="text-sm text-gray-300 space-y-1">
+                        <div className={`text-sm space-y-1 ${selectedOrder.is_blind_shipment ? 'text-blue-100' : 'text-gray-300'}`}>
                           {(selectedOrder.shippingAddress.first_name || selectedOrder.shippingAddress.last_name) && (
-                            <p className="font-medium text-white">
+                            <p className={`font-medium ${selectedOrder.is_blind_shipment ? 'text-blue-200' : 'text-white'}`}>
                               {selectedOrder.shippingAddress.first_name} {selectedOrder.shippingAddress.last_name}
                             </p>
                           )}
                           {selectedOrder.shippingAddress.company && (
-                            <p className="text-gray-300">{selectedOrder.shippingAddress.company}</p>
+                            <p className={selectedOrder.is_blind_shipment ? 'text-blue-200' : 'text-gray-300'}>{selectedOrder.shippingAddress.company}</p>
                           )}
                           {(selectedOrder.shippingAddress.address1 || selectedOrder.shippingAddress.line1) && (
                             <p>{selectedOrder.shippingAddress.address1 || selectedOrder.shippingAddress.line1}</p>
