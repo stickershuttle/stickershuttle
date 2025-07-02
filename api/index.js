@@ -123,6 +123,11 @@ console.log('✅ Express app initialized');
 // Add immediate health check - before any middleware
 app.get('/health', (req, res) => {
   console.log('💚 Health check requested (early handler)');
+  
+  // Set permissive CORS for health check
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  
   // Set a timeout to ensure response is sent
   res.setTimeout(5000, () => {
     console.log('⚠️ Health check timeout!');
@@ -137,6 +142,10 @@ app.get('/', (req, res) => {
 
 // Add a super simple test endpoint that bypasses everything
 app.get('/test', (req, res) => {
+  // Set permissive CORS for test endpoint
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  
   res.status(200).json({ 
     status: 'alive',
     time: new Date().toISOString(),
@@ -186,6 +195,7 @@ const corsConfig = {
 
     // Add development origins only in non-production environments
     const isDevelopment = process.env.NODE_ENV !== 'production';
+    console.log(`🔍 CORS Origins - NODE_ENV: ${process.env.NODE_ENV}, isDevelopment: ${isDevelopment}`);
     const developmentOrigins = isDevelopment ? [
       'http://localhost:3000',
       'http://localhost:3001', 
@@ -216,6 +226,13 @@ const corsConfig = {
     // Check exact match first
     if (allowedOrigins.includes(origin)) {
       console.log(`✅ CORS: Exact match allowed - ${origin}`);
+      return callback(null, true);
+    }
+    
+    // Check for Vercel preview deployments
+    if (/^https:\/\/([\w-]+\.)?vercel\.app$/.test(origin) || 
+        /^https:\/\/stickershuttle-[\w-]+\.vercel\.app$/.test(origin)) {
+      console.log(`✅ CORS: Vercel deployment allowed - ${origin}`);
       return callback(null, true);
     }
 
@@ -272,6 +289,11 @@ app.use((req, res, next) => {
   const origin = req.headers.origin;
   const allowedOrigins = corsConfig.getOrigins();
   
+  // Log CORS debugging info
+  if (req.path === '/graphql') {
+    console.log(`🔍 GraphQL CORS Check - Origin: ${origin}, Method: ${req.method}`);
+  }
+  
   // If origin is allowed, ensure headers are set
   if (origin && allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
@@ -279,6 +301,12 @@ app.use((req, res, next) => {
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, X-HTTP-Method-Override, apollo-require-preflight');
   }
+  
+  // Handle OPTIONS preflight
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  
   next();
 });
 
@@ -508,30 +536,7 @@ app.get('/easypost/status', (req, res) => {
   res.json(diagnostics);
 });
 
-// Special CORS handling for GraphQL endpoint
-app.use('/graphql', (req, res, next) => {
-  const origin = req.headers.origin;
-  const allowedOrigins = corsConfig.getOrigins();
-  
-  console.log(`🚀 GraphQL Request - Method: ${req.method}, Origin: ${origin || 'no-origin'}`);
-  
-  // Always set CORS headers for allowed origins on GraphQL endpoint
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, apollo-require-preflight');
-    res.setHeader('Access-Control-Max-Age', '86400');
-  }
-  
-  // Handle preflight requests immediately
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(204);
-    return;
-  }
-  
-  next();
-});
+
 
 // Add Sentry error handler middleware (temporarily commented out)
 // app.use(Sentry.Handlers.errorHandler());
@@ -539,6 +544,17 @@ app.use('/graphql', (req, res, next) => {
 // Add custom error handler for non-Sentry errors
 app.use((error, req, res, next) => {
   console.error('❌ Unhandled error:', error);
+  
+  // Ensure CORS headers are set even on errors
+  const origin = req.headers.origin;
+  const allowedOrigins = corsConfig.getOrigins();
+  
+  if (origin && (allowedOrigins.includes(origin) || 
+      /^https:\/\/([\w-]+\.)?vercel\.app$/.test(origin) || 
+      /^https:\/\/stickershuttle-[\w-]+\.vercel\.app$/.test(origin))) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
   
   // Capture error in Sentry
   Sentry.captureException(error);
@@ -7003,11 +7019,30 @@ const server = new ApolloServer({
 async function startServer() {
   try {
     await server.start();
+    
+    // Ensure GraphQL endpoint has proper CORS
+    app.use('/graphql', (req, res, next) => {
+      const origin = req.headers.origin || req.headers.referer;
+      
+      // For GraphQL, be more permissive with CORS
+      if (origin) {
+        res.header('Access-Control-Allow-Origin', origin);
+        res.header('Access-Control-Allow-Credentials', 'true');
+        res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, apollo-require-preflight');
+      }
+      
+      // Handle OPTIONS
+      if (req.method === 'OPTIONS') {
+        return res.sendStatus(204);
+      }
+      
+      next();
+    });
 
     // Apply Apollo middleware with context function
     app.use(
       '/graphql',
-      cors(corsConfig), // Use the same CORS configuration
       json({ limit: '50mb' }),
       expressMiddleware(server, {
         context: async ({ req }) => {
