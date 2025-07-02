@@ -1,6 +1,4 @@
-require('dotenv').config({ path: '../.env.local' });
-require('dotenv').config({ path: './.env.local' });
-require('dotenv').config({ path: './.env' });
+// Load environment variables - Railway provides them directly
 require('dotenv').config();
 
 // Initialize Sentry error monitoring (must be first)
