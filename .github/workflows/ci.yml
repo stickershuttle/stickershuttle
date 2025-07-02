@@ -34,19 +34,5 @@ jobs:
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
 
-  deploy-backend:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./api
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Deploy to Railway
-      uses: bervProject/railway-deploy@main
-      env:
-        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      with:
-        service: "stickershuttle"
+  # Backend deployment handled by Railway's GitHub integration
+  # deploy-backend job removed to prevent duplicate deployments
