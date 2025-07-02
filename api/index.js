@@ -4263,7 +4263,7 @@ const resolvers = {
         let checkoutSession = null;
         let customerOrder = null;
         let actualCreditsApplied = 0;
-        let remainingCredits = 0;
+        let remainingCredits = 0; // Initialize to 0
         let creditDeductionId = null; // Track the credit transaction for potential reversal
         
         // Helper function to safely parse numbers and handle NaN
@@ -4286,11 +4286,14 @@ const resolvers = {
             console.log('💳 Processing credit application for user:', input.userId);
             
             const creditHandlers = require('./credit-handlers');
-            const currentBalance = await creditHandlers.getUserCreditBalance(input.userId);
+            const userCreditData = await creditHandlers.getUserCreditBalance(input.userId);
+            const currentBalance = safeParseFloat(userCreditData?.balance, 0);
             
-            // Calculate how much credit can be applied
-            const afterDiscountTotal = cartSubtotal - discountAmount;
-            const maxCreditsToApply = Math.min(creditsToApply, currentBalance, afterDiscountTotal);
+            // Calculate how much credit can be applied - ensure all values are safe
+            const safeCartSubtotal = safeParseFloat(cartSubtotal, 0);
+            const safeDiscountAmount = safeParseFloat(discountAmount, 0);
+            const afterDiscountTotal = safeCartSubtotal - safeDiscountAmount;
+            const maxCreditsToApply = Math.min(safeParseFloat(creditsToApply, 0), currentBalance, afterDiscountTotal);
             
             if (maxCreditsToApply > 0) {
               console.log('💳 Deducting credits immediately before payment...');
@@ -4306,7 +4309,7 @@ const resolvers = {
               
               if (creditResult.success) {
                 actualCreditsApplied = maxCreditsToApply;
-                remainingCredits = creditResult.remainingBalance;
+                remainingCredits = safeParseFloat(creditResult.remainingBalance, 0);
                 creditDeductionId = creditResult.transactionId;
                 
                 console.log('✅ Credits deducted successfully at checkout time');
@@ -4317,10 +4320,10 @@ const resolvers = {
                 console.error('❌ Failed to deduct credits:', creditResult.error);
                 errors.push(`Credit deduction failed: ${creditResult.error}`);
                 actualCreditsApplied = 0;
-                remainingCredits = currentBalance;
+                remainingCredits = safeParseFloat(currentBalance, 0);
               }
             } else {
-              remainingCredits = currentBalance;
+              remainingCredits = safeParseFloat(currentBalance, 0);
               console.log('⚠️ No credits to apply (insufficient balance or amount)');
             }
             
@@ -4335,6 +4338,32 @@ const resolvers = {
             console.error('❌ Critical error processing credits:', creditError);
             errors.push(`Credit system error: ${creditError.message}`);
             actualCreditsApplied = 0;
+            
+            // Try to get current balance as fallback
+            try {
+              const creditHandlers = require('./credit-handlers');
+              const userCreditData = await creditHandlers.getUserCreditBalance(input.userId);
+              remainingCredits = safeParseFloat(userCreditData?.balance, 0);
+            } catch (fallbackError) {
+              console.error('⚠️ Failed to get fallback balance:', fallbackError);
+              remainingCredits = 0;
+            }
+          }
+        } else {
+          // No credits being applied, but get current balance for logged in users
+          if (input.userId && input.userId !== 'guest') {
+            try {
+              const creditHandlers = require('./credit-handlers');
+              const userCreditData = await creditHandlers.getUserCreditBalance(input.userId);
+              remainingCredits = safeParseFloat(userCreditData?.balance, 0);
+              console.log('💳 User current balance (no credits applied):', remainingCredits);
+            } catch (balanceError) {
+              console.error('⚠️ Error getting user balance:', balanceError);
+              remainingCredits = 0;
+            }
+          } else {
+            // Guest user or no user - no credits available
+            remainingCredits = 0;
           }
         }
 
@@ -4594,8 +4623,8 @@ const resolvers = {
             ? 'Checkout session created successfully'
             : 'Order created with some issues',
           errors: errors.length > 0 ? errors : null,
-          creditsApplied: actualCreditsApplied,
-          remainingCredits: remainingCredits - actualCreditsApplied
+          creditsApplied: safeParseFloat(actualCreditsApplied, 0),
+          remainingCredits: safeParseFloat(remainingCredits, 0)
         };
       } catch (error) {
         console.error('❌ Stripe cart order processing failed:', error);

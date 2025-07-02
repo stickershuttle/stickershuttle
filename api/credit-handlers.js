@@ -15,6 +15,12 @@ const getUserCreditBalance = async (userId) => {
     
     if (error) throw error;
     
+    // Ensure balance is always a valid number
+    let balance = 0;
+    if (data !== null && data !== undefined && !isNaN(parseFloat(data))) {
+      balance = parseFloat(data);
+    }
+    
     // Also get transaction count and last transaction date
     const { data: stats, error: statsError } = await client
       .from('user_credit_balance')
@@ -22,14 +28,27 @@ const getUserCreditBalance = async (userId) => {
       .eq('user_id', userId)
       .single();
     
+    // If the RPC call fails, try to get balance from the view table
+    if (balance === 0 && stats?.total_credits) {
+      const totalCredits = parseFloat(stats.total_credits);
+      if (!isNaN(totalCredits)) {
+        balance = totalCredits;
+      }
+    }
+    
     return {
-      balance: data || 0,
+      balance: balance,
       transactionCount: stats?.transaction_count || 0,
       lastTransactionDate: stats?.last_transaction_date || null
     };
   } catch (error) {
     console.error('Error getting user credit balance:', error);
-    throw error;
+    // Return safe defaults instead of throwing
+    return {
+      balance: 0,
+      transactionCount: 0,
+      lastTransactionDate: null
+    };
   }
 };
 
@@ -316,24 +335,172 @@ const getUserCreditHistory = async (userId) => {
 const applyCreditsToOrder = async (orderId, amount, userId) => {
   try {
     const client = supabase.getServiceClient();
+    const safeAmount = parseFloat(amount) || 0;
+    
     const { data, error } = await client
       .rpc('use_credits_for_order', {
         p_user_id: userId,
         p_order_id: orderId,
-        p_amount: amount
+        p_amount: safeAmount
       });
     
     if (error) throw error;
     
     // Get remaining balance
     const balance = await getUserCreditBalance(userId);
+    const safeBalance = parseFloat(balance.balance) || 0;
     
     return {
       success: true,
-      remainingBalance: balance.balance
+      remainingBalance: safeBalance
     };
   } catch (error) {
     console.error('Error applying credits to order:', error);
+    // Try to get current balance for fallback
+    try {
+      const fallbackBalance = await getUserCreditBalance(userId);
+      return {
+        success: false,
+        error: error.message,
+        remainingBalance: parseFloat(fallbackBalance.balance) || 0
+      };
+    } catch (fallbackError) {
+      return {
+        success: false,
+        error: error.message,
+        remainingBalance: 0
+      };
+    }
+  }
+};
+
+// Deduct credits from user (for order processing)
+const deductUserCredits = async ({ userId, amount, reason, orderId, transactionType }) => {
+  try {
+    const client = supabase.getServiceClient();
+    
+    // Get current balance first
+    const currentBalance = await getUserCreditBalance(userId);
+    const safeCurrentBalance = parseFloat(currentBalance.balance) || 0;
+    const safeAmount = parseFloat(amount) || 0;
+    
+    if (safeCurrentBalance < safeAmount) {
+      return {
+        success: false,
+        error: 'Insufficient credit balance',
+        remainingBalance: safeCurrentBalance
+      };
+    }
+    
+    const { data, error } = await client
+      .rpc('use_credits_for_order', {
+        p_user_id: userId,
+        p_order_id: orderId,
+        p_amount: safeAmount,
+        p_reason: reason || 'Credits applied to order',
+        p_transaction_type: transactionType || 'deduction'
+      });
+    
+    if (error) throw error;
+    
+    // Get updated balance
+    const updatedBalance = await getUserCreditBalance(userId);
+    const safeUpdatedBalance = parseFloat(updatedBalance.balance) || 0;
+    
+    return {
+      success: true,
+      transactionId: data?.id || null,
+      remainingBalance: safeUpdatedBalance,
+      deductedAmount: safeAmount
+    };
+  } catch (error) {
+    console.error('Error deducting user credits:', error);
+    // Get current balance for fallback
+    try {
+      const fallbackBalance = await getUserCreditBalance(userId);
+      return {
+        success: false,
+        error: error.message,
+        remainingBalance: parseFloat(fallbackBalance.balance) || 0
+      };
+    } catch (fallbackError) {
+      return {
+        success: false,
+        error: error.message,
+        remainingBalance: 0
+      };
+    }
+  }
+};
+
+// Reverse a credit transaction (for failed orders)
+const reverseTransaction = async (transactionId, reason) => {
+  try {
+    const client = supabase.getServiceClient();
+    
+    const { data, error } = await client
+      .rpc('reverse_credit_transaction', {
+        p_transaction_id: transactionId,
+        p_reason: reason || 'Transaction reversed'
+      });
+    
+    if (error) throw error;
+    
+    return {
+      success: true,
+      reversedAmount: data?.amount || 0
+    };
+  } catch (error) {
+    console.error('Error reversing credit transaction:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+// Confirm a credit transaction (for successful payments)
+const confirmTransaction = async (transactionId, orderId, reason) => {
+  try {
+    const client = supabase.getServiceClient();
+    
+    const { data, error } = await client
+      .rpc('confirm_credit_transaction', {
+        p_transaction_id: transactionId,
+        p_order_id: orderId,
+        p_reason: reason || 'Payment confirmed'
+      });
+    
+    if (error) throw error;
+    
+    return {
+      success: true,
+      confirmedAmount: data?.amount || 0
+    };
+  } catch (error) {
+    console.error('Error confirming credit transaction:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+// Update transaction with order ID
+const updateTransactionOrderId = async (transactionId, orderId) => {
+  try {
+    const client = supabase.getServiceClient();
+    
+    const { error } = await client
+      .from('credits')
+      .update({ order_id: orderId })
+      .eq('id', transactionId);
+    
+    if (error) throw error;
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating transaction order ID:', error);
     return {
       success: false,
       error: error.message
@@ -403,5 +570,9 @@ module.exports = {
   getAllCreditTransactions,
   getUserCreditHistory,
   applyCreditsToOrder,
+  deductUserCredits,
+  reverseTransaction,
+  confirmTransaction,
+  updateTransactionOrderId,
   earnPointsFromPurchase
 }; 

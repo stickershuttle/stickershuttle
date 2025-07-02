@@ -888,9 +888,20 @@ export default function CartPage() {
   // Calculate discount amount
   const discountAmount = appliedDiscount ? appliedDiscount.amount : 0;
   
-  // Calculate final total with all discounts and credits
-  const afterDiscounts = subtotal - reorderDiscount - discountAmount;
-  const finalTotal = Math.max(0, afterDiscounts - creditToApply);
+  // Helper function to safely parse numbers and handle NaN
+  const safeParseFloat = (value: any, fallback = 0): number => {
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? fallback : parsed;
+  };
+
+  // Calculate final total with all discounts and credits - ensure no NaN values
+  const safeSubtotal = safeParseFloat(subtotal, 0);
+  const safeReorderDiscount = safeParseFloat(reorderDiscount, 0);
+  const safeDiscountAmount = safeParseFloat(discountAmount, 0);
+  const safeCreditToApply = safeParseFloat(creditToApply, 0);
+  
+  const afterDiscounts = safeSubtotal - safeReorderDiscount - safeDiscountAmount;
+  const finalTotal = Math.max(0, afterDiscounts - safeCreditToApply);
 
   // Calculate rush order breakdown
   const rushOrderBreakdown = updatedCart.reduce((acc, item) => {
@@ -1921,17 +1932,23 @@ export default function CartPage() {
                           <input
                             type="number"
                             min="0"
-                            max={Math.min(userCredits, afterDiscounts)}
-                            value={creditToApply}
+                            max={Math.min(safeParseFloat(userCredits, 0), safeParseFloat(afterDiscounts, 0))}
+                            value={safeParseFloat(creditToApply, 0)}
                             onChange={(e) => {
-                              const value = parseFloat(e.target.value) || 0;
-                              setCreditToApply(Math.min(value, userCredits, afterDiscounts));
+                              const value = safeParseFloat(e.target.value, 0);
+                              const safeUserCredits = safeParseFloat(userCredits, 0);
+                              const safeAfterDiscounts = safeParseFloat(afterDiscounts, 0);
+                              setCreditToApply(Math.min(value, safeUserCredits, safeAfterDiscounts));
                             }}
                             className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/50 focus:outline-none focus:border-yellow-400 focus:bg-white/10 transition-all store-credit-input"
                             placeholder="Enter amount"
                           />
                           <button
-                            onClick={() => setCreditToApply(Math.min(userCredits, afterDiscounts))}
+                            onClick={() => {
+                              const safeUserCredits = safeParseFloat(userCredits, 0);
+                              const safeAfterDiscounts = safeParseFloat(afterDiscounts, 0);
+                              setCreditToApply(Math.min(safeUserCredits, safeAfterDiscounts));
+                            }}
                             className="px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105"
                             style={{
                               background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.5) 0%, rgba(250, 204, 21, 0.35) 50%, rgba(255, 193, 7, 0.2) 100%)',
@@ -2272,7 +2289,7 @@ export default function CartPage() {
                           totalPrice: item.customization.isReorder ? item.totalPrice * 0.9 : item.totalPrice
                         }))}
                         className="cart-checkout-button-trigger"
-                        creditsToApply={creditToApply}
+                        creditsToApply={safeParseFloat(creditToApply, 0)}
                         discountCode={appliedDiscount?.code}
                         guestCheckoutData={!user ? { firstName: guestCheckoutData.firstName, lastName: guestCheckoutData.lastName, email: guestCheckoutData.email } : undefined}
                         onCheckoutStart={() => {
