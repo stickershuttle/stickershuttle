@@ -4410,7 +4410,7 @@ const resolvers = {
         if (stripeClient.isReady() && errors.length === 0) {
           try {
             console.log('🔍 Stripe client is ready, creating checkout session...');
-            const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            const baseUrl = process.env.FRONTEND_URL || 'https://stickershuttle.com';
             
             // Calculate final cart total (credits already calculated in Step 1)
             const cartTotal = cartSubtotal - discountAmount - actualCreditsApplied;

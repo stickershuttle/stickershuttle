@@ -15,18 +15,13 @@ const getApiUrl = () => {
     return process.env.NEXT_PUBLIC_API_URL;
   }
   
-  // TEMPORARY FIX: Always use localhost for now until Railway is configured
-  // This means you need to run your API locally: cd api && npm run dev
-  return 'http://localhost:4000';
+  // If in development mode, use localhost
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:4000';
+  }
   
-  // Original logic (commented out until Railway is fixed):
-  // // If in development mode, use localhost
-  // if (process.env.NODE_ENV === 'development') {
-  //   return 'http://localhost:4000';
-  // }
-  // 
-  // // Otherwise use production URL
-  // return PRODUCTION_API_URL;
+  // Otherwise use production URL (your Railway backend)
+  return PRODUCTION_API_URL;
 };
 
 const httpLink = createHttpLink({
