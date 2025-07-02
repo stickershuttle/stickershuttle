@@ -1,4 +1,4 @@
-# api/Containerfile
+# api/Containerfile - TEMPORARY MINIMAL TEST
 FROM node:18-alpine
 
 WORKDIR /app
@@ -9,4 +9,4 @@ RUN npm install
 COPY . .
 
 # Railway will assign PORT via environment variable
-CMD ["node", "index.js"] 
+CMD ["node", "minimal-test.js"] 
