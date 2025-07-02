@@ -21,7 +21,6 @@ const { ApolloServer } = require('@apollo/server');
 const { expressMiddleware } = require('@apollo/server/express4');
 const gql = require('graphql-tag');
 const express = require('express');
-const cors = require('cors');
 const { json } = require('body-parser');
 const { GraphQLError } = require('graphql');
 const rateLimit = require('express-rate-limit');
@@ -101,10 +100,6 @@ console.log('✅ Express app initialized');
 app.get('/health', (req, res) => {
   console.log('💚 Health check requested (early handler)');
   
-  // Set permissive CORS for health check
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  
   // Set a timeout to ensure response is sent
   res.setTimeout(5000, () => {
     console.log('⚠️ Health check timeout!');
@@ -127,7 +122,6 @@ app.get('/', (req, res) => {
         <ul>
           <li><a href="/health">/health</a> - Health check</li>
           <li><a href="/test">/test</a> - Test endpoint</li>
-          <li><a href="/cors-test">/cors-test</a> - CORS test</li>
           <li>/graphql - GraphQL API</li>
         </ul>
       </body>
@@ -137,10 +131,6 @@ app.get('/', (req, res) => {
 
 // Add a super simple test endpoint that bypasses everything
 app.get('/test', (req, res) => {
-  // Set permissive CORS for test endpoint
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  
   res.status(200).json({ 
     status: 'alive',
     time: new Date().toISOString(),
@@ -202,25 +192,9 @@ process.on('unhandledRejection', (reason, promise) => {
   Sentry.captureException(new Error(`Unhandled Rejection: ${reason}`));
 });
 
-// Enhanced CORS configuration with proper security and development support
-const corsConfig = {
-  // Temporarily allow all origins to diagnose the issue
-  origin: '*',
-  credentials: true,
-  allowedHeaders: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
-  maxAge: 86400
-};
+// CORS has been removed - API will now accept requests from any origin
 
-// Apply CORS with enhanced configuration
-app.use(cors(corsConfig));
-
-// Explicitly handle OPTIONS requests for all routes
-app.options('*', cors(corsConfig));
-
-// Add security headers with Helmet (but don't override CORS)
+// Add security headers with Helmet
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -237,11 +211,7 @@ app.use(helmet({
     maxAge: 31536000,
     includeSubDomains: true,
     preload: true
-  },
-  // Don't let Helmet override CORS headers
-  crossOriginResourcePolicy: false,
-  crossOriginOpenerPolicy: false,
-  crossOriginEmbedderPolicy: false
+  }
 }));
 
 // Rate limiting configuration
@@ -351,22 +321,7 @@ app.get('/health/detailed', (req, res) => {
   });
 });
 
-// Add CORS diagnostic endpoint
-app.get('/cors-test', (req, res) => {
-  const origin = req.headers.origin || 'No origin header';
-  const headers = res.getHeaders();
-  
-  res.json({
-    message: 'CORS test endpoint',
-    requestOrigin: origin,
-    isOriginAllowed: 'All origins allowed (*)',
-    corsConfig: 'origin: *',
-    environment: process.env.NODE_ENV || 'development',
-    corsHeaders: headers,
-    nodeEnv: process.env.NODE_ENV,
-    railwayEnv: process.env.RAILWAY_ENVIRONMENT
-  });
-});
+
 
 // API info endpoint
 app.get('/info', (req, res) => {
@@ -445,17 +400,6 @@ app.get('/easypost/status', (req, res) => {
 // Add custom error handler for non-Sentry errors
 app.use((error, req, res, next) => {
   console.error('❌ Unhandled error:', error);
-  
-  // Ensure CORS headers are set even on errors
-  const origin = req.headers.origin;
-  const allowedOrigins = corsConfig.getOrigins();
-  
-  if (origin && (allowedOrigins.includes(origin) || 
-      /^https:\/\/([\w-]+\.)?vercel\.app$/.test(origin) || 
-      /^https:\/\/stickershuttle-[\w-]+\.vercel\.app$/.test(origin))) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Credentials', 'true');
-  }
   
   // Capture error in Sentry
   Sentry.captureException(error);

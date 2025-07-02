@@ -1,10 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+// CORS headers removed
 
 interface DatabaseChange {
   type: 'INSERT' | 'UPDATE' | 'DELETE'
@@ -28,7 +25,7 @@ interface NotificationPayload {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok')
   }
 
   try {
@@ -53,7 +50,7 @@ serve(async (req) => {
         record.financial_status === old_record?.financial_status) {
       console.log('⏭️ No status change detected, skipping notification')
       return new Response(JSON.stringify({ message: 'No status change' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         status: 200,
       })
     }
@@ -63,7 +60,7 @@ serve(async (req) => {
     if (skipStatuses.includes(record.order_status)) {
       console.log('⏭️ Skipping notification for status:', record.order_status)
       return new Response(JSON.stringify({ message: 'Status notification skipped' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         status: 200,
       })
     }
