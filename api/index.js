@@ -184,98 +184,14 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Enhanced CORS configuration with proper security and development support
 const corsConfig = {
-  // Define allowed origins with environment-specific logic
-  getOrigins() {
-    const baseOrigins = [
-      'https://stickershuttle.com',
-      'https://www.stickershuttle.com',
-      'https://stickershuttle.vercel.app',
-      'https://stickershuttle-production.up.railway.app' // Add Railway URL just in case
-    ];
-
-    // Add development origins only in non-production environments
-    const isDevelopment = process.env.NODE_ENV !== 'production';
-    console.log(`🔍 CORS Origins - NODE_ENV: ${process.env.NODE_ENV}, isDevelopment: ${isDevelopment}`);
-    const developmentOrigins = isDevelopment ? [
-      'http://localhost:3000',
-      'http://localhost:3001', 
-      'http://localhost:3002',
-      'http://127.0.0.1:3000',
-      'https://localhost:3000',
-      'https://studio.apollographql.com',
-      'http://localhost:4000' // Backend dev server
-    ] : [];
-
-    return [...baseOrigins, ...developmentOrigins];
-  },
-
-  // Origin validation with better security
-  origin: function (origin, callback) {
-    const allowedOrigins = corsConfig.getOrigins();
-    const isDevelopment = process.env.NODE_ENV !== 'production';
-    
-    // Log the request for debugging
-    console.log(`🔍 CORS Check - Origin: ${origin || 'no-origin'}, ENV: ${process.env.NODE_ENV || 'undefined'}`);
-    
-    // Allow requests with no origin (mobile apps, curl, Postman)
-    if (!origin) {
-      console.log('✅ CORS: No origin header (mobile/native app) - allowed');
-      return callback(null, true);
-    }
-
-    // Check exact match first
-    if (allowedOrigins.includes(origin)) {
-      console.log(`✅ CORS: Exact match allowed - ${origin}`);
-      return callback(null, true);
-    }
-    
-    // Check for Vercel preview deployments
-    if (/^https:\/\/([\w-]+\.)?vercel\.app$/.test(origin) || 
-        /^https:\/\/stickershuttle-[\w-]+\.vercel\.app$/.test(origin)) {
-      console.log(`✅ CORS: Vercel deployment allowed - ${origin}`);
-      return callback(null, true);
-    }
-
-    // In development, be more flexible with localhost variations
-    if (isDevelopment) {
-      const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|0\.0\.0\.0)(:\d+)?$/.test(origin);
-      if (isLocalhost) {
-        console.log(`✅ CORS: Development localhost allowed - ${origin}`);
-        return callback(null, true);
-      }
-    }
-
-    // Reject all other origins
-    console.error(`🚫 CORS: Blocked origin - ${origin} (ENV: ${process.env.NODE_ENV || 'undefined'})`);
-    console.error(`🔍 CORS: Allowed origins:`, allowedOrigins);
-    // Important: Return false instead of error to properly handle CORS rejection
-    callback(null, false);
-  },
-
-  // Enhanced credentials and headers configuration
+  // Temporarily allow all origins to diagnose the issue
+  origin: '*',
   credentials: true,
-  
-  // Allow common headers
-  allowedHeaders: [
-    'Origin',
-    'X-Requested-With', 
-    'Content-Type',
-    'Accept',
-    'Authorization',
-    'Cache-Control',
-    'X-HTTP-Method-Override',
-    'apollo-require-preflight'
-  ],
-  
-  // Allow common methods
+  allowedHeaders: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  
-  // Enable preflight for all routes
   preflightContinue: false,
   optionsSuccessStatus: 204,
-  
-  // Cache preflight for performance
-  maxAge: 86400 // 24 hours
+  maxAge: 86400
 };
 
 // Apply CORS with enhanced configuration
@@ -283,34 +199,6 @@ app.use(cors(corsConfig));
 
 // Explicitly handle OPTIONS requests for all routes
 app.options('*', cors(corsConfig));
-
-// Ensure CORS headers are sent even on errors
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  const allowedOrigins = corsConfig.getOrigins();
-  
-  // Log CORS debugging info
-  if (req.path === '/graphql') {
-    console.log(`🔍 GraphQL CORS Check - Origin: ${origin}, Method: ${req.method}`);
-  }
-  
-  // If origin is allowed, ensure headers are set
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, X-HTTP-Method-Override, apollo-require-preflight');
-  }
-  
-  // Handle OPTIONS preflight
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(204);
-  }
-  
-  next();
-});
-
-// Special CORS handling for GraphQL endpoint (moved after basic routes to avoid conflicts)
 
 // Add security headers with Helmet (but don't override CORS)
 app.use(helmet({
@@ -446,20 +334,13 @@ app.get('/health/detailed', (req, res) => {
 // Add CORS diagnostic endpoint
 app.get('/cors-test', (req, res) => {
   const origin = req.headers.origin || 'No origin header';
-  const allowedOrigins = corsConfig.getOrigins();
   const headers = res.getHeaders();
-  
-  // Manually set CORS headers for this test endpoint
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-  }
   
   res.json({
     message: 'CORS test endpoint',
     requestOrigin: origin,
-    isOriginAllowed: origin ? allowedOrigins.includes(origin) : 'no-origin',
-    allowedOrigins: allowedOrigins,
+    isOriginAllowed: 'All origins allowed (*)',
+    corsConfig: 'origin: *',
     environment: process.env.NODE_ENV || 'development',
     corsHeaders: headers,
     nodeEnv: process.env.NODE_ENV,
@@ -7019,26 +6900,6 @@ const server = new ApolloServer({
 async function startServer() {
   try {
     await server.start();
-    
-    // Ensure GraphQL endpoint has proper CORS
-    app.use('/graphql', (req, res, next) => {
-      const origin = req.headers.origin || req.headers.referer;
-      
-      // For GraphQL, be more permissive with CORS
-      if (origin) {
-        res.header('Access-Control-Allow-Origin', origin);
-        res.header('Access-Control-Allow-Credentials', 'true');
-        res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, apollo-require-preflight');
-      }
-      
-      // Handle OPTIONS
-      if (req.method === 'OPTIONS') {
-        return res.sendStatus(204);
-      }
-      
-      next();
-    });
 
     // Apply Apollo middleware with context function
     app.use(
