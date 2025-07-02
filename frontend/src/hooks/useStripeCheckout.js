@@ -35,25 +35,47 @@ export const useStripeCheckout = () => {
       console.log('🛒 Cart items being processed:', cartItems.length, 'items');
       console.log('📦 Cart items details:', cartItems);
 
+      // Helper function to safely parse float and handle NaN
+      const safeParseFloat = (value, fallback = 0) => {
+        const parsed = parseFloat(value);
+        return isNaN(parsed) ? fallback : parsed;
+      };
+
       const { data: orderData } = await processStripeCartOrder({
         variables: {
           input: {
             userId: currentUser?.id || null,
             guestEmail: !currentUser ? customerInfo.email : null,
-            cartItems: cartItems.map(item => ({
-              productId: item.product?.id || item.productId || `PRODUCT-${Date.now()}`,
-              productName: item.product?.name || item.name || item.title || 'Custom Stickers',
-              productCategory: item.product?.category || item.category || 'Custom Stickers',
-              sku: item.product?.sku || item.sku || `${item.product?.id || 'CUSTOM'}-${Date.now()}`,
-              quantity: item.quantity || 1,
-              unitPrice: parseFloat(item.unitPrice || item.price || item.totalPrice || 0),
-              totalPrice: parseFloat(item.totalPrice || item.price || 0),
-              calculatorSelections: item.customization?.selections || item.calculatorSelections || {},
-              customFiles: item.customization?.customFiles || item.customFiles || [],
-              customerNotes: item.customization?.notes || item.customerNotes || '',
-              instagramHandle: item.customization?.instagramHandle || item.instagramHandle || '',
-              instagramOptIn: item.customization?.instagramOptIn || item.instagramOptIn || false
-            })),
+            cartItems: cartItems.map(item => {
+              // Safely parse prices to prevent NaN values
+              const unitPrice = safeParseFloat(item.unitPrice || item.price || item.totalPrice, 0);
+              const totalPrice = safeParseFloat(item.totalPrice || item.price, 0);
+              
+              // Log any problematic price values
+              if (unitPrice === 0 || totalPrice === 0) {
+                console.warn('⚠️ Item with zero price detected:', {
+                  name: item.name || item.title,
+                  unitPrice: item.unitPrice,
+                  totalPrice: item.totalPrice,
+                  price: item.price
+                });
+              }
+              
+              return {
+                productId: item.product?.id || item.productId || `PRODUCT-${Date.now()}`,
+                productName: item.product?.name || item.name || item.title || 'Custom Stickers',
+                productCategory: item.product?.category || item.category || 'Custom Stickers',
+                sku: item.product?.sku || item.sku || `${item.product?.id || 'CUSTOM'}-${Date.now()}`,
+                quantity: item.quantity || 1,
+                unitPrice: unitPrice,
+                totalPrice: totalPrice,
+                calculatorSelections: item.customization?.selections || item.calculatorSelections || {},
+                customFiles: item.customization?.customFiles || item.customFiles || [],
+                customerNotes: item.customization?.notes || item.customerNotes || '',
+                instagramHandle: item.customization?.instagramHandle || item.instagramHandle || '',
+                instagramOptIn: item.customization?.instagramOptIn || item.instagramOptIn || false
+              };
+            }),
             customerInfo: {
               firstName: customerInfo.firstName || customerInfo.first_name || '',
               lastName: customerInfo.lastName || customerInfo.last_name || '',
@@ -64,8 +86,8 @@ export const useStripeCheckout = () => {
             billingAddress: billingAddress || shippingAddress,
             orderNote,
             discountCode,
-            discountAmount,
-            creditsToApply
+            discountAmount: safeParseFloat(discountAmount, 0),
+            creditsToApply: safeParseFloat(creditsToApply, 0)
           }
         }
       });

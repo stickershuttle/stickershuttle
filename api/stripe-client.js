@@ -34,10 +34,16 @@ class StripeClient {
     }
 
     try {
+      // Helper function to safely parse numbers and handle NaN
+      const safeParseFloat = (value, fallback = 0) => {
+        const parsed = parseFloat(value);
+        return isNaN(parsed) ? fallback : parsed;
+      };
+
       // Calculate discount proportionally across all line items
-      const originalTotal = orderData.lineItems.reduce((sum, item) => sum + item.totalPrice, 0);
-      const discountAmount = orderData.cartMetadata?.discountAmount ? parseFloat(orderData.cartMetadata.discountAmount) : 0;
-      const discountRatio = discountAmount > 0 ? discountAmount / originalTotal : 0;
+      const originalTotal = orderData.lineItems.reduce((sum, item) => sum + safeParseFloat(item.totalPrice, 0), 0);
+      const discountAmount = safeParseFloat(orderData.cartMetadata?.discountAmount, 0);
+      const discountRatio = discountAmount > 0 && originalTotal > 0 ? discountAmount / originalTotal : 0;
 
       console.log('💰 Discount calculation:', {
         originalTotal,
@@ -50,11 +56,12 @@ class StripeClient {
         payment_method_types: ['card'],
         line_items: orderData.lineItems.map(item => {
           // Apply discount proportionally to each item
-          const itemDiscountAmount = item.totalPrice * discountRatio;
-          const discountedItemPrice = item.totalPrice - itemDiscountAmount;
+          const itemTotalPrice = safeParseFloat(item.totalPrice, 0);
+          const itemDiscountAmount = itemTotalPrice * discountRatio;
+          const discountedItemPrice = itemTotalPrice - itemDiscountAmount;
           
           console.log(`📦 Item pricing: ${item.name}`, {
-            originalPrice: item.totalPrice,
+            originalPrice: itemTotalPrice,
             itemDiscountAmount,
             discountedPrice: discountedItemPrice
           });
@@ -77,7 +84,7 @@ class StripeClient {
                   category: item.category || 'custom-stickers',
                   actualQuantity: item.quantity.toString(), // Store actual quantity in metadata
                   discountApplied: discountAmount > 0 ? 'true' : 'false',
-                  originalPrice: item.totalPrice.toFixed(2),
+                  originalPrice: itemTotalPrice.toFixed(2),
                   discountAmount: itemDiscountAmount.toFixed(2)
                 }
               },

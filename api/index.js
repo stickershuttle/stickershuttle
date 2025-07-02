@@ -250,7 +250,7 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com", "https://checkout.stripe.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://js.stripe.com", "https://*.stripe.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://js.stripe.com", "https://*.stripe.com", "https://js.stripe.com/type-font/"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       connectSrc: ["'self'", "https://api.stripe.com", "https://checkout.stripe.com"],
       frameSrc: ["'self'", "https://checkout.stripe.com", "https://js.stripe.com"],
@@ -4266,10 +4266,19 @@ const resolvers = {
         let remainingCredits = 0;
         let creditDeductionId = null; // Track the credit transaction for potential reversal
         
+        // Helper function to safely parse numbers and handle NaN
+        const safeParseFloat = (value, fallback = 0) => {
+          const parsed = parseFloat(value);
+          return isNaN(parsed) ? fallback : parsed;
+        };
+
         // Step 1: Calculate credits before creating order
-        const cartSubtotal = input.cartItems.reduce((sum, item) => sum + item.totalPrice, 0);
-        const discountAmount = input.discountAmount || 0;
-        const creditsToApply = input.creditsToApply || 0;
+        const cartSubtotal = input.cartItems.reduce((sum, item) => {
+          const itemTotal = safeParseFloat(item.totalPrice, 0);
+          return sum + itemTotal;
+        }, 0);
+        const discountAmount = safeParseFloat(input.discountAmount, 0);
+        const creditsToApply = safeParseFloat(input.creditsToApply, 0);
         
         // IMMEDIATELY deduct credits if provided (before payment processing)
         if (creditsToApply > 0 && input.userId && input.userId !== 'guest') {
@@ -4462,7 +4471,32 @@ const resolvers = {
         if (stripeClient.isReady() && errors.length === 0) {
           try {
             console.log('🔍 Stripe client is ready, creating checkout session...');
-            const baseUrl = process.env.FRONTEND_URL || 'https://stickershuttle.com';
+            
+            // Dynamically determine the frontend URL based on environment
+            let baseUrl = process.env.FRONTEND_URL;
+            
+            // If FRONTEND_URL is not set, try to detect from request headers or use Railway URL
+            if (!baseUrl) {
+              // Check if we have a request with headers (for dynamic environment detection)
+              // Fall back to Railway URL if available, or localhost for development
+              if (process.env.RAILWAY_STATIC_URL) {
+                baseUrl = `https://${process.env.RAILWAY_STATIC_URL}`;
+              } else if (process.env.NODE_ENV === 'development') {
+                baseUrl = 'http://localhost:3000';
+              } else {
+                // For deployed environments, try to detect from common deployment URLs
+                // Vercel deployments typically have predictable URLs
+                const deploymentUrl = process.env.VERCEL_URL || process.env.DEPLOYMENT_URL;
+                if (deploymentUrl) {
+                  baseUrl = `https://${deploymentUrl}`;
+                } else {
+                  // Last resort fallback to production
+                  baseUrl = 'https://stickershuttle.com';
+                }
+              }
+            }
+            
+            console.log('🌐 Using frontend URL for Stripe redirects:', baseUrl);
             
             // Calculate final cart total (credits already calculated in Step 1)
             const cartTotal = cartSubtotal - discountAmount - actualCreditsApplied;
