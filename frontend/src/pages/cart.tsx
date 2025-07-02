@@ -391,6 +391,9 @@ export default function CartPage() {
   const [creditToApply, setCreditToApply] = useState(0);
   const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; amount: number } | null>(null);
   
+  // Blind shipment toggle state
+  const [isBlindShipment, setIsBlindShipment] = useState(false);
+  
   // Guest checkout form state
   const [guestCheckoutData, setGuestCheckoutData] = useState({
     firstName: '',
@@ -900,8 +903,11 @@ export default function CartPage() {
   const safeDiscountAmount = safeParseFloat(discountAmount, 0);
   const safeCreditToApply = safeParseFloat(creditToApply, 0);
   
+  // Add blind shipment fee
+  const blindShipmentFee = isBlindShipment ? 5.00 : 0;
+  
   const afterDiscounts = safeSubtotal - safeReorderDiscount - safeDiscountAmount;
-  const finalTotal = Math.max(0, afterDiscounts - safeCreditToApply);
+  const finalTotal = Math.max(0, afterDiscounts - safeCreditToApply + blindShipmentFee);
 
   // Calculate rush order breakdown
   const rushOrderBreakdown = updatedCart.reduce((acc, item) => {
@@ -1882,6 +1888,12 @@ export default function CartPage() {
                         <span>-${creditToApply.toFixed(2)}</span>
                       </div>
                     )}
+                    {isBlindShipment && (
+                      <div className="flex justify-between text-purple-300">
+                        <span>Blind Shipment Fee</span>
+                        <span>+${blindShipmentFee.toFixed(2)}</span>
+                      </div>
+                    )}
                     <hr className="border-white/20 my-3" />
                     {/* Total Savings */}
                     {(reorderDiscount > 0 || discountAmount > 0 || creditToApply > 0) && (
@@ -2291,6 +2303,7 @@ export default function CartPage() {
                         className="cart-checkout-button-trigger"
                         creditsToApply={safeParseFloat(creditToApply, 0)}
                         discountCode={appliedDiscount?.code}
+                        isBlindShipment={isBlindShipment}
                         guestCheckoutData={!user ? { firstName: guestCheckoutData.firstName, lastName: guestCheckoutData.lastName, email: guestCheckoutData.email } : undefined}
                         onCheckoutStart={() => {
                           console.log('🚀 Starting enhanced cart checkout with user context:', updatedCart.length, 'items');
@@ -2388,8 +2401,52 @@ export default function CartPage() {
                       )}
                       
                       <p className="text-xs text-gray-500 pt-2">
-                        * UPS does not deliver on weekends. Weekend delivery dates are automatically moved to the next business day.
+                        * UPS may not deliver on weekends. To be safe, delivery dates are automatically moved to the next business day.
                       </p>
+                    </div>
+
+                    {/* Blind Shipment Toggle */}
+                    <div className="p-4 rounded-xl space-y-3 mt-6" style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                      backdropFilter: 'blur(12px)'
+                    }}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">📦</span>
+                          <div>
+                            <h4 className="text-white font-medium">Blind Shipment</h4>
+                            <p className="text-gray-400 text-sm">Hide Sticker Shuttle logos from packaging</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setIsBlindShipment(!isBlindShipment)}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+                            isBlindShipment ? 'bg-blue-600' : 'bg-gray-600'
+                          }`}
+                          style={{
+                            boxShadow: isBlindShipment 
+                              ? 'rgba(59, 130, 246, 0.3) 0px 0px 20px' 
+                              : 'rgba(0, 0, 0, 0.2) 0px 2px 4px'
+                          }}
+                          title={isBlindShipment ? 'Disable blind shipment' : 'Enable blind shipment'}
+                        >
+                          <span
+                            className={`${
+                              isBlindShipment ? 'translate-x-6' : 'translate-x-1'
+                            } inline-block h-4 w-4 transform rounded-full bg-white transition duration-200 ease-in-out`}
+                            style={{
+                              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                            }}
+                          />
+                        </button>
+                      </div>
+                      {isBlindShipment && (
+                        <div className="text-xs text-blue-200 bg-blue-500/10 p-3 rounded-lg border border-blue-500/20">
+                          ℹ️ Your order will have generic packaging and shipping labels. The label will still show our return address minus our company name.
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

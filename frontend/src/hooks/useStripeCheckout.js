@@ -10,7 +10,7 @@ export const useStripeCheckout = () => {
   
   const [processStripeCartOrder] = useMutation(PROCESS_STRIPE_CART_ORDER);
 
-  const processCheckout = async (cartItems, customerInfo, shippingAddress, billingAddress = null, orderNote = '', discountCode = null, discountAmount = 0, creditsToApply = 0) => {
+  const processCheckout = async (cartItems, customerInfo, shippingAddress, billingAddress = null, orderNote = '', discountCode = null, discountAmount = 0, creditsToApply = 0, isBlindShipment = false) => {
     setLoading(true);
     setError(null);
 
@@ -87,7 +87,8 @@ export const useStripeCheckout = () => {
             orderNote,
             discountCode,
             discountAmount: safeParseFloat(discountAmount, 0),
-            creditsToApply: safeParseFloat(creditsToApply, 0)
+            creditsToApply: safeParseFloat(creditsToApply, 0),
+            isBlindShipment: isBlindShipment || false
           }
         }
       });

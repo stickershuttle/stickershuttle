@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
 import Link from 'next/link';
@@ -1102,6 +1102,7 @@ function Dashboard() {
 
   const [uploadingProfilePhoto, setUploadingProfilePhoto] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
+  const lastProfileActionTime = useRef(0);
   const [showBannerTemplates, setShowBannerTemplates] = useState(false);
 
   const syncNewCustomerToKlaviyo = async () => {
@@ -1175,8 +1176,17 @@ function Dashboard() {
   const handleProfilePhotoUpload = async (file: File) => {
     if (!user) return;
     
+    // Rate limiting: Prevent actions within 3 seconds of last action
+    const now = Date.now();
+    if (now - lastProfileActionTime.current < 3000) {
+      console.log('Rate limiting: Too soon since last action, skipping...');
+      alert('⏰ Please wait a moment between profile updates to prevent overloading our servers.');
+      return;
+    }
+    
     try {
       setUploadingProfilePhoto(true);
+      lastProfileActionTime.current = now;
       
       // Validate file
       const { validateFile } = await import('../../utils/cloudinary');
@@ -1186,9 +1196,15 @@ function Dashboard() {
         return;
       }
 
+      // Add delay to prevent rate limiting
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       // Upload to Cloudinary
       const { uploadToCloudinary } = await import('../../utils/cloudinary');
       const result = await uploadToCloudinary(file, undefined, undefined, 'profile-photos');
+
+      // Additional delay before GraphQL mutation
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Update profile using GraphQL mutation
       const { data, errors } = await client.mutate({
@@ -1202,7 +1218,13 @@ function Dashboard() {
 
       if (errors || !data?.updateUserProfilePhoto?.success) {
         console.error('GraphQL error updating profile photo:', errors);
-        alert(data?.updateUserProfilePhoto?.message || 'Failed to update profile photo');
+        const errorMessage = errors?.[0]?.message || data?.updateUserProfilePhoto?.message || 'Failed to update profile photo';
+        
+        if (errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('Too many requests')) {
+          alert('🚫 Rate limit reached! Please wait 1-2 minutes before trying again. Our servers need a brief cooldown to prevent overload.');
+        } else {
+          alert(errorMessage);
+        }
         return;
       }
 
@@ -1217,7 +1239,15 @@ function Dashboard() {
       
     } catch (error) {
       console.error('Error uploading profile photo:', error);
-      alert('Failed to upload profile photo');
+      const errorMessage = (error as any)?.message || 'Failed to upload profile photo';
+      
+      if (errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('Too many requests')) {
+        alert('🚫 Rate limit reached! Please wait 1-2 minutes before trying again. Our servers need a brief cooldown to prevent overload.');
+      } else if ((error as any)?.networkError?.statusCode === 429) {
+        alert('🚫 Rate limit reached! Please wait 1-2 minutes before trying again. Our servers need a brief cooldown to prevent overload.');
+      } else {
+        alert('Failed to upload profile photo. Please try again in a moment.');
+      }
     } finally {
       setUploadingProfilePhoto(false);
     }
@@ -1226,8 +1256,17 @@ function Dashboard() {
   const handleBannerUpload = async (file: File) => {
     if (!user) return;
     
+    // Rate limiting: Prevent actions within 3 seconds of last action
+    const now = Date.now();
+    if (now - lastProfileActionTime.current < 3000) {
+      console.log('Rate limiting: Too soon since last action, skipping...');
+      alert('⏰ Please wait a moment between banner changes to prevent overloading our servers.');
+      return;
+    }
+    
     try {
       setUploadingBanner(true);
+      lastProfileActionTime.current = now;
       
       // Validate file
       const { validateFile } = await import('../../utils/cloudinary');
@@ -1237,9 +1276,15 @@ function Dashboard() {
         return;
       }
 
+      // Add delay to prevent rate limiting
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       // Upload to Cloudinary
       const { uploadToCloudinary } = await import('../../utils/cloudinary');
       const result = await uploadToCloudinary(file, undefined, undefined, 'profile-banners');
+
+      // Additional delay before GraphQL mutation
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Update profile using GraphQL mutation
       const { data, errors } = await client.mutate({
@@ -1255,7 +1300,13 @@ function Dashboard() {
 
       if (errors || !data?.updateUserProfileBanner?.success) {
         console.error('GraphQL error updating banner:', errors);
-        alert(data?.updateUserProfileBanner?.message || 'Failed to update banner image');
+        const errorMessage = errors?.[0]?.message || data?.updateUserProfileBanner?.message || 'Failed to update banner image';
+        
+        if (errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('Too many requests')) {
+          alert('🚫 Rate limit reached! Please wait 1-2 minutes before trying again. Our servers need a brief cooldown to prevent overload.');
+        } else {
+          alert(errorMessage);
+        }
         return;
       }
 
@@ -1273,7 +1324,15 @@ function Dashboard() {
       
     } catch (error) {
       console.error('Error uploading banner:', error);
-      alert('Failed to upload banner image');
+      const errorMessage = (error as any)?.message || 'Failed to upload banner image';
+      
+      if (errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('Too many requests')) {
+        alert('🚫 Rate limit reached! Please wait 1-2 minutes before trying again. Our servers need a brief cooldown to prevent overload.');
+      } else if ((error as any)?.networkError?.statusCode === 429) {
+        alert('🚫 Rate limit reached! Please wait 1-2 minutes before trying again. Our servers need a brief cooldown to prevent overload.');
+      } else {
+        alert('Failed to upload banner image. Please try again in a moment.');
+      }
     } finally {
       setUploadingBanner(false);
     }
@@ -1288,8 +1347,20 @@ function Dashboard() {
       return;
     }
     
+    // Rate limiting: Prevent actions within 3 seconds of last action
+    const now = Date.now();
+    if (now - lastProfileActionTime.current < 3000) {
+      console.log('Rate limiting: Too soon since last action, skipping...');
+      alert('⏰ Please wait a moment between banner changes to prevent overloading our servers.');
+      return;
+    }
+    
     try {
       setUploadingBanner(true);
+      lastProfileActionTime.current = now;
+      
+      // Add delay to prevent rate limiting
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Use GraphQL mutation to remove banner
       const { data, errors } = await client.mutate({
@@ -1305,7 +1376,13 @@ function Dashboard() {
 
       if (errors || !data?.updateUserProfileBanner?.success) {
         console.error('GraphQL error removing banner:', errors);
-        alert(data?.updateUserProfileBanner?.message || 'Failed to remove banner');
+        const errorMessage = errors?.[0]?.message || data?.updateUserProfileBanner?.message || 'Failed to remove banner';
+        
+        if (errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('Too many requests')) {
+          alert('🚫 Rate limit reached! Please wait 1-2 minutes before trying again. Our servers need a brief cooldown to prevent overload.');
+        } else {
+          alert(errorMessage);
+        }
         return;
       }
 
@@ -1323,7 +1400,15 @@ function Dashboard() {
       
     } catch (error) {
       console.error('Banner removal failed:', error);
-      alert(`Failed to remove banner. Please try again. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = (error as any)?.message || 'Failed to remove banner';
+      
+      if (errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('Too many requests')) {
+        alert('🚫 Rate limit reached! Please wait 1-2 minutes before trying again. Our servers need a brief cooldown to prevent overload.');
+      } else if ((error as any)?.networkError?.statusCode === 429) {
+        alert('🚫 Rate limit reached! Please wait 1-2 minutes before trying again. Our servers need a brief cooldown to prevent overload.');
+      } else {
+        alert(`Failed to remove banner. Please try again. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     } finally {
       setUploadingBanner(false);
     }
@@ -1715,6 +1800,14 @@ function Dashboard() {
   const handleSelectBannerTemplate = async (template: any) => {
     if (!user) return;
     
+    // Rate limiting: Prevent actions within 3 seconds of last action
+    const now = Date.now();
+    if (now - lastProfileActionTime.current < 3000) {
+      console.log('Rate limiting: Too soon since last action, skipping...');
+      alert('⏰ Please wait a moment between banner changes to prevent overloading our servers.');
+      return;
+    }
+    
     // Prevent multiple simultaneous requests
     if (uploadingBanner) {
       console.log('Banner update already in progress, skipping...');
@@ -1728,6 +1821,9 @@ function Dashboard() {
       return;
     }
     
+    // Update last action time
+    lastProfileActionTime.current = now;
+    
     setUploadingBanner(true);
     setShowBannerTemplates(false);
     
@@ -1735,8 +1831,8 @@ function Dashboard() {
       // Create a CSS string for the template
       const templateCSS = JSON.stringify(template.style);
       
-      // Add delay to prevent rate limiting
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Add longer delay to prevent rate limiting (increased from 500ms to 1.5s)
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       // Update profile using GraphQL mutation
       const { data, errors } = await client.mutate({
@@ -1754,8 +1850,8 @@ function Dashboard() {
         console.error('GraphQL error updating banner template:', errors);
         const errorMessage = errors?.[0]?.message || data?.updateUserProfileBanner?.message || 'Failed to apply template';
         
-        if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
-          alert('Too many requests. Please wait a moment and try again.');
+        if (errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('Too many requests')) {
+          alert('🚫 Rate limit reached! Please wait 1-2 minutes before trying again. Our servers need a brief cooldown to prevent overload.');
         } else {
           alert(errorMessage);
         }
@@ -1778,8 +1874,10 @@ function Dashboard() {
       console.error('Banner template application failed:', error);
       const errorMessage = (error as any)?.message || 'Failed to apply template';
       
-      if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
-        alert('Too many requests. Please wait a moment and try again.');
+      if (errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('Too many requests')) {
+        alert('🚫 Rate limit reached! Please wait 1-2 minutes before trying again. Our servers need a brief cooldown to prevent overload.');
+      } else if ((error as any)?.networkError?.statusCode === 429) {
+        alert('🚫 Rate limit reached! Please wait 1-2 minutes before trying again. Our servers need a brief cooldown to prevent overload.');
       } else {
         alert('Failed to apply template. Please try again in a moment.');
       }

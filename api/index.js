@@ -266,13 +266,20 @@ app.use(helmet({
 // Rate limiting configuration
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === 'development' ? 1000 : 100, // More lenient in development
   message: {
     error: 'Too many requests from this IP, please try again later.',
     retryAfter: 900
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for health checks and GraphQL in development
+    if (process.env.NODE_ENV === 'development') {
+      return req.path === '/health' || req.path === '/graphql' || req.path === '/health/detailed';
+    }
+    return false;
+  }
 });
 
 const strictLimiter = rateLimit({
@@ -793,6 +800,7 @@ const typeDefs = gql`
     shipping_method: String
     is_express_shipping: Boolean
     is_rush_order: Boolean
+    is_blind_shipment: Boolean
     orderTags: [String]
     orderNote: String
     orderCreatedAt: String
@@ -1062,6 +1070,7 @@ const typeDefs = gql`
     discountCode: String
     discountAmount: Float
     creditsToApply: Float
+    isBlindShipment: Boolean
   }
 
   input CartItemInput {
@@ -1607,6 +1616,7 @@ const resolvers = {
     customerPhone: (parent) => parent.customer_phone || parent.customerPhone,
     shippingAddress: (parent) => parent.shipping_address || parent.shippingAddress,
     billingAddress: (parent) => parent.billing_address || parent.billingAddress,
+    is_blind_shipment: (parent) => parent.is_blind_shipment || parent.isBlindShipment,
     orderTags: (parent) => parent.order_tags || parent.orderTags,
     orderNote: (parent) => parent.order_note || parent.orderNote,
     orderCreatedAt: (parent) => parent.order_created_at || parent.orderCreatedAt,
@@ -4279,6 +4289,7 @@ const resolvers = {
         }, 0);
         const discountAmount = safeParseFloat(input.discountAmount, 0);
         const creditsToApply = safeParseFloat(input.creditsToApply, 0);
+        const blindShipmentFee = input.isBlindShipment ? 5.00 : 0;
         
         // IMMEDIATELY deduct credits if provided (before payment processing)
         if (creditsToApply > 0 && input.userId && input.userId !== 'guest') {
@@ -4293,6 +4304,7 @@ const resolvers = {
             const safeCartSubtotal = safeParseFloat(cartSubtotal, 0);
             const safeDiscountAmount = safeParseFloat(discountAmount, 0);
             const afterDiscountTotal = safeCartSubtotal - safeDiscountAmount;
+            // Credits should only apply to product total, not fees like blind shipment
             const maxCreditsToApply = Math.min(safeParseFloat(creditsToApply, 0), currentBalance, afterDiscountTotal);
             
             if (maxCreditsToApply > 0) {
@@ -4381,7 +4393,7 @@ const resolvers = {
               financial_status: 'pending',
               subtotal_price: cartSubtotal,
               total_tax: 0, // Will be updated after Stripe checkout
-              total_price: cartSubtotal - discountAmount - actualCreditsApplied,
+              total_price: cartSubtotal - discountAmount - actualCreditsApplied + blindShipmentFee,
               discount_code: input.discountCode || null,
               discount_amount: discountAmount || 0,
               credits_applied: actualCreditsApplied, // Set the actual credits that will be applied
@@ -4394,6 +4406,7 @@ const resolvers = {
               billing_address: input.billingAddress || input.shippingAddress,
               order_tags: generateOrderTags(input.cartItems).split(','),
               order_note: generateOrderNote(input.cartItems),
+              is_blind_shipment: input.isBlindShipment || false,
               order_created_at: new Date().toISOString(),
               order_updated_at: new Date().toISOString()
             };
@@ -4528,19 +4541,32 @@ const resolvers = {
             console.log('🌐 Using frontend URL for Stripe redirects:', baseUrl);
             
             // Calculate final cart total (credits already calculated in Step 1)
-            const cartTotal = cartSubtotal - discountAmount - actualCreditsApplied;
+            const cartTotal = cartSubtotal - discountAmount - actualCreditsApplied + blindShipmentFee;
             
             const checkoutData = {
-              lineItems: input.cartItems.map(item => ({
-                name: item.productName,
-                description: `${item.productName} - Custom Configuration`,
-                unitPrice: item.unitPrice,
-                totalPrice: item.totalPrice, // Add totalPrice for accurate Stripe calculations
-                quantity: item.quantity,
-                productId: item.productId,
-                sku: item.sku,
-                calculatorSelections: item.calculatorSelections
-              })),
+              lineItems: [
+                ...input.cartItems.map(item => ({
+                  name: item.productName,
+                  description: `${item.productName} - Custom Configuration`,
+                  unitPrice: item.unitPrice,
+                  totalPrice: item.totalPrice, // Add totalPrice for accurate Stripe calculations
+                  quantity: item.quantity,
+                  productId: item.productId,
+                  sku: item.sku,
+                  calculatorSelections: item.calculatorSelections
+                })),
+                // Add blind shipment fee as a line item if applicable
+                ...(blindShipmentFee > 0 ? [{
+                  name: 'Blind Shipment Fee',
+                  description: 'Discreet packaging - no order details on shipping label',
+                  unitPrice: blindShipmentFee,
+                  totalPrice: blindShipmentFee,
+                  quantity: 1,
+                  productId: 'blind-shipment',
+                  sku: 'BLIND-SHIP',
+                  calculatorSelections: {}
+                }] : [])
+              ],
               successUrl: `${baseUrl}/order-success`,
               cancelUrl: `${baseUrl}/cart`,
               customerEmail: input.customerInfo.email,

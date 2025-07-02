@@ -20,6 +20,7 @@ interface CartCheckoutButtonProps {
   onCheckoutSuccess?: () => void;
   creditsToApply?: number;
   onCreditsChange?: (credits: number) => void;
+  isBlindShipment?: boolean;
   guestCheckoutData?: {
     firstName: string;
     lastName: string;
@@ -38,6 +39,7 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
   onCheckoutSuccess,
   creditsToApply = 0,
   onCreditsChange,
+  isBlindShipment = false,
   guestCheckoutData
 }) => {
   const router = useRouter();
@@ -262,9 +264,10 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
         shippingAddress,
         null, // billing address
         '', // No automatic order note
-        discountCode ? discountCode : undefined,
+        discountCode || undefined,
         discountAmount || undefined,
-        creditsToApply || 0 // Pass credits to apply
+        creditsToApply || 0, // Pass credits to apply
+        isBlindShipment // Pass blind shipment flag
       );
 
       if (result.success) {

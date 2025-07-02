@@ -29,6 +29,7 @@ export const GET_USER_ORDERS = gql`
       shipping_method
       is_express_shipping
       is_rush_order
+      is_blind_shipment
       orderTags
       orderNote
       orderCreatedAt
@@ -102,6 +103,7 @@ export const GET_ORDER_BY_NUMBER = gql`
       shipping_method
       is_express_shipping
       is_rush_order
+      is_blind_shipment
       orderTags
       orderNote
       orderCreatedAt
@@ -175,6 +177,7 @@ export const GET_ORDER_BY_ID = gql`
       shipping_method
       is_express_shipping
       is_rush_order
+      is_blind_shipment
       orderTags
       orderNote
       orderCreatedAt

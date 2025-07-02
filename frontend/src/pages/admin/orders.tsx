@@ -176,6 +176,7 @@ interface Order {
   shipping_method?: string;
   is_express_shipping?: boolean;
   is_rush_order?: boolean;
+  is_blind_shipment?: boolean;
   orderCreatedAt?: string;
   createdAt?: string;
   orderNote?: string;
@@ -2418,7 +2419,7 @@ export default function AdminOrders() {
 
                       {/* Shipping Choice Section - Inside Order Summary */}
                       {/* Urgent Order Alerts */}
-                      {((selectedOrder as any).is_express_shipping || (selectedOrder as any).is_rush_order) && (
+                      {((selectedOrder as any).is_express_shipping || (selectedOrder as any).is_rush_order || (selectedOrder as any).is_blind_shipment) && (
                         <div className="mb-6 p-4 rounded-lg animate-pulse" style={{
                           backgroundColor: 'rgba(239, 68, 68, 0.15)',
                           border: '2px solid rgba(239, 68, 68, 0.4)',
@@ -2434,7 +2435,9 @@ export default function AdminOrders() {
                             <span className="text-base font-bold text-red-300">
                               {((selectedOrder as any).is_express_shipping && (selectedOrder as any).is_rush_order) ? '🚀⚡ RUSH + EXPRESS ALERT'
                                : (selectedOrder as any).is_express_shipping ? '⚡ EXPRESS SHIPPING ALERT'
-                               : '🚀 RUSH ORDER ALERT'}
+                               : (selectedOrder as any).is_rush_order ? '🚀 RUSH ORDER ALERT'
+                               : (selectedOrder as any).is_blind_shipment ? '📦 BLIND SHIPMENT ALERT'
+                               : 'SPECIAL HANDLING ALERT'}
                             </span>
                           </div>
                           <p className="text-sm text-red-200 ml-11 font-medium">
@@ -2442,7 +2445,11 @@ export default function AdminOrders() {
                               ? `🚨 CRITICAL URGENT: Rush production (24hr) + Express shipping (${(selectedOrder as any).shipping_method}) - highest priority!`
                               : (selectedOrder as any).is_express_shipping 
                               ? `🚨 This order requires URGENT processing - ${(selectedOrder as any).shipping_method || 'Express shipping'} selected!`
-                              : '🚨 This order requires URGENT production - Rush order (24hr processing) selected!'}
+                              : (selectedOrder as any).is_rush_order
+                              ? '🚨 This order requires URGENT production - Rush order (24hr processing) selected!'
+                              : (selectedOrder as any).is_blind_shipment
+                              ? '🚨 BLIND SHIPMENT: Use discreet packaging and hide order contents from shipping labels!'
+                              : 'This order requires special handling - please review all flags and requirements.'}
                           </p>
                         </div>
                       )}
@@ -2468,6 +2475,11 @@ export default function AdminOrders() {
                             {(selectedOrder as any).is_rush_order && (
                               <span className="px-2 py-1 text-xs font-bold bg-orange-500/20 text-orange-300 rounded-full border border-orange-400/30">
                                 RUSH
+                              </span>
+                            )}
+                            {(selectedOrder as any).is_blind_shipment && (
+                              <span className="px-2 py-1 text-xs font-bold bg-purple-500/20 text-purple-300 rounded-full border border-purple-400/30">
+                                BLIND
                               </span>
                             )}
                           </div>

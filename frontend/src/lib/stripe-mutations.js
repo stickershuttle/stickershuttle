@@ -10,9 +10,41 @@ export const PROCESS_STRIPE_CART_ORDER = gql`
       customerOrder {
         id
         userId
+        guestEmail
+        stripePaymentIntentId
+        stripeCheckoutSessionId
+        orderNumber
         orderStatus
+        fulfillmentStatus
+        financialStatus
+        trackingNumber
+        trackingCompany
+        trackingUrl
+        subtotalPrice
+        totalTax
         totalPrice
+        currency
+        customerFirstName
+        customerLastName
+        customerEmail
+        customerPhone
+        shippingAddress
+        billingAddress
+        shipping_method
+        is_express_shipping
+        is_rush_order
+        is_blind_shipment
+        orderTags
+        orderNote
         orderCreatedAt
+        orderUpdatedAt
+        createdAt
+        updatedAt
+        proof_status
+        proof_sent_at
+        proof_link
+        discountCode
+        discountAmount
       }
       message
       errors
