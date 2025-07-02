@@ -68,6 +68,8 @@ coverage/
 
 # Documentation and temp files
 *.md.backup
+docs/
+!docs/README.md
 FRESH_ORDER_CHECKOUT_FLOW_COMPLETE.md
 ORDER_COMPLETION_REDIRECT_SYSTEM.md
 ORDER_INVOICE_IMPROVEMENTS.md
@@ -77,6 +79,16 @@ PHASE2_ORDER_INVOKE_COMPLETE.md
 PHASE2_WALKTHROUGH.md
 PRICE_MAPPING_FIX.md
 SERVER_RESTART_FIX.md
+
+# Additional cleanup files
+*.backup
+*.old
+*.bak
+*-debug.js
+*-test.js
+debug-*.js
+test-*.js
+fix-*.js
 
 # Debug and test files
 api/check-*.js
