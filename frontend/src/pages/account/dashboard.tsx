@@ -797,22 +797,42 @@ function Dashboard() {
       
       if (validViews.includes(requestedView as DashboardView)) {
         setCurrentView(requestedView as DashboardView);
-        
-        // If it's order-details view with orderNumber, find and set the order
-        if (requestedView === 'order-details' && orderNumber && orders.length > 0) {
-          const foundOrder = orders.find((o: any) => 
-            o.orderNumber === orderNumber || o.id === orderNumber
-          );
-          if (foundOrder) {
-            console.log('📋 Loading order from URL:', orderNumber);
-            setSelectedOrderForInvoice(foundOrder);
-          } else {
-            console.log('⚠️ Order not found for number:', orderNumber);
-          }
-        }
       }
     }
-  }, [router.query.view, router.query.orderNumber, orders]);
+  }, [router.query.view, router.query.orderNumber, currentView]);
+
+  // Separate effect to handle order selection when orders load or change
+  useEffect(() => {
+    const requestedView = router.query.view as string;
+    const orderNumber = router.query.orderNumber as string;
+    
+    // If we're on order-details view with an orderNumber and have orders loaded
+    if (requestedView === 'order-details' && orderNumber && orders && orders.length > 0) {
+      // Don't re-select if we already have the correct order selected
+      const currentOrderNumber = selectedOrderForInvoice?.orderNumber || selectedOrderForInvoice?.id;
+      if (currentOrderNumber === orderNumber) {
+        return;
+      }
+      
+      const foundOrder = orders.find((o: any) => 
+        o.orderNumber === orderNumber || o.id === orderNumber
+      );
+      
+      if (foundOrder) {
+        console.log('📋 Loading order from URL:', orderNumber);
+        setSelectedOrderForInvoice(foundOrder);
+      } else {
+        console.log('⚠️ Order not found for number:', orderNumber, 'Available orders:', orders.map(o => ({ id: o.id, orderNumber: o.orderNumber })));
+        // Optionally redirect back to orders view if order not found
+        // setCurrentView('all-orders');
+      }
+    }
+    
+    // Clear selected order if not on order-details view
+    if (requestedView !== 'order-details' && selectedOrderForInvoice) {
+      setSelectedOrderForInvoice(null);
+    }
+  }, [router.query.view, router.query.orderNumber, orders, selectedOrderForInvoice]);
 
   // Helper function to update view and URL
   const updateCurrentView = (view: DashboardView) => {
@@ -855,10 +875,7 @@ function Dashboard() {
       }
     }
     
-    // Clear selected order if leaving order-details view
-    if (view !== 'order-details') {
-      setSelectedOrderForInvoice(null);
-    }
+    // Order clearing is now handled in the useEffect above
   };
 
   // Clear selected design image when navigating away from design vault
@@ -2208,8 +2225,8 @@ function Dashboard() {
       200: 0.463,
       300: 0.39,
       500: 0.324,
-      750: 0.324,
-      1000: 0.257,
+      750: 0.24, // 76% discount (uses 500 tier from CSV)
+      1000: 0.19, // 81% discount (uses 1000 tier from CSV)
       2500: 0.213,
     };
     
@@ -2393,9 +2410,9 @@ function Dashboard() {
   const handleViewOrderDetails = (order: any) => {
     console.log('📋 Opening details view for order:', order.id);
     
-    // Set the selected order and switch to order details view
-    setSelectedOrderForInvoice(order);
-    setCurrentView('order-details');
+    // Navigate to the order details page which will redirect back with proper URL structure
+    const orderNumber = order.orderNumber || order.id;
+    router.push(`/account/order/${orderNumber}`);
   };
 
   const handleProofAction = async (action: 'approve' | 'request_changes', orderId: string, proofId: string) => {
@@ -5658,20 +5675,40 @@ function Dashboard() {
 
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <svg className="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            Order Details
-          </h2>
-          <div className="flex items-center gap-4">
+        {/* Mobile-First Header */}
+        <div className="space-y-4">
+          {/* Title Row */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
+              <svg className="w-5 h-5 md:w-6 md:h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              <span className="hidden sm:inline">Order Details</span>
+              <span className="sm:hidden">Details</span>
+            </h2>
+            <button 
+              onClick={() => {
+                setCurrentView('all-orders');
+                setSelectedOrderForInvoice(null);
+              }}
+              className="text-purple-400 hover:text-purple-300 font-medium transition-colors duration-200 text-sm flex items-center gap-1"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              <span className="hidden sm:inline">Back to Orders</span>
+              <span className="sm:hidden">Back</span>
+            </button>
+          </div>
+
+          {/* Action Buttons - Stack on Mobile */}
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
             <button
               onClick={() => {
                 setInvoiceData(invoiceData);
-                setTimeout(generatePrintPDF, 100); // Small delay to ensure state is updated
+                setTimeout(generatePrintPDF, 100);
               }}
-              className="px-6 md:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 flex items-center gap-2"
+              className="flex-1 sm:flex-initial px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-2"
               style={{
                 backgroundColor: 'rgba(16, 185, 129, 0.2)',
                 border: '1px solid rgba(16, 185, 129, 0.3)',
@@ -5687,9 +5724,9 @@ function Dashboard() {
             <button
               onClick={() => {
                 setInvoiceData(invoiceData);
-                setTimeout(generateDownloadPDF, 100); // Small delay to ensure state is updated
+                setTimeout(generateDownloadPDF, 100);
               }}
-              className="px-6 md:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 flex items-center gap-2"
+              className="flex-1 sm:flex-initial px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-2"
               style={{
                 backgroundColor: 'rgba(139, 92, 246, 0.2)',
                 border: '1px solid rgba(139, 92, 246, 0.3)',
@@ -5702,19 +5739,10 @@ function Dashboard() {
               </svg>
               Download Invoice
             </button>
-            <button 
-              onClick={() => {
-                setCurrentView('all-orders');
-                setSelectedOrderForInvoice(null);
-              }}
-              className="text-purple-400 hover:text-purple-300 font-medium transition-colors duration-200 text-sm"
-            >
-              ← Back to Orders
-            </button>
           </div>
         </div>
 
-        <div className="container-style p-8">
+        <div className="container-style p-4 md:p-8">
           {/* Shipping Address if available */}
           {selectedOrderForInvoice.shippingAddress && (
             <div className="mb-6 p-4 bg-white/5 rounded-lg border border-white/10">
@@ -5762,13 +5790,13 @@ function Dashboard() {
               return (
                 <div 
                   key={item.id || index} 
-                  className="bg-white/5 rounded-lg p-6 border border-white/10"
+                  className="bg-white/5 rounded-lg p-4 md:p-6 border border-white/10"
                 >
-                  <div className="flex items-start gap-6">
+                  <div className="flex flex-col sm:flex-row items-start gap-4 md:gap-6">
                     {/* Product Image */}
                     {firstImage && (
-                      <div className="flex-shrink-0">
-                        <div className="w-24 h-24 rounded-lg overflow-hidden border border-white/20 bg-black/20">
+                      <div className="flex-shrink-0 w-full sm:w-auto">
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-white/20 bg-black/20 mx-auto sm:mx-0">
                           <AIFileImage
                             src={firstImage}
                             filename={firstImage.split('/').pop()?.split('?')[0] || 'design.jpg'}
@@ -5787,179 +5815,204 @@ function Dashboard() {
                     )}
 
                     {/* Product Details */}
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-4">
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-lg font-semibold text-white">{item.productName || item.name}</h4>
-                            <p className="text-gray-400 text-sm ml-4">
-                              Placed on {new Date(selectedOrderForInvoice.orderCreatedAt || selectedOrderForInvoice.date).toLocaleDateString('en-US', {
-                                weekday: 'long',
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </p>
+                    <div className="flex-1 w-full sm:w-auto">
+                      <div className="space-y-4 mb-4">
+                        {/* Product Header - Mobile Optimized */}
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                          <div className="flex-1">
+                            <h4 className="text-lg font-semibold text-white mb-2">{item.productName || item.name}</h4>
+                            <div className="space-y-1">
+                              <p className="text-gray-400 text-sm">
+                                Order #{selectedOrderForInvoice.orderNumber || selectedOrderForInvoice.id}
+                              </p>
+                              <p className="text-gray-300 text-sm">Quantity: {item.quantity}</p>
+                            </div>
                           </div>
-                          <p className="text-gray-400 text-sm mb-1">
-                            Order #{selectedOrderForInvoice.orderNumber || selectedOrderForInvoice.id}
-                          </p>
-                          <p className="text-gray-300">Quantity: {item.quantity}</p>
+                          <div className="text-left sm:text-right">
+                            <p className="text-white font-semibold text-lg">${(item.totalPrice || item.price).toFixed(2)}</p>
+                            <p className="text-gray-400 text-sm">${(item.unitPrice || (item.price / item.quantity)).toFixed(2)} each</p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-white font-semibold">${(item.totalPrice || item.price).toFixed(2)}</p>
-                          <p className="text-gray-400 text-sm">${(item.unitPrice || (item.price / item.quantity)).toFixed(2)} each</p>
+
+                        {/* Order Date - Mobile Optimized */}
+                        <div className="text-xs text-gray-400 p-2 bg-black/20 rounded-lg">
+                          <span className="font-medium">Placed on:</span> {new Date(selectedOrderForInvoice.orderCreatedAt || selectedOrderForInvoice.date).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
                         </div>
                       </div>
-                      {/* Calculator Selections - Enhanced View */}
-                      {calculatorSelections && (
-                        <div className="bg-black/20 rounded-lg p-4 border border-white/5 mb-4">
-                          <h5 className="text-sm font-semibold text-purple-400 mb-3">Product Specifications</h5>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {Object.entries(calculatorSelections).map(([key, value]: [string, any]) => {
-                              if (!value || key === 'total' || key === 'quantity' || key === 'uploadedFiles' || key === 'designFiles') return null;
-                              
-                              const formatKey = (key: string) => {
-                                const keyMap: { [key: string]: string } = {
-                                  'size': 'Size',
-                                  'material': 'Material',
-                                  'finish': 'Finish',
-                                  'turnaround': 'Turnaround Time',
-                                  'proofOption': 'Proof Option',
-                                  'cutToShape': 'Cut to Shape',
-                                  'weatherproofLaminate': 'Weatherproof Laminate',
-                                  'grommets': 'Grommets',
-                                  'poleHem': 'Pole Hem',
-                                  'whiteOption': 'White Ink',
-                                  'rush': 'Rush Order',
-                                  'instagram': 'Instagram',
-                                  'proof': 'Proof Preference'
-                                };
-                                return keyMap[key] || key.split(/(?=[A-Z])/).join(' ').replace(/^\w/, c => c.toUpperCase());
-                              };
-
-                              const formatValue = (value: any) => {
-                                if (typeof value === 'object' && value !== null) {
-                                  if (value.displayValue) return value.displayValue;
-                                  if (value.label) return value.label;
-                                  if (value.width && value.height) return `${value.width}" × ${value.height}"`;
-                                  if (value.value) {
-                                    // Special formatting for specific fields
-                                    if (key === 'rush' && value.value === 'rush-order') {
-                                      return '🚀 24-hour production (+40%)';
-                                    }
-                                    if (key === 'instagram' && value.value) {
-                                      return `@${value.value} 📸`;
-                                    }
-                                    if (key === 'proof' && typeof value.value === 'boolean') {
-                                      return value.value ? '📧 Send proof for approval' : '⚡ Skip proof - direct to production';
-                                    }
-                                    return value.value;
-                                  }
-                                }
-                                if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-                                return String(value);
-                              };
-
-                              return (
-                                <div key={key} className="border-l-2 border-purple-400/30 pl-3">
-                                  <p className="text-xs text-gray-400 uppercase tracking-wide">{formatKey(key)}</p>
-                                  <p className="text-white font-medium">{formatValue(value)}</p>
+                      {/* Calculator Selections - Enhanced View (Exactly like Admin Panel) */}
+                      {(() => {
+                        let selections = calculatorSelections || {};
+                        const orderNote = selectedOrderForInvoice.orderNote || '';
+                        
+                        // Add fallback data from order note if missing in calculator selections (exactly like admin)
+                        if (!selections.whiteOption && orderNote) {
+                          const whiteOptionMatch = orderNote.match(/⚪ White Option: (.+?)(?:\n|$)/);
+                          if (whiteOptionMatch) {
+                            selections = {
+                              ...selections,
+                              whiteOption: {
+                                type: 'white-base',
+                                value: whiteOptionMatch[1].trim(),
+                                displayValue: whiteOptionMatch[1].trim(),
+                                priceImpact: 0
+                              }
+                            };
+                          }
+                        }
+                        
+                        return Object.keys(selections).length > 0 && (
+                          <div className="bg-black/20 rounded-lg p-4 border border-white/5 mb-4">
+                            <h5 className="text-sm font-semibold text-purple-400 mb-3">Product Specifications</h5>
+                            
+                            {/* Specifications Grid - Mobile Optimized */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                              {selections.cut?.displayValue && (
+                                <div className="flex flex-col">
+                                  <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Shape</span>
+                                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-blue-300"
+                                    style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                                    {selections.cut.displayValue}
+                                  </span>
                                 </div>
-                              );
-                            })}
-                          </div>
+                              )}
+                              {selections.material?.displayValue && (
+                                <div className="flex flex-col">
+                                  <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Material</span>
+                                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-green-300"
+                                    style={{ backgroundColor: 'rgba(145, 200, 72, 0.2)', border: '1px solid rgba(145, 200, 72, 0.3)' }}>
+                                    {selections.material.displayValue}
+                                  </span>
+                                </div>
+                              )}
+                              {(() => {
+                                const size = selections.size || selections.sizePreset || {};
+                                return (size.width && size.height) || size.displayValue ? (
+                                  <div className="flex flex-col">
+                                    <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Size</span>
+                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-orange-300"
+                                      style={{ backgroundColor: 'rgba(251, 146, 60, 0.2)', border: '1px solid rgba(251, 146, 60, 0.3)' }}>
+                                      {size.width && size.height ? `${size.width}" × ${size.height}"` : size.displayValue}
+                                    </span>
+                                  </div>
+                                ) : null;
+                              })()}
+                              {selections.whiteOption?.displayValue && (
+                                <div className="flex flex-col">
+                                  <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">White Ink</span>
+                                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-cyan-300"
+                                    style={{ backgroundColor: 'rgba(6, 182, 212, 0.2)', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
+                                    {selections.whiteOption.displayValue}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
 
-                          {/* Additional Details Section */}
-                          {(() => {
-                            // Parse additional data from order note or item data
-                            const orderNote = selectedOrderForInvoice.orderNote || '';
-                            
-                            // Parse fallback data from order note if not in calculator selections
-                            const instagramFromString = orderNote.match(/📸 Instagram: @([^\\n]+)/);
-                            const instagramHandle = itemData.instagramHandle || calculatorSelections.instagram?.value || calculatorSelections.instagramHandle?.value || 
-                              (instagramFromString ? instagramFromString[1] : null);
-                            const instagramOptIn = itemData.instagramOptIn || !!calculatorSelections.instagram;
-                            
-                            const rushFromString = orderNote.includes('🚀 Rush Order') || orderNote.includes('Rush: Rush Order');
-                            const rushOrder = calculatorSelections.rush?.value || (selectedOrderForInvoice as any).is_rush_order || rushFromString;
-                            
-                            const whiteOptionFromString = orderNote.match(/⚪ White Option: (.+?)(?:\n|$)/);
-                            const whiteOption = calculatorSelections.whiteOption?.displayValue || (whiteOptionFromString ? whiteOptionFromString[1].trim() : null);
-                            
-                            const proofFromString = orderNote.includes('📧') ? true : orderNote.includes('❌ No Proof') ? false : null;
-                            const hasProofData = calculatorSelections.proof?.value !== undefined || proofFromString !== null;
-                            const proofValue = calculatorSelections.proof?.value !== undefined ? calculatorSelections.proof.value : 
-                              proofFromString !== null ? proofFromString : true;
-                            
-                            // Show additional section if ANY additional data exists
-                            const showAdditionalSection = itemData.customerNotes || instagramHandle || instagramOptIn || 
-                              itemData.customerReplacementFile || rushOrder || whiteOption || hasProofData;
-                            
-                            return showAdditionalSection ? (
-                              <div className="mt-4 pt-4 border-t border-white/10">
-                                <h6 className="text-xs text-gray-500 uppercase tracking-wide mb-3">Additional Details</h6>
-                                <div className="space-y-3">
-                                  {whiteOption && (
-                                    <div className="flex items-start gap-3">
-                                      <span className="text-xs text-gray-400 w-20">White Ink:</span>
-                                      <span className="text-white font-medium text-sm flex-1">{whiteOption}</span>
-                                    </div>
-                                  )}
-                                  {rushOrder && (
-                                    <div className="flex items-start gap-3">
-                                      <span className="text-xs text-gray-400 w-20">Rush Order:</span>
-                                      <span className="text-orange-300 font-medium text-sm flex-1">🚀 24-hour production (+40%)</span>
+                            {/* Additional Details (exactly like admin panel) */}
+                            {(() => {
+                              // Parse data from order note string format (EXACTLY like admin)
+                              const itemString = orderNote || '';
+                              
+                                                             // Enhanced fallback logic for Instagram (EXACTLY like admin)
+                               const instagramFromString = itemString.match(/📸 Instagram: @([^\\n]+)/);
+                               const instagramOptInFromString = itemString.includes('📸 Instagram') && itemString.includes('marketing');
+                               const instagramHandle = itemData.instagramHandle || selections.instagram?.value || selections.instagramHandle?.value || 
+                                 (instagramFromString ? instagramFromString[1] : null);
+                               const instagramOptIn = itemData.instagramOptIn || !!selections.instagram || instagramOptInFromString;
+                              
+                              // Enhanced fallback logic for rush order (EXACTLY like admin)
+                              const rushFromString = itemString.includes('🚀 Rush Order') || itemString.includes('Rush: Rush Order');
+                              const rushOrder = selections.rush?.value || (selectedOrderForInvoice as any).is_rush_order || rushFromString;
+                              
+                              // Enhanced fallback logic for proof preference (EXACTLY like admin)
+                              const proofFromString = itemString.includes('📧') ? true : itemString.includes('❌ No Proof') ? false : null;
+                              const hasProofData = selections.proof?.value !== undefined || proofFromString !== null;
+                              const proofValue = selections.proof?.value !== undefined ? selections.proof.value : 
+                                proofFromString !== null ? proofFromString : true;
+                              
+                              // Parse proof preference from order note text (EXACTLY like admin)
+                              const sendProofMatch = itemString.includes('Send FREE Proof') || itemString.includes('Send proof');
+                              const noProofMatch = itemString.includes("Don't Send Proof") || itemString.includes('Skip proof');
+                              const updatedHasProofData = sendProofMatch || noProofMatch || hasProofData;
+                              const updatedProofValue = sendProofMatch ? true : noProofMatch ? false : proofValue;
+                              
+                              // Show section if ANY data exists (EXACTLY like admin)
+                              const showSection = itemData.customerNotes || instagramHandle || instagramOptIn || itemData.customerReplacementFile || 
+                                rushOrder || updatedHasProofData;
+                              
+                              return showSection ? (
+                                <div className="mt-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
+                                  {itemData.customerNotes && (
+                                    <div className="text-sm">
+                                      <span className="text-gray-500">Customer Note:</span>
+                                      <span className="text-gray-300 ml-2">{itemData.customerNotes}</span>
                                     </div>
                                   )}
                                   {(instagramHandle || instagramOptIn) && (
-                                    <div className="flex items-start gap-3">
-                                      <span className="text-xs text-gray-400 w-20">Instagram:</span>
-                                      <span className="text-pink-300 font-medium text-sm flex-1">
-                                        {instagramHandle ? `@${instagramHandle}` : 'Opted in for posting'} 📸
+                                    <div className="text-sm mt-1">
+                                      <span className="text-gray-500">Instagram:</span>
+                                      <span className="text-gray-300 ml-2">
+                                        {instagramHandle ? `@${instagramHandle}` : 'Opted in for posting'}
+                                        <span className="text-pink-400 ml-2">📸</span>
                                         {instagramOptIn && instagramHandle && (
                                           <span className="ml-2 text-xs text-green-400">(Marketing opt-in)</span>
                                         )}
                                       </span>
                                     </div>
                                   )}
-                                  {hasProofData && (
-                                    <div className="flex items-start gap-3">
-                                      <span className="text-xs text-gray-400 w-20">Proof:</span>
-                                      <span className={`font-medium text-sm flex-1 ${proofValue ? 'text-blue-300' : 'text-gray-300'}`}>
-                                        {proofValue ? '📧 Send proof for approval' : '⚡ Skip proof - direct to production'}
+                                  {rushOrder && (
+                                    <div className="text-sm mt-1">
+                                      <span className="text-gray-500">Rush Order:</span>
+                                      <span className="text-orange-300 ml-2 font-medium">🚀 24-hour production (+40%)</span>
+                                    </div>
+                                  )}
+                                  {updatedHasProofData && (
+                                    <div className="text-sm mt-1">
+                                      <span className="text-gray-500">Proof Preference:</span>
+                                      <span className={`ml-2 ${updatedProofValue ? 'text-blue-300' : 'text-gray-300'}`}>
+                                        {updatedProofValue ? '📧 Send proof for approval' : '⚡ Skip proof - direct to production'}
                                       </span>
                                     </div>
                                   )}
-                                  {itemData.customerNotes && (
-                                    <div className="flex items-start gap-3">
-                                      <span className="text-xs text-gray-400 w-20">Notes:</span>
-                                      <span className="text-gray-300 font-medium text-sm flex-1">{itemData.customerNotes}</span>
-                                    </div>
-                                  )}
                                   {itemData.customerReplacementFile && (
-                                    <div className="flex items-start gap-3">
-                                      <span className="text-xs text-gray-400 w-20">Updated File:</span>
-                                      <div className="flex-1">
-                                        <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-500/30">
-                                          <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                          </svg>
-                                          <span className="text-orange-300 text-sm font-medium">
-                                            {itemData.customerReplacementFileName || 'Customer uploaded file'}
-                                          </span>
+                                    <div className="text-sm mt-1 p-2 rounded-lg bg-orange-500/10 border border-orange-500/30">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                        </svg>
+                                        <span className="text-orange-400 font-medium">Customer Replacement File</span>
+                                      </div>
+                                      <div className="ml-6 space-y-1">
+                                        <div className="text-xs text-gray-300">
+                                          <span className="text-gray-500">File:</span>
+                                          <span className="ml-2 text-orange-400">{itemData.customerReplacementFileName || 'Customer uploaded file'}</span>
                                         </div>
+                                        {itemData.customerReplacementAt && (
+                                          <div className="text-xs text-gray-400">
+                                            <span className="text-gray-500">Uploaded:</span>
+                                            <span className="ml-2">{new Date(itemData.customerReplacementAt).toLocaleDateString('en-US', { 
+                                              month: 'short', 
+                                              day: 'numeric', 
+                                              hour: '2-digit', 
+                                              minute: '2-digit' 
+                                            })}</span>
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   )}
                                 </div>
-                              </div>
-                            ) : null;
-                          })()}
-                        </div>
-                      )}
+                              ) : null;
+                            })()}
+                          </div>
+                        );
+                      })()}
 
                       {/* Customer Notes */}
                       {(itemData.customerNotes || selectedOrderForInvoice.customerNotes) && (
@@ -5979,23 +6032,23 @@ function Dashboard() {
                             Tracking Information
                           </h4>
                           <div className="space-y-3">
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                               <div>
                                 <p className="text-gray-300 text-sm">Tracking Number</p>
-                                <p className="text-white font-mono">{selectedOrderForInvoice.trackingNumber}</p>
+                                <p className="text-white font-mono text-sm break-all">{selectedOrderForInvoice.trackingNumber}</p>
                               </div>
                               {selectedOrderForInvoice.trackingCompany && (
-                                <div className="text-right">
+                                <div className="text-left sm:text-right">
                                   <p className="text-gray-300 text-sm">Carrier</p>
                                   <p className="text-white">{selectedOrderForInvoice.trackingCompany}</p>
                                 </div>
                               )}
                             </div>
                             <div className="pt-3 border-t border-white/10">
-                              <div className="flex gap-2">
+                              <div className="flex flex-col sm:flex-row gap-2">
                                 <button 
                                   onClick={() => handleTrackOrder(selectedOrderForInvoice)}
-                                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 hover:scale-105"
+                                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 hover:scale-105"
                                   style={{
                                     backgroundColor: 'rgba(34, 197, 94, 0.2)',
                                     border: '1px solid rgba(34, 197, 94, 0.3)',
@@ -6010,7 +6063,7 @@ function Dashboard() {
                                 </button>
                                 <button 
                                   onClick={() => handleReorder(selectedOrderForInvoice.id)}
-                                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 hover:scale-105"
+                                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 hover:scale-105"
                                   style={{
                                     backgroundColor: 'rgba(245, 158, 11, 0.2)',
                                     border: '1px solid rgba(245, 158, 11, 0.3)',
@@ -10048,3 +10101,5 @@ export async function getServerSideProps() {
 }
 
 export default Dashboard;
+
+

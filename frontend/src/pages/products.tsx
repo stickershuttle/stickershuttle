@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import Layout from "@/components/Layout";
 
 export default function Products() {
+  const router = useRouter();
   const [dotCount, setDotCount] = useState<number>(1);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   // Animate the dots for "blast off"
   useEffect(() => {
@@ -13,10 +16,69 @@ export default function Products() {
     return () => clearInterval(interval);
   }, []);
 
+  // Check if item was just added to cart
+  useEffect(() => {
+    if (router.query.added === 'true') {
+      setShowSuccess(true);
+      // Clean URL after showing message
+      router.replace('/products', undefined, { shallow: true });
+      // Auto-hide after 5 seconds
+      setTimeout(() => setShowSuccess(false), 5000);
+    }
+  }, [router.query.added, router]);
+
   return (
     <Layout title="Products - Sticker Shuttle">
-        {/* Main Content */}
-        <main className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto py-12 px-4">
+      <style jsx>{`
+        @keyframes bounce-in {
+          0% {
+            opacity: 0;
+            transform: translateY(-20px) scale(0.8);
+          }
+          60% {
+            opacity: 1;
+            transform: translateY(5px) scale(1.05);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        
+        .animate-bounce-in {
+          animation: bounce-in 0.5s ease-out;
+        }
+      `}</style>
+      
+      {/* Success Message */}
+      {showSuccess && (
+        <div 
+          className="fixed top-4 right-4 z-50 px-6 py-4 rounded-xl text-white font-medium shadow-lg transition-all duration-500 animate-bounce-in"
+          style={{
+            background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+            backdropFilter: 'blur(25px) saturate(180%)',
+            border: '1px solid rgba(34, 197, 94, 0.4)',
+            boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-green-400">✅</span>
+            <span>Item added to cart!</span>
+            <Link href="/cart" className="text-green-300 hover:text-green-200 underline transition-colors">
+              View Cart
+            </Link>
+            <button 
+              onClick={() => setShowSuccess(false)}
+              className="text-green-300 hover:text-green-200 ml-2 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <main className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto py-12 px-4">
           {/* Hero */}
           <div className="text-center mb-8 relative">
             {/* Background Grid - Enhanced visibility */}

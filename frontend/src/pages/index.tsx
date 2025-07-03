@@ -228,13 +228,15 @@ export default function Home() {
                 <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593600/Amazon-Go_by2gkb.png" alt="Amazon" width={120} height={80} className="h-20 w-auto brand-float-3" priority />
                 <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593604/ChickFilA-Icon-Web_anobg1.png" alt="Chick-fil-A" width={120} height={80} className="h-20 w-auto brand-float-4" priority />
                 <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_Nike_gmedyb.png" alt="Nike" width={120} height={80} className="h-20 w-auto brand-float-5" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593671/StickerShuttle_Brands_XFinity_nz2obt.png" alt="Xfinity" width={120} height={80} className="h-20 w-auto brand-float-6" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" width={120} height={80} className="h-20 w-auto brand-float-1" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_SSPR_ewqax7.png" alt="SSPR" width={120} height={80} className="h-20 w-auto brand-float-2" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593662/StickerShuttle_Brands_CGR_ryewlb.png" alt="CGR" width={120} height={80} className="h-20 w-auto brand-float-3" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_WF_vrafue.png" alt="WF" width={120} height={80} className="h-20 w-auto brand-float-4" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593666/StickerShuttle_Brands_UnoMas_ntorew.png" alt="UnoMas" width={120} height={80} className="h-20 w-auto brand-float-5" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593610/LT-Icon_llqxai.png" alt="LT" width={120} height={80} className="h-20 w-auto brand-float-6" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751505017/StickerShuttle_HarryPotter_zlrki5.png" alt="Harry Potter" width={120} height={80} className="h-20 w-auto brand-float-6" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751396878/CanAmIcon_o3tydg.png" alt="Can-Am" width={96} height={64} className="h-16 w-auto brand-float-1" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593671/StickerShuttle_Brands_XFinity_nz2obt.png" alt="Xfinity" width={120} height={80} className="h-20 w-auto brand-float-2" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" width={120} height={80} className="h-20 w-auto brand-float-3" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_SSPR_ewqax7.png" alt="SSPR" width={120} height={80} className="h-20 w-auto brand-float-4" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593662/StickerShuttle_Brands_CGR_ryewlb.png" alt="CGR" width={120} height={80} className="h-20 w-auto brand-float-5" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_WF_vrafue.png" alt="WF" width={120} height={80} className="h-20 w-auto brand-float-6" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593666/StickerShuttle_Brands_UnoMas_ntorew.png" alt="UnoMas" width={120} height={80} className="h-20 w-auto brand-float-1" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593610/LT-Icon_llqxai.png" alt="LT" width={120} height={80} className="h-20 w-auto brand-float-2" />
                 
                 {/* Duplicate set for seamless loop */}
                 <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593661/StickerShuttle_Brands_AndHealth_bawirz.png" alt="AndHealth" width={120} height={80} className="h-20 w-auto brand-float-1" />
@@ -242,13 +244,15 @@ export default function Home() {
                 <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593600/Amazon-Go_by2gkb.png" alt="Amazon" width={120} height={80} className="h-20 w-auto brand-float-3" />
                 <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593604/ChickFilA-Icon-Web_anobg1.png" alt="Chick-fil-A" width={120} height={80} className="h-20 w-auto brand-float-4" />
                 <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_Nike_gmedyb.png" alt="Nike" width={120} height={80} className="h-20 w-auto brand-float-5" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593671/StickerShuttle_Brands_XFinity_nz2obt.png" alt="Xfinity" width={120} height={80} className="h-20 w-auto brand-float-6" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" width={120} height={80} className="h-20 w-auto brand-float-1" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_SSPR_ewqax7.png" alt="SSPR" width={120} height={80} className="h-20 w-auto brand-float-2" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593662/StickerShuttle_Brands_CGR_ryewlb.png" alt="CGR" width={120} height={80} className="h-20 w-auto brand-float-3" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_WF_vrafue.png" alt="WF" width={120} height={80} className="h-20 w-auto brand-float-4" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593666/StickerShuttle_Brands_UnoMas_ntorew.png" alt="UnoMas" width={120} height={80} className="h-20 w-auto brand-float-5" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593610/LT-Icon_llqxai.png" alt="LT" width={120} height={80} className="h-20 w-auto brand-float-6" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751505017/StickerShuttle_HarryPotter_zlrki5.png" alt="Harry Potter" width={120} height={80} className="h-20 w-auto brand-float-6" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751396878/CanAmIcon_o3tydg.png" alt="Can-Am" width={96} height={64} className="h-16 w-auto brand-float-1" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593671/StickerShuttle_Brands_XFinity_nz2obt.png" alt="Xfinity" width={120} height={80} className="h-20 w-auto brand-float-2" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" width={120} height={80} className="h-20 w-auto brand-float-3" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_SSPR_ewqax7.png" alt="SSPR" width={120} height={80} className="h-20 w-auto brand-float-4" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593662/StickerShuttle_Brands_CGR_ryewlb.png" alt="CGR" width={120} height={80} className="h-20 w-auto brand-float-5" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_WF_vrafue.png" alt="WF" width={120} height={80} className="h-20 w-auto brand-float-6" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593666/StickerShuttle_Brands_UnoMas_ntorew.png" alt="UnoMas" width={120} height={80} className="h-20 w-auto brand-float-1" />
+                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593610/LT-Icon_llqxai.png" alt="LT" width={120} height={80} className="h-20 w-auto brand-float-2" />
               </div>
               
               {/* Fade effects */}

@@ -361,8 +361,8 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
       200: 0.463, // 53.7% discount
       300: 0.39, // 61% discount
       500: 0.324, // 67.6% discount
-      750: 0.324, // 67.6% discount
-      1000: 0.257, // 74.3% discount
+      750: 0.24, // 76% discount (uses 500 tier from CSV)
+      1000: 0.19, // 81% discount (uses 1000 tier from CSV)
       2500: 0.213, // 78.7% discount
     }
 
@@ -501,12 +501,32 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
     setUploadError(null)
   }
 
-  const handleAddToCart = () => {
+  // Get file type icon based on format
+  const getFileTypeIcon = (format: string): string | null => {
+    const lowerFormat = format.toLowerCase()
+    
+    if (lowerFormat === 'ai') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751503976/Adobe_Illustrator_.AI_File_Icon_v3wshr.png'
+    }
+    if (lowerFormat === 'psd') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751504068/PSD_file_icon.svg_sbi8dh.png'
+    }
+    if (lowerFormat === 'eps') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751504098/9034333_ykhb8f.png'
+    }
+    if (lowerFormat === 'pdf') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751504123/PDF_file_icon.svg_uovjbk.png'
+    }
+    
+    return null
+  }
+
+  const createCartItem = () => {
     const area = calculateArea(selectedSize, customWidth, customHeight);
     const quantity = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity);
     const { total, perSticker } = calculatePrice(quantity, area, rushOrder);
 
-    const cartItem = {
+    return {
       id: generateCartItemId(),
       product: {
         id: "chrome-stickers",
@@ -570,10 +590,20 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
       totalPrice: total,
       addedAt: new Date().toISOString()
     };
+  };
 
+  const handleCheckout = () => {
+    const cartItem = createCartItem();
     addToCart(cartItem);
-    // Redirect to cart page
+    // Redirect to cart page for checkout
     router.push('/cart');
+  };
+
+  const handleAddToCartAndKeepShopping = () => {
+    const cartItem = createCartItem();
+    addToCart(cartItem);
+    // Redirect to products page with success message
+    router.push('/products?added=true');
   };
 
   return (
@@ -1219,46 +1249,92 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
                           </div>
                           <p className="text-white font-medium text-base mb-2 hidden md:block">Drag or click to upload your file</p>
                           <p className="text-white font-medium text-base mb-2 md:hidden">Tap to add file</p>
-                          <p className="text-white/80 text-sm">All formats supported. Max file size: 10MB | 1 file per order</p>
+                          <p className="text-white/80 text-sm">All formats supported. Max file size: 25MB | 1 file per order</p>
                         </div>
                       )}
                     </div>
                   ) : (
                     <div className="border border-green-400/50 rounded-xl p-4 bg-green-500/10 backdrop-blur-md">
-                      <div className="flex items-center justify-between min-w-0">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative z-10">
-                            <AIFileImage
-                              src={uploadedFile.secure_url}
-                              filename={uploadedFile.original_filename}
-                              alt={uploadedFile.original_filename}
-                              className="w-full h-full object-cover rounded-lg relative z-10"
-                              size="thumbnail"
-                              showFileType={false}
-                            />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-green-200 font-medium break-words">{uploadedFile.original_filename}</p>
-                            <p className="text-green-300/80 text-sm">
-                              {(uploadedFile.bytes / 1024 / 1024).toFixed(2)} MB • {uploadedFile.format.toUpperCase()}
-                            </p>
-                          </div>
+                      {/* Responsive Layout: Vertical on mobile, Horizontal on desktop */}
+                      <div className="flex flex-col md:flex-row gap-4 items-start">
+                        {/* Image Preview - Full width on mobile, fixed size on desktop */}
+                        <div className="w-full h-48 md:w-32 md:h-32 lg:w-40 lg:h-40 rounded-xl overflow-hidden border border-green-400/30 bg-white/5 backdrop-blur-md p-3 flex items-center justify-center flex-shrink-0">
+                          <AIFileImage
+                            src={uploadedFile.secure_url}
+                            filename={uploadedFile.original_filename}
+                            alt={uploadedFile.original_filename}
+                            className="w-full h-full object-contain"
+                            size="preview"
+                            showFileType={false}
+                          />
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <button
-                            onClick={() => document.getElementById('file-input')?.click()}
-                            className="text-blue-300 hover:text-blue-200 p-2 hover:bg-blue-500/20 rounded-lg transition-colors cursor-pointer"
-                            title="Replace file"
-                          >
-                            🔄
-                          </button>
-                          <button
-                            onClick={removeUploadedFile}
-                            className="text-red-300 hover:text-red-200 p-2 hover:bg-red-500/20 rounded-lg transition-colors cursor-pointer"
-                            title="Remove file"
-                          >
-                            🗑️
-                          </button>
+
+                        {/* File Info - Below image on mobile, right side on desktop */}
+                        <div className="flex-1 min-w-0 w-full">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div className="text-green-400 text-xl">📎</div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-green-200 font-medium break-words text-lg">{uploadedFile.original_filename}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <button
+                                onClick={() => document.getElementById('file-input')?.click()}
+                                className="text-blue-300 hover:text-blue-200 p-2 hover:bg-blue-500/20 rounded-lg transition-colors cursor-pointer"
+                                title="Replace file"
+                              >
+                                🔄
+                              </button>
+                              <button
+                                onClick={removeUploadedFile}
+                                className="text-red-300 hover:text-red-200 p-2 hover:bg-red-500/20 rounded-lg transition-colors cursor-pointer"
+                                title="Remove file"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* File Details */}
+                          <div className="space-y-2 mb-3">
+                            <div className="flex flex-wrap items-center gap-3 text-green-300/80 text-sm">
+                              <span className="flex items-center gap-1">
+                                <span className="text-green-400">📏</span>
+                                {(uploadedFile.bytes / 1024 / 1024).toFixed(2)} MB
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <span className="text-green-400">🎨</span>
+                                {uploadedFile.format.toUpperCase()}
+                              </span>
+                              {uploadedFile.width && uploadedFile.height && (
+                                <span className="flex items-center gap-1">
+                                  <span className="text-green-400">📐</span>
+                                  {uploadedFile.width}x{uploadedFile.height}px
+                                </span>
+                              )}
+                            </div>
+                            
+                            {/* File Type Icon */}
+                            {getFileTypeIcon(uploadedFile.format) && (
+                              <div className="flex items-center gap-2">
+                                <img 
+                                  src={getFileTypeIcon(uploadedFile.format)!} 
+                                  alt={`${uploadedFile.format.toUpperCase()} file`}
+                                  className="w-6 h-6 object-contain opacity-80"
+                                />
+                                <span className="text-xs text-green-300/60">
+                                  Professional design file detected
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Upload Success Message */}
+                          <div className="flex items-center gap-2 text-green-300 text-sm">
+                            <span className="text-green-400">✅</span>
+                            <span>File uploaded successfully!</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1273,28 +1349,30 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
                     </div>
                   )}
                   
-                  <div className="mt-4 flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
-                       style={{
-                         background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
-                         border: '1px solid rgba(147, 51, 234, 0.4)',
-                         backdropFilter: 'blur(12px)'
-                       }}>
-                    <button
-                      onClick={() => setUploadLater(!uploadLater)}
-                      disabled={!!uploadedFile}
-                      title={uploadLater ? "Disable upload later" : "Enable upload later"}
-                      className={`w-12 h-6 rounded-full transition-colors ${
-                        uploadLater ? 'bg-purple-500' : 'bg-white/20'
-                      } ${uploadedFile ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                        uploadLater ? 'translate-x-7' : 'translate-x-1'
-                      }`} />
-                    </button>
-                    <label className={`text-sm font-medium ${uploadedFile ? 'text-white/50' : 'text-purple-200'}`}>
-                      Upload Artwork Later
-                    </label>
-                  </div>
+                  {!uploadedFile && (
+                    <div className="mt-4 flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+                         style={{
+                           background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                           border: '1px solid rgba(147, 51, 234, 0.4)',
+                           backdropFilter: 'blur(12px)'
+                         }}>
+                      <button
+                        onClick={() => setUploadLater(!uploadLater)}
+                        disabled={!!uploadedFile}
+                        title={uploadLater ? "Disable upload later" : "Enable upload later"}
+                        className={`w-12 h-6 rounded-full transition-colors ${
+                          uploadLater ? 'bg-purple-500' : 'bg-white/20'
+                        } ${uploadedFile ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                          uploadLater ? 'translate-x-7' : 'translate-x-1'
+                        }`} />
+                      </button>
+                      <label className={`text-sm font-medium ${uploadedFile ? 'text-white/50' : 'text-purple-200'}`}>
+                        Upload Artwork Later
+                      </label>
+                    </div>
+                  )}
                   {uploadLater && !uploadedFile && (
                     <div className="mt-2 text-white/80 text-sm italic flex items-center">
                       <span role="img" aria-label="caution" className="mr-1">
@@ -1484,31 +1562,91 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
             </div>
           </div>
 
-          {/* Enhanced Order Button */}
-          <button 
-            onClick={handleAddToCart}
-            disabled={!totalPrice || (!uploadedFile && !uploadLater)} 
-            className="w-full py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 mb-4 relative overflow-hidden group hover:scale-[1.025] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-            style={{
-              background: !totalPrice || (!uploadedFile && !uploadLater) ? '#666' : 'linear-gradient(135deg, #ffd713, #ffed4e)',
-              color: '#030140',
-              fontWeight: 'bold',
-              border: !totalPrice || (!uploadedFile && !uploadLater) ? 'none' : 'solid',
-              borderWidth: !totalPrice || (!uploadedFile && !uploadLater) ? '0' : '0.03125rem',
-              borderColor: !totalPrice || (!uploadedFile && !uploadLater) ? 'transparent' : '#e6c211',
-              boxShadow: !totalPrice || (!uploadedFile && !uploadLater) ? 'none' : '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
-              cursor: 'pointer'
-            }}
-          >
-            <span className="relative z-10 flex items-center justify-center gap-2">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              {!uploadedFile && !uploadLater ? "Please Upload Artwork or Select Upload Later" : "Add to Cart"}
-            </span>
-          </button>
+          {/* Action Buttons */}
+          <div className="space-y-3 mb-4">
+            {/* Conditional Button Display */}
+            {!totalPrice || (!uploadedFile && !uploadLater) ? (
+              /* Single Upload Required Button */
+              <button 
+                disabled={true}
+                className="w-full py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: '#666',
+                  color: 'white',
+                  fontWeight: 'bold'
+                }}
+              >
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  {!totalPrice ? "Please Configure Your Order Above" : "Please Upload Artwork or Select Upload Later"}
+                </span>
+              </button>
+            ) : (
+              /* Dual Buttons */
+              <div className="flex gap-3">
+                {/* Add to Cart & Keep Shopping Button - 80% width */}
+                <button 
+                  onClick={handleAddToCartAndKeepShopping}
+                  className="py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group hover:scale-[1.0025]"
+                  style={{
+                    width: '80%',
+                    background: 'linear-gradient(135deg, #ffd713, #ffed4e)',
+                    color: '#030140',
+                    fontWeight: 'bold',
+                    border: '0.03125rem solid #e6c211',
+                    boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)'
+                  }}
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span className="hidden sm:inline">Add to Cart & Keep Shopping</span>
+                    <span className="sm:hidden">Add & Browse</span>
+                  </span>
+                </button>
+
+                {/* Checkout Button - 20% width */}
+                <button 
+                  onClick={handleCheckout}
+                  className="py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group hover:scale-[1.0025]"
+                  style={{
+                    width: '20%',
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                    color: 'white',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span className="hidden sm:inline">Checkout</span>
+                    <span className="sm:hidden">💳</span>
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {/* Helpful text */}
+            <div className="text-center py-2">
+              <p className="text-white/60 text-sm">
+                {!totalPrice || (!uploadedFile && !uploadLater) 
+                  ? "Complete your configuration to proceed"
+                  : "Items will be added to your cart for review before checkout"
+                }
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   )
 }
+
+

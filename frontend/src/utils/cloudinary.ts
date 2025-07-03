@@ -147,10 +147,10 @@ export const uploadToCloudinary = async (
 };
 
 export const validateFile = (file: File): { valid: boolean; error?: string } => {
-  // Check file size (10MB limit)
-  const maxSize = 10 * 1024 * 1024; // 10MB
+  // Check file size (25MB limit)
+  const maxSize = 25 * 1024 * 1024; // 25MB
   if (file.size > maxSize) {
-    return { valid: false, error: 'File size must be less than 10MB' };
+    return { valid: false, error: 'File size must be less than 25MB' };
   }
 
   // Get file extension from filename

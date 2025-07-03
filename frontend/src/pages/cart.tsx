@@ -56,10 +56,23 @@ const calculateAreaFromSize = (sizeString: string, customWidth?: string, customH
     return PRESET_SIZES.medium.sqInches; // Default to 9 sq in (3" × 3")
   }
   
+  // Handle custom sizes with provided width/height parameters
   if (sizeString.includes("Custom") && customWidth && customHeight) {
     const w = parseFloat(customWidth) || 0;
     const h = parseFloat(customHeight) || 0;
     return calculateSquareInches(w, h);
+  }
+  
+  // Handle stored custom sizes in format "1.5\"x2\"" or "1.5x2"
+  if (sizeString.includes('x') && !sizeString.includes('Small') && !sizeString.includes('Medium') && !sizeString.includes('Large')) {
+    const match = sizeString.match(/(\d+(?:\.\d+)?)\s*["']?\s*x\s*(\d+(?:\.\d+)?)/i);
+    if (match) {
+      const w = parseFloat(match[1]) || 0;
+      const h = parseFloat(match[2]) || 0;
+      const area = w * h;
+      console.log(`Cart: Parsed custom size ${sizeString} as ${w}" x ${h}" = ${area} sq inches`);
+      return area;
+    }
   }
   
   // Use preset sizes for accurate square inch calculation
@@ -203,8 +216,8 @@ const calculateItemPricing = (
     200: 0.463,
     300: 0.39,
     500: 0.324,
-    750: 0.324,
-    1000: 0.257,
+    750: 0.24, // 76% discount (uses 500 tier from CSV)
+    1000: 0.19, // 81% discount (uses 1000 tier from CSV)
     2500: 0.213,
   };
 
@@ -2733,6 +2746,9 @@ export default function CartPage() {
     </Layout>
   );
 } 
+
+
+
 
 
 

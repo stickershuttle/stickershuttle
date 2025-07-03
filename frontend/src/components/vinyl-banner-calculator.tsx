@@ -224,6 +224,26 @@ const VinylBannerCalculator: React.FC = () => {
     setUploadError(null);
   };
 
+  // Get file type icon based on format
+  const getFileTypeIcon = (format: string): string | null => {
+    const lowerFormat = format.toLowerCase();
+    
+    if (lowerFormat === 'ai') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751503976/Adobe_Illustrator_.AI_File_Icon_v3wshr.png';
+    }
+    if (lowerFormat === 'psd') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751504068/PSD_file_icon.svg_sbi8dh.png';
+    }
+    if (lowerFormat === 'eps') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751504098/9034333_ykhb8f.png';
+    }
+    if (lowerFormat === 'pdf') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751504123/PDF_file_icon.svg_uovjbk.png';
+    }
+    
+    return null;
+  };
+
   const handleAddToCart = () => {
     if (pricing.total === 0) return;
     
@@ -386,8 +406,6 @@ const VinylBannerCalculator: React.FC = () => {
             )}
           </div>
 
-
-
           {/* Finishing Options */}
           <div>
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
@@ -535,51 +553,101 @@ const VinylBannerCalculator: React.FC = () => {
                   </div>
                 ) : (
                   <div className="mb-4">
-                    <div className="text-4xl mb-3">📁</div>
+                    <div className="mb-3 flex justify-center -ml-4">
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751341811/StickerShuttleFileIcon4_gkhsu5.png" 
+                        alt="Upload file" 
+                        className="w-20 h-20 object-contain"
+                      />
+                    </div>
                     <p className="text-white font-medium text-base mb-2 hidden md:block">Drag or click to upload your file</p>
                     <p className="text-white font-medium text-base mb-2 md:hidden">Tap to add file</p>
-                    <p className="text-white/70 text-sm">Supported formats:</p>
-                    <p className="text-white/80 text-sm font-mono">.ai, .svg, .eps, .png, .jpg, .pdf</p>
-                    <p className="text-white/60 text-xs mt-2">Max file size: 10MB</p>
+                    <p className="text-white/80 text-sm">All formats supported. Max file size: 25MB | 1 file per order</p>
                   </div>
                 )}
               </div>
             ) : (
               <div className="border border-green-400/50 rounded-xl p-4 bg-green-500/10 backdrop-blur-md">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative z-10">
-                      <AIFileImage
-                        src={uploadedFile.secure_url}
-                        filename={uploadedFile.original_filename}
-                        alt={uploadedFile.original_filename}
-                        className="w-full h-full object-cover rounded-lg relative z-10"
-                        size="thumbnail"
-                        showFileType={false}
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-green-200 font-medium break-words">{uploadedFile.original_filename}</p>
-                      <p className="text-green-300/80 text-sm">
-                        {(uploadedFile.bytes / 1024 / 1024).toFixed(2)} MB • {uploadedFile.format.toUpperCase()}
-                      </p>
-                    </div>
+                {/* Responsive Layout: Vertical on mobile, Horizontal on desktop */}
+                <div className="flex flex-col md:flex-row gap-4 items-start">
+                  {/* Image Preview - Full width on mobile, fixed size on desktop */}
+                  <div className="w-full h-48 md:w-32 md:h-32 lg:w-40 lg:h-40 rounded-xl overflow-hidden border border-green-400/30 bg-white/5 backdrop-blur-md p-3 flex items-center justify-center flex-shrink-0">
+                    <AIFileImage
+                      src={uploadedFile.secure_url}
+                      filename={uploadedFile.original_filename}
+                      alt={uploadedFile.original_filename}
+                      className="w-full h-full object-contain"
+                      size="preview"
+                      showFileType={false}
+                    />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => document.getElementById('file-input')?.click()}
-                      className="text-blue-300 hover:text-blue-200 p-2 hover:bg-blue-500/20 rounded-lg transition-colors cursor-pointer"
-                      title="Replace file"
-                    >
-                      🔄
-                    </button>
-                    <button
-                      onClick={removeUploadedFile}
-                      className="text-red-300 hover:text-red-200 p-2 hover:bg-red-500/20 rounded-lg transition-colors cursor-pointer"
-                      title="Remove file"
-                    >
-                      🗑️
-                    </button>
+
+                  {/* File Info - Below image on mobile, right side on desktop */}
+                  <div className="flex-1 min-w-0 w-full">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="text-green-400 text-xl">📎</div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-green-200 font-medium break-words text-lg">{uploadedFile.original_filename}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => document.getElementById('file-input')?.click()}
+                          className="text-blue-300 hover:text-blue-200 p-2 hover:bg-blue-500/20 rounded-lg transition-colors cursor-pointer"
+                          title="Replace file"
+                        >
+                          🔄
+                        </button>
+                        <button
+                          onClick={removeUploadedFile}
+                          className="text-red-300 hover:text-red-200 p-2 hover:bg-red-500/20 rounded-lg transition-colors cursor-pointer"
+                          title="Remove file"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* File Details */}
+                    <div className="space-y-2 mb-3">
+                      <div className="flex flex-wrap items-center gap-3 text-green-300/80 text-sm">
+                        <span className="flex items-center gap-1">
+                          <span className="text-green-400">📏</span>
+                          {(uploadedFile.bytes / 1024 / 1024).toFixed(2)} MB
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="text-green-400">🎨</span>
+                          {uploadedFile.format.toUpperCase()}
+                        </span>
+                        {uploadedFile.width && uploadedFile.height && (
+                          <span className="flex items-center gap-1">
+                            <span className="text-green-400">📐</span>
+                            {uploadedFile.width}x{uploadedFile.height}px
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* File Type Icon */}
+                      {getFileTypeIcon(uploadedFile.format) && (
+                        <div className="flex items-center gap-2">
+                          <img 
+                            src={getFileTypeIcon(uploadedFile.format)!} 
+                            alt={`${uploadedFile.format.toUpperCase()} file`}
+                            className="w-6 h-6 object-contain opacity-80"
+                          />
+                          <span className="text-xs text-green-300/60">
+                            Professional design file detected
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Upload Success Message */}
+                    <div className="flex items-center gap-2 text-green-300 text-sm">
+                      <span className="text-green-400">✅</span>
+                      <span>File uploaded successfully!</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -594,7 +662,8 @@ const VinylBannerCalculator: React.FC = () => {
               </div>
             )}
             
-                          <div className="mt-4 flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+            {!uploadedFile && (
+              <div className="mt-4 flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
                    style={{
                      background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
                      border: '1px solid rgba(147, 51, 234, 0.4)',
@@ -616,6 +685,7 @@ const VinylBannerCalculator: React.FC = () => {
                   Upload Artwork Later
                 </label>
               </div>
+            )}
             {uploadLater && !uploadedFile && (
               <div className="mt-2 text-white/80 text-sm italic flex items-center">
                 <span role="img" aria-label="caution" className="mr-1">⚠️</span>

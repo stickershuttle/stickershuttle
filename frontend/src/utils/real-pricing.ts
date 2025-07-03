@@ -107,13 +107,25 @@ export async function loadRealPricingData(): Promise<{
   quantityDiscounts: QuantityDiscountRow[];
 }> {
   try {
+    console.log('Attempting to load CSV files from:', {
+      basePriceUrl: '/orbit/base-price.csv',
+      qtyUrl: '/orbit/qty-sq.csv'
+    });
+    
     const [basePriceResponse, qtyDiscountResponse] = await Promise.all([
       fetch('/orbit/base-price.csv'),
       fetch('/orbit/qty-sq.csv')
     ]);
     
+    console.log('CSV fetch responses:', {
+      basePriceOk: basePriceResponse.ok,
+      basePriceStatus: basePriceResponse.status,
+      qtyDiscountOk: qtyDiscountResponse.ok,
+      qtyDiscountStatus: qtyDiscountResponse.status
+    });
+    
     if (!basePriceResponse.ok || !qtyDiscountResponse.ok) {
-      throw new Error('Failed to load pricing CSV files');
+      throw new Error(`Failed to load pricing CSV files: base-price (${basePriceResponse.status}), qty-sq (${qtyDiscountResponse.status})`);
     }
     
     const [basePriceText, qtyDiscountText] = await Promise.all([
@@ -121,10 +133,15 @@ export async function loadRealPricingData(): Promise<{
       qtyDiscountResponse.text()
     ]);
     
+    console.log('CSV file sizes:', {
+      basePriceLength: basePriceText.length,
+      qtyDiscountLength: qtyDiscountText.length
+    });
+    
     const basePricing = parseBasePricing(basePriceText);
     const quantityDiscounts = parseQuantityDiscounts(qtyDiscountText);
     
-    console.log('Loaded pricing data:', {
+    console.log('Successfully loaded pricing data:', {
       basePricing: basePricing.length,
       quantityDiscounts: quantityDiscounts.length
     });
@@ -133,6 +150,9 @@ export async function loadRealPricingData(): Promise<{
     
   } catch (error) {
     console.error('Error loading real pricing data:', error);
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      console.error('This appears to be a network error. CSV files may not be accessible.');
+    }
     throw error;
   }
 }
