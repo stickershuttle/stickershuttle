@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getSupabase } from '../lib/supabase';
 import { useMutation } from '@apollo/client';
 import { SYNC_CUSTOMER_TO_KLAVIYO } from '../lib/klaviyo-mutations';
+import { CREATE_USER_PROFILE, CREATE_WHOLESALE_USER_PROFILE } from '../lib/profile-mutations';
 
 export default function SignUp() {
   const router = useRouter();
@@ -20,6 +21,10 @@ export default function SignUp() {
 
   // Klaviyo integration
   const [syncToKlaviyo] = useMutation(SYNC_CUSTOMER_TO_KLAVIYO);
+  
+  // Profile creation mutations
+  const [createUserProfile] = useMutation(CREATE_USER_PROFILE);
+  const [createWholesaleUserProfile] = useMutation(CREATE_WHOLESALE_USER_PROFILE);
 
   const [formData, setFormData] = useState({
     email: router.query.email ? decodeURIComponent(router.query.email as string) : '',
@@ -27,6 +32,11 @@ export default function SignUp() {
     confirmPassword: '',
     firstName: '',
     lastName: '',
+    companyName: '',
+    isWholesale: false,
+    wholesaleMonthlyCustomers: '',
+    wholesaleOrderingFor: '',
+    wholesaleFitExplanation: '',
     agreeToTerms: false
   });
 
@@ -40,8 +50,9 @@ export default function SignUp() {
     }
   }, [router.query.email]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    const checked = 'checked' in e.target ? e.target.checked : false;
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
@@ -77,6 +88,11 @@ export default function SignUp() {
     const directLastName = formDataElements.get('lastName') as string;
     const directEmail = formDataElements.get('email') as string;
     const directPassword = formDataElements.get('password') as string;
+    const directCompanyName = formDataElements.get('companyName') as string;
+    const directIsWholesale = formDataElements.get('isWholesale') === 'on';
+    const directWholesaleMonthlyCustomers = formDataElements.get('wholesaleMonthlyCustomers') as string;
+    const directWholesaleOrderingFor = formDataElements.get('wholesaleOrderingFor') as string;
+    const directWholesaleFitExplanation = formDataElements.get('wholesaleFitExplanation') as string;
 
     console.log('🎯 Using direct form data:', {
       firstName: directFirstName,
@@ -104,6 +120,40 @@ export default function SignUp() {
       setError('Please agree to the terms and conditions');
       setLoading(false);
       return;
+    }
+
+    // Wholesale validation
+    if (formData.isWholesale) {
+      if (!formData.companyName.trim()) {
+        console.log('❌ Wholesale signup missing company name');
+        setError('Company name is required for wholesale accounts');
+        setLoading(false);
+        return;
+      }
+      if (!formData.wholesaleMonthlyCustomers.trim()) {
+        console.log('❌ Wholesale signup missing monthly customers info');
+        setError('Please specify how many customers you work with monthly');
+        setLoading(false);
+        return;
+      }
+      if (!formData.wholesaleOrderingFor.trim()) {
+        console.log('❌ Wholesale signup missing ordering for info');
+        setError('Please specify if you are ordering for clients or yourself');
+        setLoading(false);
+        return;
+      }
+      if (!formData.wholesaleFitExplanation.trim()) {
+        console.log('❌ Wholesale signup missing fit explanation');
+        setError('Please explain why we may be a good fit');
+        setLoading(false);
+        return;
+      }
+      if (formData.wholesaleOrderingFor === 'myself') {
+        console.log('❌ Wholesale signup not allowed for personal use only');
+        setError('Wholesale accounts are for ordering for clients only. Please select "For clients" or "Both clients and myself"');
+        setLoading(false);
+        return;
+      }
     }
 
     console.log('✅ Validation passed, attempting signup...');
@@ -238,6 +288,45 @@ export default function SignUp() {
       }
 
       console.log('✅ Email verified successfully!');
+      
+      // Create user profile based on type
+      if (data.user?.id) {
+        try {
+          console.log('👤 Creating user profile...');
+          
+          if (formData.isWholesale) {
+            console.log('🏪 Creating wholesale user profile');
+            await createWholesaleUserProfile({
+              variables: {
+                userId: data.user.id,
+                input: {
+                  firstName: userFirstName,
+                  lastName: userLastName,
+                  companyName: formData.companyName,
+                  wholesaleMonthlyCustomers: formData.wholesaleMonthlyCustomers,
+                  wholesaleOrderingFor: formData.wholesaleOrderingFor,
+                  wholesaleFitExplanation: formData.wholesaleFitExplanation,
+                  signupCreditAmount: 25.00 // $25 welcome bonus for wholesale customers
+                }
+              }
+            });
+            console.log('✅ Wholesale profile created successfully!');
+          } else {
+            console.log('👤 Creating regular user profile');
+            await createUserProfile({
+              variables: {
+                userId: data.user.id,
+                firstName: userFirstName,
+                lastName: userLastName
+              }
+            });
+            console.log('✅ Regular profile created successfully!');
+          }
+        } catch (profileError) {
+          console.error('⚠️ Profile creation failed (non-critical):', profileError);
+          // Don't block signup if profile creation fails
+        }
+      }
       
       // Sync new customer to Klaviyo default list
       try {
@@ -543,6 +632,45 @@ export default function SignUp() {
 
             {/* Sign Up Form */}
             <form onSubmit={handleSubmit} className="space-y-4 mobile-signup-form">
+              {/* Wholesale Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-xl transition-all duration-300" 
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                  backdropFilter: 'blur(12px)'
+                }}
+              >
+                <div className="flex-1">
+                  <h3 className="text-white font-medium text-lg">Wholesale Account</h3>
+                  <p className="text-gray-300 text-sm">Get 10% store credit + $25 welcome bonus</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, isWholesale: !prev.isWholesale }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                    formData.isWholesale ? 'bg-blue-600' : 'bg-gray-600'
+                  }`}
+                  aria-label="Toggle wholesale account"
+                  title="Toggle wholesale account"
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      formData.isWholesale ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <input
+                  type="checkbox"
+                  name="isWholesale"
+                  checked={formData.isWholesale}
+                  onChange={() => {}} // Handled by button click
+                  className="hidden"
+                  title="Wholesale account toggle"
+                  aria-label="Wholesale account toggle"
+                />
+              </div>
+
               {/* Name Fields */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -593,6 +721,109 @@ export default function SignUp() {
                   required
                 />
               </div>
+
+              {/* Wholesale Questions (shown only when toggle is on) */}
+              {formData.isWholesale && (
+                <div className="space-y-4 p-4 rounded-xl border border-blue-500/30 bg-blue-500/5">
+                  <div className="text-center">
+                    <h4 className="text-white font-medium text-lg mb-2">Wholesale Application</h4>
+                    <p className="text-gray-300 text-sm">Please provide additional information for wholesale pricing</p>
+                  </div>
+
+                  {/* Company Name */}
+                  <div>
+                    <label htmlFor="companyName" className="block text-sm font-medium text-gray-300 mb-2">
+                      Company Name *
+                    </label>
+                    <input
+                      type="text"
+                      id="companyName"
+                      name="companyName"
+                      value={formData.companyName}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      placeholder="Your Company Name"
+                      required={formData.isWholesale}
+                    />
+                  </div>
+
+                  {/* Monthly Customers */}
+                  <div>
+                    <label htmlFor="wholesaleMonthlyCustomers" className="block text-sm font-medium text-gray-300 mb-2">
+                      How many customers do you work with monthly? *
+                    </label>
+                    <select
+                      id="wholesaleMonthlyCustomers"
+                      name="wholesaleMonthlyCustomers"
+                      value={formData.wholesaleMonthlyCustomers}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      style={{ 
+                        color: 'white',
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                      }}
+                      required={formData.isWholesale}
+                    >
+                      <option value="" style={{ color: 'black', backgroundColor: 'white' }}>Select range</option>
+                      <option value="1-10" style={{ color: 'black', backgroundColor: 'white' }}>1-10 customers</option>
+                      <option value="11-25" style={{ color: 'black', backgroundColor: 'white' }}>11-25 customers</option>
+                      <option value="26-50" style={{ color: 'black', backgroundColor: 'white' }}>26-50 customers</option>
+                      <option value="51-100" style={{ color: 'black', backgroundColor: 'white' }}>51-100 customers</option>
+                      <option value="100+" style={{ color: 'black', backgroundColor: 'white' }}>100+ customers</option>
+                    </select>
+                  </div>
+
+                  {/* Ordering For */}
+                  <div>
+                    <label htmlFor="wholesaleOrderingFor" className="block text-sm font-medium text-gray-300 mb-2">
+                      Are you ordering for clients or yourself? *
+                    </label>
+                    <select
+                      id="wholesaleOrderingFor"
+                      name="wholesaleOrderingFor"
+                      value={formData.wholesaleOrderingFor}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      style={{ 
+                        color: 'white',
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                      }}
+                      required={formData.isWholesale}
+                    >
+                      <option value="" style={{ color: 'black', backgroundColor: 'white' }}>Select option</option>
+                      <option value="clients" style={{ color: 'black', backgroundColor: 'white' }}>For clients</option>
+                      <option value="myself" style={{ color: 'black', backgroundColor: 'white' }}>For myself</option>
+                      <option value="both" style={{ color: 'black', backgroundColor: 'white' }}>Both clients and myself</option>
+                    </select>
+                    
+                    {/* Validation message for "For myself" selection */}
+                    {formData.wholesaleOrderingFor === 'myself' && (
+                      <div className="mt-2 p-3 rounded-lg bg-red-500/20 border border-red-500/30">
+                        <p className="text-red-300 text-sm">
+                          ⚠️ This is for wholesale only. You must order for other clients to qualify for wholesale pricing.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Fit Explanation */}
+                  <div>
+                    <label htmlFor="wholesaleFitExplanation" className="block text-sm font-medium text-gray-300 mb-2">
+                      Explain why we may be a good fit *
+                    </label>
+                    <textarea
+                      id="wholesaleFitExplanation"
+                      name="wholesaleFitExplanation"
+                      value={formData.wholesaleFitExplanation}
+                      onChange={handleInputChange}
+                      rows={4}
+                      className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-vertical"
+                      placeholder="Tell us about your business needs, expected order volume, how you plan to use our services, etc."
+                      required={formData.isWholesale}
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Password Fields */}
               <div className="grid grid-cols-1 gap-4">
@@ -773,6 +1004,45 @@ export default function SignUp() {
 
                   {/* Sign Up Form */}
                   <form onSubmit={handleSubmit} className="space-y-4 desktop-signup-form">
+                    {/* Wholesale Toggle */}
+                    <div className="flex items-center justify-between p-4 rounded-xl transition-all duration-300" 
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
+                      }}
+                    >
+                      <div className="flex-1">
+                        <h3 className="text-white font-medium text-lg">Wholesale Account</h3>
+                        <p className="text-gray-300 text-sm">Get 10% store credit + $25 welcome bonus</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, isWholesale: !prev.isWholesale }))}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                          formData.isWholesale ? 'bg-blue-600' : 'bg-gray-600'
+                        }`}
+                        aria-label="Toggle wholesale account"
+                        title="Toggle wholesale account"
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            formData.isWholesale ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                      <input
+                        type="checkbox"
+                        name="isWholesale"
+                        checked={formData.isWholesale}
+                        onChange={() => {}} // Handled by button click
+                        className="hidden"
+                        title="Wholesale account toggle"
+                        aria-label="Wholesale account toggle"
+                      />
+                    </div>
+
                     {/* Name Fields */}
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -823,6 +1093,109 @@ export default function SignUp() {
                         required
                       />
                     </div>
+
+                    {/* Wholesale Questions (shown only when toggle is on) */}
+                    {formData.isWholesale && (
+                      <div className="space-y-4 p-4 rounded-xl border border-blue-500/30 bg-blue-500/5">
+                        <div className="text-center">
+                          <h4 className="text-white font-medium text-lg mb-2">Wholesale Application</h4>
+                          <p className="text-gray-300 text-sm">Please provide additional information for wholesale pricing</p>
+                        </div>
+
+                        {/* Company Name */}
+                        <div>
+                          <label htmlFor="companyName-desktop" className="block text-sm font-medium text-gray-300 mb-2">
+                            Company Name *
+                          </label>
+                          <input
+                            type="text"
+                            id="companyName-desktop"
+                            name="companyName"
+                            value={formData.companyName}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                            placeholder="Your Company Name"
+                            required={formData.isWholesale}
+                          />
+                        </div>
+
+                        {/* Monthly Customers */}
+                        <div>
+                          <label htmlFor="wholesaleMonthlyCustomers-desktop" className="block text-sm font-medium text-gray-300 mb-2">
+                            How many customers do you work with monthly? *
+                          </label>
+                          <select
+                            id="wholesaleMonthlyCustomers-desktop"
+                            name="wholesaleMonthlyCustomers"
+                            value={formData.wholesaleMonthlyCustomers}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                            style={{ 
+                              color: 'white',
+                              backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                            }}
+                            required={formData.isWholesale}
+                          >
+                            <option value="" style={{ color: 'black', backgroundColor: 'white' }}>Select range</option>
+                            <option value="1-10" style={{ color: 'black', backgroundColor: 'white' }}>1-10 customers</option>
+                            <option value="11-25" style={{ color: 'black', backgroundColor: 'white' }}>11-25 customers</option>
+                            <option value="26-50" style={{ color: 'black', backgroundColor: 'white' }}>26-50 customers</option>
+                            <option value="51-100" style={{ color: 'black', backgroundColor: 'white' }}>51-100 customers</option>
+                            <option value="100+" style={{ color: 'black', backgroundColor: 'white' }}>100+ customers</option>
+                          </select>
+                        </div>
+
+                        {/* Ordering For */}
+                        <div>
+                          <label htmlFor="wholesaleOrderingFor-desktop" className="block text-sm font-medium text-gray-300 mb-2">
+                            Are you ordering for clients or yourself? *
+                          </label>
+                          <select
+                            id="wholesaleOrderingFor-desktop"
+                            name="wholesaleOrderingFor"
+                            value={formData.wholesaleOrderingFor}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                            style={{ 
+                              color: 'white',
+                              backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                            }}
+                            required={formData.isWholesale}
+                          >
+                            <option value="" style={{ color: 'black', backgroundColor: 'white' }}>Select option</option>
+                            <option value="clients" style={{ color: 'black', backgroundColor: 'white' }}>For clients</option>
+                            <option value="myself" style={{ color: 'black', backgroundColor: 'white' }}>For myself</option>
+                            <option value="both" style={{ color: 'black', backgroundColor: 'white' }}>Both clients and myself</option>
+                          </select>
+                          
+                          {/* Validation message for "For myself" selection */}
+                          {formData.wholesaleOrderingFor === 'myself' && (
+                            <div className="mt-2 p-3 rounded-lg bg-red-500/20 border border-red-500/30">
+                              <p className="text-red-300 text-sm">
+                                ⚠️ This is for wholesale only. You must order for other clients to qualify for wholesale pricing.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Fit Explanation */}
+                        <div>
+                          <label htmlFor="wholesaleFitExplanation-desktop" className="block text-sm font-medium text-gray-300 mb-2">
+                            Explain why we may be a good fit *
+                          </label>
+                          <textarea
+                            id="wholesaleFitExplanation-desktop"
+                            name="wholesaleFitExplanation"
+                            value={formData.wholesaleFitExplanation}
+                            onChange={handleInputChange}
+                            rows={4}
+                            className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-vertical"
+                            placeholder="Tell us about your business needs, expected order volume, how you plan to use our services, etc."
+                            required={formData.isWholesale}
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     {/* Password Fields */}
                     <div className="grid grid-cols-1 gap-4">
