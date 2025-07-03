@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { Instagram } from "lucide-react"
 import { 
   BasePriceRow, 
   QuantityDiscountRow, 
@@ -13,6 +14,7 @@ import AIFileImage from './AIFileImage'
 import { useCart } from "@/components/CartContext"
 import { generateCartItemId } from "@/types/product"
 import { useRouter } from "next/router"
+import { getSupabase } from "@/lib/supabase"
 
 interface BasePricing {
   sqInches: number
@@ -59,6 +61,10 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
+  // User and profile states
+  const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
+
   // Check for mobile on component mount and resize
   useEffect(() => {
     const checkMobile = () => {
@@ -70,6 +76,46 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
     
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  // Fetch user and profile data
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const supabase = await getSupabase();
+        
+        // Get current user
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        setUser(currentUser);
+        
+        if (currentUser) {
+          // Get user profile
+          const { data: profileData } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .single();
+          
+          setProfile(profileData);
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
+    fetchUserData();
+  }, [])
+
+  // Calculate dynamic credit rate based on wholesale status
+  const getCreditRate = () => {
+    if (!profile) return 0.05; // Default 5% for non-logged in users
+    
+    // Check if user is wholesale and approved
+    if (profile.is_wholesale_customer && profile.wholesale_status === 'approved') {
+      return profile.wholesale_credit_rate || 0.10; // Use profile rate or default 10%
+    }
+    
+    return 0.05; // Default 5% for regular users
+  }
 
   // Auto-expand textarea when additionalNotes changes
   useEffect(() => {
@@ -355,7 +401,20 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
       2500: 0.213, // 78.7% discount
     }
 
-    const discountMultiplier = discountMap[qty] || 1.0
+    // Find the appropriate quantity tier (use lower tier as per CSV note)
+    // "Any quantities or square inches between these values default to the lowest displayed value"
+    let applicableQuantity = 50; // Default to lowest tier
+    const quantityTiers = [50, 100, 200, 300, 500, 750, 1000, 2500];
+    
+    for (const tier of quantityTiers) {
+      if (qty >= tier) {
+        applicableQuantity = tier;
+      } else {
+        break;
+      }
+    }
+
+    const discountMultiplier = discountMap[applicableQuantity] || 1.0
     pricePerSticker = scaledBasePrice * discountMultiplier * kissCutMultiplier
     totalPrice = pricePerSticker * qty
 
@@ -1113,7 +1172,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                          }}>
                       <span className="flex items-center justify-start gap-1.5 text-yellow-200">
                         <i className="fas fa-coins text-yellow-300"></i>
-                        You'll earn ${(parseFloat(totalPrice.replace('$', '')) * 0.05).toFixed(2)} in store credit on this order!
+                        You'll earn ${(parseFloat(totalPrice.replace('$', '')) * getCreditRate()).toFixed(2)} in store credit on this order!
                       </span>
                     </div>
                   )}
@@ -1515,13 +1574,129 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                           postToInstagram ? 'translate-x-7' : 'translate-x-1'
                         }`} />
                       </button>
-                      <label className={`text-sm font-medium ${postToInstagram ? 'text-purple-200' : 'text-white/80'}`}>
-                        {postToInstagram ? '✅ Post to Instagram' : '❌ Don\'t Post to Instagram'}
+                      <Instagram className="h-5 w-5 text-purple-400" />
+                      <label className="text-sm font-medium text-purple-200">
+                        Post my order to Instagram
                       </label>
                     </div>
+                    
+                    {/* Instagram handle input - right under Instagram toggle */}
+                    {postToInstagram && (
+                      <div className="mt-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white text-xl">@</span>
+                          <div className="flex-grow p-3 rounded-lg backdrop-blur-md"
+                               style={{
+                                 background: 'rgba(255, 255, 255, 0.05)',
+                                 border: '1px solid rgba(255, 255, 255, 0.1)',
+                                 boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                               }}>
+                            <input
+                              type="text"
+                              placeholder="Enter your Instagram handle"
+                              value={instagramHandle}
+                              onChange={(e) => setInstagramHandle(e.target.value)}
+                              className="w-full bg-transparent text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-purple-400/50 transition-all border-0"
+                            />
+                          </div>
+                        </div>
+                        <div className="text-xs text-white/70 italic">
+                          *Most reels are posted within a week or two of your order being delivered. We may reach out to post it sooner.
+                        </div>
+                        <div className="text-xs">
+                          <a 
+                            href="https://www.instagram.com/stickershuttle/" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-purple-300 hover:text-purple-200 underline"
+                          >
+                            Follow @stickershuttle
+                          </a>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            {/* Conditional Button Display */}
+            {!totalPrice || (!uploadedFile && !uploadLater) ? (
+              /* Single Upload Required Button */
+              <button 
+                disabled={true}
+                className="w-full py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: '#666',
+                  color: 'white',
+                  fontWeight: 'bold'
+                }}
+              >
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  {!totalPrice ? "Please Configure Your Order Above" : "Please Upload Artwork or Select Upload Later"}
+                </span>
+              </button>
+            ) : (
+              /* Dual Buttons */
+              <div className="flex flex-col sm:flex-row gap-3">
+                {/* Add to Cart & Keep Shopping Button - Full width on mobile, 80% on desktop */}
+                <button 
+                  onClick={handleAddToCartAndKeepShopping}
+                  className="w-full sm:w-4/5 py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group hover:scale-[1.0025] cursor-pointer"
+                  style={{
+                    background: 'linear-gradient(135deg, #ffd713, #ffed4e)',
+                    color: '#030140',
+                    fontWeight: 'bold',
+                    border: '0.03125rem solid #e6c211',
+                    boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)'
+                  }}
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span className="hidden sm:inline">Add & Keep Shopping</span>
+                    <span className="sm:hidden">Add & Keep Shopping</span>
+                  </span>
+                </button>
+
+                {/* Checkout Button - Full width on mobile, 20% on desktop */}
+                <button 
+                  onClick={handleCheckout}
+                  className="w-full sm:w-1/5 py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group hover:scale-[1.025] cursor-pointer"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                    color: 'white',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span>Checkout</span>
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {/* Helpful text */}
+            <div className="text-center py-2">
+              <p className="text-white/60 text-sm">
+                {!totalPrice || (!uploadedFile && !uploadLater) 
+                  ? "Complete your configuration to proceed"
+                  : "Items will be added to your cart for review before checkout"
+                }
+              </p>
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { Instagram } from "lucide-react"
 import { 
   BasePriceRow, 
   QuantityDiscountRow, 
@@ -13,6 +14,7 @@ import AIFileImage from './AIFileImage'
 import { useCart } from "@/components/CartContext"
 import { generateCartItemId } from "@/types/product"
 import { useRouter } from "next/router"
+import { getSupabase } from "@/lib/supabase"
 
 interface BasePricing {
   sqInches: number
@@ -58,6 +60,10 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
+  // User and profile states
+  const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
+
   // Check for mobile on component mount and resize
   useEffect(() => {
     const checkMobile = () => {
@@ -69,6 +75,46 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
     
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  // Fetch user and profile data
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const supabase = await getSupabase();
+        
+        // Get current user
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        setUser(currentUser);
+        
+        if (currentUser) {
+          // Get user profile
+          const { data: profileData } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .single();
+          
+          setProfile(profileData);
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
+    fetchUserData();
+  }, [])
+
+  // Calculate dynamic credit rate based on wholesale status
+  const getCreditRate = () => {
+    if (!profile) return 0.05; // Default 5% for non-logged in users
+    
+    // Check if user is wholesale and approved
+    if (profile.is_wholesale_customer && profile.wholesale_status === 'approved') {
+      return profile.wholesale_credit_rate || 0.10; // Use profile rate or default 10%
+    }
+    
+    return 0.05; // Default 5% for regular users
+  }
 
   // Auto-expand textarea when additionalNotes changes
   useEffect(() => {
@@ -1080,7 +1126,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                          }}>
                       <span className="flex items-center justify-start gap-1.5 text-yellow-200">
                         <i className="fas fa-coins text-yellow-300"></i>
-                        You'll earn ${(parseFloat(totalPrice.replace('$', '')) * 0.05).toFixed(2)} in store credit on this order!
+                        You'll earn ${(parseFloat(totalPrice.replace('$', '')) * getCreditRate()).toFixed(2)} in store credit on this order!
                       </span>
                     </div>
                   )}
@@ -1482,23 +1528,45 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                           postToInstagram ? 'translate-x-7' : 'translate-x-1'
                         }`} />
                       </button>
-                      <label className={`text-sm font-medium ${postToInstagram ? 'text-purple-200' : 'text-white/70'}`}>
-                        {postToInstagram ? '📸 Share on Instagram' : '📷 Instagram Opt-in'}
+                      <Instagram className="h-5 w-5 text-purple-400" />
+                      <label className="text-sm font-medium text-purple-200">
+                        Post my order to Instagram
                       </label>
                     </div>
                     
+                    {/* Instagram handle input - right under Instagram toggle */}
                     {postToInstagram && (
-                      <div className="mt-3">
-                        <input
-                          type="text"
-                          placeholder="@yourusername (optional)"
-                          value={instagramHandle}
-                          onChange={(e) => setInstagramHandle(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive"
-                        />
-                        <p className="mt-2 text-xs text-white/60">
-                          We'll feature your order on our Instagram and tag you if you provide your handle.
-                        </p>
+                      <div className="mt-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white text-xl">@</span>
+                          <div className="flex-grow p-3 rounded-lg backdrop-blur-md"
+                               style={{
+                                 background: 'rgba(255, 255, 255, 0.05)',
+                                 border: '1px solid rgba(255, 255, 255, 0.1)',
+                                 boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                               }}>
+                            <input
+                              type="text"
+                              placeholder="Enter your Instagram handle"
+                              value={instagramHandle}
+                              onChange={(e) => setInstagramHandle(e.target.value)}
+                              className="w-full bg-transparent text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-purple-400/50 transition-all border-0"
+                            />
+                          </div>
+                        </div>
+                        <div className="text-xs text-white/70 italic">
+                          *Most reels are posted within a week or two of your order being delivered. We may reach out to post it sooner.
+                        </div>
+                        <div className="text-xs">
+                          <a 
+                            href="https://www.instagram.com/stickershuttle/" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-purple-300 hover:text-purple-200 underline"
+                          >
+                            Follow @stickershuttle
+                          </a>
+                        </div>
                       </div>
                     )}
                   </div>

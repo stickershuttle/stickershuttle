@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { Instagram } from "lucide-react"
 import { 
   BasePriceRow, 
   QuantityDiscountRow, 
@@ -13,6 +14,7 @@ import AIFileImage from './AIFileImage'
 import { useCart } from "@/components/CartContext"
 import { generateCartItemId } from "@/types/product"
 import { useRouter } from "next/router"
+import { getSupabase } from "@/lib/supabase"
 
 interface BasePricing {
   sqInches: number
@@ -58,6 +60,10 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
+  // User and profile states
+  const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
+
   // Check for mobile on component mount and resize
   useEffect(() => {
     const checkMobile = () => {
@@ -69,6 +75,46 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
     
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  // Fetch user and profile data
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const supabase = await getSupabase();
+        
+        // Get current user
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        setUser(currentUser);
+        
+        if (currentUser) {
+          // Get user profile
+          const { data: profileData } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .single();
+          
+          setProfile(profileData);
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
+    fetchUserData();
+  }, [])
+
+  // Calculate dynamic credit rate based on wholesale status
+  const getCreditRate = () => {
+    if (!profile) return 0.05; // Default 5% for non-logged in users
+    
+    // Check if user is wholesale and approved
+    if (profile.is_wholesale_customer && profile.wholesale_status === 'approved') {
+      return profile.wholesale_credit_rate || 0.10; // Use profile rate or default 10%
+    }
+    
+    return 0.05; // Default 5% for regular users
+  }
 
   // Auto-expand textarea when additionalNotes changes
   useEffect(() => {
@@ -366,7 +412,20 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
       2500: 0.213, // 78.7% discount
     }
 
-    const discountMultiplier = discountMap[qty] || 1.0
+    // Find the appropriate quantity tier (use lower tier as per CSV note)
+    // "Any quantities or square inches between these values default to the lowest displayed value"
+    let applicableQuantity = 50; // Default to lowest tier
+    const quantityTiers = [50, 100, 200, 300, 500, 750, 1000, 2500];
+    
+    for (const tier of quantityTiers) {
+      if (qty >= tier) {
+        applicableQuantity = tier;
+      } else {
+        break;
+      }
+    }
+
+    const discountMultiplier = discountMap[applicableQuantity] || 1.0
     pricePerSticker = scaledBasePrice * discountMultiplier * whiteOptionMultiplier
     totalPrice = pricePerSticker * qty
 
@@ -1083,7 +1142,7 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                          }}>
                       <span className="flex items-center justify-start gap-1.5 text-yellow-200">
                         <i className="fas fa-coins text-yellow-300"></i>
-                        You'll earn ${(parseFloat(totalPrice.replace('$', '')) * 0.05).toFixed(2)} in store credit on this order!
+                        You'll earn ${(parseFloat(totalPrice.replace('$', '')) * getCreditRate()).toFixed(2)} in store credit on this order!
                       </span>
                     </div>
                   )}
@@ -1485,6 +1544,7 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                           postToInstagram ? 'translate-x-7' : 'translate-x-1'
                         }`} />
                       </button>
+                      <Instagram className="h-5 w-5 text-purple-400" />
                       <label className="text-sm font-medium text-purple-200">
                         Post my order to Instagram
                       </label>
