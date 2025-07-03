@@ -506,7 +506,7 @@ const updateTransactionOrderId = async (transactionId, orderId) => {
   }
 };
 
-// Earn points/credits from purchase (5% cashback)
+// Earn points/credits from purchase (5% cashback) with $100 limit
 const earnPointsFromPurchase = async (userId, orderTotal, orderId) => {
   try {
     if (!userId || userId === 'guest') {
@@ -522,31 +522,57 @@ const earnPointsFromPurchase = async (userId, orderTotal, orderId) => {
       return { success: false, message: 'No points to earn' };
     }
 
-    console.log(`💰 Earning ${pointsEarned} points from $${orderTotal} purchase for user ${userId}, order ${orderId}`);
+    console.log(`💰 Attempting to earn ${pointsEarned} points from $${orderTotal} purchase for user ${userId}, order ${orderId}`);
     
     const client = supabase.getServiceClient();
     
-    // Use the new function that supports order linkage
+    // Use the new function that supports credit limits
     const { data, error } = await client
-      .rpc('add_user_credits_with_order', {
+      .rpc('add_user_credits_with_limit', {
         p_user_id: userId,
         p_amount: pointsEarned,
         p_reason: `$${pointsEarned.toFixed(2)} earned from your recent order`,
         p_order_id: orderId,
         p_created_by: null,
-        p_expires_at: null
+        p_expires_at: null,
+        p_credit_limit: 100.00
       });
     
     if (error) throw error;
     
-    console.log('✅ Points earned successfully and linked to order:', { pointsEarned, orderId });
-    
-    return {
-      success: true,
-      pointsEarned: pointsEarned,
-      orderId: orderId,
-      message: `$${pointsEarned.toFixed(2)} earned from your recent order`
-    };
+    // Handle different scenarios based on response
+    if (data.success === false && data.limit_reached) {
+      console.log('🚫 Credit limit reached - no additional credits earned:', data);
+      return {
+        success: false,
+        limitReached: true,
+        currentBalance: data.current_balance,
+        creditLimit: data.credit_limit,
+        message: 'Credit limit reached - no additional credits earned'
+      };
+    } else if (data.success === true && data.limit_reached) {
+      console.log('⚠️ Partial credits earned - limit reached:', data);
+      return {
+        success: true,
+        limitReached: true,
+        pointsEarned: data.amount,
+        totalBalance: data.balance,
+        creditLimit: data.credit_limit,
+        orderId: orderId,
+        message: `$${data.amount.toFixed(2)} earned (limit reached)`
+      };
+    } else {
+      console.log('✅ Points earned successfully:', { pointsEarned: data.amount, orderId });
+      return {
+        success: true,
+        limitReached: false,
+        pointsEarned: data.amount,
+        totalBalance: data.balance,
+        creditLimit: data.credit_limit,
+        orderId: orderId,
+        message: `$${data.amount.toFixed(2)} earned from your recent order`
+      };
+    }
   } catch (error) {
     console.error('Error earning points from purchase:', error);
     return {

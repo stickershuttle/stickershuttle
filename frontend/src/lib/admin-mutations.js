@@ -39,4 +39,63 @@ export const BACKUP_USER_DATA = gql`
       error
     }
   }
+`;
+
+export const CREATE_SHARED_CART = gql`
+  mutation CreateSharedCart($input: CreateSharedCartInput!) {
+    createSharedCart(input: $input) {
+      success
+      sharedCart {
+        id
+        shareId
+        cartData
+        createdBy
+        createdAt
+        expiresAt
+        accessCount
+        lastAccessAt
+      }
+      shareUrl
+      error
+    }
+  }
+`;
+
+export const GET_SHARED_CART = gql`
+  query GetSharedCart($shareId: String!) {
+    getSharedCart(shareId: $shareId) {
+      success
+      sharedCart {
+        id
+        shareId
+        cartData
+        createdBy
+        createdAt
+        expiresAt
+        accessCount
+        lastAccessAt
+      }
+      error
+    }
+  }
+`;
+
+export const GET_ALL_SHARED_CARTS = gql`
+  query GetAllSharedCarts($offset: Int, $limit: Int) {
+    getAllSharedCarts(offset: $offset, limit: $limit) {
+      success
+      sharedCarts {
+        id
+        shareId
+        cartData
+        createdBy
+        createdAt
+        expiresAt
+        accessCount
+        lastAccessAt
+      }
+      totalCount
+      error
+    }
+  }
 `; 

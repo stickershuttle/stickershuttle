@@ -525,6 +525,10 @@ const typeDefs = gql`
     # Sitewide Alert queries
     getActiveSitewideAlerts: [SitewideAlert!]!
     getAllSitewideAlerts: [SitewideAlert!]!
+    
+    # Shared cart queries
+    getSharedCart(shareId: String!): SharedCartResult!
+    getAllSharedCarts(offset: Int, limit: Int): AllSharedCartsResult!
   }
 
   type Mutation {
@@ -587,6 +591,8 @@ const typeDefs = gql`
     addCreditsToAllUsers(amount: Float!, reason: String!): AddCreditsToAllUsersResult!
     applyCreditsToOrder(orderId: ID!, amount: Float!): ApplyCreditsResult!
 
+    # Shared cart mutations
+    createSharedCart(input: CreateSharedCartInput!): SharedCartResult!
     
     # User Profile mutations
     updateUserProfileNames(userId: ID!, firstName: String!, lastName: String!): UserProfileResult!
@@ -1589,6 +1595,37 @@ const typeDefs = gql`
   
   type IncrementBlogViewsResult {
     success: Boolean!
+  }
+  
+  # Shared Cart Types
+  type SharedCart {
+    id: ID!
+    shareId: String!
+    cartData: JSON!
+    createdBy: String!
+    createdAt: String!
+    expiresAt: String
+    accessCount: Int!
+    lastAccessAt: String
+  }
+  
+  type SharedCartResult {
+    success: Boolean!
+    sharedCart: SharedCart
+    shareUrl: String
+    error: String
+  }
+  
+  type AllSharedCartsResult {
+    success: Boolean!
+    sharedCarts: [SharedCart!]!
+    totalCount: Int!
+    error: String
+  }
+  
+  input CreateSharedCartInput {
+    cartData: JSON!
+    expiresAt: String
   }
 `;
 
@@ -3288,6 +3325,116 @@ const resolvers = {
       } catch (error) {
         console.error('Error fetching all sitewide alerts:', error);
         throw new Error(error.message);
+      }
+    },
+
+    // Shared cart queries
+    getSharedCart: async (_, { shareId }) => {
+      try {
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get shared cart
+        const { data: sharedCart, error } = await client
+          .from('shared_carts')
+          .select('*')
+          .eq('share_id', shareId)
+          .single();
+
+        if (error) {
+          console.error('❌ Error retrieving shared cart:', error);
+          throw new Error('Shared cart not found');
+        }
+
+        // Check if expired
+        if (sharedCart.expires_at && new Date(sharedCart.expires_at) < new Date()) {
+          throw new Error('Shared cart has expired');
+        }
+
+        // Update access count and last access time
+        await client
+          .from('shared_carts')
+          .update({
+            access_count: sharedCart.access_count + 1,
+            last_access_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('share_id', shareId);
+
+        console.log('✅ Successfully retrieved shared cart:', shareId);
+        
+        return {
+          success: true,
+          sharedCart: {
+            id: sharedCart.id,
+            shareId: sharedCart.share_id,
+            cartData: sharedCart.cart_data,
+            createdBy: sharedCart.created_by,
+            createdAt: sharedCart.created_at,
+            expiresAt: sharedCart.expires_at,
+            accessCount: sharedCart.access_count + 1,
+            lastAccessAt: new Date().toISOString()
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in getSharedCart:', error);
+        return { success: false, error: error.message };
+      }
+    },
+
+    // Get all shared carts (admin only)
+    getAllSharedCarts: async (_, { offset = 0, limit = 20 }) => {
+      try {
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get total count first
+        const { count: totalCount, error: countError } = await client
+          .from('shared_carts')
+          .select('*', { count: 'exact', head: true });
+
+        if (countError) {
+          console.error('❌ Error getting shared carts count:', countError);
+          throw new Error('Failed to get shared carts count');
+        }
+
+        // Get shared carts with pagination
+        const { data: sharedCarts, error } = await client
+          .from('shared_carts')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(offset, offset + limit - 1);
+
+        if (error) {
+          console.error('❌ Error retrieving shared carts:', error);
+          throw new Error('Failed to retrieve shared carts');
+        }
+
+        console.log(`✅ Successfully retrieved ${sharedCarts.length} shared carts (${totalCount} total)`);
+        
+        return {
+          success: true,
+          sharedCarts: sharedCarts.map(cart => ({
+            id: cart.id,
+            shareId: cart.share_id,
+            cartData: cart.cart_data,
+            createdBy: cart.created_by,
+            createdAt: cart.created_at,
+            expiresAt: cart.expires_at,
+            accessCount: cart.access_count,
+            lastAccessAt: cart.last_access_at
+          })),
+          totalCount: totalCount || 0
+        };
+      } catch (error) {
+        console.error('❌ Error in getAllSharedCarts:', error);
+        return { success: false, sharedCarts: [], totalCount: 0, error: error.message };
       }
     }
   },
@@ -5830,6 +5977,70 @@ const resolvers = {
       } catch (error) {
         console.error('❌ Error applying credits to order:', error);
         throw new Error('Failed to apply credits');
+      }
+    },
+
+    // Shared cart mutations
+    createSharedCart: async (_, { input }, context) => {
+      try {
+        // Anyone can create shared carts
+        const { user } = context;
+        const createdBy = user?.email || 'anonymous';
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Generate a unique share ID
+        const { v4: uuidv4 } = require('uuid');
+        const shareId = uuidv4();
+        
+        // Set expiration (default 30 days from now)
+        const expiresAt = input.expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        
+        // Create shared cart record
+        const { data: sharedCart, error } = await client
+          .from('shared_carts')
+          .insert({
+            share_id: shareId,
+            cart_data: input.cartData,
+            created_by: createdBy,
+            expires_at: expiresAt,
+            access_count: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error creating shared cart:', error);
+          throw new Error(`Failed to create shared cart: ${error.message}`);
+        }
+
+        const shareUrl = `${process.env.FRONTEND_URL || 'https://stickershuttle.com'}/shared-cart/${shareId}`;
+        
+        console.log('✅ Successfully created shared cart:', shareId);
+        
+        return {
+          success: true,
+          sharedCart: {
+            id: sharedCart.id,
+            shareId: sharedCart.share_id,
+            cartData: sharedCart.cart_data,
+            createdBy: sharedCart.created_by,
+            createdAt: sharedCart.created_at,
+            expiresAt: sharedCart.expires_at,
+            accessCount: sharedCart.access_count,
+            lastAccessAt: sharedCart.last_access_at
+          },
+          shareUrl
+        };
+      } catch (error) {
+        console.error('❌ Error in createSharedCart:', error);
+        return { success: false, error: error.message };
       }
     },
 

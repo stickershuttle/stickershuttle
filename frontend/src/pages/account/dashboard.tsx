@@ -7164,35 +7164,69 @@ function Dashboard() {
       
       {/* Credit Notification (fallback for when animation isn't triggered) */}
       {showCreditNotification && creditNotifications.length > 0 && (
-        <div className="mb-6 p-4 rounded-xl animate-pulse" style={{
-          background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.5) 0%, rgba(250, 204, 21, 0.35) 50%, rgba(255, 193, 7, 0.2) 100%)',
-          backdropFilter: 'blur(25px) saturate(200%)',
-          border: '2px solid rgba(255, 215, 0, 0.6)',
-          boxShadow: 'rgba(250, 204, 21, 0.3) 0px 4px 16px, rgba(255, 255, 255, 0.4) 0px 1px 0px inset'
-        }}>
-          <div className="flex items-center gap-3">
-            <span className="text-xl">🎉</span>
-            <div className="flex-1">
-              <h3 className="text-yellow-300 font-bold text-lg">Store Credit Added!</h3>
-              <p className="text-yellow-200 text-sm">
-                You've received <span className="font-bold">${creditNotifications.reduce((sum, n) => sum + n.amount, 0).toFixed(2)}</span> in store credit!
-              </p>
-              {creditNotifications.length === 1 && creditNotifications[0].reason && (
-                <p className="text-yellow-200 text-xs mt-1">
-                  Reason: {creditNotifications[0].reason}
-                </p>
-              )}
+        <>
+          {creditNotifications.some(n => n.type === 'credit_limit_warning') ? (
+            // Credit Limit Warning Notification
+            <div className="mb-6 p-4 rounded-xl animate-pulse" style={{
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.5) 0%, rgba(248, 113, 113, 0.35) 50%, rgba(254, 202, 202, 0.2) 100%)',
+              backdropFilter: 'blur(25px) saturate(200%)',
+              border: '2px solid rgba(239, 68, 68, 0.6)',
+              boxShadow: 'rgba(239, 68, 68, 0.3) 0px 4px 16px, rgba(255, 255, 255, 0.4) 0px 1px 0px inset'
+            }}>
+              <div className="flex items-center gap-3">
+                <span className="text-xl">⚠️</span>
+                <div className="flex-1">
+                  <h3 className="text-red-300 font-bold text-lg">Credit Limit Reached!</h3>
+                  <p className="text-red-200 text-sm">
+                    You've reached your $100.00 credit limit. Please use your existing credits on future orders.
+                  </p>
+                  <p className="text-red-200 text-xs mt-1">
+                    You will not earn additional credits until you spend some of your current balance.
+                  </p>
+                </div>
+                <button
+                  onClick={handleDismissCreditNotification}
+                  className="text-red-300 hover:text-red-100 transition-colors"
+                  title="Close notification"
+                  aria-label="Close credit notification"
+                >
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
             </div>
-            <button
-              onClick={handleDismissCreditNotification}
-              className="text-yellow-300 hover:text-yellow-100 transition-colors"
-              title="Close notification"
-              aria-label="Close credit notification"
-            >
-              <i className="fas fa-times"></i>
-            </button>
-          </div>
-        </div>
+          ) : (
+            // Regular Credit Added Notification
+            <div className="mb-6 p-4 rounded-xl animate-pulse" style={{
+              background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.5) 0%, rgba(250, 204, 21, 0.35) 50%, rgba(255, 193, 7, 0.2) 100%)',
+              backdropFilter: 'blur(25px) saturate(200%)',
+              border: '2px solid rgba(255, 215, 0, 0.6)',
+              boxShadow: 'rgba(250, 204, 21, 0.3) 0px 4px 16px, rgba(255, 255, 255, 0.4) 0px 1px 0px inset'
+            }}>
+              <div className="flex items-center gap-3">
+                <span className="text-xl">🎉</span>
+                <div className="flex-1">
+                  <h3 className="text-yellow-300 font-bold text-lg">Store Credit Added!</h3>
+                  <p className="text-yellow-200 text-sm">
+                    You've received <span className="font-bold">${creditNotifications.reduce((sum, n) => sum + n.amount, 0).toFixed(2)}</span> in store credit!
+                  </p>
+                  {creditNotifications.length === 1 && creditNotifications[0].reason && (
+                    <p className="text-yellow-200 text-xs mt-1">
+                      Reason: {creditNotifications[0].reason}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={handleDismissCreditNotification}
+                  className="text-yellow-300 hover:text-yellow-100 transition-colors"
+                  title="Close notification"
+                  aria-label="Close credit notification"
+                >
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Store Credit Display - Compact */}
@@ -7200,21 +7234,32 @@ function Dashboard() {
         <div 
           className="rounded-2xl overflow-hidden mb-6"
           style={{
-            background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.6) 0%, rgba(255, 215, 0, 0.4) 25%, rgba(250, 204, 21, 0.25) 50%, rgba(255, 193, 7, 0.15) 75%, rgba(250, 204, 21, 0.1) 100%)',
+            background: creditBalance >= 100 
+              ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.6) 0%, rgba(248, 113, 113, 0.4) 25%, rgba(254, 202, 202, 0.25) 50%, rgba(239, 68, 68, 0.15) 75%, rgba(254, 202, 202, 0.1) 100%)'
+              : 'linear-gradient(135deg, rgba(250, 204, 21, 0.6) 0%, rgba(255, 215, 0, 0.4) 25%, rgba(250, 204, 21, 0.25) 50%, rgba(255, 193, 7, 0.15) 75%, rgba(250, 204, 21, 0.1) 100%)',
             backdropFilter: 'blur(25px) saturate(200%)',
-            border: '1px solid rgba(255, 215, 0, 0.5)',
-            boxShadow: 'rgba(250, 204, 21, 0.25) 0px 4px 20px, rgba(255, 255, 255, 0.3) 0px 1px 0px inset'
+            border: creditBalance >= 100 ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid rgba(255, 215, 0, 0.5)',
+            boxShadow: creditBalance >= 100 
+              ? 'rgba(239, 68, 68, 0.25) 0px 4px 20px, rgba(255, 255, 255, 0.3) 0px 1px 0px inset'
+              : 'rgba(250, 204, 21, 0.25) 0px 4px 20px, rgba(255, 255, 255, 0.3) 0px 1px 0px inset'
           }}
         >
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">🎉</span>
+                <span className="text-2xl">{creditBalance >= 100 ? '🚨' : '🎉'}</span>
                 <div>
                   <h3 className="text-lg font-bold text-white">
                     ${creditBalance.toFixed(2)} Store Credit
                   </h3>
-                  <p className="text-yellow-300 text-sm">Available to use</p>
+                  <p className={`text-sm ${creditBalance >= 100 ? 'text-red-300' : 'text-yellow-300'}`}>
+                    {creditBalance >= 100 ? 'Limit reached ($100.00)' : 'Available to use'}
+                  </p>
+                  {creditBalance >= 100 && (
+                    <p className="text-red-200 text-xs mt-1">
+                      Spend credits to earn more on future orders
+                    </p>
+                  )}
                 </div>
               </div>
               
@@ -7222,10 +7267,14 @@ function Dashboard() {
                 onClick={() => window.location.href = '/products'}
                 className="px-3 md:px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.5) 0%, rgba(250, 204, 21, 0.35) 50%, rgba(255, 193, 7, 0.2) 100%)',
+                  background: creditBalance >= 100 
+                    ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.5) 0%, rgba(248, 113, 113, 0.35) 50%, rgba(254, 202, 202, 0.2) 100%)'
+                    : 'linear-gradient(135deg, rgba(255, 215, 0, 0.5) 0%, rgba(250, 204, 21, 0.35) 50%, rgba(255, 193, 7, 0.2) 100%)',
                   backdropFilter: 'blur(25px) saturate(200%)',
-                  border: '1px solid rgba(255, 215, 0, 0.6)',
-                  boxShadow: 'rgba(250, 204, 21, 0.3) 0px 4px 16px, rgba(255, 255, 255, 0.4) 0px 1px 0px inset'
+                  border: creditBalance >= 100 ? '1px solid rgba(239, 68, 68, 0.6)' : '1px solid rgba(255, 215, 0, 0.6)',
+                  boxShadow: creditBalance >= 100 
+                    ? 'rgba(239, 68, 68, 0.3) 0px 4px 16px, rgba(255, 255, 255, 0.4) 0px 1px 0px inset'
+                    : 'rgba(250, 204, 21, 0.3) 0px 4px 16px, rgba(255, 255, 255, 0.4) 0px 1px 0px inset'
                 }}
               >
                 <svg className="w-3 md:w-4 h-3 md:h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">

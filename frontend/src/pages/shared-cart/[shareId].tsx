@@ -1,5 +1,5 @@
 import Layout from "@/components/Layout";
-import { useCart } from "@/components/CartContext";
+import { useRouter } from 'next/router';
 import Link from "next/link";
 import Image from "next/image";
 import CartCheckoutButton from "@/components/CartCheckoutButton";
@@ -21,7 +21,7 @@ import { useQuery, useMutation } from "@apollo/client";
 import DiscountCodeInput from "@/components/DiscountCodeInput";
 import { UPDATE_USER_PROFILE_NAMES, CREATE_USER_PROFILE } from "@/lib/profile-mutations";
 import { TRACK_KLAVIYO_EVENT } from "@/lib/klaviyo-mutations";
-import { CREATE_SHARED_CART } from "@/lib/admin-mutations";
+import { GET_SHARED_CART } from "@/lib/admin-mutations";
 
 // Available configuration options
 const SHAPE_OPTIONS = ["Custom Shape", "Circle", "Oval", "Rectangle", "Square"];
@@ -386,8 +386,10 @@ const formatOptionName = (type: string) => {
   }
 };
 
-export default function CartPage() {
-  const { cart, removeFromCart, clearCart, updateCartItemQuantity, updateCartItemCustomization } = useCart();
+export default function SharedCartPage() {
+  const router = useRouter();
+  const { shareId } = router.query;
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [pricingData, setPricingData] = useState<{ basePricing: BasePriceRow[]; quantityDiscounts: QuantityDiscountRow[] } | null>(null);
   const [updatedCart, setUpdatedCart] = useState<CartItem[]>(cart);
   const [wishlistItems, setWishlistItems] = useState<string[]>([]);
@@ -425,10 +427,38 @@ export default function CartPage() {
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   
-  // Share cart state
-  const [isCreatingSharedCart, setIsCreatingSharedCart] = useState(false);
-  const [sharedCartUrl, setSharedCartUrl] = useState<string | null>(null);
-  const [showShareModal, setShowShareModal] = useState(false);
+  // Loading and error states for shared cart
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Query shared cart data
+  const { data: sharedCartData, loading: sharedCartLoading, error: sharedCartError } = useQuery(GET_SHARED_CART, {
+    variables: { shareId },
+    skip: !shareId,
+    onCompleted: (data) => {
+      if (data?.getSharedCart?.success && data?.getSharedCart?.sharedCart) {
+        try {
+          const cartData = typeof data.getSharedCart.sharedCart.cartData === 'string' 
+            ? JSON.parse(data.getSharedCart.sharedCart.cartData)
+            : data.getSharedCart.sharedCart.cartData;
+          setCart(cartData);
+          setIsLoading(false);
+        } catch (parseError) {
+          console.error('Error parsing cart data:', parseError);
+          setError('Failed to load cart data');
+          setIsLoading(false);
+        }
+      } else {
+        setError(data?.getSharedCart?.error || 'Cart not found');
+        setIsLoading(false);
+      }
+    },
+    onError: (error) => {
+      console.error('GraphQL error:', error);
+      setError('Failed to load shared cart. Make sure your backend is running.');
+      setIsLoading(false);
+    }
+  });
 
   // Query for user credit balance
   const { data: creditData } = useQuery(GET_USER_CREDIT_BALANCE, {
@@ -439,24 +469,6 @@ export default function CartPage() {
   // Mutations for user profile
   const [updateUserProfileNames] = useMutation(UPDATE_USER_PROFILE_NAMES);
   const [createUserProfile] = useMutation(CREATE_USER_PROFILE);
-  
-  // Mutation for creating shared cart
-  const [createSharedCart] = useMutation(CREATE_SHARED_CART, {
-    onCompleted: (data) => {
-      if (data.createSharedCart.success) {
-        setSharedCartUrl(data.createSharedCart.shareUrl);
-        setShowShareModal(true);
-        console.log('✅ Shared cart created successfully:', data.createSharedCart.shareUrl);
-      } else {
-        console.error('❌ Error creating shared cart:', data.createSharedCart.error);
-      }
-      setIsCreatingSharedCart(false);
-    },
-    onError: (error) => {
-      console.error('❌ GraphQL error creating shared cart:', error);
-      setIsCreatingSharedCart(false);
-    }
-  });
 
   const userCredits = creditData?.getUserCreditBalance?.balance || 0;
 
@@ -571,22 +583,21 @@ export default function CartPage() {
     return currentQuantity < 750 ? 50 : 250;
   };
 
-  // Handle quantity change
-  const handleQuantityChange = (itemId: string, newQuantity: number) => {
-    if (newQuantity < 1) return;
-    
-    const item = updatedCart.find(item => item.id === itemId);
-    if (!item || !pricingData) return;
+  // Shared carts are read-only - create stub functions to prevent errors
+  const updateCartItemQuantity = (itemId: string, quantity: number, unitPrice?: number, totalPrice?: number) => {
+    // Read-only: no-op
+  };
+  
+  const updateCartItemCustomization = (itemId: string, updatedItem: any) => {
+    // Read-only: no-op
+  };
 
-    const pricing = calculateItemPricing(item, newQuantity, pricingData);
-    const updatedItem = {
-      ...item,
-      quantity: newQuantity,
-      unitPrice: pricing.perSticker,
-      totalPrice: pricing.total
-    };
+  const setIsCreatingSharedCart = (value: boolean) => {
+    // No sharing functionality for shared carts
+  };
 
-    updateCartItemQuantity(itemId, newQuantity, pricing.perSticker, pricing.total);
+  const createSharedCart = () => {
+    // No sharing functionality for shared carts
   };
 
   // Handle proof preference change
@@ -934,56 +945,7 @@ export default function CartPage() {
     return isNaN(parsed) ? fallback : parsed;
   };
 
-  // Handle creating a shared cart
-  const handleCreateSharedCart = async () => {
-    if (updatedCart.length === 0) {
-      console.error('❌ Cannot share empty cart');
-      return;
-    }
-
-    setIsCreatingSharedCart(true);
-    
-    try {
-      await createSharedCart({
-        variables: {
-          input: {
-            cartData: JSON.stringify(updatedCart)
-          }
-        }
-      });
-    } catch (error) {
-      console.error('❌ Error creating shared cart:', error);
-      setIsCreatingSharedCart(false);
-    }
-  };
-
-  // Handle copying share URL
-  const handleCopyShareUrl = async () => {
-    if (sharedCartUrl) {
-      try {
-        await navigator.clipboard.writeText(sharedCartUrl);
-        console.log('✅ Share URL copied to clipboard');
-        
-        // Show feedback to user
-        const button = document.querySelector('[data-copy-button]') as HTMLButtonElement;
-        if (button) {
-          const originalText = button.textContent;
-          button.textContent = 'Copied!';
-          setTimeout(() => {
-            button.textContent = originalText;
-          }, 2000);
-        }
-      } catch (err) {
-        console.error('Failed to copy to clipboard:', err);
-        // Fallback: select the text for manual copying
-        const input = document.querySelector('[data-share-url-input]') as HTMLInputElement;
-        if (input) {
-          input.select();
-          input.setSelectionRange(0, 99999); // For mobile devices
-        }
-      }
-    }
-  };
+  // Shared cart page doesn't need cart sharing functionality
 
   // Calculate final total with all discounts and credits - ensure no NaN values
   const safeSubtotal = safeParseFloat(subtotal, 0);
@@ -1027,8 +989,62 @@ export default function CartPage() {
     return sum;
   }, 0);
 
+  if (isLoading) {
+    return (
+      <Layout title="Loading Shared Cart - Sticker Shuttle">
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-white text-lg">Loading shared cart...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error) {
+    return (
+      <Layout title="Shared Cart - Sticker Shuttle">
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="text-6xl mb-4">🔗</div>
+            <h1 className="text-3xl font-bold text-white mb-4">Shared Cart</h1>
+            <p className="text-gray-400 mb-8">Share ID: {shareId}</p>
+            <p className="text-yellow-400 mb-8">{error}</p>
+            <div 
+              className="p-6 rounded-xl max-w-md mx-auto"
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                backdropFilter: 'blur(12px)'
+              }}
+            >
+              <p className="text-white text-sm mb-4">
+                ✅ Database table created! Make sure your backend API is running on port 4000.
+              </p>
+              <a 
+                href="/"
+                className="px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:scale-105 inline-block"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(180%)',
+                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                  boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                  color: '#ffffff'
+                }}
+              >
+                Go to Homepage
+              </a>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
-    <Layout title="Your Cart - Sticker Shuttle">
+    <Layout title="Shared Cart - Sticker Shuttle">
       <section className="pt-7 pb-8">
         <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           {/* Login Recommendation - Mobile Banner */}
@@ -1141,7 +1157,10 @@ export default function CartPage() {
           )}
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <h1 className="text-3xl font-bold text-white">Your Cart</h1>
+            <div>
+              <h1 className="text-3xl font-bold text-white">Shared Cart</h1>
+              <p className="text-gray-400 mt-1">This cart was shared with you</p>
+            </div>
           </div>
           
           {updatedCart.length === 0 ? (
@@ -1938,25 +1957,7 @@ export default function CartPage() {
                    boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
                    backdropFilter: 'blur(12px)'
                  }}>
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-semibold text-white">Order Summary</h3>
-                    {updatedCart.length > 0 && (
-                      <button
-                        onClick={handleCreateSharedCart}
-                        disabled={isCreatingSharedCart}
-                        className="text-white/70 hover:text-white transition-colors"
-                        title="Share this cart with others"
-                      >
-                        {isCreatingSharedCart ? (
-                          <div className="w-5 h-5 animate-spin rounded-full border-2 border-white/70 border-t-transparent"></div>
-                        ) : (
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                          </svg>
-                        )}
-                      </button>
-                    )}
-                  </div>
+                  <h3 className="text-xl font-semibold text-white mb-6">Order Summary</h3>
                   <div className="space-y-3 mb-6">
                     <div className="flex justify-between text-gray-300">
                       <span>Subtotal ({totalQuantity} stickers)</span>
@@ -2580,7 +2581,7 @@ export default function CartPage() {
                       )}
                     </div>
                     
-
+                    {/* No sharing functionality on shared cart page */}
                   </div>
                 </div>
               </div>
@@ -2864,94 +2865,7 @@ export default function CartPage() {
         </div>
       )}
 
-      {/* Share Cart Modal */}
-      {showShareModal && sharedCartUrl && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div 
-            className="max-w-md w-full rounded-2xl p-6"
-            style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-              backdropFilter: 'blur(12px)'
-            }}
-          >
-            <div className="text-center mb-6">
-              <h3 className="text-xl font-bold text-white mb-2">🔗 Cart Shared Successfully!</h3>
-              <p className="text-white/80 text-sm">Share this link with anyone to let them pay for this cart</p>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">
-                  Share URL
-                </label>
-                                 <div className="flex gap-2">
-                   <input
-                     type="text"
-                     value={sharedCartUrl}
-                     readOnly
-                     data-share-url-input
-                     className="flex-1 px-3 py-2 text-sm rounded-lg bg-white/5 border border-white/10 text-white focus:outline-none focus:border-purple-400 focus:bg-white/10 transition-all"
-                     onClick={(e) => (e.target as HTMLInputElement).select()}
-                   />
-                   <button
-                     onClick={handleCopyShareUrl}
-                     data-copy-button
-                     className="px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 hover:scale-105"
-                     style={{
-                       background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                       backdropFilter: 'blur(25px) saturate(180%)',
-                       border: '1px solid rgba(59, 130, 246, 0.4)',
-                       boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
-                       color: '#ffffff'
-                     }}
-                   >
-                     Copy
-                   </button>
-                 </div>
-              </div>
-              
-              <div className="text-xs text-gray-400 bg-white/5 p-3 rounded-lg border border-white/10">
-                💡 <strong>Note:</strong> This link will expire in 30 days. Anyone with this link can view and pay for this exact cart configuration.
-              </div>
-            </div>
-            
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowShareModal(false);
-                  setSharedCartUrl(null);
-                }}
-                className="flex-1 py-2 px-4 rounded-lg font-semibold transition-all duration-200"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  color: '#ffffff'
-                }}
-              >
-                Close
-              </button>
-              
-              <button
-                onClick={() => {
-                  window.open(sharedCartUrl, '_blank');
-                }}
-                className="flex-1 py-2 px-4 rounded-lg font-semibold transition-all duration-200 hover:scale-105"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                  backdropFilter: 'blur(25px) saturate(180%)',
-                  border: '1px solid rgba(59, 130, 246, 0.4)',
-                  boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
-                  color: '#ffffff'
-                }}
-              >
-                Preview
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* No share modal needed for shared cart page */}
     </Layout>
   );
 } 
