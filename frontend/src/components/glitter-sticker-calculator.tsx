@@ -702,8 +702,9 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
   
 
 `}</style>
-              <div className="">
-          {/* Main Container */}
+      
+      <div className="">
+        {/* Main Container */}
         <div className="rounded-3xl">
           {/* Top Section */}
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-18 gap-4 lg:gap-6 mb-4 lg:mb-6">
