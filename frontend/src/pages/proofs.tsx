@@ -4,6 +4,7 @@ import Layout from '@/components/Layout';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { getSupabase } from '../lib/supabase';
 import { uploadToCloudinary } from '../utils/cloudinary';
+import AIFileImage from '@/components/AIFileImage';
 
 // GraphQL query to get user orders with proofs
 const GET_USER_ORDERS_WITH_PROOFS = gql`
@@ -22,6 +23,7 @@ const GET_USER_ORDERS_WITH_PROOFS = gql`
         status
         customerNotes
         adminNotes
+        cutLines
       }
       items {
         id
@@ -52,6 +54,7 @@ const GET_ORDER_BY_ID = gql`
         status
         customerNotes
         adminNotes
+        cutLines
       }
       items {
         id
@@ -86,6 +89,7 @@ interface Proof {
   status: string;
   customerNotes?: string;
   adminNotes?: string;
+  cutLines?: string;
 }
 
 interface Order {
@@ -117,6 +121,9 @@ export default function ProofsPage() {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [currentProofId, setCurrentProofId] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, boolean>>({});
+  const [uploadProgress, setUploadProgress] = useState<{ percentage: number } | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [replacementFile, setReplacementFile] = useState<any>(null);
 
   // Query for all user orders
   const { data, loading: ordersLoading, refetch } = useQuery(GET_USER_ORDERS_WITH_PROOFS, {
@@ -224,36 +231,98 @@ export default function ProofsPage() {
     if (!selectedOrder || !currentProofId) return;
 
     setUploadingFile(true);
+    setUploadError(null);
+    setUploadProgress({ percentage: 0 });
+    
     try {
-      // Upload to Cloudinary
-      const result = await uploadToCloudinary(
-        file,
-        {
-          selectedCut: 'customer_revision',
-          selectedMaterial: 'customer_file',
-          timestamp: new Date().toISOString()
-        },
-        undefined,
-        'customer-files'
-      );
+      // Validate file size (25MB max to match vinyl calculator)
+      if (file.size > 25 * 1024 * 1024) {
+        setUploadError('File size must be less than 25MB');
+        setUploadingFile(false);
+        setUploadProgress(null);
+        return;
+      }
 
+      // Upload to Cloudinary with progress tracking
+              const result = await uploadToCloudinary(
+          file,
+          {
+            selectedCut: 'customer_revision',
+            selectedMaterial: 'customer_file',
+            timestamp: new Date().toISOString()
+          },
+          (progress) => {
+            setUploadProgress({ percentage: progress.percentage });
+          },
+          'customer-files'
+        );
+
+      // Store the uploaded file info
+      setReplacementFile(result);
+      
       // Track that a file has been uploaded for this proof
       setUploadedFiles(prev => ({
         ...prev,
         [currentProofId]: true
       }));
 
-      // Here you would typically call a mutation to save the customer's revised file
-      // For now, we'll just show success
-      alert('File uploaded successfully! We\'ll review your changes.');
-      setShowFileUpload(false);
-      setUploadingFile(false);
-      setCurrentProofId(null);
+      // Clear progress after brief delay
+      setTimeout(() => {
+        setUploadProgress(null);
+      }, 500);
+      
     } catch (error) {
       console.error('Error uploading file:', error);
-      alert('Failed to upload file');
+      setUploadError('Failed to upload file. Please try again.');
+      setUploadProgress(null);
+    } finally {
       setUploadingFile(false);
     }
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const file = event.dataTransfer.files[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+  };
+
+  const removeUploadedFile = () => {
+    setReplacementFile(null);
+    if (currentProofId) {
+      setUploadedFiles(prev => ({
+        ...prev,
+        [currentProofId]: false
+      }));
+    }
+  };
+
+  const getFileTypeIcon = (format: string): string | null => {
+    const formatLower = format.toLowerCase();
+    if (formatLower === 'ai') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1734130723/ai-icon_jxr2qr.png';
+    } else if (formatLower === 'svg') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1734130753/svg-icon_bkrvgp.png';
+    } else if (formatLower === 'eps') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1734130744/eps-icon_e9vmek.png';
+    } else if (formatLower === 'psd') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1734130759/psd-icon_yidukx.png';
+    } else if (formatLower === 'pdf') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749414147/PDF_hvqhxf.png';
+    }
+    return null;
   };
 
   const formatDate = (dateString: string) => {
@@ -472,37 +541,62 @@ export default function ProofsPage() {
                         />
                       </div>
                       
-                      {/* Cut-line Options - Show only selected option */}
+                      {/* Cut-line Options - Show based on admin selection */}
                       {(() => {
-                        // Get cut line selection from the first item's calculator selections
-                        const firstItem = selectedOrder.items[0];
-                        const cutSelection = firstItem?.calculatorSelections?.cut;
+                        // Get cut line selection from proof's cutLines field (set by admin)
+                        const cutLines = proof.cutLines ? proof.cutLines.split(',') : [];
                         
-                        if (!cutSelection?.displayValue) return null;
+                        if (cutLines.length === 0) return null;
                         
-                        const isGreenCut = cutSelection.displayValue.toLowerCase().includes('kiss') || 
-                                          cutSelection.displayValue.toLowerCase().includes('cut through backing') ||
-                                          !cutSelection.displayValue.toLowerCase().includes('through');
+                        const hasGreen = cutLines.includes('green');
+                        const hasGrey = cutLines.includes('grey');
                         
                         return (
-                          <div className="mt-4 p-4 rounded-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
-
-                            
-                            <div className="flex items-center gap-3">
-                              <div 
-                                className="w-4 h-4 rounded border-2 flex-shrink-0" 
-                                style={{ 
-                                  borderColor: isGreenCut ? '#91c848' : '#6b7280', 
-                                  backgroundColor: 'transparent' 
-                                }}
-                              ></div>
-                              <span 
-                                className="text-sm font-medium" 
-                                style={{ color: isGreenCut ? '#91c848' : '#6b7280' }}
-                              >
-                                {isGreenCut ? 'Green' : 'Grey'} cut-line indicates where the sticker will be cut - {cutSelection.displayValue}
-                              </span>
+                          <div className="mt-4 p-4 rounded-lg space-y-3" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
+                            <div className="flex items-center gap-2 mb-2">
+                              <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a1.994 1.994 0 01-1.414.586H7a4 4 0 01-4-4V7a4 4 0 014-4z" />
+                              </svg>
+                              <span className="text-sm text-gray-300 font-medium">This is the cut line, it will not show up on the print.</span>
                             </div>
+                            
+                            {/* Green Cut Line */}
+                            {hasGreen && (
+                              <div className="flex items-center gap-3">
+                                <div 
+                                  className="w-4 h-4 rounded border-2 flex-shrink-0" 
+                                  style={{ 
+                                    borderColor: '#91c848', 
+                                    backgroundColor: 'transparent' 
+                                  }}
+                                ></div>
+                                <span 
+                                  className="text-sm font-medium" 
+                                  style={{ color: '#91c848' }}
+                                >
+                                  Green cut-line shows where sticker will be cut
+                                </span>
+                              </div>
+                            )}
+                            
+                            {/* Grey Cut Line */}
+                            {hasGrey && (
+                              <div className="flex items-center gap-3">
+                                <div 
+                                  className="w-4 h-4 rounded border-2 flex-shrink-0" 
+                                  style={{ 
+                                    borderColor: '#9ca3af', 
+                                    backgroundColor: 'transparent' 
+                                  }}
+                                ></div>
+                                <span 
+                                  className="text-sm font-medium" 
+                                  style={{ color: '#9ca3af' }}
+                                >
+                                  Grey cut-line shows where sticker will be cut
+                                </span>
+                              </div>
+                            )}
                           </div>
                         );
                       })()}
@@ -520,6 +614,7 @@ export default function ProofsPage() {
                             onClick={() => {
                               setCurrentProofId(proof.id);
                               setShowFileUpload(true);
+                              setReplacementFile(null);
                             }}
                           >
                             <div className="flex flex-col items-center text-center">
@@ -537,7 +632,7 @@ export default function ProofsPage() {
                           </div>
                           
                           {/* File Upload Status */}
-                          {uploadedFiles[proof.id] && (
+                          {uploadedFiles[proof.id] && !showFileUpload && (
                             <div className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: 'rgba(34, 197, 94, 0.1)' }}>
                               <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -792,52 +887,201 @@ export default function ProofsPage() {
           
           {/* File Upload Modal */}
           {showFileUpload && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4 container-style">
-                <h3 className="text-lg font-semibold text-white mb-4">Upload New File</h3>
-                
-                <div className="mb-4">
-                  <input
-                    type="file"
-                    accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd"
-                    aria-label="Select replacement file"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        handleFileUpload(file);
-                      }
-                    }}
-                    className="w-full px-3 py-2 rounded-lg text-white backdrop-blur-md"
-                    style={{ 
-                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                      border: '1px solid rgba(255, 255, 255, 0.2)'
-                    }}
-                    disabled={uploadingFile}
-                  />
-                  <p className="text-xs text-gray-400 mt-1">
-                    Supports: .ai, .svg, .eps, .png, .jpg, .psd (max 10MB)
-                  </p>
-                </div>
-
-                {uploadingFile && (
-                  <div className="mb-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-400 mx-auto"></div>
-                    <p className="text-sm text-gray-400 text-center mt-2">Uploading...</p>
-                  </div>
-                )}
-
-                <div className="flex gap-3">
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-gray-900 rounded-lg p-6 max-w-2xl w-full container-style max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-semibold text-white">Upload Replacement File</h3>
                   <button
                     onClick={() => {
                       setShowFileUpload(false);
                       setCurrentProofId(null);
+                      setReplacementFile(null);
+                      setUploadError(null);
                     }}
-                    className="flex-1 px-6 md:px-4 py-2 rounded-lg text-gray-300 hover:text-white transition-colors button-interactive"
+                    className="text-gray-400 hover:text-white transition-colors"
+                    aria-label="Close upload modal"
+                  >
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                
+                {/* Hidden file input */}
+                <input
+                  id="proof-file-input"
+                  type="file"
+                  accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  aria-label="Upload replacement file"
+                />
+
+                {!replacementFile ? (
+                  <div 
+                    className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative"
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onClick={() => document.getElementById('proof-file-input')?.click()}
+                  >
+                    {uploadingFile ? (
+                      <div className="mb-4">
+                        <div className="text-4xl mb-3">⏳</div>
+                        <p className="text-white font-medium text-base mb-2">Uploading...</p>
+                        {uploadProgress && (
+                          <div className="w-full bg-white/20 rounded-full h-2 mb-2">
+                            <div 
+                              className="bg-purple-400 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${uploadProgress.percentage}%` }}
+                            ></div>
+                          </div>
+                        )}
+                        {uploadProgress && (
+                          <p className="text-white/80 text-sm">{uploadProgress.percentage}% complete</p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mb-4">
+                        <div className="mb-3 flex justify-center">
+                          <img 
+                            src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751341811/StickerShuttleFileIcon4_gkhsu5.png" 
+                            alt="Upload file" 
+                            className="w-20 h-20 object-contain"
+                          />
+                        </div>
+                        <p className="text-white font-medium text-base mb-2 hidden md:block">Drag or click to upload your file</p>
+                        <p className="text-white font-medium text-base mb-2 md:hidden">Tap to add file</p>
+                        <p className="text-white/80 text-sm">All formats supported. Max file size: 25MB | 1 file per order</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="border border-green-400/50 rounded-xl p-4 bg-green-500/10 backdrop-blur-md">
+                    <div className="flex flex-col md:flex-row gap-4 items-start">
+                      {/* Image Preview */}
+                      <div className="w-full h-48 md:w-32 md:h-32 lg:w-40 lg:h-40 rounded-xl overflow-hidden border border-green-400/30 bg-white/5 backdrop-blur-md p-3 flex items-center justify-center flex-shrink-0">
+                        <AIFileImage
+                          src={replacementFile.secure_url}
+                          filename={replacementFile.original_filename}
+                          alt={replacementFile.original_filename}
+                          className="w-full h-full object-contain"
+                          size="preview"
+                          showFileType={false}
+                        />
+                      </div>
+
+                      {/* File Info */}
+                      <div className="flex-1 min-w-0 w-full">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className="text-green-400 text-xl">📎</div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-green-200 font-medium break-words text-lg">{replacementFile.original_filename}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <button
+                              onClick={() => document.getElementById('proof-file-input')?.click()}
+                              className="text-blue-300 hover:text-blue-200 p-2 hover:bg-blue-500/20 rounded-lg transition-colors cursor-pointer"
+                              title="Replace file"
+                            >
+                              🔄
+                            </button>
+                            <button
+                              onClick={removeUploadedFile}
+                              className="text-red-300 hover:text-red-200 p-2 hover:bg-red-500/20 rounded-lg transition-colors cursor-pointer"
+                              title="Remove file"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* File Details */}
+                        <div className="space-y-2 mb-3">
+                          <div className="flex flex-wrap items-center gap-3 text-green-300/80 text-sm">
+                            <span className="flex items-center gap-1">
+                              <span className="text-green-400">📏</span>
+                              {(replacementFile.bytes / 1024 / 1024).toFixed(2)} MB
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <span className="text-green-400">🎨</span>
+                              {replacementFile.format.toUpperCase()}
+                            </span>
+                            {replacementFile.width && replacementFile.height && (
+                              <span className="flex items-center gap-1">
+                                <span className="text-green-400">📐</span>
+                                {replacementFile.width}x{replacementFile.height}px
+                              </span>
+                            )}
+                          </div>
+                          
+                          {/* File Type Icon */}
+                          {getFileTypeIcon(replacementFile.format) && (
+                            <div className="flex items-center gap-2">
+                              <img 
+                                src={getFileTypeIcon(replacementFile.format)!} 
+                                alt={`${replacementFile.format.toUpperCase()} file`}
+                                className="w-6 h-6 object-contain opacity-80"
+                              />
+                              <span className="text-xs text-green-300/60">
+                                Professional design file detected
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Upload Success Message */}
+                        <div className="flex items-center gap-2 text-green-300 text-sm">
+                          <span className="text-green-400">✅</span>
+                          <span>File uploaded successfully!</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {uploadError && (
+                  <div className="mt-3 p-3 bg-red-500/20 border border-red-400/50 rounded-lg">
+                    <p className="text-red-200 text-sm flex items-center gap-2">
+                      <span>⚠️</span>
+                      {uploadError}
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={() => {
+                      setShowFileUpload(false);
+                      setCurrentProofId(null);
+                      setReplacementFile(null);
+                      setUploadError(null);
+                    }}
+                    className="flex-1 px-6 md:px-4 py-3 rounded-lg text-gray-300 hover:text-white transition-colors button-interactive"
                     style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
                     disabled={uploadingFile}
                   >
                     Cancel
                   </button>
+                  {replacementFile && (
+                    <button
+                      onClick={() => {
+                        // Close modal and keep the file uploaded status
+                        setShowFileUpload(false);
+                        alert('File uploaded successfully! Include your changes in the feedback section below.');
+                      }}
+                      className="flex-1 px-6 md:px-4 py-3 rounded-xl text-white font-semibold transition-all button-interactive"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: '1px solid rgba(34, 197, 94, 0.4)',
+                        boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                      }}
+                    >
+                      Confirm Upload
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

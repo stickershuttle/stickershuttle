@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { uploadToCloudinary, validateFile, CloudinaryUploadResult, UploadProgress } from '../utils/cloudinary';
+import { uploadToCloudinary, validateFile, CloudinaryUploadResult, UploadProgress, getDisplayUrl, getThumbnailUrl, isDesignFile } from '../utils/cloudinary';
 import { useMutation, gql } from '@apollo/client';
 
 // GraphQL mutation to add proof to order
@@ -14,6 +14,7 @@ const ADD_ORDER_PROOF = gql`
         proofTitle
         uploadedAt
         uploadedBy
+        cutLines
       }
     }
   }
@@ -27,6 +28,7 @@ const SEND_PROOFS = gql`
       proofs {
         id
         status
+        cutLines
       }
     }
   }
@@ -46,6 +48,7 @@ const REPLACE_PROOF_FILE = gql`
         replacedAt
         uploadedBy
         status
+        cutLines
       }
     }
   }
@@ -64,6 +67,7 @@ const REMOVE_PROOF = gql`
         uploadedAt
         uploadedBy
         status
+        cutLines
       }
     }
   }
@@ -78,6 +82,7 @@ const ADD_PROOF_NOTES = gql`
         id
         adminNotes
         customerNotes
+        cutLines
       }
     }
   }
@@ -114,6 +119,30 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
     proofStatus,
     existingProofsCount: existingProofs.length,
     existingProofs
+  });
+
+  // Debug customer replacement files
+  console.log('🔍 Customer Replacement Files Debug:', {
+    isAdmin,
+    orderItemsLength: orderItems?.length,
+    hasReplacementFiles: orderItems?.some(item => item.customerReplacementFile),
+    orderItems: orderItems?.map(item => ({
+      hasReplacementFile: !!item.customerReplacementFile,
+      fileName: item.customerReplacementFileName,
+      fileUrl: item.customerReplacementFile
+    })),
+    existingProofsLength: existingProofs?.length,
+    existingProofs: existingProofs?.map(proof => ({
+      id: proof.id,
+      proofTitle: proof.proofTitle,
+      replaced: proof.replaced,
+      replacedAt: proof.replacedAt,
+      proofUrl: proof.proofUrl,
+      originalFileName: proof.originalFileName
+    })),
+    proofsWithReplacements: existingProofs?.filter(proof => proof.replaced && proof.proofUrl),
+    shouldShowSection: ((existingProofs && existingProofs.some(proof => proof.replaced && proof.proofUrl)) || 
+                       (orderItems && orderItems.some(item => item.customerReplacementFile)))
   });
   
   const [proofFiles, setProofFiles] = useState<ProofFile[]>([]);
@@ -416,7 +445,8 @@ Please try re-uploading or contact support.`);
             // Store PDF dimensions for size display (not visible to customer)
             adminNotes: cutContourInfo?.dimensionsInches ? 
               `PDF_DIMENSIONS:${cutContourInfo.dimensionsInches.width}x${cutContourInfo.dimensionsInches.height}` : 
-              null
+              null,
+            cutLines: selectedCutLines.join(',') // Include selected cut lines
           }
         }
       });
@@ -522,6 +552,166 @@ Please try re-uploading or contact support.`);
     });
   };
 
+  // Helper function to get file type icon for non-previewable files
+  const getFileTypeIcon = (filename: string, fileType?: string) => {
+    const extension = filename.toLowerCase().split('.').pop();
+    
+    switch (extension) {
+      case 'ai':
+        return (
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="text-center">
+              <svg className="w-8 h-8 text-orange-500 mx-auto mb-1" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M7.5 5.5a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-9a2 2 0 00-2-2h-9z"/>
+                <path d="M8 9h2l.5 3h3L14 9h2l-2.5 6h-3L8 9z" fill="white"/>
+              </svg>
+              <span className="text-xs text-orange-500 font-medium">AI</span>
+            </div>
+          </div>
+        );
+      case 'eps':
+        return (
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="text-center">
+              <svg className="w-8 h-8 text-purple-500 mx-auto mb-1" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M7.5 5.5a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-9a2 2 0 00-2-2h-9z"/>
+                <path d="M8 9h2v1h-1v1h1v1h-1v1h2v1H8V9zm4 0h2a1 1 0 011 1v1a1 1 0 01-1 1v1a1 1 0 011 1v1a1 1 0 01-1 1h-2V9zm1 1v1h1v-1h-1zm0 3v1h1v-1h-1z" fill="white"/>
+              </svg>
+              <span className="text-xs text-purple-500 font-medium">EPS</span>
+            </div>
+          </div>
+        );
+      case 'psd':
+        return (
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="text-center">
+              <svg className="w-8 h-8 text-blue-500 mx-auto mb-1" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M7.5 5.5a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-9a2 2 0 00-2-2h-9z"/>
+                <path d="M8 9h2a1 1 0 011 1v1a1 1 0 01-1 1H9v1h2v1H8V9zm1 1v1h1v-1H9zm3 0h2a1 1 0 011 1v1a1 1 0 01-1 1h-1v1a1 1 0 01-1 1v-5zm1 1v1h1v-1h-1z" fill="white"/>
+              </svg>
+              <span className="text-xs text-blue-500 font-medium">PSD</span>
+            </div>
+          </div>
+        );
+      case 'pdf':
+        return (
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="text-center">
+              <svg className="w-8 h-8 text-red-500 mx-auto mb-1" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+              </svg>
+              <span className="text-xs text-red-600 font-medium">PDF</span>
+            </div>
+          </div>
+        );
+      case 'svg':
+        return (
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="text-center">
+              <svg className="w-8 h-8 text-green-500 mx-auto mb-1" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M7.5 5.5a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-9a2 2 0 00-2-2h-9z"/>
+                <path d="M8 9h2a1 1 0 011 1v1a1 1 0 01-1 1v1a1 1 0 011 1v1H8v-1h1v-1H8v-1h1v-1H8V9zm4 0h2l1 3-1 3h-2v-2h1l.5-1-.5-1h-1V9z" fill="white"/>
+              </svg>
+              <span className="text-xs text-green-500 font-medium">SVG</span>
+            </div>
+          </div>
+        );
+      default:
+        return (
+          <div className="w-full h-full flex items-center justify-center">
+            <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+        );
+    }
+  };
+
+  // Enhanced file preview component
+  const FilePreview = ({ fileUrl, fileName, isClickable = true, size = 'medium' }: {
+    fileUrl: string;
+    fileName: string;
+    isClickable?: boolean;
+    size?: 'small' | 'medium' | 'large';
+  }) => {
+    const [imageError, setImageError] = useState(false);
+    
+    const sizeClasses = {
+      small: 'w-16 h-16',
+      medium: 'w-20 h-20', 
+      large: 'w-24 h-24'
+    };
+
+    const extension = fileName.toLowerCase().split('.').pop();
+    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension || '');
+    const isSvg = extension === 'svg';
+    const isPdf = extension === 'pdf';
+    const isDesign = ['ai', 'eps', 'psd'].includes(extension || '');
+
+    const handleClick = () => {
+      if (isClickable) {
+        window.open(fileUrl, '_blank');
+      }
+    };
+
+    const handleImageError = () => {
+      setImageError(true);
+    };
+
+    // For regular images and SVGs, show the actual preview
+    if ((isImage || isSvg) && !isDesign) {
+      return (
+        <div className={`${sizeClasses[size]} rounded-lg overflow-hidden flex-shrink-0 ${isClickable ? 'cursor-pointer' : ''}`} style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
+          {!imageError ? (
+            <img
+              src={fileUrl}
+              alt={fileName}
+              className="w-full h-full object-contain p-2"
+              onClick={handleClick}
+              onError={handleImageError}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center" onClick={handleClick}>
+              {getFileTypeIcon(fileName)}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // For design files (AI, EPS, PSD) and PDFs from Cloudinary, try to show a converted preview
+    if ((isDesign || isPdf) && fileUrl.includes('cloudinary.com')) {
+      return (
+        <div className={`${sizeClasses[size]} rounded-lg overflow-hidden flex-shrink-0 ${isClickable ? 'cursor-pointer' : ''}`} style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
+          {!imageError ? (
+            <img
+              src={getDisplayUrl(fileUrl, fileName, { width: 200, height: 200 })}
+              alt={fileName}
+              className="w-full h-full object-contain p-2"
+              onClick={handleClick}
+              onError={handleImageError}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center" onClick={handleClick}>
+              {getFileTypeIcon(fileName)}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // For all other files or when image conversion fails, show the appropriate icon
+    return (
+      <div 
+        className={`${sizeClasses[size]} rounded-lg overflow-hidden flex-shrink-0 ${isClickable ? 'cursor-pointer' : ''}`}
+        style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
+        onClick={handleClick}
+      >
+        {getFileTypeIcon(fileName)}
+      </div>
+    );
+  };
+
   // Handle proof replacement
   const handleReplaceProof = async (proofId: string, file: File) => {
     console.log('🔄 Replacing proof:', proofId, 'with file:', file.name);
@@ -555,6 +745,7 @@ Please try re-uploading or contact support.`);
             proofUrl,
             proofPublicId: cloudinaryResult.public_id, // Don't add proofs/ prefix - it's already included
             proofTitle: file.name,
+            cutLines: selectedCutLines.join(',') // Include selected cut lines
           }
         }
       });
@@ -815,33 +1006,21 @@ Please try re-uploading or contact support.`);
           >
             <div className="flex items-start gap-4">
               {/* Preview */}
-                              <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
-                  {proof.proofUrl ? (
-                    proof.proofUrl.toLowerCase().endsWith('.pdf') ? (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="text-center">
-                          <svg className="w-8 h-8 text-red-500 mx-auto mb-1" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
-                          </svg>
-                          <span className="text-xs text-red-600 font-medium">PDF</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <img
-                        src={proof.proofUrl}
-                        alt="Proof preview" 
-                        className="w-full h-full object-contain cursor-pointer p-4"
-                        onClick={() => window.open(proof.proofUrl, '_blank')}
-                      />
-                    )
-                ) : (
+              {proof.proofUrl ? (
+                <FilePreview 
+                  fileUrl={proof.proofUrl} 
+                  fileName={proof.proofTitle || 'Design Proof'} 
+                  size="medium" 
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
                   <div className="w-full h-full flex items-center justify-center">
                     <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* File Info */}
               <div className="flex-1">
@@ -1098,26 +1277,14 @@ Please try re-uploading or contact support.`);
             <div className="flex items-center gap-4">
               {/* Preview */}
               <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
-                {proofFile.file.type === 'application/pdf' ? (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <div className="text-center">
-                      <svg className="w-6 h-6 text-red-500 mx-auto mb-1" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
-                      </svg>
-                    </div>
-                  </div>
-                ) : proofFile.preview ? (
+                {proofFile.preview ? (
                   <img 
                     src={proofFile.preview} 
                     alt="Proof preview" 
                     className="w-full h-full object-contain p-4"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
+                  getFileTypeIcon(proofFile.file.name, proofFile.file.type)
                 )}
               </div>
 
@@ -1290,11 +1457,236 @@ Please try re-uploading or contact support.`);
         </div>
       )}
 
+      {/* Customer Replacement Files Section - Shows both proof replacements and item replacements */}
+      {isAdmin && ((existingProofs && existingProofs.some(proof => proof.replaced && proof.proofUrl)) || 
+                   (orderItems && orderItems.some(item => item.customerReplacementFile))) && (
+        <div className="space-y-3 mt-6">
+          
+          <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+            <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            Customer Uploaded Replacement Files
+          </h4>
+          
+          {/* Show replacement files from proofs */}
+          {existingProofs && existingProofs.filter(proof => proof.replaced && proof.proofUrl).map((proof, index) => {
+            // Find the original proof that was replaced - look for the most recent non-replaced proof
+            const originalProof = existingProofs
+              .filter(p => p.id !== proof.id && !p.replaced && p.proofUrl)
+              .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0];
+            
+            // Debug logging to understand the proof structure
+            console.log('🔍 Replacement file debug:', {
+              replacementProof: {
+                id: proof.id,
+                title: proof.proofTitle,
+                replaced: proof.replaced,
+                replacedAt: proof.replacedAt,
+                uploadedAt: proof.uploadedAt,
+                proofUrl: proof.proofUrl
+              },
+              originalProof: originalProof ? {
+                id: originalProof.id,
+                title: originalProof.proofTitle,
+                replaced: originalProof.replaced,
+                uploadedAt: originalProof.uploadedAt,
+                proofUrl: originalProof.proofUrl
+              } : null,
+              allProofs: existingProofs.map(p => ({
+                id: p.id,
+                title: p.proofTitle,
+                replaced: p.replaced,
+                uploadedAt: p.uploadedAt
+              }))
+            });
+
+            return (
+              <div
+                key={`proof-replacement-${proof.id}`}
+                className="rounded-lg p-4 border transition-all ring-2 ring-orange-400 ring-opacity-60"
+                style={{
+                  backgroundColor: 'rgba(251, 146, 60, 0.1)',
+                  border: '1px solid rgba(251, 146, 60, 0.4)'
+                }}
+              >
+                <div className="flex items-start gap-4">
+                  {/* Original and Replacement Preview Column */}
+                  <div className="flex flex-col items-center gap-2">
+                    {/* Original File Preview */}
+                    {originalProof && (
+                      <>
+                        <div className="text-center">
+                          <p className="text-xs text-gray-400 mb-1">Original:</p>
+                          {originalProof.proofUrl && (
+                            <div className="opacity-60">
+                              <FilePreview 
+                                fileUrl={originalProof.proofUrl} 
+                                fileName={originalProof.proofTitle || 'Original Proof'} 
+                                size="large" 
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Arrow Down */}
+                        <svg className="w-6 h-6 text-orange-400 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                        </svg>
+                      </>
+                    )}
+
+                    {/* Replacement File Preview */}
+                    <div className="text-center">
+                      <p className="text-xs text-orange-300 mb-1 font-medium">Customer's New File:</p>
+                      {proof.proofUrl && (
+                        <FilePreview 
+                          fileUrl={proof.proofUrl} 
+                          fileName={proof.originalFileName || proof.proofTitle || 'Replacement File'} 
+                          size="large" 
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                {/* File Info and Actions */}
+                <div className="flex-1">
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-sm font-medium text-white">
+                        {proof.originalFileName || proof.proofTitle || 'Replacement File'}
+                      </p>
+                      <p className="text-xs text-orange-300">
+                        Customer uploaded this as a replacement for: {proof.proofTitle || 'Original Proof'}
+                      </p>
+                      {proof.replacedAt && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          Uploaded: {formatDateTime(proof.replacedAt)}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Customer Notes if any */}
+                    {proof.customerNotes && (
+                      <div className="mt-2 p-2 bg-purple-500 bg-opacity-10 border border-purple-500 border-opacity-20 rounded">
+                        <p className="text-xs text-purple-300 font-medium">Customer Notes:</p>
+                        <p className="text-xs text-gray-300 mt-1">{proof.customerNotes}</p>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = proof.proofUrl;
+                          a.download = proof.originalFileName || proof.proofTitle || 'replacement-file';
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                        }}
+                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all hover:scale-105"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                          backdropFilter: 'blur(25px) saturate(180%)',
+                          border: '1px solid rgba(59, 130, 246, 0.4)'
+                        }}
+                      >
+                        <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Download New File
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            );
+          })}
+          
+          {/* Show replacement files from order items (if any) */}
+          {orderItems && orderItems.filter(item => item.customerReplacementFile).map((item, index) => (
+            <div
+              key={`replacement-${index}`}
+              className="rounded-lg p-4 border transition-all ring-2 ring-orange-400 ring-opacity-60"
+              style={{
+                backgroundColor: 'rgba(251, 146, 60, 0.1)',
+                border: '1px solid rgba(251, 146, 60, 0.4)'
+              }}
+            >
+              <div className="flex items-start gap-4">
+                {/* File Preview */}
+                {item.customerReplacementFile && (
+                  <FilePreview 
+                    fileUrl={item.customerReplacementFile} 
+                    fileName={item.customerReplacementFileName || 'Replacement File'} 
+                    size="large" 
+                  />
+                )}
+
+                {/* File Info and Actions */}
+                <div className="flex-1">
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-sm font-medium text-white">
+                        {item.customerReplacementFileName || 'Replacement File'}
+                      </p>
+                      <p className="text-xs text-orange-300">
+                        Customer uploaded this as a replacement
+                      </p>
+                      {item.customerReplacementAt && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          Uploaded: {formatDateTime(item.customerReplacementAt)}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Customer Notes if any */}
+                    {item.customerNotes && (
+                      <div className="mt-2 p-2 bg-purple-500 bg-opacity-10 border border-purple-500 border-opacity-20 rounded">
+                        <p className="text-xs text-purple-300 font-medium">Customer Notes:</p>
+                        <p className="text-xs text-gray-300 mt-1">{item.customerNotes}</p>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = item.customerReplacementFile;
+                          a.download = item.customerReplacementFileName || 'replacement-file';
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                        }}
+                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all hover:scale-105"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                          backdropFilter: 'blur(25px) saturate(180%)',
+                          border: '1px solid rgba(59, 130, 246, 0.4)'
+                        }}
+                      >
+                        <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Download New File
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Hidden file input for proof replacement */}
       <input
         ref={replaceFileInputRef}
         type="file"
-        accept="image/*,.pdf"
+        accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd,.pdf"
         style={{ display: 'none' }}
         title="Select replacement proof file"
         aria-label="Select replacement proof file"

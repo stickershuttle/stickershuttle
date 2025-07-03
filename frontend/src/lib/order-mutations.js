@@ -69,6 +69,7 @@ export const GET_USER_ORDERS = gql`
         status
         customerNotes
         adminNotes
+        cutLines
       }
     }
   }
@@ -143,6 +144,7 @@ export const GET_ORDER_BY_NUMBER = gql`
         status
         customerNotes
         adminNotes
+        cutLines
       }
     }
   }
@@ -217,6 +219,7 @@ export const GET_ORDER_BY_ID = gql`
         status
         customerNotes
         adminNotes
+        cutLines
       }
     }
   }
@@ -244,6 +247,52 @@ export const UPDATE_ORDER_STATUS = gql`
       trackingNumber
       trackingCompany
       trackingUrl
+    }
+  }
+`;
+
+// Mutation to update proof status
+export const UPDATE_PROOF_STATUS = gql`
+  mutation UpdateProofStatus($orderId: ID!, $proofId: ID!, $status: String!, $customerNotes: String) {
+    updateProofStatus(orderId: $orderId, proofId: $proofId, status: $status, customerNotes: $customerNotes) {
+      id
+      proof_status
+      proofs {
+        id
+        proofUrl
+        proofPublicId
+        proofTitle
+        uploadedAt
+        uploadedBy
+        status
+        customerNotes
+        adminNotes
+        cutLines
+      }
+    }
+  }
+`;
+
+// Mutation to update proof file by customer
+export const UPDATE_PROOF_FILE_BY_CUSTOMER = gql`
+  mutation UpdateProofFileByCustomer($orderId: ID!, $proofId: ID!, $newFileUrl: String!, $originalFileName: String!) {
+    updateProofFileByCustomer(orderId: $orderId, proofId: $proofId, newFileUrl: $newFileUrl, originalFileName: $originalFileName) {
+      id
+      proof_status
+      proofs {
+        id
+        proofUrl
+        proofPublicId
+        proofTitle
+        uploadedAt
+        uploadedBy
+        status
+        customerNotes
+        adminNotes
+        replaced
+        replacedAt
+        originalFileName
+      }
     }
   }
 `; 

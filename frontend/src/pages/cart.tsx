@@ -1619,6 +1619,8 @@ export default function CartPage() {
                                   if (!sel) return false;
                                   // Skip proof and rush selections here
                                   if (key === 'proof' || key === 'rush') return false;
+                                  // Skip Instagram selection (it has its own dedicated section)
+                                  if (key === 'instagram') return false;
                                   // Skip duplicate size entries
                                   if (key === 'size' && item.customization.selections?.['size-preset']) return false;
                                   // For deal items, only allow shape options (no material/finish)

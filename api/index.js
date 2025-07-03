@@ -833,6 +833,7 @@ const typeDefs = gql`
     status: String
     customerNotes: String
     adminNotes: String
+    cutLines: String
     replaced: Boolean
     replacedAt: String
     originalFileName: String
@@ -1253,6 +1254,7 @@ const typeDefs = gql`
     proofPublicId: String!
     proofTitle: String
     adminNotes: String
+    cutLines: String
   }
 
   # Review Input Types
@@ -1697,7 +1699,8 @@ const resolvers = {
     uploadedAt: (parent) => parent.uploadedAt || parent.uploaded_at,
     uploadedBy: (parent) => parent.uploadedBy || parent.uploaded_by,
     customerNotes: (parent) => parent.customerNotes || parent.customer_notes,
-    adminNotes: (parent) => parent.adminNotes || parent.admin_notes
+    adminNotes: (parent) => parent.adminNotes || parent.admin_notes,
+    cutLines: (parent) => parent.cutLines || parent.cut_lines
   },
 
   Review: {
@@ -3543,7 +3546,8 @@ const resolvers = {
           uploadedBy: 'admin', // In future, get from auth context
           status: 'pending',
           adminNotes: proofData.adminNotes || null,
-          customerNotes: null
+          customerNotes: null,
+          cutLines: proofData.cutLines || null
         };
         
         // Update proofs array

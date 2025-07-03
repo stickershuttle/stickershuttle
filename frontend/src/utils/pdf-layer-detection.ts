@@ -30,14 +30,34 @@ export async function detectCutContourLayers(file: File): Promise<LayerInfo> {
       console.error('Failed to import pdfjs-dist:', importError);
       throw new Error('PDF.js library could not be loaded. This might be a browser compatibility issue.');
     }
+
+    // Skip analysis for non-PDF files
+    if (!(file.type === 'application/pdf' || file.type === 'application/x-pdf' || file.name.toLowerCase().endsWith('.pdf'))) {
+      console.log('📄 Skipping PDF analysis for non-PDF file:', file.name);
+      return {
+        hasCutContour: false,
+        layerNames: [],
+        totalLayers: 0
+      };
+    }
     
-    // Set worker source with fallback
+    // Set worker source with fallback - updated to match installed version
     try {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.3.31/build/pdf.worker.min.js`;
     } catch (workerError) {
       console.warn('Could not set PDF.js worker source:', workerError);
-      // Try alternative worker source
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
+      try {
+        // Try alternative worker source
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.min.js`;
+      } catch (fallbackError) {
+        console.warn('Could not set fallback PDF.js worker source:', fallbackError);
+        // Try using a local/bundled worker if available
+        try {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.js`;
+        } catch (localError) {
+          console.warn('No local PDF worker available, PDF analysis may be limited');
+        }
+      }
     }
 
     const arrayBuffer = await file.arrayBuffer();
@@ -232,7 +252,9 @@ export async function analyzePDFForCutLines(file: File): Promise<{
 
 // Helper function to check if a file is PDF
 export function isPDF(file: File): boolean {
-  return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  return file.type === 'application/pdf' || 
+         file.type === 'application/x-pdf' ||
+         file.name.toLowerCase().endsWith('.pdf');
 }
 
 // Color utilities for cut line validation

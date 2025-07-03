@@ -32,6 +32,30 @@ const UPDATE_PROOF_STATUS = gql`
     }
   }
 `;
+
+// Mutation to update proof file by customer
+const UPDATE_PROOF_FILE_BY_CUSTOMER = gql`
+  mutation UpdateProofFileByCustomer($orderId: ID!, $proofId: ID!, $newFileUrl: String!, $originalFileName: String!) {
+    updateProofFileByCustomer(orderId: $orderId, proofId: $proofId, newFileUrl: $newFileUrl, originalFileName: $originalFileName) {
+      id
+      proof_status
+      proofs {
+        id
+        proofUrl
+        proofPublicId
+        proofTitle
+        uploadedAt
+        uploadedBy
+        status
+        customerNotes
+        adminNotes
+        replaced
+        replacedAt
+        originalFileName
+      }
+    }
+  }
+`;
 import useInvoiceGenerator, { InvoiceData } from '../../components/InvoiceGenerator';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import dynamic from 'next/dynamic';
@@ -84,6 +108,7 @@ interface Order {
     status: string;
     customerNotes?: string;
     adminNotes?: string;
+    cutLines?: string;
   }>;
   proof_status?: string;
   proof_sent_at?: string;
@@ -128,7 +153,7 @@ function Dashboard() {
     }
   });
 
-  // Add proof update mutation
+  // Add proof update mutations
   const [updateProofStatus] = useMutation(UPDATE_PROOF_STATUS, {
     onCompleted: () => {
       // Force a fresh network request for orders data after proof update
@@ -139,6 +164,15 @@ function Dashboard() {
     },
     onError: (error) => {
       console.error('Error updating proof status:', error);
+    }
+  });
+
+  const [updateProofFileByCustomer] = useMutation(UPDATE_PROOF_FILE_BY_CUSTOMER, {
+    onCompleted: () => {
+      console.log('✅ Proof file updated by customer');
+    },
+    onError: (error) => {
+      console.error('Error updating proof file:', error);
     }
   });
   
@@ -157,8 +191,11 @@ function Dashboard() {
     orderId: string;
     proofId: string;
     cutContourInfo?: any;
+    uploadedFile?: any;
   } | null>(null);
   const [replacementSent, setReplacementSent] = useState<{[key: string]: boolean}>({});
+  const [uploadProgress, setUploadProgress] = useState<{ percentage: number } | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   
   // Use real orders only - no sample data
   const orders: Order[] = realOrders || [];
@@ -2443,122 +2480,179 @@ function Dashboard() {
   const handleFileSelect = async (file: File, orderId: string, proofId: string) => {
     if (!file) return;
 
+    // Validate file size (25MB max to match vinyl calculator)
+    if (file.size > 25 * 1024 * 1024) {
+      setUploadError('File size must be less than 25MB');
+      setActionNotification({ 
+        message: 'File size must be less than 25MB', 
+        type: 'error' 
+      });
+      setTimeout(() => setActionNotification(null), 4000);
+      return;
+    }
+
+    setUploadingFile(true);
+    setUploadError(null);
+    setUploadProgress({ percentage: 0 });
+    
     try {
-      // Validate file before staging
-      const { validateFile } = await import('../../utils/cloudinary');
-      const validation = validateFile(file);
+      const { uploadToCloudinary } = await import('../../utils/cloudinary');
       
-      if (!validation.valid) {
-        setActionNotification({ 
-          message: validation.error || 'Invalid file', 
-          type: 'error' 
-        });
-        setTimeout(() => setActionNotification(null), 4000);
-        return;
-      }
+      // Upload to Cloudinary with progress tracking
+      const result = await uploadToCloudinary(
+        file,
+        {
+          selectedCut: 'customer_revision',
+          selectedMaterial: 'customer_file',
+          timestamp: new Date().toISOString()
+        },
+        (progress) => {
+          setUploadProgress({ percentage: progress.percentage });
+        },
+        'customer-files'
+      );
 
-      // Check for CutContour1 layers in PDF files
-      let cutContourInfo = null;
-      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-        try {
-          const { analyzePDFForCutLines } = await import('../../utils/pdf-layer-detection');
-          cutContourInfo = await analyzePDFForCutLines(file);
-          console.log('📄 PDF layer analysis:', cutContourInfo);
-        } catch (error) {
-          console.warn('⚠️ Could not analyze PDF layers:', error);
-        }
+      // Create preview for images
+      let preview = '';
+      if (file.type.startsWith('image/')) {
+        preview = URL.createObjectURL(file);
       }
-
-      // Create preview URL
-      const preview = URL.createObjectURL(file);
       
-      // Stage the file for preview
+      // Store the staged file with uploaded data
       setStagedFile({
         file,
         preview,
         orderId,
         proofId,
-        cutContourInfo // Add cut contour analysis to staged file
+        cutContourInfo: null,
+        uploadedFile: result
       });
-
-      console.log('📁 File staged for replacement:', file.name);
       
-      // Show cut contour feedback if available
-      if (cutContourInfo) {
-        if (cutContourInfo.hasCutLines) {
-          setActionNotification({ 
-            message: '✅ CutContour1 layer detected! Your cut lines look good.', 
-            type: 'success' 
-          });
-        } else if (cutContourInfo.recommendations.length > 0) {
-          setActionNotification({ 
-            message: `⚠️ ${cutContourInfo.recommendations[0]}`, 
-            type: 'warning' 
-          });
-        }
-        setTimeout(() => setActionNotification(null), 6000);
-      }
+      // Clear progress after brief delay
+      setTimeout(() => {
+        setUploadProgress(null);
+      }, 500);
+      
+      console.log('✅ File uploaded successfully:', result);
       
       // Clear the file input to allow selecting the same file again
       const input = document.getElementById(`proof-file-input-${proofId}`) as HTMLInputElement;
       if (input) {
         input.value = '';
       }
-
     } catch (error: any) {
-      console.error('Error staging file:', error);
+      console.error('❌ File upload failed:', error);
+      setUploadError('Failed to upload file. Please try again.');
+      setUploadProgress(null);
       setActionNotification({ 
-        message: `Failed to stage file: ${error?.message || 'Unknown error'}`, 
+        message: `Failed to upload file: ${error?.message || 'Unknown error'}`, 
         type: 'error' 
       });
       setTimeout(() => setActionNotification(null), 4000);
+    } finally {
+      setUploadingFile(false);
     }
   };
 
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>, orderId: string, proofId: string) => {
+    event.preventDefault();
+    const file = event.dataTransfer.files[0];
+    if (file) {
+      handleFileSelect(file, orderId, proofId);
+    }
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+  };
+
+  const removeUploadedFile = () => {
+    if (stagedFile?.preview) {
+      URL.revokeObjectURL(stagedFile.preview);
+    }
+    setStagedFile(null);
+    setUploadError(null);
+  };
+
+  const getFileTypeIcon = (format: string): string | null => {
+    const formatLower = format.toLowerCase();
+    if (formatLower === 'ai') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1734130723/ai-icon_jxr2qr.png';
+    } else if (formatLower === 'svg') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1734130753/svg-icon_bkrvgp.png';
+    } else if (formatLower === 'eps') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1734130744/eps-icon_e9vmek.png';
+    } else if (formatLower === 'psd') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1734130759/psd-icon_yidukx.png';
+    } else if (formatLower === 'pdf') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749414147/PDF_hvqhxf.png';
+    }
+    return null;
+  };
+
   const handleSendReplacement = async () => {
-    if (!stagedFile) return;
+    if (!stagedFile || !stagedFile.uploadedFile) return;
 
+    console.log('📤 Sending replacement file:', stagedFile);
+    setUploadingFile(true);
+    
     try {
-      setUploadingFile(true);
-      console.log('🔄 Uploading replacement file:', stagedFile.file.name);
-
-      // Use the existing Cloudinary utility function
-      const { uploadToCloudinary } = await import('../../utils/cloudinary');
+      // NEW WORKFLOW: When customer uploads replacement file:
+      // 1. Update proof with customer's replacement file (stores in database)
+      // 2. Set proof status to "changes_requested" (triggers admin review)
+      // 3. Admin can see and download the replacement file in admin panel
+      const orderId = stagedFile.orderId;
+      const proofId = stagedFile.proofId;
       
-      const cloudinaryData = await uploadToCloudinary(
-        stagedFile.file,
-        undefined, // no metadata needed for proof replacements
-        undefined, // no progress callback needed
-        'customer-replacements' // folder for customer replacements
-      );
-      
-      console.log('✅ File uploaded to Cloudinary:', cloudinaryData.secure_url);
-
-      // Update the ORDER's custom files (not the proof) - this is what gets printed
-      const { gql } = await import('@apollo/client');
-      const { default: apolloClient } = await import('../../lib/apollo-client');
-      
-      // For now, we'll just upload the file and track the replacement in frontend state
-      // The actual integration with order files can be done later by admin team
-      
-      console.log('✅ Replacement file uploaded to:', cloudinaryData.secure_url);
-      console.log('📝 File details:', {
-        orderId: stagedFile.orderId,
-        proofId: stagedFile.proofId,
-        fileName: stagedFile.file.name,
-        fileUrl: cloudinaryData.secure_url,
-        timestamp: new Date().toISOString()
+      // Step 1: Update the proof with the customer's replacement file
+      console.log('📁 Updating proof file in database...');
+      console.log('🔍 Mutation variables:', {
+        orderId: orderId,
+        proofId: proofId,
+        newFileUrl: stagedFile.uploadedFile.secure_url,
+        originalFileName: stagedFile.file.name
       });
       
-      // Store replacement info in localStorage for admin reference
+      try {
+        const result = await updateProofFileByCustomer({
+          variables: {
+            orderId: orderId,
+            proofId: proofId,
+            newFileUrl: stagedFile.uploadedFile.secure_url,
+            originalFileName: stagedFile.file.name
+          }
+        });
+        console.log('✅ Proof file updated successfully:', result);
+      } catch (mutationError: any) {
+        console.error('❌ updateProofFileByCustomer mutation error:', mutationError);
+        console.error('Error details:', {
+          message: mutationError.message,
+          networkError: mutationError.networkError,
+          graphQLErrors: mutationError.graphQLErrors
+        });
+        throw mutationError;
+      }
+      
+      // Step 2: Update the proof status to "changes_requested"  
+      console.log('🔄 Setting proof status to changes_requested...');
+      await updateProofStatus({
+        variables: {
+          orderId: orderId,
+          proofId: proofId,
+          status: 'changes_requested',
+          customerNotes: proofComments || 'Customer uploaded a replacement file'
+        }
+      });
+      
+      // Store replacement info in localStorage for additional reference
       const replacementKey = `replacement_${stagedFile.orderId}_${stagedFile.proofId}`;
       const replacementData = {
         orderId: stagedFile.orderId,
         proofId: stagedFile.proofId,
         originalFileName: stagedFile.file.name,
-        replacementFileUrl: cloudinaryData.secure_url,
+        replacementFileUrl: stagedFile.uploadedFile.secure_url,
         uploadedAt: new Date().toISOString(),
-        customerEmail: 'current-user-email' // This would come from auth context
+        customerEmail: (user as any)?.email || 'current-user-email'
       };
       
       try {
@@ -2575,25 +2669,23 @@ function Dashboard() {
       // Track that a file has been uploaded for this proof
       setUploadedFiles(prev => ({ ...prev, [proofKey]: true }));
 
-      // Clean up staged file
-      URL.revokeObjectURL(stagedFile.preview);
-      setStagedFile(null);
-
-      // Note: We're not updating the proof image - that stays the same
-      // The replacement file will be processed by the admin team
+      // Clean up
+      removeUploadedFile();
+      setProofComments('');
       
       setActionNotification({ 
-        message: 'Replacement file sent successfully! We\'ll review it and send you an updated proof shortly.', 
+        message: '✅ Replacement file sent! Proof status changed to "changes requested". Our team will review your changes.', 
         type: 'success' 
       });
-      setTimeout(() => setActionNotification(null), 4000);
-
-    } catch (error: any) {
-      console.error('Error uploading replacement file:', error);
-      const errorMessage = error?.message || 'Unknown error occurred';
+      setTimeout(() => setActionNotification(null), 5000);
       
+      // Refresh orders to show the updated data
+      refreshOrders();
+      
+    } catch (error: any) {
+      console.error('❌ Failed to send replacement:', error);
       setActionNotification({ 
-        message: `Failed to upload replacement file: ${errorMessage}`, 
+        message: 'Failed to send replacement file. Please try again.', 
         type: 'error' 
       });
       setTimeout(() => setActionNotification(null), 4000);
@@ -4695,28 +4787,45 @@ function Dashboard() {
                     })()}
                     
                     {(() => {
-                      // Get cut line selection from the first item's calculator selections
-                      const firstItem = order.items[0];
-                      const cutSelection = firstItem?._fullOrderData?.calculatorSelections?.cut;
+                      // Get cut line selection from proof's cutLines field (set by admin)
+                      const cutLines = proof.cutLines ? proof.cutLines.split(',') : [];
                       
-                      if (!cutSelection?.displayValue) return null;
+                      if (cutLines.length === 0) return null;
                       
-                      const isGreenCut = cutSelection.displayValue.toLowerCase().includes('kiss') || 
-                                        cutSelection.displayValue.toLowerCase().includes('cut through backing') ||
-                                        !cutSelection.displayValue.toLowerCase().includes('through');
+                      const hasGreen = cutLines.includes('green');
+                      const hasGrey = cutLines.includes('grey');
                       
+                      // Show both if both are selected, otherwise show the one that's selected
                       return (
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className="w-4 h-4 rounded border-2 flex-shrink-0" 
-                            style={{ 
-                              borderColor: isGreenCut ? '#91c848' : '#6b7280', 
-                              backgroundColor: 'transparent' 
-                            }}
-                          ></div>
-                          <span className="text-white text-xs">
-                            {isGreenCut ? 'Green' : 'Grey'} cut-line shows where sticker will be cut
-                          </span>
+                        <div className="space-y-1">
+                          {hasGreen && (
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-4 h-4 rounded border-2 flex-shrink-0" 
+                                style={{ 
+                                  borderColor: '#91c848', 
+                                  backgroundColor: 'transparent' 
+                                }}
+                              ></div>
+                              <span className="text-white text-xs">
+                                Green cut-line shows where sticker will be cut
+                              </span>
+                            </div>
+                          )}
+                          {hasGrey && (
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-4 h-4 rounded border-2 flex-shrink-0" 
+                                style={{ 
+                                  borderColor: '#9ca3af', 
+                                  backgroundColor: 'transparent' 
+                                }}
+                              ></div>
+                              <span className="text-white text-xs">
+                                Grey cut-line shows where sticker will be cut
+                              </span>
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
@@ -4765,35 +4874,14 @@ function Dashboard() {
                         
                         {/* File Upload/Preview Area */}
                         {!stagedFile || (stagedFile.orderId !== order.id || stagedFile.proofId !== proof.id) ? (
-                          /* File Upload Drop Zone */
-                          <div 
-                            className={`border-2 border-dashed rounded-lg p-4 mb-3 text-center transition-colors cursor-pointer ${
-                              uploadingFile 
-                                ? 'border-blue-400/50 bg-blue-500/10' 
-                                : 'border-white/20 hover:border-white/30'
-                            }`}
-                            onClick={() => !uploadingFile && document.getElementById(`proof-file-input-${proof.id}`)?.click()}
-                          >
-                            {uploadingFile ? (
-                              <div className="flex flex-col items-center">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mb-2"></div>
-                                <p className="text-xs text-blue-400 mb-1">Uploading...</p>
-                                <p className="text-xs text-gray-500">Please wait</p>
-                              </div>
-                            ) : (
-                              <>
-                                <svg className="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                </svg>
-                                <p className="text-xs text-gray-400 mb-1">Upload replacement file</p>
-                                <p className="text-xs text-gray-500">Click to browse or drag & drop</p>
-                              </>
-                            )}
+                          /* File Upload Drop Zone - Updated to match vinyl calculator */
+                          <div>
+                            {/* Hidden file input */}
                             <input 
                               id={`proof-file-input-${proof.id}`}
                               type="file" 
                               className="hidden" 
-                              accept="image/*,application/pdf,.ai,.eps,.psd"
+                              accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd"
                               title="Upload replacement file"
                               aria-label="Upload replacement file for proof"
                               onChange={(e) => {
@@ -4804,51 +4892,159 @@ function Dashboard() {
                               }}
                               disabled={uploadingFile}
                             />
+
+                            <div 
+                              className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative mb-3"
+                              onDrop={(e) => handleDrop(e, order.id, proof.id)}
+                              onDragOver={handleDragOver}
+                              onClick={() => !uploadingFile && document.getElementById(`proof-file-input-${proof.id}`)?.click()}
+                            >
+                              {uploadingFile ? (
+                                <div className="mb-4">
+                                  <div className="text-4xl mb-3">⏳</div>
+                                  <p className="text-white font-medium text-base mb-2">Uploading...</p>
+                                  {uploadProgress && (
+                                    <div className="w-full bg-white/20 rounded-full h-2 mb-2">
+                                      <div 
+                                        className="bg-purple-400 h-2 rounded-full transition-all duration-300"
+                                        style={{ width: `${uploadProgress.percentage}%` }}
+                                      ></div>
+                                    </div>
+                                  )}
+                                  {uploadProgress && (
+                                    <p className="text-white/80 text-sm">{uploadProgress.percentage}% complete</p>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="mb-4">
+                                  <div className="mb-3 flex justify-center -ml-4">
+                                    <img 
+                                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751341811/StickerShuttleFileIcon4_gkhsu5.png" 
+                                      alt="Upload file" 
+                                      className="w-20 h-20 object-contain"
+                                    />
+                                  </div>
+                                  <p className="text-white font-medium text-base mb-2 hidden md:block">Drag or click to upload your file</p>
+                                  <p className="text-white font-medium text-base mb-2 md:hidden">Tap to add file</p>
+                                  <p className="text-white/80 text-sm">All formats supported. Max file size: 25MB | 1 file per order</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {uploadError && (
+                              <div className="mt-3 p-3 bg-red-500/20 border border-red-400/50 rounded-lg mb-3">
+                                <p className="text-red-200 text-sm flex items-center gap-2">
+                                  <span>⚠️</span>
+                                  {uploadError}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         ) : (
-                          /* Staged File Preview */
-                          <div className="border-2 border-green-400/50 rounded-lg p-4 mb-3 bg-green-500/10">
-                            <div className="flex items-center gap-3 mb-3">
-                              <div className="w-16 h-16 rounded-lg overflow-hidden bg-white/10">
-                                {stagedFile.file.type === 'application/pdf' ? (
-                                  <div className="w-full h-full flex items-center justify-center">
-                                    <svg className="w-8 h-8 text-red-500" fill="currentColor" viewBox="0 0 24 24">
-                                      <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
-                                    </svg>
-                                  </div>
-                                ) : (
-                                  <img 
-                                    src={stagedFile.preview} 
-                                    alt="New file preview" 
-                                    className="w-full h-full object-cover"
-                                  />
-                                )}
+                          /* Staged File Preview - Updated to match vinyl calculator */
+                          <div className="border border-green-400/50 rounded-xl p-4 bg-green-500/10 backdrop-blur-md mb-3">
+                            <div className="flex flex-col md:flex-row gap-4 items-start">
+                              {/* Image Preview */}
+                              <div className="w-full h-48 md:w-32 md:h-32 lg:w-40 lg:h-40 rounded-xl overflow-hidden border border-green-400/30 bg-white/5 backdrop-blur-md p-3 flex items-center justify-center flex-shrink-0">
+                                <AIFileImage
+                                  src={stagedFile.uploadedFile?.secure_url || stagedFile.preview}
+                                  filename={stagedFile.file.name}
+                                  alt={stagedFile.file.name}
+                                  className="w-full h-full object-contain"
+                                  size="preview"
+                                  showFileType={false}
+                                />
                               </div>
-                              <div className="flex-1">
-                                <p className="text-sm font-medium text-white">{stagedFile.file.name}</p>
-                                <p className="text-xs text-gray-400">
-                                  {(stagedFile.file.size / 1024 / 1024).toFixed(2)} MB • Ready to send
-                                </p>
-                                <div className="flex items-center gap-1 mt-1">
-                                  <div className="w-2 h-2 rounded-full bg-green-400"></div>
-                                  <span className="text-xs text-green-400">Staged for replacement</span>
+
+                              {/* File Info */}
+                              <div className="flex-1 min-w-0 w-full">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="text-green-400 text-xl">📎</div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-green-200 font-medium break-words text-lg">{stagedFile.file.name}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    <button
+                                      onClick={() => document.getElementById(`proof-file-input-${stagedFile.proofId}`)?.click()}
+                                      className="text-blue-300 hover:text-blue-200 p-2 hover:bg-blue-500/20 rounded-lg transition-colors cursor-pointer"
+                                      title="Replace file"
+                                    >
+                                      🔄
+                                    </button>
+                                    <button
+                                      onClick={removeUploadedFile}
+                                      className="text-red-300 hover:text-red-200 p-2 hover:bg-red-500/20 rounded-lg transition-colors cursor-pointer"
+                                      title="Remove file"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* File Details */}
+                                <div className="space-y-2 mb-3">
+                                  <div className="flex flex-wrap items-center gap-3 text-green-300/80 text-sm">
+                                    <span className="flex items-center gap-1">
+                                      <span className="text-green-400">📏</span>
+                                      {(stagedFile.file.size / 1024 / 1024).toFixed(2)} MB
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <span className="text-green-400">🎨</span>
+                                      {stagedFile.uploadedFile?.format?.toUpperCase() || stagedFile.file.type.split('/')[1]?.toUpperCase() || 'FILE'}
+                                    </span>
+                                    {stagedFile.uploadedFile?.width && stagedFile.uploadedFile?.height && (
+                                      <span className="flex items-center gap-1">
+                                        <span className="text-green-400">📐</span>
+                                        {stagedFile.uploadedFile.width}x{stagedFile.uploadedFile.height}px
+                                      </span>
+                                    )}
+                                  </div>
+                                  
+                                  {/* File Type Icon */}
+                                  {stagedFile.uploadedFile?.format && getFileTypeIcon(stagedFile.uploadedFile.format) && (
+                                    <div className="flex items-center gap-2">
+                                      <img 
+                                        src={getFileTypeIcon(stagedFile.uploadedFile.format)!} 
+                                        alt={`${stagedFile.uploadedFile.format.toUpperCase()} file`}
+                                        className="w-6 h-6 object-contain opacity-80"
+                                      />
+                                      <span className="text-xs text-green-300/60">
+                                        Professional design file detected
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Upload Success Message */}
+                                <div className="flex items-center gap-2 text-green-300 text-sm">
+                                  <span className="text-green-400">✅</span>
+                                  <span>File uploaded successfully!</span>
                                 </div>
                               </div>
                             </div>
                             
                             {/* Action Buttons */}
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 mt-4">
                               <button
                                 onClick={handleSendReplacement}
                                 disabled={uploadingFile}
-                                className="flex-1 py-2 px-6 md:px-4 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                                className="flex-1 py-3 px-6 md:px-4 rounded-xl text-white font-semibold transition-all button-interactive disabled:opacity-50"
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                                  backdropFilter: 'blur(25px) saturate(180%)',
+                                  border: '1px solid rgba(34, 197, 94, 0.4)',
+                                  boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                }}
                               >
                                 {uploadingFile ? 'Sending...' : 'Send Replacement'}
                               </button>
                               <button
                                 onClick={handleCancelReplacement}
                                 disabled={uploadingFile}
-                                className="px-6 md:px-4 py-2 rounded-lg bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                                className="px-6 md:px-4 py-3 rounded-xl text-gray-300 hover:text-white transition-colors button-interactive disabled:opacity-50"
+                                style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
                               >
                                 Cancel
                               </button>

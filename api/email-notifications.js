@@ -69,118 +69,73 @@ const getOrderStatusEmailTemplate = (orderData, newStatus) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${statusInfo.subject}</title>
 </head>
-<body style="margin: 0; padding: 20px; background-color: #030140; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-height: 100vh;">
-  <div style="max-width: 600px; margin: 0 auto; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); border-radius: 16px; overflow: hidden;">
+<body style="margin: 0; padding: 20px; background-color: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-height: 100vh;">
+  <div style="max-width: 600px; margin: 0 auto; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 16px; overflow: hidden;">
     
     <!-- Header -->
-    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 30px 20px; text-align: center;">
-      <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: bold;">
+    <div style="background: #f1f3f5; border-bottom: 1px solid #e9ecef; padding: 30px 20px; text-align: center;">
+      <h1 style="color: #1a1a1a; margin: 0; font-size: 22px; font-weight: bold;">
         ${statusInfo.emoji} ${statusInfo.title}
       </h1>
-      <p style="color: #e2e8f0; margin: 10px 0 0 0; font-size: 16px;">
+      <p style="color: #4b5563; margin: 10px 0 0 0; font-size: 16px;">
         Order #${orderData.orderNumber}
       </p>
     </div>
 
     <!-- Main Content -->
     <div style="padding: 30px 20px;">
-      <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); border-left: 4px solid ${statusInfo.color}; padding: 20px; margin-bottom: 30px; border-radius: 12px;">
-        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #ffffff;">
+      <div style="background: #ffffff; border: 1px solid #e9ecef; border-left: 4px solid ${statusInfo.color}; padding: 20px; margin-bottom: 30px; border-radius: 12px;">
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #1a1a1a;">
           ${statusInfo.message}
         </p>
-      </div>
-
-      <!-- Order Details -->
-      <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 20px; border-radius: 12px; margin-bottom: 30px;">
-        <h3 style="margin: 0 0 15px 0; color: #ffffff; font-size: 18px;">Order Details</h3>
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr>
-            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">Order Number:</td>
-            <td style="padding: 8px 0; color: #ffffff; font-weight: 600;">#${orderData.orderNumber}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">Status:</td>
-            <td style="padding: 8px 0; color: ${statusInfo.color}; font-weight: 600;">${newStatus}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">Order Total:</td>
-            <td style="padding: 8px 0; color: #ffffff; font-weight: 600;">$${orderData.totalPrice?.toFixed(2) || 'N/A'}</td>
-          </tr>
-          ${(newStatus === 'Shipped' || newStatus === 'Delivered') && orderData.trackingNumber ? `
-          <tr>
-            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">Tracking:</td>
-            <td style="padding: 8px 0;">
-              <a href="${orderData.trackingUrl || '#'}" style="color: #60a5fa; text-decoration: none; font-weight: 600;">
-                ${orderData.trackingNumber}
-              </a>
-            </td>
-          </tr>
-          ` : ''}
-        </table>
       </div>
 
       <!-- Action Buttons -->
       <div style="text-align: center; margin-bottom: 30px;">
         ${newStatus === 'Building Proof' ? `
-        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background: linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%); backdrop-filter: blur(25px) saturate(180%); border: 1px solid rgba(59, 130, 246, 0.4); box-shadow: rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
+        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background-color: #3B82F6; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
           View Order Details
         </a>
         ` : ''}
         
         ${newStatus === 'Proof Sent' ? `
-        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background: linear-gradient(135deg, rgba(255, 215, 19, 0.6) 0%, rgba(255, 215, 19, 0.4) 50%, rgba(255, 215, 19, 0.7) 100%); backdrop-filter: blur(25px) saturate(180%); border: 1px solid rgba(255, 215, 19, 0.4); box-shadow: rgba(255, 215, 19, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
+        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background-color: #F59E0B; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
           Review Proof
         </a>
         ` : ''}
         
-        ${newStatus === 'Printing' ? `
-        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background: linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%); backdrop-filter: blur(25px) saturate(180%); border: 1px solid rgba(59, 130, 246, 0.4); box-shadow: rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
+        ${newStatus === 'Shipped' || newStatus === 'Out for Delivery' ? `
+        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background-color: #3B82F6; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
           View Order Details
         </a>
-        ` : ''}
-        
-        ${(newStatus === 'Shipped' && orderData.trackingNumber) ? `
-        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background: linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%); backdrop-filter: blur(25px) saturate(180%); border: 1px solid rgba(59, 130, 246, 0.4); box-shadow: rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
-          View Order Details
-        </a>
-        <a href="${orderData.trackingUrl || '#'}" style="display: inline-block; background: linear-gradient(135deg, rgba(255, 215, 19, 0.6) 0%, rgba(255, 215, 19, 0.4) 50%, rgba(255, 215, 19, 0.7) 100%); backdrop-filter: blur(25px) saturate(180%); border: 1px solid rgba(255, 215, 19, 0.4); box-shadow: rgba(255, 215, 19, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
+        <a href="${orderData.trackingUrl || '#'}" style="display: inline-block; background-color: #F59E0B; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
           Track Package
-        </a>
-        ` : (newStatus === 'Shipped' ? `
-        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background: linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%); backdrop-filter: blur(25px) saturate(180%); border: 1px solid rgba(59, 130, 246, 0.4); box-shadow: rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
-          View Order Details
-        </a>
-        ` : '')}
-        
-        ${newStatus === 'Delivered' ? `
-        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background: linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%); backdrop-filter: blur(25px) saturate(180%); border: 1px solid rgba(59, 130, 246, 0.4); box-shadow: rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
-          View Order Details
         </a>
         ` : ''}
       </div>
 
       <!-- Support Section -->
-      <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 20px; text-align: center;">
-        <p style="margin: 0 0 10px 0; color: #d1d5db; font-size: 14px;">
+      <div style="border-top: 1px solid #e9ecef; padding-top: 20px; text-align: center;">
+        <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px;">
           Questions about your order?
         </p>
-        <a href="${FRONTEND_URL}/contact" style="color: #60a5fa; text-decoration: none; font-weight: 600;">
+        <a href="${FRONTEND_URL}/contact-us" style="color: #3b82f6; text-decoration: none; font-weight: 600;">
           Contact Support
         </a>
       </div>
     </div>
 
     <!-- Footer -->
-    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 20px; text-align: center;">
+    <div style="background: #f1f3f5; border-top: 1px solid #e9ecef; padding: 20px; text-align: center;">
       <!-- Logo -->
       <div style="margin-bottom: 15px;">
-        <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
+        <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751567428/LogoDarktGreyStickerShuttle_lpvvnc.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
       </div>
       
-      <p style="margin: 0 0 10px 0; color: #d1d5db; font-size: 14px;">
+      <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px;">
         Thank you for choosing Sticker Shuttle!
       </p>
-      <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+      <p style="margin: 0; color: #6b7280; font-size: 12px;">
         This email was sent to ${orderData.customerEmail} regarding order #${orderData.orderNumber}
       </p>
     </div>
@@ -387,61 +342,61 @@ const getAdminNotificationTemplate = (type, orderData, extraData = {}) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${template.subject}</title>
 </head>
-<body style="margin: 0; padding: 20px; background-color: #030140; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-height: 100vh;">
-  <div style="max-width: 600px; margin: 0 auto; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); border-radius: 16px; overflow: hidden;">
+<body style="margin: 0; padding: 20px; background-color: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-height: 100vh;">
+  <div style="max-width: 600px; margin: 0 auto; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 16px; overflow: hidden;">
     
     <!-- Header -->
-    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 30px 20px; text-align: center;">
-      <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: bold;">
+    <div style="background: #f1f3f5; border-bottom: 1px solid #e9ecef; padding: 30px 20px; text-align: center;">
+      <h1 style="color: #1a1a1a; margin: 0; font-size: 22px; font-weight: bold;">
         ${template.emoji} ${template.title}
       </h1>
-      <p style="color: #e2e8f0; margin: 10px 0 0 0; font-size: 16px;">
+      <p style="color: #4b5563; margin: 10px 0 0 0; font-size: 16px;">
         Order #${orderData.orderNumber}
       </p>
     </div>
 
     <!-- Main Content -->
     <div style="padding: 30px 20px;">
-      <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); border-left: 4px solid ${template.color}; padding: 20px; margin-bottom: 30px; border-radius: 12px;">
-        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #ffffff;">
+      <div style="background: #ffffff; border: 1px solid #e9ecef; border-left: 4px solid ${template.color}; padding: 20px; margin-bottom: 30px; border-radius: 12px;">
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #1a1a1a;">
           ${template.message}
         </p>
       </div>
 
       <!-- Order Details -->
-      <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 20px; border-radius: 12px; margin-bottom: 30px;">
-        <h3 style="margin: 0 0 15px 0; color: #ffffff; font-size: 18px;">Order Details</h3>
+      <div style="background: #ffffff; border: 1px solid #e9ecef; padding: 20px; border-radius: 12px; margin-bottom: 30px;">
+        <h3 style="margin: 0 0 15px 0; color: #1a1a1a; font-size: 18px;">Order Details</h3>
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
-            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">Order Number:</td>
-            <td style="padding: 8px 0; color: #ffffff; font-weight: 600;">#${orderData.orderNumber}</td>
+            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Order Number:</td>
+            <td style="padding: 8px 0; color: #1a1a1a; font-weight: 600;">#${orderData.orderNumber}</td>
           </tr>
           <tr>
-            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">Customer:</td>
-            <td style="padding: 8px 0; color: #ffffff; font-weight: 600;">${orderData.customerName || 'N/A'}</td>
+            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Customer:</td>
+            <td style="padding: 8px 0; color: #1a1a1a; font-weight: 600;">${orderData.customerName || 'N/A'}</td>
           </tr>
           <tr>
-            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">Email:</td>
-            <td style="padding: 8px 0; color: #ffffff; font-weight: 600;">${orderData.customerEmail || 'N/A'}</td>
+            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Email:</td>
+            <td style="padding: 8px 0; color: #1a1a1a; font-weight: 600;">${orderData.customerEmail || 'N/A'}</td>
           </tr>
           <tr>
-            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">Order Total:</td>
-            <td style="padding: 8px 0; color: #ffffff; font-weight: 600;">$${orderData.totalPrice?.toFixed(2) || 'N/A'}</td>
+            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Order Total:</td>
+            <td style="padding: 8px 0; color: #1a1a1a; font-weight: 600;">$${orderData.totalPrice?.toFixed(2) || 'N/A'}</td>
           </tr>
           <tr>
-            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">Status:</td>
+            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Status:</td>
             <td style="padding: 8px 0; color: ${template.color}; font-weight: 600;">${orderData.orderStatus || 'Processing'}</td>
           </tr>
           ${type === 'proof_changes_requested' && extraData.customerNotes ? `
           <tr>
-            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">Customer Notes:</td>
-            <td style="padding: 8px 0; color: #ffffff; font-weight: 600;">${extraData.customerNotes}</td>
+            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Customer Notes:</td>
+            <td style="padding: 8px 0; color: #1a1a1a; font-weight: 600;">${extraData.customerNotes}</td>
           </tr>
           ` : ''}
           ${orderData.calculatorSelections ? `
           <tr>
-            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">Product Details:</td>
-            <td style="padding: 8px 0; color: #ffffff; font-weight: 600;">${orderData.calculatorSelections}</td>
+            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Product Details:</td>
+            <td style="padding: 8px 0; color: #1a1a1a; font-weight: 600;">${orderData.calculatorSelections}</td>
           </tr>
           ` : ''}
         </table>
@@ -449,25 +404,33 @@ const getAdminNotificationTemplate = (type, orderData, extraData = {}) => {
 
       <!-- Action Button -->
       <div style="text-align: center; margin-bottom: 30px;">
-        <a href="${adminPanelUrl}" style="display: inline-block; background: linear-gradient(135deg, rgba(${template.buttonColor === '#10B981' ? '16, 185, 129' : '245, 158, 11'}, 0.6) 0%, rgba(${template.buttonColor === '#10B981' ? '16, 185, 129' : '245, 158, 11'}, 0.4) 50%, rgba(${template.buttonColor === '#10B981' ? '16, 185, 129' : '245, 158, 11'}, 0.7) 100%); backdrop-filter: blur(25px) saturate(180%); border: 1px solid rgba(${template.buttonColor === '#10B981' ? '16, 185, 129' : '245, 158, 11'}, 0.4); box-shadow: rgba(${template.buttonColor === '#10B981' ? '16, 185, 129' : '245, 158, 11'}, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
+        <a href="${adminPanelUrl}" style="display: inline-block; background-color: ${template.buttonColor}; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
           ${template.buttonText}
         </a>
       </div>
 
-
+      <!-- Support Section -->
+      <div style="border-top: 1px solid #e9ecef; padding-top: 20px; text-align: center;">
+        <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px;">
+          Need to contact the customer?
+        </p>
+        <a href="mailto:${orderData.customerEmail}" style="color: #3b82f6; text-decoration: none; font-weight: 600;">
+          Send Email
+        </a>
+      </div>
     </div>
 
     <!-- Footer -->
-    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 20px; text-align: center;">
+    <div style="background: #f1f3f5; border-top: 1px solid #e9ecef; padding: 20px; text-align: center;">
       <!-- Logo -->
       <div style="margin-bottom: 15px;">
-        <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
+        <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751567428/LogoDarktGreyStickerShuttle_lpvvnc.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
       </div>
       
-      <p style="margin: 0 0 10px 0; color: #d1d5db; font-size: 14px;">
-        Admin Notification - Sticker Shuttle
+      <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px;">
+        Internal Notification - Sticker Shuttle Admin
       </p>
-      <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+      <p style="margin: 0; color: #6b7280; font-size: 12px;">
         This email was sent to ${adminEmail} regarding order #${orderData.orderNumber}
       </p>
     </div>
@@ -694,7 +657,7 @@ const getUserFileUploadTemplate = (userData, fileName, fileSize, message) => {
     <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 20px; text-align: center;">
       <!-- Logo -->
       <div style="margin-bottom: 15px;">
-        <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
+        <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751567428/LogoDarktGreyStickerShuttle_lpvvnc.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
       </div>
       
       <p style="margin: 0 0 10px 0; color: #d1d5db; font-size: 14px;">
@@ -848,7 +811,7 @@ const isFirstTimeCustomer = async (customerEmail) => {
     const orderCount = orders?.length || 0;
     console.log(`📊 Customer ${customerEmail} has ${orderCount} previous paid orders`);
     
-    return orderCount <= 1; // First-time if this is their first paid order
+    return orderCount === 0; // First-time only if they have no previous paid orders
   } catch (error) {
     console.error('❌ Error in isFirstTimeCustomer:', error);
     return true; // Default to first-time if error
@@ -858,7 +821,7 @@ const isFirstTimeCustomer = async (customerEmail) => {
 // Welcome email template for first-time customers
 const getWelcomeEmailTemplate = (orderData) => {
   return {
-    subject: `🎉 Welcome to Sticker Shuttle! Order #${orderData.orderNumber} confirmed`,
+    subject: `🚀 Welcome to Sticker Shuttle! Order #${orderData.orderNumber} confirmed`,
     html: `
 <!DOCTYPE html>
 <html>
@@ -867,15 +830,15 @@ const getWelcomeEmailTemplate = (orderData) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Welcome to Sticker Shuttle!</title>
 </head>
-<body style="margin: 0; padding: 20px; background-color: #030140; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-height: 100vh;">
-  <div style="max-width: 600px; margin: 0 auto; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); border-radius: 16px; overflow: hidden;">
+<body style="margin: 0; padding: 20px; background-color: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-height: 100vh;">
+  <div style="max-width: 600px; margin: 0 auto; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 16px; overflow: hidden;">
     
     <!-- Header -->
-    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 30px 20px; text-align: center;">
-      <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">
-        🎉 Welcome to Sticker Shuttle!
+    <div style="background: #f1f3f5; border-bottom: 1px solid #e9ecef; padding: 30px 20px; text-align: center;">
+      <h1 style="color: #1a1a1a; margin: 0; font-size: 28px; font-weight: bold;">
+        🎉 You did it!
       </h1>
-      <p style="color: #e2e8f0; margin: 10px 0 0 0; font-size: 18px;">
+      <p style="color: #4b5563; margin: 10px 0 0 0; font-size: 18px;">
         Your first order is confirmed!
       </p>
     </div>
@@ -883,93 +846,62 @@ const getWelcomeEmailTemplate = (orderData) => {
     <!-- Main Content -->
     <div style="padding: 30px 20px;">
       <!-- Welcome Message -->
-      <div style="background: linear-gradient(135deg, rgba(147, 51, 234, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%); border: 1px solid rgba(147, 51, 234, 0.3); padding: 25px; margin-bottom: 30px; border-radius: 12px; text-align: center;">
-        <h2 style="margin: 0 0 15px 0; color: #ffffff; font-size: 22px;">Thank you for choosing us! 🚀</h2>
-        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #e2e8f0;">
-          We're thrilled to have you as part of the Sticker Shuttle family! Your order <strong>#${orderData.orderNumber}</strong> has been confirmed and we're already working on making your custom stickers perfect.
+      <div style="background: #ffffff; border: 1px solid #e9ecef; padding: 25px; margin-bottom: 30px; border-radius: 12px; text-align: center;">
+        <h2 style="margin: 0 0 15px 0; color: #1a1a1a; font-size: 22px;">Thank you for trusting us! 🚀</h2>
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #4b5563;">
+          We're thrilled to have you here! Your order has been received and we'll start working on it right away.
         </p>
       </div>
 
-      <!-- What Happens Next -->
-      <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 25px; margin-bottom: 30px; border-radius: 12px;">
-        <h3 style="margin: 0 0 20px 0; color: #ffffff; font-size: 20px;">What happens next?</h3>
-        <div style="space-y: 15px;">
-          <div style="display: flex; align-items: flex-start; margin-bottom: 15px;">
-            <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%); color: #ffffff; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; margin-right: 15px; flex-shrink: 0;">1</div>
-            <div>
-              <h4 style="margin: 0 0 5px 0; color: #ffffff; font-size: 16px;">We create your digital proof</h4>
-              <p style="margin: 0; color: #d1d5db; font-size: 14px;">Our design team will create a digital proof of your stickers for your review (usually within 24 hours).</p>
-            </div>
-          </div>
-          <div style="display: flex; align-items: flex-start; margin-bottom: 15px;">
-            <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%); color: #ffffff; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; margin-right: 15px; flex-shrink: 0;">2</div>
-            <div>
-              <h4 style="margin: 0 0 5px 0; color: #ffffff; font-size: 16px;">You approve the proof</h4>
-              <p style="margin: 0; color: #d1d5db; font-size: 14px;">We'll email you when your proof is ready for review. You can approve it or request changes.</p>
-            </div>
-          </div>
-          <div style="display: flex; align-items: flex-start;">
-            <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%); color: #ffffff; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; margin-right: 15px; flex-shrink: 0;">3</div>
-            <div>
-              <h4 style="margin: 0 0 5px 0; color: #ffffff; font-size: 16px;">We print and ship</h4>
-              <p style="margin: 0; color: #d1d5db; font-size: 14px;">Once approved, we'll print your stickers and ship them to you with tracking information.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Order Details -->
-      <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 20px; border-radius: 12px; margin-bottom: 30px;">
-        <h3 style="margin: 0 0 15px 0; color: #ffffff; font-size: 18px;">Order Summary</h3>
+      <div style="background: #ffffff; border: 1px solid #e9ecef; padding: 20px; border-radius: 12px; margin-bottom: 30px;">
+        <h3 style="margin: 0 0 15px 0; color: #1a1a1a; font-size: 18px;">Order Details</h3>
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
-            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">Order Number:</td>
-            <td style="padding: 8px 0; color: #ffffff; font-weight: 600;">#${orderData.orderNumber}</td>
+            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Order Number:</td>
+            <td style="padding: 8px 0; color: #1a1a1a; font-weight: 600;">#${orderData.orderNumber}</td>
           </tr>
           <tr>
-            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">Order Total:</td>
-            <td style="padding: 8px 0; color: #86efac; font-weight: 600;">$${orderData.totalPrice?.toFixed(2) || 'N/A'}</td>
+            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Order Total:</td>
+            <td style="padding: 8px 0; color: #10b981; font-weight: 600;">$${orderData.totalPrice?.toFixed(2) || 'N/A'}</td>
           </tr>
           <tr>
-            <td style="padding: 8px 0; color: #d1d5db; font-weight: 500;">Status:</td>
-            <td style="padding: 8px 0; color: #60a5fa; font-weight: 600;">Processing</td>
+            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Status:</td>
+            <td style="padding: 8px 0; color: #3b82f6; font-weight: 600;">Processing</td>
           </tr>
         </table>
       </div>
 
       <!-- Action Button -->
       <div style="text-align: center; margin-bottom: 30px;">
-        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background: linear-gradient(135deg, rgba(147, 51, 234, 0.6) 0%, rgba(147, 51, 234, 0.4) 50%, rgba(147, 51, 234, 0.7) 100%); backdrop-filter: blur(25px) saturate(180%); border: 1px solid rgba(147, 51, 234, 0.4); box-shadow: rgba(147, 51, 234, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset; color: #ffffff; padding: 15px 40px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px;">
+        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background-color: #3B82F6; color: #ffffff; padding: 15px 40px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px;">
           Track Your Order
         </a>
       </div>
 
       <!-- Support Section -->
-      <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 20px; text-align: center;">
-        <p style="margin: 0 0 10px 0; color: #d1d5db; font-size: 14px;">
+      <div style="border-top: 1px solid #e9ecef; padding-top: 20px; text-align: center;">
+        <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px;">
           Questions about your order or need help?
         </p>
-        <a href="${FRONTEND_URL}/contact" style="color: #60a5fa; text-decoration: none; font-weight: 600;">
-          Contact Our Support Team
+        <a href="${FRONTEND_URL}/contact-us" style="color: #3b82f6; text-decoration: none; font-weight: 600;">
+          Contact Support
         </a>
-        <p style="margin: 10px 0 0 0; color: #9ca3af; font-size: 12px;">
-          We typically respond within a few hours!
-        </p>
       </div>
     </div>
 
     <!-- Footer -->
-    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); padding: 20px; text-align: center;">
+    <div style="background: #f1f3f5; border-top: 1px solid #e9ecef; padding: 20px; text-align: center;">
       <!-- Logo -->
       <div style="margin-bottom: 15px;">
-        <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
+        <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751567428/LogoDarktGreyStickerShuttle_lpvvnc.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
       </div>
       
-      <p style="margin: 0 0 10px 0; color: #d1d5db; font-size: 14px;">
-        Welcome to the Sticker Shuttle family! 🎉
+      <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px;">
+        Thank you for choosing Sticker Shuttle!
       </p>
-      <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-        This email was sent to ${orderData.customerEmail} regarding your first order #${orderData.orderNumber}
+      <p style="margin: 0; color: #6b7280; font-size: 12px;">
+        This email was sent to ${orderData.customerEmail} regarding order #${orderData.orderNumber}
       </p>
     </div>
   </div>
@@ -1009,44 +941,28 @@ const sendOrderStatusNotificationEnhanced = async (orderData, newStatus) => {
       return { success: false, error: 'No customer email' };
     }
 
-    // For 'Building Proof' status on new orders, check if customer is first-time
-    if (newStatus === 'Building Proof') {
+    // Check if this is a first-time customer when the order is paid
+    if (newStatus === 'paid' || newStatus === 'Building Proof') {
       const isFirstTime = await isFirstTimeCustomer(normalizedOrderData.customerEmail);
       
       if (isFirstTime) {
-        console.log(`🎉 First-time customer detected for ${normalizedOrderData.customerEmail}, sending welcome email first`);
+        console.log(`🎉 First-time customer detected for ${normalizedOrderData.customerEmail}, sending welcome email`);
         
-        // Send welcome email first
+        // Send welcome email
         const welcomeTemplate = getWelcomeEmailTemplate(normalizedOrderData);
         const welcomeResult = await sendEmail(normalizedOrderData.customerEmail, welcomeTemplate.subject, welcomeTemplate.html);
         
         if (welcomeResult.success) {
           console.log(`✅ Welcome email sent for order ${normalizedOrderData.orderNumber}`);
-          
-          // Wait 5 minutes, then send the proof notification
-          setTimeout(async () => {
-            try {
-              console.log(`📧 Sending delayed proof notification for first-time customer order ${normalizedOrderData.orderNumber}`);
-              const proofTemplate = getOrderStatusEmailTemplate(normalizedOrderData, 'Building Proof');
-              const proofResult = await sendEmail(normalizedOrderData.customerEmail, proofTemplate.subject, proofTemplate.html);
-              
-              if (proofResult.success) {
-                console.log(`✅ Delayed proof notification sent for order ${normalizedOrderData.orderNumber}`);
-              } else {
-                console.error(`❌ Delayed proof notification failed for order ${normalizedOrderData.orderNumber}:`, proofResult.error);
-              }
-            } catch (delayedError) {
-              console.error('❌ Error in delayed proof notification:', delayedError);
-            }
-          }, 5 * 60 * 1000); // 5 minutes delay
-          
-          return welcomeResult;
+          // If this is the 'paid' status notification, don't send another email
+          if (newStatus === 'paid') {
+            return welcomeResult;
+          }
         } else {
-          console.error('❌ Welcome email failed, falling back to standard notification');
-          // Fall back to standard notification if welcome email fails
+          console.error(`❌ Welcome email failed for order ${normalizedOrderData.orderNumber}:`, welcomeResult.error);
         }
       } else {
-        console.log(`🔄 Returning customer detected for ${normalizedOrderData.customerEmail}, sending standard proof notification`);
+        console.log(`🔄 Returning customer detected for ${normalizedOrderData.customerEmail}, skipping welcome email`);
       }
     }
 

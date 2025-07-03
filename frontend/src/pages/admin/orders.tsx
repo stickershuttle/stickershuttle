@@ -84,6 +84,9 @@ const GET_ALL_ORDERS = gql`
         status
         customerNotes
         adminNotes
+        replaced
+        replacedAt
+        originalFileName
       }
     }
   }
@@ -536,15 +539,92 @@ export default function AdminOrders() {
     }
   };
 
-  // Download file
-  const handleDownloadFile = (fileUrl: string, fileName?: string) => {
-    const link = document.createElement('a');
-    link.href = fileUrl;
-    link.download = fileName || fileUrl.split('/').pop() || 'download';
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // Download file - Enhanced to force download with descriptive filename
+  const handleDownloadFile = async (fileUrl: string, customerName?: string, productName?: string, quantity?: number, originalFileName?: string) => {
+    try {
+      // Extract original filename from URL if not provided
+      const urlFileName = fileUrl.split('/').pop()?.split('?')[0] || 'design';
+      const originalFile = originalFileName || urlFileName;
+      
+      // Get file extension
+      const fileExtension = originalFile.includes('.') ? originalFile.split('.').pop() : 'jpg';
+      
+      // Create descriptive filename: CustomerName_ProductName_QTY_Source_OriginalFileName
+      let descriptiveFileName = '';
+      
+      if (customerName) {
+        // Clean customer name (remove spaces, special chars)
+        const cleanCustomerName = customerName.replace(/[^a-zA-Z0-9]/g, '');
+        descriptiveFileName += cleanCustomerName + '_';
+      }
+      
+      if (productName) {
+        // Clean product name (remove spaces, special chars)
+        const cleanProductName = productName.replace(/[^a-zA-Z0-9]/g, '');
+        descriptiveFileName += cleanProductName + '_';
+      }
+      
+      if (quantity) {
+        descriptiveFileName += quantity + '_';
+      }
+      
+      descriptiveFileName += 'Source_';
+      
+      // Add original filename (without extension first, then add extension)
+      const originalNameWithoutExt = originalFile.includes('.') ? originalFile.substring(0, originalFile.lastIndexOf('.')) : originalFile;
+      const cleanOriginalName = originalNameWithoutExt.replace(/[^a-zA-Z0-9]/g, '');
+      descriptiveFileName += cleanOriginalName;
+      
+      // Add extension
+      if (fileExtension) {
+        descriptiveFileName += '.' + fileExtension;
+      }
+      
+      // For Cloudinary URLs, we can add fl_attachment to force download
+      let downloadUrl = fileUrl;
+      if (fileUrl.includes('cloudinary.com')) {
+        // Add fl_attachment flag to force download
+        downloadUrl = fileUrl.replace('/image/upload/', '/image/upload/fl_attachment/');
+      }
+
+      // Fetch the file as a blob to ensure download
+      const response = await fetch(downloadUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      
+      // Create blob URL and download
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = descriptiveFileName;
+      link.style.display = 'none';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up blob URL after a short delay
+      setTimeout(() => {
+        window.URL.revokeObjectURL(blobUrl);
+      }, 100);
+      
+    } catch (error) {
+      console.error('Download failed:', error);
+      
+      // Fallback to simple download method with descriptive name
+      const fallbackFileName = originalFileName || fileUrl.split('/').pop()?.split('?')[0] || 'download';
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.download = fallbackFileName;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   // Copy to clipboard
@@ -2089,7 +2169,19 @@ export default function AdminOrders() {
                                   {/* Download Button */}
                                   {itemImage && (
                                     <button
-                                      onClick={() => handleDownloadFile(itemImage, item.productName + '_design.jpg')}
+                                      onClick={() => {
+                                        // Prioritize company name, fallback to customer name
+                                        const companyName = selectedOrder.shippingAddress?.company || selectedOrder.billingAddress?.company;
+                                        const customerName = companyName || `${selectedOrder.customerFirstName || ''} ${selectedOrder.customerLastName || ''}`.trim();
+                                        
+                                        handleDownloadFile(
+                                          itemImage,
+                                          customerName,
+                                          item.productName,
+                                          item.quantity,
+                                          itemImage.split('/').pop()?.split('?')[0]
+                                        );
+                                      }}
                                       className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-6 flex items-center justify-center text-blue-400 hover:text-blue-300 hover:scale-110 transition-all duration-200"
                                       title="Download original file"
                                     >
@@ -2173,7 +2265,7 @@ export default function AdminOrders() {
                                     const rushOrder = selections.rush?.value || (selectedOrder as any).is_rush_order || rushFromString;
                                     
                                     // Enhanced fallback logic for proof preference
-                                    const proofFromString = itemString.includes('📧') ? true : itemString.includes('❌ No Proof') ? false : null;
+                                    const proofFromString = itemString.includes('📧') ? true : itemString.includes('No Proof') ? false : null;
                                     const hasProofData = selections.proof?.value !== undefined || proofFromString !== null;
                                     const proofValue = selections.proof?.value !== undefined ? selections.proof.value : 
                                       proofFromString !== null ? proofFromString : true;
@@ -2187,7 +2279,7 @@ export default function AdminOrders() {
                                     
                                     // Parse proof preference from order note text  
                                     const sendProofMatch = itemString.includes('Send FREE Proof') || itemString.includes('Send proof');
-                                    const noProofMatch = itemString.includes("Don't Send Proof") || itemString.includes('Skip proof');
+                                    const noProofMatch = itemString.includes("Don't Send Proof") || itemString.includes('Skip proof') || itemString.includes('No Proof');
                                     const updatedHasProofData = sendProofMatch || noProofMatch || hasProofData;
                                     const updatedProofValue = sendProofMatch ? true : noProofMatch ? false : proofValue;
                                     
@@ -2202,13 +2294,13 @@ export default function AdminOrders() {
                                             <span className="text-gray-300 ml-2">{item.customerNotes}</span>
                                           </div>
                                         )}
-                                        {(instagramHandle || instagramOptIn) && (
+                                        {(updatedInstagramHandle || updatedInstagramOptIn) && (
                                           <div className="text-sm mt-1">
                                             <span className="text-gray-500">Instagram:</span>
                                             <span className="text-gray-300 ml-2">
-                                              {instagramHandle ? `@${instagramHandle}` : 'Opted in for posting'}
+                                              {updatedInstagramHandle ? `@${updatedInstagramHandle}` : 'Opted in for posting'}
                                               <span className="text-pink-400 ml-2">📸</span>
-                                              {instagramOptIn && instagramHandle && (
+                                              {updatedInstagramOptIn && updatedInstagramHandle && (
                                                 <span className="ml-2 text-xs text-green-400">(Marketing opt-in)</span>
                                               )}
                                             </span>
@@ -2355,28 +2447,6 @@ export default function AdminOrders() {
                   {/* Action Buttons */}
                   <div className="flex items-center justify-center gap-3">
                     
-                    {/* Download File Button */}
-                    {(() => {
-                      const firstItemWithFile = selectedOrder.items.find(item => getProductImage(item));
-                      return firstItemWithFile ? (
-                        <button
-                          onClick={() => handleDownloadFile(getProductImage(firstItemWithFile)!, firstItemWithFile.productName + '_design.jpg')}
-                          className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105 h-[34px]"
-                          style={{
-                            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                            backdropFilter: 'blur(25px) saturate(180%)',
-                            border: '1px solid rgba(59, 130, 246, 0.4)',
-                            boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          }}
-                        >
-                          <svg className="h-3 w-3 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                          </svg>
-                          Download File
-                        </button>
-                      ) : null;
-                    })()}
-
                     {/* Tracking/Label Button */}
                     {selectedOrder.trackingNumber ? (
                       <button
@@ -2459,7 +2529,7 @@ export default function AdminOrders() {
                               {((selectedOrder as any).is_express_shipping && (selectedOrder as any).is_rush_order) ? '🚀⚡ RUSH + EXPRESS ALERT'
                                : (selectedOrder as any).is_express_shipping ? '⚡ EXPRESS SHIPPING ALERT'
                                : (selectedOrder as any).is_rush_order ? '🚀 RUSH ORDER ALERT'
-                               : (selectedOrder as any).is_blind_shipment ? '📦 BLIND SHIPMENT ALERT'
+                               : (selectedOrder as any).is_blind_shipment ? '🚚 Blind Shipment Alert'
                                : 'SPECIAL HANDLING ALERT'}
                             </span>
                           </div>
@@ -2471,7 +2541,7 @@ export default function AdminOrders() {
                               : (selectedOrder as any).is_rush_order
                               ? '🚨 This order requires URGENT production - Rush order (24hr processing) selected!'
                               : (selectedOrder as any).is_blind_shipment
-                              ? '🚨 BLIND SHIPMENT: Use discreet packaging and hide order contents from shipping labels!'
+                              ? 'Do not include any Sticker Shuttle branding on the package or shipping label'
                               : 'This order requires special handling - please review all flags and requirements.'}
                           </p>
                         </div>
@@ -2581,8 +2651,41 @@ export default function AdminOrders() {
                                 {/* Product Details */}
                                 <div className="flex-1">
                                   <div className="flex justify-between items-start">
-                                    <div>
-                                      <h4 className="font-semibold text-white text-base">{item.productName}</h4>
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <h4 className="font-semibold text-white text-base">{item.productName}</h4>
+                                        {/* Download Button for this specific item */}
+                                        {itemImage && (
+                                          <button
+                                            onClick={() => {
+                                              // Prioritize company name, fallback to customer name
+                                              const companyName = selectedOrder.shippingAddress?.company || selectedOrder.billingAddress?.company;
+                                              const customerName = companyName || `${selectedOrder.customerFirstName || ''} ${selectedOrder.customerLastName || ''}`.trim();
+                                              
+                                              handleDownloadFile(
+                                                itemImage,
+                                                customerName,
+                                                item.productName,
+                                                item.quantity,
+                                                itemImage.split('/').pop()?.split('?')[0]
+                                              );
+                                            }}
+                                            className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105"
+                                            style={{
+                                              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                                              backdropFilter: 'blur(25px) saturate(180%)',
+                                              border: '1px solid rgba(59, 130, 246, 0.4)',
+                                              boxShadow: 'rgba(59, 130, 246, 0.3) 0px 4px 16px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                            }}
+                                            title="Download original file"
+                                          >
+                                            <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                                            </svg>
+                                            Download
+                                          </button>
+                                        )}
+                                      </div>
                                       <p className="text-sm text-gray-400 mt-1">SKU: {item.sku || 'N/A'}</p>
                                     </div>
                                     <div className="text-right">
@@ -2645,19 +2748,24 @@ export default function AdminOrders() {
                                       (instagramFromString ? instagramFromString[1] : null);
                                     const instagramOptIn = item.instagramOptIn || !!selections.instagram || instagramOptInFromString;
                                     
+                                    // Parse Instagram from order note text
+                                    const instagramMatch = itemString.match(/Instagram: @([^\s\n,]+)/i);
+                                    const updatedInstagramHandle = instagramMatch ? instagramMatch[1] : instagramHandle;
+                                    const updatedInstagramOptIn = !!updatedInstagramHandle || instagramOptIn;
+                                    
                                     // Enhanced fallback logic for rush order
                                     const rushFromString = itemString.includes('🚀 Rush Order') || itemString.includes('Rush: Rush Order');
                                     const rushOrder = selections.rush?.value || (selectedOrder as any).is_rush_order || rushFromString;
                                     
                                     // Enhanced fallback logic for proof preference
-                                    const proofFromString = itemString.includes('📧') ? true : itemString.includes('❌ No Proof') ? false : null;
+                                    const proofFromString = itemString.includes('📧') ? true : itemString.includes('No Proof') ? false : null;
                                     const hasProofData = selections.proof?.value !== undefined || proofFromString !== null;
                                     const proofValue = selections.proof?.value !== undefined ? selections.proof.value : 
                                       proofFromString !== null ? proofFromString : true;
                                     
                                     // Parse proof preference from order note text  
                                     const sendProofMatch = itemString.includes('Send FREE Proof') || itemString.includes('Send proof');
-                                    const noProofMatch = itemString.includes("Don't Send Proof") || itemString.includes('Skip proof');
+                                    const noProofMatch = itemString.includes("Don't Send Proof") || itemString.includes('Skip proof') || itemString.includes('No Proof');
                                     const updatedHasProofData = sendProofMatch || noProofMatch || hasProofData;
                                     const updatedProofValue = sendProofMatch ? true : noProofMatch ? false : proofValue;
                                     
@@ -2673,13 +2781,13 @@ export default function AdminOrders() {
                                             <span className="text-gray-300 ml-2">{item.customerNotes}</span>
                                           </div>
                                         )}
-                                        {(instagramHandle || instagramOptIn) && (
+                                        {(updatedInstagramHandle || updatedInstagramOptIn) && (
                                           <div className="text-sm mt-1">
                                             <span className="text-gray-500">Instagram:</span>
                                             <span className="text-gray-300 ml-2">
-                                              {instagramHandle ? `@${instagramHandle}` : 'Opted in for posting'}
+                                              {updatedInstagramHandle ? `@${updatedInstagramHandle}` : 'Opted in for posting'}
                                               <span className="text-pink-400 ml-2">📸</span>
-                                              {instagramOptIn && instagramHandle && (
+                                              {updatedInstagramOptIn && updatedInstagramHandle && (
                                                 <span className="ml-2 text-xs text-green-400">(Marketing opt-in)</span>
                                               )}
                                             </span>
@@ -2711,7 +2819,19 @@ export default function AdminOrders() {
                                               <div className="text-xs text-gray-300">
                                                 <span className="text-gray-500">File:</span>
                                                 <button
-                                                  onClick={() => handleDownloadFile(item.customerReplacementFile!, item.customerReplacementFileName)}
+                                                  onClick={() => {
+                                                    // Prioritize company name, fallback to customer name
+                                                    const companyName = selectedOrder.shippingAddress?.company || selectedOrder.billingAddress?.company;
+                                                    const customerName = companyName || `${selectedOrder.customerFirstName || ''} ${selectedOrder.customerLastName || ''}`.trim();
+                                                    
+                                                    handleDownloadFile(
+                                                      item.customerReplacementFile!,
+                                                      customerName,
+                                                      item.productName + ' Replacement',
+                                                      item.quantity,
+                                                      item.customerReplacementFileName
+                                                    );
+                                                  }}
                                                   className="ml-2 text-orange-400 hover:text-orange-300 underline"
                                                 >
                                                   {item.customerReplacementFileName || 'Download'}
@@ -3247,9 +3367,6 @@ export default function AdminOrders() {
                         {selectedOrder.is_blind_shipment && (
                           <div className="mb-4 p-3 rounded-lg border border-blue-400 bg-blue-500/20">
                             <div className="flex items-center gap-2 text-blue-300">
-                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.16 6.16a5 5 0 017.68 7.68l-7.68-7.68zM6.16 13.16a5 5 0 007.68 7.68l-7.68-7.68zM6.16 6.16L13.84 13.84" />
-                              </svg>
                               <span className="font-semibold text-sm">🚚 This order requested Blind Shipping!</span>
                             </div>
                             <p className="text-xs text-blue-200 mt-1">
@@ -3263,7 +3380,7 @@ export default function AdminOrders() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                           </svg>
-                          {selectedOrder.is_blind_shipment ? 'Shipping Address (BLIND SHIPPING)' : 'Shipping Address'}
+                          Shipping Address
                         </h3>
                         <div className={`text-sm space-y-1 ${selectedOrder.is_blind_shipment ? 'text-blue-100' : 'text-gray-300'}`}>
                           {(selectedOrder.shippingAddress.first_name || selectedOrder.shippingAddress.last_name) && (
