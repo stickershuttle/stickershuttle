@@ -1585,13 +1585,12 @@ export default function ClearStickerCalculator({ initialBasePricing, realPricing
               </button>
             ) : (
               /* Dual Buttons */
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 {/* Add to Cart & Keep Shopping Button - 80% width */}
                 <button 
                   onClick={handleAddToCartAndKeepShopping}
-                  className="py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group hover:scale-[1.0025]"
+                  className="w-full sm:w-4/5 py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group hover:scale-[1.0025] cursor-pointer"
                   style={{
-                    width: '80%',
                     background: 'linear-gradient(135deg, #ffd713, #ffed4e)',
                     color: '#030140',
                     fontWeight: 'bold',
@@ -1601,19 +1600,18 @@ export default function ClearStickerCalculator({ initialBasePricing, realPricing
                 >
                   <span className="relative z-10 flex items-center justify-center gap-2">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
-                    <span className="hidden sm:inline">Add to Cart & Keep Shopping</span>
-                    <span className="sm:hidden">Add & Browse</span>
+                    <span className="hidden sm:inline">Add & Keep Shopping</span>
+                    <span className="sm:hidden">Add & Keep Shopping</span>
                   </span>
                 </button>
 
                 {/* Checkout Button - 20% width */}
                 <button 
                   onClick={handleCheckout}
-                  className="py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group hover:scale-[1.0025]"
+                  className="w-full sm:w-1/5 py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group hover:scale-[1.0025] cursor-pointer"
                   style={{
-                    width: '20%',
                     background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
                     backdropFilter: 'blur(25px) saturate(180%)',
                     border: '1px solid rgba(59, 130, 246, 0.4)',
@@ -1626,8 +1624,7 @@ export default function ClearStickerCalculator({ initialBasePricing, realPricing
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
-                    <span className="hidden sm:inline">Checkout</span>
-                    <span className="sm:hidden">💳</span>
+                    <span>Checkout</span>
                   </span>
                 </button>
               </div>

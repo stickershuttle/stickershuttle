@@ -15,6 +15,8 @@ export default function UniversalHeader() {
   const [orderSearch, setOrderSearch] = useState<string>('');
   const [profile, setProfile] = useState<any>(null);
   const [showProfileDropdown, setShowProfileDropdown] = useState<boolean>(false);
+  const [creditBalance, setCreditBalance] = useState<number>(0);
+  const [creditBalanceLoaded, setCreditBalanceLoaded] = useState<boolean>(false);
   const router = useRouter();
 
   // Admin emails list - same as in admin dashboard
@@ -137,10 +139,41 @@ export default function UniversalHeader() {
 
         if (isMounted && !error && profileData) {
           setProfile(profileData);
+          // Fetch credit balance
+          fetchCreditBalance(userId, supabase);
         }
       } catch (profileError) {
         // Profile errors shouldn't affect auth state
         console.warn('Profile fetch failed (non-critical):', profileError);
+      }
+    };
+
+    // Fetch user's credit balance
+    const fetchCreditBalance = async (userId: string, supabase: any) => {
+      try {
+        // Use the user_credit_balance view which aggregates all transactions
+        const { data: creditData, error } = await supabase
+          .from('user_credit_balance')
+          .select('total_credits')
+          .eq('user_id', userId)
+          .single();
+
+        if (isMounted) {
+          if (!error && creditData && creditData.total_credits !== null) {
+            setCreditBalance(Number(creditData.total_credits) || 0);
+          } else {
+            // User doesn't have any credit transactions yet, set to 0
+            setCreditBalance(0);
+          }
+          setCreditBalanceLoaded(true);
+        }
+      } catch (creditError) {
+        // Credit balance errors shouldn't affect auth state
+        console.warn('Credit balance fetch failed (non-critical):', creditError);
+        if (isMounted) {
+          setCreditBalance(0);
+          setCreditBalanceLoaded(true);
+        }
       }
     };
 
@@ -153,6 +186,8 @@ export default function UniversalHeader() {
       setAuthError(false);
       setLoading(false);
       setShowProfileDropdown(false);
+      setCreditBalance(0);
+      setCreditBalanceLoaded(false);
     };
 
     // Initialize authentication
@@ -174,6 +209,8 @@ export default function UniversalHeader() {
       setUser(null);
       setProfile(null);
       setShowProfileDropdown(false);
+      setCreditBalance(0);
+      setCreditBalanceLoaded(false);
       router.push('/');
     } catch (error) {
       console.error('Error signing out:', error);
@@ -611,6 +648,23 @@ export default function UniversalHeader() {
               </Link>
             )}
             
+                        {/* Store Credit Balance - Show for logged in users when loaded */}
+            {!isAdminPage && showAccountDashboard && creditBalanceLoaded && (
+              <Link 
+                href="/account/dashboard?view=financial"
+                className="px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.15) 50%, rgba(255, 215, 0, 0.05) 100%)',
+                  border: '1px solid rgba(255, 215, 0, 0.4)',
+                  boxShadow: '0 8px 32px rgba(255, 215, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(12px)'
+                }}
+              >
+                <i className="fas fa-coins text-yellow-300"></i>
+                <span className="text-yellow-200">${creditBalance.toFixed(2)}</span>
+              </Link>
+            )}
+            
             {/* Authentication Navigation - Show login/signup by default unless user verified */}
             {showAccountDashboard ? (
               // Logged In and Verified - Show Profile Dropdown
@@ -707,7 +761,7 @@ export default function UniversalHeader() {
                         </Link>
 
                         <Link 
-                          href="/account/dashboard?view=finances"
+                          href="/account/dashboard?view=financial"
                           className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
                           onClick={() => setShowProfileDropdown(false)}
                         >
@@ -893,7 +947,7 @@ export default function UniversalHeader() {
               </Link>
 
               <Link 
-                href="/account/dashboard?view=finances"
+                href="/account/dashboard?view=financial"
                 className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
                 onClick={() => setIsMobileMenuOpen(false)}
               >

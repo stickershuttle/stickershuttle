@@ -609,99 +609,95 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
   return (
     <div className="transition-colors duration-200">
       <style jsx>{`
-  @keyframes bounce-in {
-    0% {
-      opacity: 0;
-      transform: translateX(-50%) translateY(20px) scale(0.5);
-    }
-    60% {
-      opacity: 1;
-      transform: translateX(-50%) translateY(-10px) scale(1.1);
-    }
-    100% {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0) scale(1);
-    }
-  }
-  
-  @keyframes fade-out {
-    0% {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0) scale(1);
-    }
-    100% {
-      opacity: 0;
-      transform: translateX(-50%) translateY(-20px) scale(0.8);
-    }
-  }
-  
-  @keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-3px); }
-  }
-  
+        @keyframes bounce-in {
+          0% {
+            opacity: 0;
+            transform: translateX(-50%) translateY(20px) scale(0.5);
+          }
+          60% {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-10px) scale(1.1);
+          }
+          100% {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0) scale(1);
+          }
+        }
+        
+        @keyframes fade-out {
+          0% {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0) scale(1);
+          }
+          100% {
+            opacity: 0;
+            transform: translateX(-50%) translateY(-20px) scale(0.8);
+          }
+        }
+        
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-3px); }
+        }
+        
+        .animate-bounce-in {
+          animation: bounce-in 0.4s ease-out;
+        }
+        
+        .animate-fade-out {
+          animation: fade-out 0.3s ease-in forwards;
+        }
+        
+        .animate-glow-purple {
+          box-shadow: 0 0 15px rgba(168, 85, 247, 0.4), 0 0 25px rgba(168, 85, 247, 0.2);
+        }
+        
+        .animate-glow-green {
+          box-shadow: 0 0 15px rgba(34, 197, 94, 0.4), 0 0 25px rgba(34, 197, 94, 0.2);
+        }
+        
+        .animate-glow-yellow {
+          box-shadow: 0 0 15px rgba(234, 179, 8, 0.4), 0 0 25px rgba(234, 179, 8, 0.2);
+        }
+        
+        .animate-glow-red {
+          box-shadow: 0 0 15px rgba(239, 68, 68, 0.4), 0 0 25px rgba(239, 68, 68, 0.2);
+        }
 
-  
-  .animate-bounce-in {
-    animation: bounce-in 0.4s ease-out;
-  }
-  
-  .animate-fade-out {
-    animation: fade-out 0.3s ease-in forwards;
-  }
-  
-  .animate-glow-purple {
-    box-shadow: 0 0 15px rgba(168, 85, 247, 0.4), 0 0 25px rgba(168, 85, 247, 0.2);
-  }
-  
-  .animate-glow-green {
-    box-shadow: 0 0 15px rgba(34, 197, 94, 0.4), 0 0 25px rgba(34, 197, 94, 0.2);
-  }
-  
-  .animate-glow-yellow {
-    box-shadow: 0 0 15px rgba(234, 179, 8, 0.4), 0 0 25px rgba(234, 179, 8, 0.2);
-  }
-  
-  .animate-glow-red {
-    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4), 0 0 25px rgba(239, 68, 68, 0.2);
-  }
+        .animate-glow-blue {
+          box-shadow: 0 0 15px rgba(59, 130, 246, 0.4), 0 0 25px rgba(59, 130, 246, 0.2);
+        }
+        
+        .animate-glow-orange {
+          box-shadow: 0 0 15px rgba(249, 115, 22, 0.4), 0 0 25px rgba(249, 115, 22, 0.2);
+        }
 
-  .animate-glow-blue {
-    box-shadow: 0 0 15px rgba(59, 130, 246, 0.4), 0 0 25px rgba(59, 130, 246, 0.2);
-  }
-  
-  .animate-glow-orange {
-    box-shadow: 0 0 15px rgba(249, 115, 22, 0.4), 0 0 25px rgba(249, 115, 22, 0.2);
-  }
-
-  .container-style {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(12px);
-    border-radius: 16px;
-  }
-  
-  .button-interactive {
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    overflow: hidden;
-  }
-  
-  .button-interactive:hover {
-    transform: translateY(-1px);
-  }
-  
-  .button-interactive:active {
-    transform: translateY(0) scale(0.98);
-  }
-  
-  .button-selected {
-    position: relative;
-  }
-  
-
-`}</style>
+        .container-style {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(12px);
+          border-radius: 16px;
+        }
+        
+        .button-interactive {
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          position: relative;
+          overflow: hidden;
+        }
+        
+        .button-interactive:hover {
+          transform: translateY(-1px);
+        }
+        
+        .button-interactive:active {
+          transform: translateY(0) scale(0.98);
+        }
+        
+        .button-selected {
+          position: relative;
+        }
+      `}</style>
       
       <div className="">
         {/* Main Container */}
@@ -1484,4 +1480,127 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                       >
                         <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
                           postToInstagram ? 'translate-x-7' : 'translate-x-1'
-                        }`}
+                        }`} />
+                      </button>
+                      <label className={`text-sm font-medium ${postToInstagram ? 'text-purple-200' : 'text-white/70'}`}>
+                        {postToInstagram ? '📸 Share on Instagram' : '📷 Instagram Opt-in'}
+                      </label>
+                    </div>
+                    
+                    {postToInstagram && (
+                      <div className="mt-3">
+                        <input
+                          type="text"
+                          placeholder="@yourusername (optional)"
+                          value={instagramHandle}
+                          onChange={(e) => setInstagramHandle(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive"
+                        />
+                        <p className="mt-2 text-xs text-white/60">
+                          We'll feature your order on our Instagram and tag you if you provide your handle.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Additional Instructions */}
+                  <div>
+                    <label className="block text-sm font-medium text-white mb-2">
+                      Additional Instructions
+                    </label>
+                    <textarea
+                      placeholder="Any specific instructions or notes for your order..."
+                      value={additionalNotes}
+                      onChange={(e) => setAdditionalNotes(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive resize-none"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            {/* Conditional Button Display */}
+            {!totalPrice || (!uploadedFile && !uploadLater) ? (
+              /* Single Upload Required Button */
+              <button 
+                disabled={true}
+                className="w-full py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: '#666',
+                  color: 'white',
+                  fontWeight: 'bold'
+                }}
+              >
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  {!totalPrice ? "Please Configure Your Order Above" : "Please Upload Artwork or Select Upload Later"}
+                </span>
+              </button>
+            ) : (
+              /* Dual Buttons */
+              <div className="flex flex-col sm:flex-row gap-3">
+                {/* Add to Cart & Keep Shopping Button - Full width on mobile, 80% on desktop */}
+                <button 
+                  onClick={handleAddToCartAndKeepShopping}
+                  className="w-full sm:w-4/5 py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group hover:scale-[1.0025] cursor-pointer"
+                  style={{
+                    background: 'linear-gradient(135deg, #ffd713, #ffed4e)',
+                    color: '#030140',
+                    fontWeight: 'bold',
+                    border: '0.03125rem solid #e6c211',
+                    boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)'
+                  }}
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                                          <span className="hidden sm:inline">Add & Keep Shopping</span>
+                    <span className="sm:hidden">Add & Keep Shopping</span>
+                  </span>
+                </button>
+
+                {/* Checkout Button - Full width on mobile, 20% on desktop */}
+                <button 
+                  onClick={handleCheckout}
+                  className="w-full sm:w-1/5 py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group hover:scale-[1.025] cursor-pointer"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                    color: 'white',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span>Checkout</span>
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {/* Helpful text */}
+            <div className="text-center py-2">
+              <p className="text-white/60 text-sm">
+                {!totalPrice || (!uploadedFile && !uploadLater) 
+                  ? "Complete your configuration to proceed"
+                  : "Items will be added to your cart for review before checkout"
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -182,15 +182,18 @@ export default function Home() {
         </div>
                 <div className="flex justify-center px-4">
                   <div 
-                    className="px-4 py-1.5 rounded-full text-center text-xs font-medium text-white border shadow-lg"
+                    className="px-4 py-1.5 rounded-full text-center text-xs font-medium border shadow-lg"
                     style={{
-                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.05) 100%)',
-                      backdropFilter: 'blur(20px) saturate(180%)',
-                      borderColor: 'rgba(255, 255, 255, 0.3)',
-                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 3px rgba(0, 0, 0, 0.1)'
+                      background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.15) 50%, rgba(255, 215, 0, 0.05) 100%)',
+                      border: '1px solid rgba(255, 215, 0, 0.4)',
+                      backdropFilter: 'blur(12px)',
+                      boxShadow: '0 8px 32px rgba(255, 215, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
                     }}
                   >
-                    EASY ONLINE ORDERING, PRINTED IN 24 HRS
+                    <span className="flex items-center justify-center gap-1.5 text-yellow-200">
+                      <i className="fas fa-coins text-yellow-300"></i>
+                      Earn 5% Back on All Orders!
+                    </span>
                   </div>
                 </div>
               </div>
@@ -216,7 +219,7 @@ export default function Home() {
             </div>
             <div className="relative overflow-hidden">
               <div 
-                className="flex gap-6 animate-scroll"
+                className="flex gap-4 animate-scroll"
                 style={{
                   animation: 'scroll 35s linear infinite',
                   width: 'max-content'
@@ -1085,6 +1088,80 @@ export default function Home() {
                   <p className="text-gray-300 text-sm leading-relaxed flex-grow">
                     Incredible! They were able to not only make my business logo into great quality stickers, they also made my own photos into stickers!! I recommend them to everyone looking for custom stickers! Beautiful work, quality, attention to detail, communication! 10/10!
                   </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Store Credit Rewards Section */}
+        <section className="py-4">
+          <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
+            <div 
+              className="rounded-2xl p-8 text-center relative overflow-hidden"
+              style={{
+                background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.15) 50%, rgba(255, 215, 0, 0.05) 100%)',
+                border: '1px solid rgba(255, 215, 0, 0.4)',
+                backdropFilter: 'blur(12px)',
+                boxShadow: '0 8px 32px rgba(255, 215, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+              }}
+            >
+              {/* Background decoration - Gold coins */}
+              <div className="absolute inset-0 opacity-20">
+                {/* Top coins */}
+                <div className="absolute top-6 left-8 text-yellow-400 text-lg">🪙</div>
+                <div className="absolute top-4 left-1/4 text-yellow-300 text-sm">💰</div>
+                <div className="absolute top-8 right-1/4 text-yellow-400 text-base">🪙</div>
+                <div className="absolute top-6 right-8 text-yellow-300 text-sm">💰</div>
+                
+                {/* Middle coins */}
+                <div className="absolute top-1/2 left-6 text-yellow-400 text-sm">🪙</div>
+                <div className="absolute top-1/2 right-6 text-yellow-300 text-base">💰</div>
+                <div className="absolute top-1/3 left-12 text-yellow-400 text-xs">🪙</div>
+                <div className="absolute top-2/3 right-12 text-yellow-300 text-sm">💰</div>
+                
+                {/* Bottom coins */}
+                <div className="absolute bottom-6 left-1/3 text-yellow-400 text-sm">🪙</div>
+                <div className="absolute bottom-8 left-16 text-yellow-300 text-xs">💰</div>
+                <div className="absolute bottom-4 right-1/3 text-yellow-400 text-base">🪙</div>
+                <div className="absolute bottom-6 right-16 text-yellow-300 text-sm">💰</div>
+                
+                {/* Corner coins */}
+                <div className="absolute top-12 left-1/2 text-yellow-400 text-xs">🪙</div>
+                <div className="absolute bottom-12 left-1/2 text-yellow-300 text-sm">💰</div>
+              </div>
+
+              <div className="relative z-10">
+                <div className="flex items-center justify-center gap-3 mb-4">
+                  <i className="fas fa-coins text-yellow-300 text-4xl"></i>
+                  <h2 className="text-3xl md:text-4xl font-bold text-yellow-200">
+                    Earn 5% Back on Every Order!
+                  </h2>
+                </div>
+                
+                <div className="max-w-3xl mx-auto">
+                  <p className="text-yellow-100 text-lg mb-6 leading-relaxed">
+                    <strong className="text-yellow-200">Limited-Time Offer:</strong> Get 5% of your order total back as store credit! 
+                    Use it for future orders or save up for bigger projects.
+                  </p>
+                  
+                  <div className="flex justify-center">
+                    <Link href="/products">
+                      <button 
+                        className="px-8 py-3 font-semibold text-lg transition-all duration-300 transform hover:scale-105 rounded-lg"
+                        style={{
+                          backgroundColor: '#ffd713',
+                          color: '#030140',
+                          boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
+                          border: 'solid',
+                          borderWidth: '0.03125rem',
+                          borderColor: '#e6c211'
+                        }}
+                      >
+                        Start Earning →
+                      </button>
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>

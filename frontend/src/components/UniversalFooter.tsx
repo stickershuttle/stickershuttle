@@ -122,6 +122,12 @@ export default function UniversalFooter() {
                     Returns
                   </Link>
                 </li>
+                <li>
+                  <Link href="/store-credit" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center text-sm">
+                    <span className="mr-2">🪙</span>
+                    How to Earn Points
+                  </Link>
+                </li>
               </ul>
             </div>
 
@@ -242,7 +248,7 @@ export default function UniversalFooter() {
               
               {/* Built with Love and Copyright */}
               <div className="text-gray-300 text-sm flex items-center">
-                Built with ❤️ by © Sticker Shuttle
+                Built with <span className="heart-pulse cursor-pointer">❤️</span> by © Sticker Shuttle
               </div>
             </div>
           </div>
@@ -293,6 +299,27 @@ export default function UniversalFooter() {
           0% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
+        }
+
+        .heart-pulse {
+          display: inline-block;
+          transition: transform 0.3s ease;
+        }
+
+        .heart-pulse:hover {
+          animation: heartbeat 1.5s ease-in-out infinite;
+          transform: scale(1.1);
+        }
+
+        @keyframes heartbeat {
+          0% { transform: scale(1.1); }
+          7% { transform: scale(1.3); }
+          14% { transform: scale(1.1); }
+          21% { transform: scale(1.2); }
+          28% { transform: scale(1.1); }
+          35% { transform: scale(1.1); }
+          42% { transform: scale(1.1); }
+          100% { transform: scale(1.1); }
         }
       `}</style>
     </>

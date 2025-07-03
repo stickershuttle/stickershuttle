@@ -779,30 +779,60 @@ function Dashboard() {
     }
   }, [currentView, orders, creditBalance, lifetimeCredits]);
 
-  // Handle URL query parameters for view navigation - only on initial mount
+  // Handle URL query parameters for view navigation
   useEffect(() => {
-    // Only run on initial mount to set the view from URL
-    if (router.isReady) {
-      const requestedView = router.query.view as string;
-      const orderNumber = router.query.orderNumber as string;
+    // Get the requested view from URL
+    const requestedView = router.query.view as string;
+    const orderNumber = router.query.orderNumber as string;
+    
+    // If no view in URL, set to default
+    if (!requestedView && currentView !== 'default') {
+      setCurrentView('default');
+      return;
+    }
+    
+    // If view in URL is different from current, update
+    if (requestedView && requestedView !== currentView) {
+      const validViews: DashboardView[] = ['default', 'all-orders', 'financial', 'items-analysis', 'design-vault', 'proofs', 'order-details', 'settings', 'support'];
       
-      if (requestedView) {
-        const validViews: DashboardView[] = ['default', 'all-orders', 'financial', 'items-analysis', 'design-vault', 'proofs', 'order-details', 'settings', 'support'];
-        
-        if (validViews.includes(requestedView as DashboardView)) {
-          setCurrentView(requestedView as DashboardView);
-        }
+      if (validViews.includes(requestedView as DashboardView)) {
+        setCurrentView(requestedView as DashboardView);
       }
     }
-  }, [router.isReady]); // Only depend on router.isReady to run once on mount
+  }, [router.query.view, router.query.orderNumber, currentView]);
 
-  // Separate effect to handle order selection based on current view
+  // Separate effect to handle order selection when orders load or change
   useEffect(() => {
+    const requestedView = router.query.view as string;
+    const orderNumber = router.query.orderNumber as string;
+    
+    // If we're on order-details view with an orderNumber and have orders loaded
+    if (requestedView === 'order-details' && orderNumber && orders && orders.length > 0) {
+      // Don't re-select if we already have the correct order selected
+      const currentOrderNumber = selectedOrderForInvoice?.orderNumber || selectedOrderForInvoice?.id;
+      if (currentOrderNumber === orderNumber) {
+        return;
+      }
+      
+      const foundOrder = orders.find((o: any) => 
+        o.orderNumber === orderNumber || o.id === orderNumber
+      );
+      
+      if (foundOrder) {
+        console.log('📋 Loading order from URL:', orderNumber);
+        setSelectedOrderForInvoice(foundOrder);
+      } else {
+        console.log('⚠️ Order not found for number:', orderNumber, 'Available orders:', orders.map(o => ({ id: o.id, orderNumber: o.orderNumber })));
+        // Optionally redirect back to orders view if order not found
+        // setCurrentView('all-orders');
+      }
+    }
+    
     // Clear selected order if not on order-details view
-    if (currentView !== 'order-details' && selectedOrderForInvoice) {
+    if (requestedView !== 'order-details' && selectedOrderForInvoice) {
       setSelectedOrderForInvoice(null);
     }
-  }, [currentView]);
+  }, [router.query.view, router.query.orderNumber, orders, selectedOrderForInvoice]);
 
   // Helper function to update view and URL
   const updateCurrentView = (view: DashboardView) => {
@@ -812,28 +842,25 @@ function Dashboard() {
     // Update state immediately
     setCurrentView(view);
     
-    // Update URL without navigation
-    if (typeof window !== 'undefined') {
-      let url = '/account/dashboard';
-      const params = new URLSearchParams();
-      
-      if (view !== 'default') {
-        params.set('view', view);
-      }
-      
-      // Preserve orderNumber if we're on order-details view
-      if (view === 'order-details' && selectedOrderForInvoice) {
-        params.set('orderNumber', selectedOrderForInvoice.orderNumber || selectedOrderForInvoice.id);
-      }
-      
-      const queryString = params.toString();
-      if (queryString) {
-        url += `?${queryString}`;
-      }
-      
-      // Update URL without navigation
-      window.history.replaceState({}, '', url);
+    // Build URL with query parameters
+    let url = '/account/dashboard';
+    const params = new URLSearchParams();
+    
+    if (view !== 'default') {
+      params.set('view', view);
     }
+    
+    // Preserve orderNumber if we're on order-details view
+    if (view === 'order-details' && selectedOrderForInvoice) {
+      params.set('orderNumber', selectedOrderForInvoice.orderNumber || selectedOrderForInvoice.id);
+    }
+    
+    const queryString = params.toString();
+    if (queryString) {
+      url += `?${queryString}`;
+    }
+    
+    router.push(url, undefined, { shallow: true });
     
     // Load saved support form draft when switching to support view
     if (view === 'support') {
@@ -4267,52 +4294,54 @@ function Dashboard() {
                 <p className="text-xs text-gray-400 mb-4">{design.design} • Ordered {design.timesOrdered} times</p>
                 
                 <div className="space-y-2">
-                  <button className="w-full py-2 px-3 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
+                  <button className="w-full py-2 px-3 rounded-lg text-xs font-semibold text-white transition-all duration-300 hover:scale-105"
                           style={{
-                            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                            backdropFilter: 'blur(25px) saturate(180%)',
-                            border: '1px solid rgba(59, 130, 246, 0.4)',
-                            boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
-                            color: 'white'
+                            background: 'linear-gradient(135deg, #3b82f6, #60a5fa)',
+                            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.15)'
                           }}>
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Download
+                    📥 Download
                   </button>
-                  <button
-                    onClick={() => handleReorder(design.lastOrderId)}
-                    disabled={reorderingId === design.lastOrderId}
-                    className="w-full py-2 px-3 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
-                    style={{
-                      background: reorderingId === design.lastOrderId 
-                        ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(107, 114, 128, 0.25) 50%, rgba(107, 114, 128, 0.1) 100%)'
-                        : 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
-                      backdropFilter: 'blur(25px) saturate(180%)',
-                      border: reorderingId === design.lastOrderId 
-                        ? '1px solid rgba(107, 114, 128, 0.4)'
-                        : '1px solid rgba(245, 158, 11, 0.4)',
-                      boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
-                      color: 'white'
-                    }}
-                  >
-                    {reorderingId === design.lastOrderId ? (
-                      <>
-                        <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Adding...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                          <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-                        </svg>
-                        Reorder
-                      </>
-                    )}
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button className="py-2 px-3 rounded-lg text-xs font-medium text-white transition-all duration-300 hover:scale-105 backdrop-blur-md"
+                            style={{
+                              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              backdropFilter: 'blur(10px)',
+                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+                            }}>
+                      🔗 Share
+                    </button>
+                    <button
+                      onClick={() => handleReorder(design.lastOrderId)}
+                      disabled={reorderingId === design.lastOrderId}
+                      className="py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-300 hover:scale-105 shadow-lg"
+                      style={{
+                        backgroundColor: reorderingId === design.lastOrderId ? '#666' : '#ffd713',
+                        color: '#030140',
+                        boxShadow: reorderingId === design.lastOrderId ? 'none' : '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
+                        border: 'solid',
+                        borderWidth: '0.03125rem',
+                        borderColor: reorderingId === design.lastOrderId ? '#666' : '#e6c211'
+                      }}
+                    >
+                      {reorderingId === design.lastOrderId ? (
+                        <>
+                          <svg className="animate-spin w-3 h-3 text-gray-600 inline mr-1" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Adding...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3 h-3 text-black inline mr-1" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12L8.1 13h7.45c.75 0 1.41-.41 1.75-1.03L21.7 4H5.21l-.94-2H1zm16 16c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                          </svg>
+                          Reorder
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -8747,11 +8776,11 @@ function Dashboard() {
                       currentView === 'default' ? 'rounded-2xl' : 'container-style'
                     }`}
                     style={currentView === 'default' ? {
-                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.4) 0%, rgba(139, 92, 246, 0.25) 50%, rgba(139, 92, 246, 0.1) 100%)',
+                      background: 'linear-gradient(135deg, rgba(100, 116, 139, 0.3) 0%, rgba(100, 116, 139, 0.2) 50%, rgba(100, 116, 139, 0.1) 100%)',
                       backdropFilter: 'blur(25px) saturate(180%)',
                       WebkitBackdropFilter: 'blur(25px) saturate(180%)' as any,
-                      border: '1px solid rgba(139, 92, 246, 0.4)',
-                      boxShadow: '0 4px 16px rgba(139, 92, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                      border: '1px solid rgba(100, 116, 139, 0.4)',
+                      boxShadow: '0 4px 16px rgba(100, 116, 139, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
                     } : {
                       background: 'rgba(255, 255, 255, 0.05)',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -8785,11 +8814,11 @@ function Dashboard() {
                       currentView === 'all-orders' ? 'rounded-2xl' : 'container-style'
                     }`}
                     style={currentView === 'all-orders' ? {
-                      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.4) 0%, rgba(16, 185, 129, 0.25) 50%, rgba(16, 185, 129, 0.1) 100%)',
+                      background: 'linear-gradient(135deg, rgba(75, 85, 99, 0.3) 0%, rgba(75, 85, 99, 0.2) 50%, rgba(75, 85, 99, 0.1) 100%)',
                       backdropFilter: 'blur(25px) saturate(180%)',
                       WebkitBackdropFilter: 'blur(25px) saturate(180%)' as any,
-                      border: '1px solid rgba(16, 185, 129, 0.4)',
-                      boxShadow: '0 4px 16px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                      border: '1px solid rgba(75, 85, 99, 0.4)',
+                      boxShadow: '0 4px 16px rgba(75, 85, 99, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
                     } : {
                       background: 'rgba(255, 255, 255, 0.05)',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -8819,11 +8848,11 @@ function Dashboard() {
                       currentView === 'financial' ? 'rounded-2xl' : 'container-style'
                     }`}
                     style={currentView === 'financial' ? {
-                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                      background: 'linear-gradient(135deg, rgba(71, 85, 105, 0.3) 0%, rgba(71, 85, 105, 0.2) 50%, rgba(71, 85, 105, 0.1) 100%)',
                       backdropFilter: 'blur(25px) saturate(180%)',
                       WebkitBackdropFilter: 'blur(25px) saturate(180%)' as any,
-                      border: '1px solid rgba(59, 130, 246, 0.4)',
-                      boxShadow: '0 4px 16px rgba(59, 130, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                      border: '1px solid rgba(71, 85, 105, 0.4)',
+                      boxShadow: '0 4px 16px rgba(71, 85, 105, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
                     } : {
                       background: 'rgba(255, 255, 255, 0.05)',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -8849,21 +8878,19 @@ function Dashboard() {
 
                                       <button 
                     onClick={() => updateCurrentView('design-vault')}
-                    className={`block p-3 lg:p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden ${
-                      currentView === 'design-vault' ? 'rounded-2xl' : 'container-style'
-                    }`}
-                    style={currentView === 'design-vault' ? {
-                      background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.4) 0%, rgba(236, 72, 153, 0.25) 50%, rgba(236, 72, 153, 0.1) 100%)',
-                      backdropFilter: 'blur(25px) saturate(180%)',
-                      WebkitBackdropFilter: 'blur(25px) saturate(180%)' as any,
-                      border: '1px solid rgba(236, 72, 153, 0.4)',
-                      boxShadow: '0 4px 16px rgba(236, 72, 153, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                    } : {
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                      backdropFilter: 'blur(12px)',
-                      WebkitBackdropFilter: 'blur(12px)' as any
+                    className="block rounded-2xl p-3 lg:p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden"
+                    style={{
+                      background: currentView === 'design-vault' 
+                        ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.3) 0%, rgba(107, 114, 128, 0.2) 50%, rgba(107, 114, 128, 0.1) 100%)'
+                        : 'rgba(255, 255, 255, 0.05)',
+                      backdropFilter: currentView === 'design-vault' ? 'blur(25px) saturate(180%)' : 'blur(12px)',
+                      WebkitBackdropFilter: currentView === 'design-vault' ? 'blur(25px) saturate(180%)' as any : 'blur(12px)' as any,
+                      border: currentView === 'design-vault' 
+                        ? '1px solid rgba(107, 114, 128, 0.4)' 
+                        : '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: currentView === 'design-vault'
+                        ? '0 8px 32px rgba(107, 114, 128, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                        : '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
                     }}
                   >
                     <div className="flex items-center gap-2 lg:gap-3">
@@ -8924,23 +8951,8 @@ function Dashboard() {
                     {/* Get Support and Settings layout */}
                     <div className="space-y-3">
                       <button 
-                        onClick={() => updateCurrentView('support')}
-                        className={`block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden ${
-                          currentView === 'support' ? 'rounded-2xl' : 'container-style'
-                        }`}
-                        style={currentView === 'support' ? {
-                          background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
-                          backdropFilter: 'blur(25px) saturate(180%)',
-                          WebkitBackdropFilter: 'blur(25px) saturate(180%)' as any,
-                          border: '1px solid rgba(239, 68, 68, 0.4)',
-                          boxShadow: '0 4px 16px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                        } : {
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
-                          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                          backdropFilter: 'blur(12px)',
-                          WebkitBackdropFilter: 'blur(12px)' as any
-                        }}
+                        onClick={handleGetSupport}
+                        className="container-style block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden"
                       >
                         <div className="flex items-center gap-3">
                           <div className="p-2 rounded-lg bg-transparent">
@@ -8958,22 +8970,7 @@ function Dashboard() {
 
                       <button 
                         onClick={() => updateCurrentView('settings')}
-                        className={`block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden ${
-                          currentView === 'settings' ? 'rounded-2xl' : 'container-style'
-                        }`}
-                        style={currentView === 'settings' ? {
-                          background: 'linear-gradient(135deg, rgba(156, 163, 175, 0.4) 0%, rgba(156, 163, 175, 0.25) 50%, rgba(156, 163, 175, 0.1) 100%)',
-                          backdropFilter: 'blur(25px) saturate(180%)',
-                          WebkitBackdropFilter: 'blur(25px) saturate(180%)' as any,
-                          border: '1px solid rgba(156, 163, 175, 0.4)',
-                          boxShadow: '0 4px 16px rgba(156, 163, 175, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                        } : {
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
-                          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                          backdropFilter: 'blur(12px)',
-                          WebkitBackdropFilter: 'blur(12px)' as any
-                        }}
+                        className="container-style block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden"
                       >
                         <div className="flex items-center gap-3">
                                                   <div className="p-2 rounded-lg bg-transparent">
@@ -9214,7 +9211,7 @@ function Dashboard() {
              {/* Support */}
        <button
          onClick={() => {
-           updateCurrentView('support');
+           handleGetSupport();
            setExpandedPillButton(expandedPillButton === 'support' ? null : 'support');
          }}
          className={`relative flex items-center p-2.5 rounded-full transition-all duration-300 ${
