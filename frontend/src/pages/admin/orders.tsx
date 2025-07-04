@@ -2590,12 +2590,6 @@ export default function AdminOrders() {
                         </div>
                         <p className="text-sm text-gray-300 ml-6">
                           {(selectedOrder as any).shipping_method || 'UPS Ground'}
-                          {/* Debug info - remove in production */}
-                          {process.env.NODE_ENV === 'development' && (
-                            <span className="text-xs text-gray-500 ml-2">
-                              (Raw: {JSON.stringify((selectedOrder as any).shipping_method)})
-                            </span>
-                          )}
                           <div className="flex gap-2 mt-1">
                             {(selectedOrder as any).is_express_shipping && (
                               <span className="px-2 py-1 text-xs font-bold bg-red-500/20 text-red-300 rounded-full border border-red-400/30">

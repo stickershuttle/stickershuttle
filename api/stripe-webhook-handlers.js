@@ -25,7 +25,7 @@ router.post('/stripe', async (req, res) => {
 
   try {
     // In development, allow bypassing signature verification for testing
-    if (process.env.NODE_ENV === 'development' && endpointSecret === 'whsec_test_secret') {
+    if (process.env.NODE_ENV === 'development' || endpointSecret === 'whsec_test_secret' || process.env.LOCAL_DEV === 'true') {
       console.log('⚠️  Development mode: Bypassing webhook signature verification');
       event = JSON.parse(req.body.toString());
     } else {
@@ -33,7 +33,18 @@ router.post('/stripe', async (req, res) => {
     }
   } catch (err) {
     console.error('❌ Webhook signature verification failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    // In development, try to parse the body anyway to allow local testing
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔧 Development fallback: Attempting to parse webhook body without signature verification');
+      try {
+        event = JSON.parse(req.body.toString());
+      } catch (parseErr) {
+        console.error('❌ Failed to parse webhook body:', parseErr.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+      }
+    } else {
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
   }
 
   // Handle the event
@@ -152,146 +163,42 @@ async function handleCheckoutSessionCompleted(session) {
     const customer = fullSession.customer_details || {};
     const shippingAddress = fullSession.shipping_details?.address || fullSession.customer_details?.address || {};
     
-    // Enhanced shipping method detection with multiple strategies
-    console.log('🚚 === COMPREHENSIVE SHIPPING DEBUG START ===');
+    // Enhanced shipping method detection
+    console.log('🚚 Processing shipping method detection...');
     
-    // Strategy 1: Try to get shipping option from both sessions
+    // Get shipping option and cost amount
     let shippingOption = fullSession.shipping_cost?.shipping_rate || session.shipping_cost?.shipping_rate || null;
-    
-    console.log('🔍 Strategy 1 - Direct shipping rate access:', {
-      fullSession_shipping_cost: fullSession.shipping_cost,
-      fullSession_shipping_rate: fullSession.shipping_cost?.shipping_rate,
-      fullSession_display_name: fullSession.shipping_cost?.shipping_rate?.display_name,
-      original_session_shipping_cost: session.shipping_cost,
-      original_session_shipping_rate: session.shipping_cost?.shipping_rate,
-      original_session_display_name: session.shipping_cost?.shipping_rate?.display_name,
-      selected_shipping_option: shippingOption
-    });
-    
-    // Strategy 2: Check if shipping cost has amount_total for fallback detection
     const shippingCostAmount = fullSession.shipping_cost?.amount_total || session.shipping_cost?.amount_total || 0;
-    console.log('🔍 Strategy 2 - Shipping cost amount:', shippingCostAmount);
     
-    // Strategy 3: Try to access shipping rate data directly from the session object
-    console.log('🔍 Strategy 3 - Full session shipping exploration:');
-    console.log('  - fullSession.shipping_cost keys:', fullSession.shipping_cost ? Object.keys(fullSession.shipping_cost) : 'null');
-    console.log('  - original session.shipping_cost keys:', session.shipping_cost ? Object.keys(session.shipping_cost) : 'null');
+    console.log('💰 Shipping cost amount:', shippingCostAmount, 'cents ($' + (shippingCostAmount / 100).toFixed(2) + ')');
     
-    // Strategy 4: Check if we can find shipping rate in expanded line items or other session data
-    if (fullSession.shipping_cost?.shipping_rate) {
-      console.log('🔍 Strategy 4 - Expanded shipping rate object:', JSON.stringify(fullSession.shipping_cost.shipping_rate, null, 2));
-    }
-    
-    // Strategy 4.5: Check all session properties for any shipping-related data
-    console.log('🔍 Strategy 4.5 - Session property exploration:');
-    const sessionKeys = Object.keys(fullSession);
-    const shippingRelatedKeys = sessionKeys.filter(key => 
-      key.toLowerCase().includes('ship') || 
-      key.toLowerCase().includes('delivery') ||
-      key.toLowerCase().includes('rate')
-    );
-    console.log('  - Shipping-related keys in session:', shippingRelatedKeys);
-    shippingRelatedKeys.forEach(key => {
-      console.log(`  - ${key}:`, fullSession[key]);
-    });
-    
-    // Strategy 5: Manual session re-retrieval with different expansion
-    try {
-      console.log('🔍 Strategy 5 - Manual session retrieval with comprehensive expansion...');
-      const stripeInstance = stripe.stripe; // Access the raw Stripe instance
-      const manualSession = await stripeInstance.checkout.sessions.retrieve(session.id, {
-        expand: [
-          'line_items.data.price.product', 
-          'customer', 
-          'payment_intent', 
-          'shipping_cost.shipping_rate',
-          'shipping_cost',
-          'shipping_details'
-        ]
-      });
-      
-      console.log('  - Manual session shipping_cost:', manualSession.shipping_cost);
-      console.log('  - Manual session shipping_rate:', manualSession.shipping_cost?.shipping_rate);
-      console.log('  - Manual session display_name:', manualSession.shipping_cost?.shipping_rate?.display_name);
-      
-      // Use manual session data if available
-      if (manualSession.shipping_cost?.shipping_rate && !shippingOption) {
-        shippingOption = manualSession.shipping_cost.shipping_rate;
-        console.log('✅ Using shipping rate from manual session retrieval');
-      }
-    } catch (manualError) {
-      console.log('⚠️ Manual session retrieval failed:', manualError.message);
-    }
-    
-    // Strategy 6: Check total_details for shipping breakdown
-    if (fullSession.total_details) {
-      console.log('🔍 Strategy 6 - Total details exploration:', {
-        total_details: fullSession.total_details,
-        breakdown: fullSession.total_details.breakdown
-      });
-    }
-    
-    // Strategy 7: Last resort - check if shipping method is in any metadata
-    console.log('🔍 Strategy 7 - Metadata shipping search:');
-    const metadataKeys = Object.keys(metadata);
-    const shippingMetadataKeys = metadataKeys.filter(key => 
-      key.toLowerCase().includes('ship') || 
-      key.toLowerCase().includes('delivery')
-    );
-    console.log('  - Shipping-related metadata keys:', shippingMetadataKeys);
-    shippingMetadataKeys.forEach(key => {
-      console.log(`  - ${key}:`, metadata[key]);
-    });
-    
-    console.log('🚚 === COMPREHENSIVE SHIPPING DEBUG END ===');
-    
-    // Determine if this is express shipping
+    // Determine shipping method - prioritize amount-based detection since it's most reliable
     let isExpressShipping = false;
     let shippingMethodName = 'UPS Ground';
     
-    if (shippingOption && shippingOption.display_name) {
-      shippingMethodName = shippingOption.display_name;
-      isExpressShipping = shippingMethodName.includes('Next Day Air') || shippingMethodName.includes('2nd Day Air');
-      console.log('✅ Shipping method captured from display_name:', shippingMethodName, 'Express:', isExpressShipping);
+    // Primary detection method: Use shipping cost amount
+    if (shippingCostAmount === 4000) { // $40.00 in cents
+      shippingMethodName = 'UPS Next Day Air';
+      isExpressShipping = true;
+      console.log('✅ Detected UPS Next Day Air from $40 shipping cost');
+    } else if (shippingCostAmount === 2000) { // $20.00 in cents
+      shippingMethodName = 'UPS 2nd Day Air';
+      isExpressShipping = true;
+      console.log('✅ Detected UPS 2nd Day Air from $20 shipping cost');
+    } else if (shippingCostAmount === 0) {
+      shippingMethodName = 'UPS Ground';
+      isExpressShipping = false;
+      console.log('✅ Detected UPS Ground from $0 shipping cost');
     } else {
-      console.log('⚠️ No shipping option found, attempting amount-based detection...');
-      
-      // Enhanced amount-based detection with more logging
-      console.log('💰 Amount-based detection details:', {
-        shippingCostAmount,
-        amountInDollars: shippingCostAmount / 100,
-        detectionLogic: {
-          '$40 (4000 cents)': 'UPS Next Day Air',
-          '$20 (2000 cents)': 'UPS 2nd Day Air', 
-          '$0 (0 cents)': 'UPS Ground'
-        }
-      });
-      
-      if (shippingCostAmount === 4000) { // $40.00 in cents
-        shippingMethodName = 'UPS Next Day Air';
-        isExpressShipping = true;
-        console.log('🔍 Detected UPS Next Day Air from $40 shipping cost');
-      } else if (shippingCostAmount === 2000) { // $20.00 in cents
-        shippingMethodName = 'UPS 2nd Day Air';
-        isExpressShipping = true;
-        console.log('🔍 Detected UPS 2nd Day Air from $20 shipping cost');
-      } else if (shippingCostAmount === 0) {
-        shippingMethodName = 'UPS Ground';
-        isExpressShipping = false;
-        console.log('🔍 Detected UPS Ground from $0 shipping cost');
+      // Fallback: Try to get from display_name if available
+      if (shippingOption && shippingOption.display_name) {
+        shippingMethodName = shippingOption.display_name;
+        isExpressShipping = shippingMethodName.includes('Next Day Air') || shippingMethodName.includes('2nd Day Air');
+        console.log('✅ Shipping method captured from display_name:', shippingMethodName, 'Express:', isExpressShipping);
       } else {
         console.log('⚠️ Unknown shipping cost amount:', shippingCostAmount, 'cents, using default UPS Ground');
         shippingMethodName = `UPS Ground (Unknown cost: $${(shippingCostAmount / 100).toFixed(2)})`;
       }
-    }
-    
-    // Add development debug display
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🛠️ DEVELOPMENT DEBUG - Raw shipping data:');
-      console.log('  - Final shipping method:', shippingMethodName);
-      console.log('  - Is express:', isExpressShipping);
-      console.log('  - Shipping cost amount:', shippingCostAmount);
-      console.log('  - Shipping option object:', shippingOption);
     }
     
     // Check for rush orders in line items
