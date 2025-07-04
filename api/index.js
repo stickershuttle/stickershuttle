@@ -494,7 +494,7 @@ const typeDefs = gql`
     canUserReviewOrder(userId: ID!, orderId: ID!): Boolean!
     
     # Discount queries
-    validateDiscountCode(code: String!, orderAmount: Float!): DiscountValidation!
+    validateDiscountCode(code: String!, orderAmount: Float!, sessionId: String): DiscountValidation!
     getAllDiscountCodes: [DiscountCode!]!
     getDiscountCodeStats(codeId: ID!): DiscountCodeStats!
     
@@ -507,6 +507,14 @@ const typeDefs = gql`
     # User queries
     getAllUsers: [User!]!
     getUserProfile(userId: ID!): UserProfile
+    
+    # Admin wholesale queries
+    getPendingWholesaleApplications: [UserProfile!]!
+    getAllWholesaleCustomers: [UserProfile!]!
+    
+    # Wholesale client management queries
+    getWholesaleClients(userId: ID!): [WholesaleClient!]!
+    getClientOrders(clientId: ID!): [CustomerOrder!]!
     
     # Blog queries
     blog_posts(limit: Int, offset: Int, where: BlogPostWhere, order_by: BlogPostOrderBy): [BlogPost!]!
@@ -583,7 +591,7 @@ const typeDefs = gql`
     updateDiscountCode(id: ID!, input: UpdateDiscountCodeInput!): DiscountCode!
     deleteDiscountCode(id: ID!): Boolean!
     applyDiscountToCheckout(code: String!, orderAmount: Float!, hasReorderItems: Boolean): DiscountValidation!
-    removeDiscountSession: MutationResult!
+    removeDiscountSession(sessionId: String): MutationResult!
     
     # Credit mutations
     markCreditNotificationsRead(userId: String!): MutationResult!
@@ -597,10 +605,21 @@ const typeDefs = gql`
     # User Profile mutations
     updateUserProfileNames(userId: ID!, firstName: String!, lastName: String!): UserProfileResult!
     createUserProfile(userId: ID!, firstName: String, lastName: String): UserProfileResult!
+    createWholesaleUserProfile(userId: ID!, input: WholesaleUserProfileInput!): UserProfileResult!
     updateUserProfilePhoto(userId: ID!, photoUrl: String!, photoPublicId: String): UserProfileResult!
     updateUserProfileBanner(userId: ID!, bannerUrl: String, bannerPublicId: String, bannerTemplate: String, bannerTemplateId: Int): UserProfileResult!
     updateUserProfileCompany(userId: ID!, companyName: String!): UserProfileResult!
     updateUserProfileComprehensive(userId: ID!, input: UserProfileInput!): UserProfileResult!
+    updateWholesaleStatus(userId: ID!, isWholesaleCustomer: Boolean!, wholesaleCreditRate: Float): UserProfileResult!
+    
+    # Admin wholesale mutations
+    approveWholesaleApplication(userId: ID!, approvedBy: ID!): WholesaleApprovalResult!
+    rejectWholesaleApplication(userId: ID!, rejectedBy: ID!): WholesaleApprovalResult!
+    
+    # Wholesale client management mutations
+    createWholesaleClient(input: CreateWholesaleClientInput!): WholesaleClientResult!
+    updateWholesaleClient(clientId: ID!, input: UpdateWholesaleClientInput!): WholesaleClientResult!
+    deleteWholesaleClient(clientId: ID!): WholesaleClientResult!
     
     # Blog mutations
     insert_blog_posts_one(object: BlogPostInput!): BlogPost!
@@ -708,6 +727,15 @@ const typeDefs = gql`
     bannerImagePublicId: String
     bannerTemplate: String
     bannerTemplateId: Int
+    companyName: String
+    isWholesaleCustomer: Boolean
+    wholesaleCreditRate: Float
+    wholesaleMonthlyCustomers: String
+    wholesaleOrderingFor: String
+    wholesaleFitExplanation: String
+    wholesaleStatus: String
+    wholesaleApprovedAt: String
+    wholesaleApprovedBy: String
     createdAt: String!
     updatedAt: String!
   }
@@ -716,6 +744,54 @@ const typeDefs = gql`
     success: Boolean!
     message: String
     userProfile: UserProfile
+  }
+
+  type WholesaleApprovalResult {
+    success: Boolean!
+    message: String
+    userProfile: UserProfile
+  }
+
+  # Wholesale Client Types
+  type WholesaleClient {
+    id: ID!
+    wholesaleUserId: ID!
+    clientName: String!
+    clientEmail: String
+    clientPhone: String
+    clientCompany: String
+    clientAddress: String
+    notes: String
+    isActive: Boolean!
+    createdAt: String!
+    updatedAt: String!
+    orderCount: Int!
+    totalSpent: Float!
+  }
+
+  type WholesaleClientResult {
+    success: Boolean!
+    message: String
+    client: WholesaleClient
+  }
+
+  input CreateWholesaleClientInput {
+    clientName: String!
+    clientEmail: String
+    clientPhone: String
+    clientCompany: String
+    clientAddress: String
+    notes: String
+  }
+
+  input UpdateWholesaleClientInput {
+    clientName: String
+    clientEmail: String
+    clientPhone: String
+    clientCompany: String
+    clientAddress: String
+    notes: String
+    isActive: Boolean
   }
 
   input UserProfileInput {
@@ -727,6 +803,18 @@ const typeDefs = gql`
     bannerImageUrl: String
     bannerImagePublicId: String
     bio: String
+    isWholesaleCustomer: Boolean
+    wholesaleCreditRate: Float
+  }
+
+  input WholesaleUserProfileInput {
+    firstName: String!
+    lastName: String!
+    companyName: String!
+    wholesaleMonthlyCustomers: String!
+    wholesaleOrderingFor: String!
+    wholesaleFitExplanation: String!
+    signupCreditAmount: Float
   }
 
   type Address {
@@ -820,6 +908,7 @@ const typeDefs = gql`
     proof_link: String
     discountCode: String
     discountAmount: Float
+    wholesaleClientId: ID
   }
 
   type OrderProof {
@@ -1739,31 +1828,35 @@ const resolvers = {
         const paidOrders = rpcData.filter(order => order.financial_status === 'paid');
         console.log('💰 Filtered to paid orders:', paidOrders.length, 'of', rpcData.length, 'total');
         
-        // Fetch proof data for all orders since RPC doesn't include it
+        // Fetch additional data for all orders since RPC doesn't include everything
         const client = supabaseClient.getServiceClient();
         const orderIds = paidOrders.map(order => order.order_id);
         
-        let proofsData = {};
+        let additionalOrderData = {};
         if (orderIds.length > 0) {
-          const { data: ordersWithProofs, error: proofsError } = await client
+          const { data: ordersWithExtras, error: extrasError } = await client
             .from('orders_main')
-            .select('id, proofs, proof_status, proof_sent_at, proof_link')
+            .select('id, proofs, proof_status, proof_sent_at, proof_link, order_note, customer_first_name, customer_last_name, customer_email')
             .in('id', orderIds);
             
-          if (proofsError) {
-            console.error('❌ Error fetching proof data:', proofsError);
+          if (extrasError) {
+            console.error('❌ Error fetching additional order data:', extrasError);
           } else {
-            // Create lookup map for proof data
-            proofsData = ordersWithProofs.reduce((acc, order) => {
+            // Create lookup map for additional order data
+            additionalOrderData = ordersWithExtras.reduce((acc, order) => {
               acc[order.id] = {
                 proofs: order.proofs || [],
                 proof_status: order.proof_status,
                 proof_sent_at: order.proof_sent_at,
-                proof_link: order.proof_link
+                proof_link: order.proof_link,
+                order_note: order.order_note,
+                customer_first_name: order.customer_first_name,
+                customer_last_name: order.customer_last_name,
+                customer_email: order.customer_email
               };
               return acc;
             }, {});
-            console.log('🔍 Proof data fetched for', Object.keys(proofsData).length, 'orders');
+            console.log('🔍 Additional order data fetched for', Object.keys(additionalOrderData).length, 'orders');
           }
         }
         
@@ -1774,12 +1867,16 @@ const resolvers = {
         
         // Map RPC function results to match GraphQL schema expectations (camelCase field names)
         const ordersWithTracking = await Promise.all(paidOrders.map(async order => {
-          // Get proof data for this order
-          const orderProofData = proofsData[order.order_id] || {
+          // Get additional data for this order (proofs, order note, customer info, etc.)
+          const orderExtras = additionalOrderData[order.order_id] || {
             proofs: [],
             proof_status: null,
             proof_sent_at: null,
-            proof_link: null
+            proof_link: null,
+            order_note: null,
+            customer_first_name: null,
+            customer_last_name: null,
+            customer_email: null
           };
           
           // Fetch tracking data separately for each order
@@ -1811,11 +1908,14 @@ const resolvers = {
           }, 0);
           
           console.log(`🔍 Order ${order.order_id} calculated total: ${calculatedTotal} from ${order.items?.length || 0} items`);
-          console.log(`🔍 Order ${order.order_id} proof data:`, {
-            hasProofs: orderProofData.proofs.length > 0,
-            proofsCount: orderProofData.proofs.length,
-            proof_status: orderProofData.proof_status,
-            proof_sent_at: orderProofData.proof_sent_at
+          console.log(`🔍 Order ${order.order_id} additional data:`, {
+            hasProofs: orderExtras.proofs.length > 0,
+            proofsCount: orderExtras.proofs.length,
+            proof_status: orderExtras.proof_status,
+            proof_sent_at: orderExtras.proof_sent_at,
+            hasOrderNote: !!orderExtras.order_note,
+            orderNoteLength: orderExtras.order_note ? orderExtras.order_note.length : 0,
+            hasCustomerInfo: !!(orderExtras.customer_first_name || orderExtras.customer_email)
           });
           console.log(`🎯 Order ${order.order_id} Shopify data:`, {
             shopify_order_id: order.shopify_order_id,
@@ -1840,6 +1940,13 @@ const resolvers = {
             'mapped shopifyOrderNumber': order.shopify_order_number || null
           });
           
+          // 🔍 Debug log for white option fix verification
+          if (orderExtras.order_note && orderExtras.order_note.includes('⚪ White Option')) {
+            const whiteOptionMatch = orderExtras.order_note.match(/⚪ White Option: (.+?)(?:\n|$)/);
+            console.log(`✅ WHITE OPTION FIX: Order ${order.order_id} has white option:`, 
+              whiteOptionMatch?.[1] || 'pattern not found');
+          }
+          
           const mappedOrder = {
             // Map RPC field names to expected GraphQL schema field names (camelCase)
             id: String(order.order_id), // Ensure string ID
@@ -1858,23 +1965,23 @@ const resolvers = {
             totalTax: null, // RPC doesn't return this
             totalPrice: calculatedTotal, // Use calculated total from items
             currency: 'USD', // RPC doesn't return this, default to USD
-            customerFirstName: null, // RPC doesn't return this
-            customerLastName: null,
-            customerEmail: null,
-            customerPhone: null,
+            customerFirstName: orderExtras.customer_first_name, // Now available from database fetch
+            customerLastName: orderExtras.customer_last_name, // Now available from database fetch
+            customerEmail: orderExtras.customer_email, // Now available from database fetch
+            customerPhone: null, // RPC doesn't return this
             shippingAddress: null,
             billingAddress: null,
             orderTags: null,
-            orderNote: null,
+            orderNote: orderExtras.order_note, // 🎯 THIS IS THE KEY FIX - now includes actual order note!
             orderCreatedAt: order.order_created_at || new Date().toISOString(),
             orderUpdatedAt: null, // RPC doesn't return this
             createdAt: order.order_created_at || new Date().toISOString(), // Use order_created_at as fallback
             updatedAt: order.order_created_at || new Date().toISOString(), // Use order_created_at as fallback
             // Add proof-related fields
-            proofs: orderProofData.proofs || [], // Include proofs array from fetched data
-            proof_status: orderProofData.proof_status || null, // Include proof status
-            proof_sent_at: orderProofData.proof_sent_at || null, // Include proof sent timestamp
-            proof_link: orderProofData.proof_link || null, // Include proof link
+            proofs: orderExtras.proofs || [], // Include proofs array from fetched data
+            proof_status: orderExtras.proof_status || null, // Include proof status
+            proof_sent_at: orderExtras.proof_sent_at || null, // Include proof sent timestamp
+            proof_link: orderExtras.proof_link || null, // Include proof link
             // Map items from JSONB to expected structure (camelCase field names)
             items: (order.items || []).map(item => ({
               id: String(item.id || `item-${Date.now()}-${Math.random()}`), // Ensure string ID
@@ -2667,15 +2774,15 @@ const resolvers = {
     },
 
     // Discount queries
-    validateDiscountCode: async (_, { code, orderAmount }, context) => {
+    validateDiscountCode: async (_, { code, orderAmount, sessionId }, context) => {
       try {
-        console.log('🏷️ Validating discount code from GraphQL:', code);
+        console.log('🏷️ Validating discount code from GraphQL:', code, 'sessionId:', sessionId);
         
         // Get user info from context if available
         const userId = context.user?.id || null;
         const guestEmail = context.guestEmail || null;
         
-        const result = await discountManager.validateCode(code, orderAmount, userId, guestEmail);
+        const result = await discountManager.validateCode(code, orderAmount, userId, guestEmail, sessionId);
         
         // Map the result to GraphQL schema
         return {
@@ -2883,11 +2990,371 @@ const resolvers = {
           bannerImageUrl: profile.banner_image_url,
           profilePhotoPublicId: profile.profile_photo_public_id,
           bannerImagePublicId: profile.banner_image_public_id,
+          companyName: profile.company_name,
+          isWholesaleCustomer: profile.is_wholesale_customer || false,
+          wholesaleCreditRate: profile.wholesale_credit_rate || 0.05,
+          wholesaleMonthlyCustomers: profile.wholesale_monthly_customers,
+          wholesaleOrderingFor: profile.wholesale_ordering_for,
+          wholesaleFitExplanation: profile.wholesale_fit_explanation,
+          wholesaleStatus: profile.wholesale_status,
+          wholesaleApprovedAt: profile.wholesale_approved_at,
+          wholesaleApprovedBy: profile.wholesale_approved_by,
           createdAt: profile.created_at,
           updatedAt: profile.updated_at
         };
       } catch (error) {
         console.error('❌ Error in getUserProfile:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    // Admin wholesale queries
+    getPendingWholesaleApplications: async (_, args, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        console.log('🏪 Fetching pending wholesale applications');
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Profile service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get all wholesale customers with pending status
+        const { data: profiles, error } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('is_wholesale_customer', true)
+          .eq('wholesale_status', 'pending')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('❌ Error fetching pending wholesale applications:', error);
+          throw new Error(`Failed to fetch applications: ${error.message}`);
+        }
+
+        console.log(`✅ Found ${profiles?.length || 0} pending wholesale applications`);
+        
+        return (profiles || []).map(profile => ({
+          id: profile.id,
+          userId: profile.user_id,
+          firstName: profile.first_name,
+          lastName: profile.last_name,
+          displayName: profile.display_name,
+          bio: profile.bio,
+          profilePhotoUrl: profile.profile_photo_url,
+          bannerImageUrl: profile.banner_image_url,
+          profilePhotoPublicId: profile.profile_photo_public_id,
+          bannerImagePublicId: profile.banner_image_public_id,
+          companyName: profile.company_name,
+          isWholesaleCustomer: profile.is_wholesale_customer,
+          wholesaleCreditRate: profile.wholesale_credit_rate,
+          wholesaleMonthlyCustomers: profile.wholesale_monthly_customers,
+          wholesaleOrderingFor: profile.wholesale_ordering_for,
+          wholesaleFitExplanation: profile.wholesale_fit_explanation,
+          wholesaleStatus: profile.wholesale_status,
+          wholesaleApprovedAt: profile.wholesale_approved_at,
+          wholesaleApprovedBy: profile.wholesale_approved_by,
+          createdAt: profile.created_at,
+          updatedAt: profile.updated_at
+        }));
+      } catch (error) {
+        console.error('❌ Error in getPendingWholesaleApplications:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    getAllWholesaleCustomers: async (_, args, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        console.log('🏪 Fetching all wholesale customers');
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Profile service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get all wholesale customers (any status)
+        const { data: profiles, error } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('is_wholesale_customer', true)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('❌ Error fetching wholesale customers:', error);
+          throw new Error(`Failed to fetch customers: ${error.message}`);
+        }
+
+        console.log(`✅ Found ${profiles?.length || 0} wholesale customers`);
+        
+        return (profiles || []).map(profile => ({
+          id: profile.id,
+          userId: profile.user_id,
+          firstName: profile.first_name,
+          lastName: profile.last_name,
+          displayName: profile.display_name,
+          bio: profile.bio,
+          profilePhotoUrl: profile.profile_photo_url,
+          bannerImageUrl: profile.banner_image_url,
+          profilePhotoPublicId: profile.profile_photo_public_id,
+          bannerImagePublicId: profile.banner_image_public_id,
+          companyName: profile.company_name,
+          isWholesaleCustomer: profile.is_wholesale_customer,
+          wholesaleCreditRate: profile.wholesale_credit_rate,
+          wholesaleMonthlyCustomers: profile.wholesale_monthly_customers,
+          wholesaleOrderingFor: profile.wholesale_ordering_for,
+          wholesaleFitExplanation: profile.wholesale_fit_explanation,
+          wholesaleStatus: profile.wholesale_status,
+          wholesaleApprovedAt: profile.wholesale_approved_at,
+          wholesaleApprovedBy: profile.wholesale_approved_by,
+          createdAt: profile.created_at,
+          updatedAt: profile.updated_at
+        }));
+      } catch (error) {
+        console.error('❌ Error in getAllWholesaleCustomers:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    // Wholesale client management queries
+    getWholesaleClients: async (_, { userId }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        console.log('🏪 Fetching wholesale clients for user:', userId);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Client service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get all clients for this wholesale user
+        const { data: clients, error } = await client
+          .from('wholesale_clients')
+          .select('*')
+          .eq('wholesale_user_id', userId)
+          .eq('is_active', true)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('❌ Error fetching wholesale clients:', error);
+          throw new Error(`Failed to fetch clients: ${error.message}`);
+        }
+
+        console.log(`✅ Found ${clients?.length || 0} wholesale clients`);
+        
+        // For each client, get their order count and total spent
+        const clientsWithStats = await Promise.all((clients || []).map(async (clientRecord) => {
+          try {
+                         // Get order statistics for this client
+             const { data: orders, error: ordersError } = await client
+               .from('orders_main')
+               .select('total_price')
+               .eq('wholesale_client_id', clientRecord.id);
+
+            if (ordersError) {
+              console.warn('⚠️ Error fetching orders for client:', clientRecord.id, ordersError);
+            }
+
+            const orderCount = orders?.length || 0;
+            const totalSpent = orders?.reduce((sum, order) => sum + (order.total_price || 0), 0) || 0;
+
+            return {
+              id: clientRecord.id,
+              wholesaleUserId: clientRecord.wholesale_user_id,
+              clientName: clientRecord.client_name,
+              clientEmail: clientRecord.client_email,
+              clientPhone: clientRecord.client_phone,
+              clientCompany: clientRecord.client_company,
+              clientAddress: clientRecord.client_address,
+              notes: clientRecord.notes,
+              isActive: clientRecord.is_active,
+              createdAt: clientRecord.created_at,
+              updatedAt: clientRecord.updated_at,
+              orderCount,
+              totalSpent
+            };
+          } catch (err) {
+            console.warn('⚠️ Error processing client stats:', err);
+            return {
+              id: clientRecord.id,
+              wholesaleUserId: clientRecord.wholesale_user_id,
+              clientName: clientRecord.client_name,
+              clientEmail: clientRecord.client_email,
+              clientPhone: clientRecord.client_phone,
+              clientCompany: clientRecord.client_company,
+              clientAddress: clientRecord.client_address,
+              notes: clientRecord.notes,
+              isActive: clientRecord.is_active,
+              createdAt: clientRecord.created_at,
+              updatedAt: clientRecord.updated_at,
+              orderCount: 0,
+              totalSpent: 0
+            };
+          }
+        }));
+        
+        return clientsWithStats;
+      } catch (error) {
+        console.error('❌ Error in getWholesaleClients:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    getClientOrders: async (_, { clientId }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        console.log('📦 Fetching orders for client:', clientId);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Order service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+                 // Get all orders for this client
+         const { data: orders, error } = await client
+           .from('orders_main')
+           .select('*')
+           .eq('wholesale_client_id', clientId)
+           .order('order_created_at', { ascending: false });
+
+        if (error) {
+          console.error('❌ Error fetching client orders:', error);
+          throw new Error(`Failed to fetch orders: ${error.message}`);
+        }
+
+        console.log(`✅ Found ${orders?.length || 0} orders for client`);
+        
+        // Transform the orders to match the CustomerOrder type
+        const transformedOrders = await Promise.all((orders || []).map(async (order) => {
+          try {
+                         // Get order items
+             const { data: items, error: itemsError } = await client
+               .from('order_items_new')
+               .select('*')
+               .eq('order_id', order.id);
+
+            if (itemsError) {
+              console.warn('⚠️ Error fetching items for order:', order.id, itemsError);
+            }
+
+            // Get order proofs
+            const { data: proofs, error: proofsError } = await client
+              .from('order_proofs')
+              .select('*')
+              .eq('order_id', order.id);
+
+            if (proofsError) {
+              console.warn('⚠️ Error fetching proofs for order:', order.id, proofsError);
+            }
+
+            return {
+              id: order.id,
+              userId: order.user_id,
+              guestEmail: order.guest_email,
+              stripePaymentIntentId: order.stripe_payment_intent_id,
+              stripeCheckoutSessionId: order.stripe_checkout_session_id,
+              orderNumber: order.order_number,
+              orderStatus: order.order_status,
+              fulfillmentStatus: order.fulfillment_status,
+              financialStatus: order.financial_status,
+              trackingNumber: order.tracking_number,
+              trackingCompany: order.tracking_company,
+              trackingUrl: order.tracking_url,
+              subtotalPrice: order.subtotal_price,
+              totalTax: order.total_tax,
+              totalPrice: order.total_price,
+              currency: order.currency,
+              customerFirstName: order.customer_first_name,
+              customerLastName: order.customer_last_name,
+              customerEmail: order.customer_email,
+              customerPhone: order.customer_phone,
+              shippingAddress: order.shipping_address,
+              billingAddress: order.billing_address,
+              shipping_method: order.shipping_method,
+              is_express_shipping: order.is_express_shipping,
+              is_rush_order: order.is_rush_order,
+              is_blind_shipment: order.is_blind_shipment,
+              orderTags: order.order_tags,
+              orderNote: order.order_note,
+              orderCreatedAt: order.order_created_at,
+              orderUpdatedAt: order.order_updated_at,
+              createdAt: order.created_at,
+              updatedAt: order.updated_at,
+              items: (items || []).map(item => ({
+                id: item.id,
+                customerOrderId: item.order_id,
+                stripeLineItemId: item.stripe_line_item_id,
+                productId: item.product_id,
+                productName: item.product_name,
+                productCategory: item.product_category,
+                sku: item.sku,
+                quantity: item.quantity,
+                unitPrice: item.unit_price,
+                totalPrice: item.total_price,
+                calculatorSelections: item.calculator_selections,
+                customFiles: item.custom_files,
+                customerNotes: item.customer_notes,
+                instagramHandle: item.instagram_handle,
+                instagramOptIn: item.instagram_opt_in,
+                fulfillmentStatus: item.fulfillment_status,
+                createdAt: item.created_at,
+                updatedAt: item.updated_at,
+                customerReplacementFile: item.customer_replacement_file,
+                customerReplacementFileName: item.customer_replacement_file_name,
+                customerReplacementAt: item.customer_replacement_at
+              })),
+              proofs: (proofs || []).map(proof => ({
+                id: proof.id,
+                orderId: proof.order_id,
+                proofUrl: proof.proof_url,
+                proofPublicId: proof.proof_public_id,
+                proofTitle: proof.proof_title,
+                uploadedAt: proof.uploaded_at,
+                uploadedBy: proof.uploaded_by,
+                status: proof.status,
+                customerNotes: proof.customer_notes,
+                adminNotes: proof.admin_notes,
+                cutLines: proof.cut_lines,
+                replaced: proof.replaced,
+                replacedAt: proof.replaced_at,
+                originalFileName: proof.original_file_name
+              })),
+              proof_status: order.proof_status,
+              proof_sent_at: order.proof_sent_at,
+              proof_link: order.proof_link,
+              discountCode: order.discount_code,
+              discountAmount: order.discount_amount,
+              wholesaleClientId: order.wholesale_client_id
+            };
+          } catch (err) {
+            console.warn('⚠️ Error processing order:', order.id, err);
+            return null;
+          }
+        }));
+
+        return transformedOrders.filter(order => order !== null);
+      } catch (error) {
+        console.error('❌ Error in getClientOrders:', error);
         throw new Error(error.message);
       }
     },
@@ -5915,13 +6382,14 @@ const resolvers = {
 
     removeDiscountSession: async (_, args, context) => {
       try {
-        console.log('🗑️ Removing discount session');
+        console.log('🗑️ Removing discount session', 'sessionId:', args.sessionId);
         
         // Get user info from context if available
         const userId = context.user?.id || null;
         const guestEmail = context.guestEmail || null;
+        const sessionId = args.sessionId || null;
         
-        discountManager.removeDiscountFromSession(userId, guestEmail);
+        discountManager.removeDiscountFromSession(userId, guestEmail, sessionId);
         
         return {
           success: true,
@@ -6435,6 +6903,9 @@ const resolvers = {
             bannerImageUrl: profile.banner_image_url,
             profilePhotoPublicId: profile.profile_photo_public_id,
             bannerImagePublicId: profile.banner_image_public_id,
+            companyName: profile.company_name,
+            isWholesaleCustomer: profile.is_wholesale_customer,
+            wholesaleCreditRate: profile.wholesale_credit_rate,
             createdAt: profile.created_at,
             updatedAt: profile.updated_at
           }
@@ -6445,6 +6916,605 @@ const resolvers = {
           success: false,
           message: error.message,
           userProfile: null
+        };
+      }
+    },
+
+    createWholesaleUserProfile: async (_, { userId, input }) => {
+      try {
+        console.log('🏪 Creating wholesale user profile:', { userId, input });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Profile service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get a random default avatar
+        const { getRandomAvatar } = require('./avatar-utils');
+        const randomAvatar = getRandomAvatar();
+        console.log('🎭 Assigned random avatar:', randomAvatar);
+        
+        // Create wholesale profile with 5% credit rate (pending approval)
+        const displayName = `${input.firstName} ${input.lastName}`;
+        const wholesaleCreditRate = 0.05; // 5% until approved for wholesale
+        
+        const { data: profile, error } = await client
+          .from('user_profiles')
+          .upsert({
+            user_id: userId,
+            first_name: input.firstName,
+            last_name: input.lastName,
+            display_name: displayName,
+            company_name: input.companyName,
+            is_wholesale_customer: true,
+            wholesale_credit_rate: wholesaleCreditRate,
+            wholesale_monthly_customers: input.wholesaleMonthlyCustomers,
+            wholesale_ordering_for: input.wholesaleOrderingFor,
+            wholesale_fit_explanation: input.wholesaleFitExplanation,
+            wholesale_status: 'pending',
+            profile_photo_url: randomAvatar,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id'
+          })
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error creating wholesale user profile:', error);
+          throw new Error(`Failed to create wholesale profile: ${error.message}`);
+        }
+
+        console.log('✅ Successfully created wholesale user profile');
+        
+        // Grant signup credits if specified
+        if (input.signupCreditAmount && input.signupCreditAmount > 0) {
+          try {
+            console.log(`💰 Granting ${input.signupCreditAmount} signup credits to wholesale customer`);
+            
+            const { data: creditResult, error: creditError } = await client
+              .rpc('grant_wholesale_signup_credits', {
+                p_user_id: userId,
+                p_signup_credit_amount: input.signupCreditAmount
+              });
+
+            if (creditError) {
+              console.error('❌ Error granting signup credits:', creditError);
+              // Don't fail the entire operation, just log it
+            } else {
+              console.log('✅ Successfully granted signup credits:', creditResult);
+            }
+          } catch (creditError) {
+            console.error('❌ Error in signup credit process:', creditError);
+            // Don't fail the entire operation
+          }
+        }
+        
+        return {
+          success: true,
+          message: 'Wholesale profile created successfully',
+          userProfile: {
+            id: profile.id,
+            userId: profile.user_id,
+            firstName: profile.first_name,
+            lastName: profile.last_name,
+            displayName: profile.display_name,
+            bio: profile.bio,
+            profilePhotoUrl: profile.profile_photo_url,
+            bannerImageUrl: profile.banner_image_url,
+            profilePhotoPublicId: profile.profile_photo_public_id,
+            bannerImagePublicId: profile.banner_image_public_id,
+            companyName: profile.company_name,
+            isWholesaleCustomer: profile.is_wholesale_customer,
+            wholesaleCreditRate: profile.wholesale_credit_rate,
+            wholesaleMonthlyCustomers: profile.wholesale_monthly_customers,
+            wholesaleOrderingFor: profile.wholesale_ordering_for,
+            wholesaleFitExplanation: profile.wholesale_fit_explanation,
+            createdAt: profile.created_at,
+            updatedAt: profile.updated_at
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in createWholesaleUserProfile:', error);
+        return {
+          success: false,
+          message: error.message,
+          userProfile: null
+        };
+      }
+    },
+
+    updateWholesaleStatus: async (_, { userId, isWholesaleCustomer, wholesaleCreditRate }) => {
+      try {
+        console.log('🔄 Updating wholesale status:', { userId, isWholesaleCustomer, wholesaleCreditRate });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Profile service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Update wholesale status and credit rate
+        const updateData = {
+          is_wholesale_customer: isWholesaleCustomer,
+          wholesale_credit_rate: wholesaleCreditRate || (isWholesaleCustomer ? 0.10 : 0.05),
+          updated_at: new Date().toISOString()
+        };
+        
+        const { data: profile, error } = await client
+          .from('user_profiles')
+          .update(updateData)
+          .eq('user_id', userId)
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error updating wholesale status:', error);
+          throw new Error(`Failed to update wholesale status: ${error.message}`);
+        }
+
+        console.log('✅ Successfully updated wholesale status');
+        
+        return {
+          success: true,
+          message: 'Wholesale status updated successfully',
+          userProfile: {
+            id: profile.id,
+            userId: profile.user_id,
+            firstName: profile.first_name,
+            lastName: profile.last_name,
+            displayName: profile.display_name,
+            bio: profile.bio,
+            profilePhotoUrl: profile.profile_photo_url,
+            bannerImageUrl: profile.banner_image_url,
+            profilePhotoPublicId: profile.profile_photo_public_id,
+            bannerImagePublicId: profile.banner_image_public_id,
+            companyName: profile.company_name,
+            isWholesaleCustomer: profile.is_wholesale_customer,
+            wholesaleCreditRate: profile.wholesale_credit_rate,
+            createdAt: profile.created_at,
+            updatedAt: profile.updated_at
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in updateWholesaleStatus:', error);
+        return {
+          success: false,
+          message: error.message,
+          userProfile: null
+        };
+      }
+    },
+
+    // Admin wholesale approval mutations
+    approveWholesaleApplication: async (_, { userId, approvedBy }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        console.log('✅ Approving wholesale application:', { userId, approvedBy });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Profile service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Update wholesale status to approved with 10% credit rate
+        const updateData = {
+          wholesale_status: 'approved',
+          wholesale_credit_rate: 0.10, // Upgrade to 10% 
+          wholesale_approved_at: new Date().toISOString(),
+          wholesale_approved_by: approvedBy,
+          updated_at: new Date().toISOString()
+        };
+        
+        const { data: profile, error } = await client
+          .from('user_profiles')
+          .update(updateData)
+          .eq('user_id', userId)
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error approving wholesale application:', error);
+          throw new Error(`Failed to approve application: ${error.message}`);
+        }
+
+        console.log('✅ Successfully approved wholesale application');
+
+        // Send approval email notification
+        try {
+          const emailNotifications = require('./email-notifications');
+          await emailNotifications.sendWholesaleApprovalEmail({
+            userId: userId,
+            email: profile.email || '',
+            firstName: profile.first_name || 'Customer',
+            companyName: profile.company_name || ''
+          });
+          console.log('✅ Wholesale approval email sent');
+        } catch (emailError) {
+          console.error('⚠️ Failed to send approval email (non-critical):', emailError);
+          // Don't fail the whole operation if email fails
+        }
+        
+        return {
+          success: true,
+          message: 'Wholesale application approved successfully! Customer now gets 10% store credit.',
+          userProfile: {
+            id: profile.id,
+            userId: profile.user_id,
+            firstName: profile.first_name,
+            lastName: profile.last_name,
+            displayName: profile.display_name,
+            bio: profile.bio,
+            profilePhotoUrl: profile.profile_photo_url,
+            bannerImageUrl: profile.banner_image_url,
+            profilePhotoPublicId: profile.profile_photo_public_id,
+            bannerImagePublicId: profile.banner_image_public_id,
+            companyName: profile.company_name,
+            isWholesaleCustomer: profile.is_wholesale_customer,
+            wholesaleCreditRate: profile.wholesale_credit_rate,
+            wholesaleMonthlyCustomers: profile.wholesale_monthly_customers,
+            wholesaleOrderingFor: profile.wholesale_ordering_for,
+            wholesaleFitExplanation: profile.wholesale_fit_explanation,
+            wholesaleStatus: profile.wholesale_status,
+            wholesaleApprovedAt: profile.wholesale_approved_at,
+            wholesaleApprovedBy: profile.wholesale_approved_by,
+            createdAt: profile.created_at,
+            updatedAt: profile.updated_at
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in approveWholesaleApplication:', error);
+        return {
+          success: false,
+          message: error.message,
+          userProfile: null
+        };
+      }
+    },
+
+    rejectWholesaleApplication: async (_, { userId, rejectedBy }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        console.log('❌ Rejecting wholesale application:', { userId, rejectedBy });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Profile service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Update wholesale status to rejected, keep 5% credit rate
+        const updateData = {
+          wholesale_status: 'rejected',
+          wholesale_credit_rate: 0.05, // Keep at 5%
+          wholesale_approved_at: new Date().toISOString(), // Track rejection time
+          wholesale_approved_by: rejectedBy,
+          updated_at: new Date().toISOString()
+        };
+        
+        const { data: profile, error } = await client
+          .from('user_profiles')
+          .update(updateData)
+          .eq('user_id', userId)
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error rejecting wholesale application:', error);
+          throw new Error(`Failed to reject application: ${error.message}`);
+        }
+
+        console.log('✅ Successfully rejected wholesale application');
+        
+        return {
+          success: true,
+          message: 'Wholesale application rejected. Customer remains at 5% store credit.',
+          userProfile: {
+            id: profile.id,
+            userId: profile.user_id,
+            firstName: profile.first_name,
+            lastName: profile.last_name,
+            displayName: profile.display_name,
+            bio: profile.bio,
+            profilePhotoUrl: profile.profile_photo_url,
+            bannerImageUrl: profile.banner_image_url,
+            profilePhotoPublicId: profile.profile_photo_public_id,
+            bannerImagePublicId: profile.banner_image_public_id,
+            companyName: profile.company_name,
+            isWholesaleCustomer: profile.is_wholesale_customer,
+            wholesaleCreditRate: profile.wholesale_credit_rate,
+            wholesaleMonthlyCustomers: profile.wholesale_monthly_customers,
+            wholesaleOrderingFor: profile.wholesale_ordering_for,
+            wholesaleFitExplanation: profile.wholesale_fit_explanation,
+            wholesaleStatus: profile.wholesale_status,
+            wholesaleApprovedAt: profile.wholesale_approved_at,
+            wholesaleApprovedBy: profile.wholesale_approved_by,
+            createdAt: profile.created_at,
+            updatedAt: profile.updated_at
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in rejectWholesaleApplication:', error);
+        return {
+          success: false,
+          message: error.message,
+          userProfile: null
+        };
+      }
+    },
+
+    // Wholesale client management mutations
+    createWholesaleClient: async (_, { input }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        console.log('🏪 Creating wholesale client:', input);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Client service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Verify the user is an approved wholesale customer
+        const { data: userProfile, error: profileError } = await client
+          .from('user_profiles')
+          .select('wholesale_status')
+          .eq('user_id', user.id)
+          .single();
+
+        if (profileError || userProfile?.wholesale_status !== 'approved') {
+          throw new Error('Only approved wholesale customers can create clients');
+        }
+
+        // Create the client
+        const { data: newClient, error } = await client
+          .from('wholesale_clients')
+          .insert({
+            wholesale_user_id: user.id,
+            client_name: input.clientName,
+            client_email: input.clientEmail,
+            client_phone: input.clientPhone,
+            client_company: input.clientCompany,
+            client_address: input.clientAddress,
+            notes: input.notes,
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error creating wholesale client:', error);
+          throw new Error(`Failed to create client: ${error.message}`);
+        }
+
+        console.log('✅ Successfully created wholesale client');
+        
+        return {
+          success: true,
+          message: 'Client created successfully',
+          client: {
+            id: newClient.id,
+            wholesaleUserId: newClient.wholesale_user_id,
+            clientName: newClient.client_name,
+            clientEmail: newClient.client_email,
+            clientPhone: newClient.client_phone,
+            clientCompany: newClient.client_company,
+            clientAddress: newClient.client_address,
+            notes: newClient.notes,
+            isActive: newClient.is_active,
+            createdAt: newClient.created_at,
+            updatedAt: newClient.updated_at,
+            orderCount: 0,
+            totalSpent: 0
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in createWholesaleClient:', error);
+        return {
+          success: false,
+          message: error.message,
+          client: null
+        };
+      }
+    },
+
+    updateWholesaleClient: async (_, { clientId, input }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        console.log('🔄 Updating wholesale client:', clientId);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Client service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Verify the client belongs to this user
+        const { data: existingClient, error: clientError } = await client
+          .from('wholesale_clients')
+          .select('*')
+          .eq('id', clientId)
+          .eq('wholesale_user_id', user.id)
+          .single();
+
+        if (clientError || !existingClient) {
+          throw new Error('Client not found or access denied');
+        }
+
+        // Update the client
+        const updateData = {
+          updated_at: new Date().toISOString()
+        };
+
+        if (input.clientName !== undefined) updateData.client_name = input.clientName;
+        if (input.clientEmail !== undefined) updateData.client_email = input.clientEmail;
+        if (input.clientPhone !== undefined) updateData.client_phone = input.clientPhone;
+        if (input.clientCompany !== undefined) updateData.client_company = input.clientCompany;
+        if (input.clientAddress !== undefined) updateData.client_address = input.clientAddress;
+        if (input.notes !== undefined) updateData.notes = input.notes;
+        if (input.isActive !== undefined) updateData.is_active = input.isActive;
+
+        const { data: updatedClient, error } = await client
+          .from('wholesale_clients')
+          .update(updateData)
+          .eq('id', clientId)
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error updating wholesale client:', error);
+          throw new Error(`Failed to update client: ${error.message}`);
+        }
+
+        console.log('✅ Successfully updated wholesale client');
+
+                 // Get order stats for the updated client
+         const { data: orders, error: ordersError } = await client
+           .from('orders_main')
+           .select('total_price')
+           .eq('wholesale_client_id', clientId);
+
+        const orderCount = orders?.length || 0;
+        const totalSpent = orders?.reduce((sum, order) => sum + (order.total_price || 0), 0) || 0;
+        
+        return {
+          success: true,
+          message: 'Client updated successfully',
+          client: {
+            id: updatedClient.id,
+            wholesaleUserId: updatedClient.wholesale_user_id,
+            clientName: updatedClient.client_name,
+            clientEmail: updatedClient.client_email,
+            clientPhone: updatedClient.client_phone,
+            clientCompany: updatedClient.client_company,
+            clientAddress: updatedClient.client_address,
+            notes: updatedClient.notes,
+            isActive: updatedClient.is_active,
+            createdAt: updatedClient.created_at,
+            updatedAt: updatedClient.updated_at,
+            orderCount,
+            totalSpent
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in updateWholesaleClient:', error);
+        return {
+          success: false,
+          message: error.message,
+          client: null
+        };
+      }
+    },
+
+    deleteWholesaleClient: async (_, { clientId }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        console.log('🗑️ Deleting wholesale client:', clientId);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Client service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Verify the client belongs to this user
+        const { data: existingClient, error: clientError } = await client
+          .from('wholesale_clients')
+          .select('*')
+          .eq('id', clientId)
+          .eq('wholesale_user_id', user.id)
+          .single();
+
+        if (clientError || !existingClient) {
+          throw new Error('Client not found or access denied');
+        }
+
+                 // Check if client has any orders
+         const { data: orders, error: ordersError } = await client
+           .from('orders_main')
+           .select('id')
+           .eq('wholesale_client_id', clientId)
+           .limit(1);
+
+        if (ordersError) {
+          console.warn('⚠️ Error checking client orders:', ordersError);
+        }
+
+        if (orders && orders.length > 0) {
+          // Soft delete by setting is_active to false
+          const { data: deletedClient, error } = await client
+            .from('wholesale_clients')
+            .update({
+              is_active: false,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', clientId)
+            .select('*')
+            .single();
+
+          if (error) {
+            console.error('❌ Error soft deleting wholesale client:', error);
+            throw new Error(`Failed to delete client: ${error.message}`);
+          }
+
+          console.log('✅ Successfully soft deleted wholesale client (has orders)');
+          
+          return {
+            success: true,
+            message: 'Client archived successfully (has existing orders)',
+            client: null
+          };
+        } else {
+          // Hard delete if no orders
+          const { error } = await client
+            .from('wholesale_clients')
+            .delete()
+            .eq('id', clientId);
+
+          if (error) {
+            console.error('❌ Error deleting wholesale client:', error);
+            throw new Error(`Failed to delete client: ${error.message}`);
+          }
+
+          console.log('✅ Successfully deleted wholesale client');
+          
+          return {
+            success: true,
+            message: 'Client deleted successfully',
+            client: null
+          };
+        }
+      } catch (error) {
+        console.error('❌ Error in deleteWholesaleClient:', error);
+        return {
+          success: false,
+          message: error.message,
+          client: null
         };
       }
     },

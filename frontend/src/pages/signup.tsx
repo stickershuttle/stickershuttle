@@ -20,17 +20,11 @@ export default function SignUp() {
   const [userLastName, setUserLastName] = useState('');
 
   // Klaviyo integration
-  const [syncToKlaviyo] = useMutation(SYNC_CUSTOMER_TO_KLAVIYO, {
-    errorPolicy: 'ignore'
-  });
+  const [syncToKlaviyo] = useMutation(SYNC_CUSTOMER_TO_KLAVIYO);
   
   // Profile creation mutations
-  const [createUserProfile] = useMutation(CREATE_USER_PROFILE, {
-    errorPolicy: 'ignore'
-  });
-  const [createWholesaleUserProfile] = useMutation(CREATE_WHOLESALE_USER_PROFILE, {
-    errorPolicy: 'ignore'
-  });
+  const [createUserProfile] = useMutation(CREATE_USER_PROFILE);
+  const [createWholesaleUserProfile] = useMutation(CREATE_WHOLESALE_USER_PROFILE);
 
   const [formData, setFormData] = useState({
     email: router.query.email ? decodeURIComponent(router.query.email as string) : '',

@@ -70,7 +70,11 @@ export default function VinylStickers() {
   ];
 
   return (
-    <Layout title="Vinyl Stickers - Waterproof & UV Resistant | Sticker Shuttle">
+    <Layout 
+      title="Vinyl Stickers - Waterproof & UV Resistant | Sticker Shuttle"
+      description="Premium vinyl stickers perfect for laptops, water bottles, and outdoor use - waterproof, scratch-resistant, and dishwasher safe."
+      ogImage="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749652894/StickerShuttle_Banner_PurpleCustomStickers_zxst8r.webp"
+    >
       <style jsx>{`
         .container-style {
           background: rgba(255, 255, 255, 0.05);

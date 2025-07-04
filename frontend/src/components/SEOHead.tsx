@@ -107,9 +107,7 @@ export default function SEOHead({
       <meta name="twitter:image" content={ogImage} />
       <meta name="twitter:image:alt" content="Sticker Shuttle - Custom Sticker Printing" />
       
-      {/* Favicon and Icons */}
-      <link rel="icon" type="image/svg+xml" href="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591674/AlienSSFavicon_jlkmoi.svg" />
-      <link rel="icon" type="image/png" sizes="32x32" href="/favicon.ico" />
+      {/* Favicon is handled in _document.js */}
       
       {/* Theme Color */}
       <meta name="theme-color" content="#030140" />

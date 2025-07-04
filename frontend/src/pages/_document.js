@@ -20,7 +20,10 @@ export default function Document() {
         />
         
         {/* Favicon */}
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" type="image/svg+xml" href="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591675/Asset_8_mhjgsx.svg?v=2" />
+        <link rel="shortcut icon" href="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591675/Asset_8_mhjgsx.svg?v=2" />
+        <link rel="apple-touch-icon" href="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591675/Asset_8_mhjgsx.svg?v=2" />
+        <link rel="icon" sizes="16x16 32x32 48x48" href="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591675/Asset_8_mhjgsx.svg?v=2" />
         
         {/* Meta tags */}
         <meta name="description" content="Custom stickers, labels, and decals - High quality printing with fast shipping" />

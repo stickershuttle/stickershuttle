@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useLazyQuery, useMutation, gql } from '@apollo/client';
 
 const VALIDATE_DISCOUNT = gql`
-  query ValidateDiscountCode($code: String!, $orderAmount: Float!) {
-    validateDiscountCode(code: $code, orderAmount: $orderAmount) {
+  query ValidateDiscountCode($code: String!, $orderAmount: Float!, $sessionId: String) {
+    validateDiscountCode(code: $code, orderAmount: $orderAmount, sessionId: $sessionId) {
       valid
       discountCode {
         id
@@ -18,10 +18,9 @@ const VALIDATE_DISCOUNT = gql`
 `;
 
 const REMOVE_DISCOUNT_SESSION = gql`
-  mutation RemoveDiscountSession {
-    removeDiscountSession {
+  mutation RemoveDiscountSession($sessionId: String) {
+    removeDiscountSession(sessionId: $sessionId) {
       success
-      message
     }
   }
 `;
@@ -33,31 +32,58 @@ interface DiscountCodeInputProps {
   currentAppliedDiscount?: { code: string; amount: number } | null;
   hasReorderDiscount?: boolean;
   reorderDiscountAmount?: number;
+  hasStoreCredits?: boolean;
 }
 
-export default function DiscountCodeInput({ orderAmount, onDiscountApplied, className = '', currentAppliedDiscount, hasReorderDiscount, reorderDiscountAmount }: DiscountCodeInputProps) {
+// Helper function to get or create a persistent session ID
+function getSessionId(): string {
+  const SESSION_KEY = 'ss_discount_session_id';
+  let sessionId = localStorage.getItem(SESSION_KEY);
+  
+  if (!sessionId) {
+    // Generate a new session ID using crypto API or fallback
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      sessionId = crypto.randomUUID();
+    } else {
+      // Fallback for older browsers
+      sessionId = 'xxxx-xxxx-xxxx'.replace(/[x]/g, () => {
+        return (Math.random() * 16 | 0).toString(16);
+      });
+    }
+    localStorage.setItem(SESSION_KEY, sessionId);
+  }
+  
+  return sessionId;
+}
+
+export default function DiscountCodeInput({ orderAmount, onDiscountApplied, className = '', currentAppliedDiscount, hasReorderDiscount, reorderDiscountAmount, hasStoreCredits }: DiscountCodeInputProps) {
   const [discountCode, setDiscountCode] = useState('');
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<any>(null);
   const [hasValidated, setHasValidated] = useState(false);
+  const [sessionId] = useState(() => getSessionId());
 
   // Initialize component state based on current applied discount
   React.useEffect(() => {
-    if (currentAppliedDiscount && !validationResult) {
+    console.log('🔄 DiscountCodeInput: currentAppliedDiscount changed:', currentAppliedDiscount);
+    
+    if (currentAppliedDiscount && currentAppliedDiscount.code) {
+      // Apply discount from parent
       setDiscountCode(currentAppliedDiscount.code);
       setValidationResult({
         valid: true,
         discountCode: {
           code: currentAppliedDiscount.code,
-          discountType: 'unknown', // We don't have this info from the prop
-          discountValue: 0 // We don't have this info from the prop
+          discountType: 'unknown',
+          discountValue: 0
         },
         discountAmount: currentAppliedDiscount.amount,
         message: `Discount code "${currentAppliedDiscount.code}" applied`
       });
       setHasValidated(true);
-    } else if (!currentAppliedDiscount && validationResult?.valid) {
-      // Reset if no discount is applied externally but we have a valid result
+    } else if (!currentAppliedDiscount) {
+      // No discount applied from parent - clear everything
+      console.log('🔄 DiscountCodeInput: Clearing all discount state');
       setDiscountCode('');
       setValidationResult(null);
       setHasValidated(false);
@@ -75,7 +101,8 @@ export default function DiscountCodeInput({ orderAmount, onDiscountApplied, clas
         if (currentAppliedDiscount && currentAppliedDiscount.code !== result.discountCode.code) {
           setValidationResult({
             valid: false,
-            message: `Cannot apply "${result.discountCode.code}". Remove "${currentAppliedDiscount.code}" first to use a different discount code.`
+            message: `Cannot apply "${result.discountCode.code}". Remove "${currentAppliedDiscount.code}" first to use a different discount code.`,
+            showResetOption: true
           });
           onDiscountApplied(null);
           return;
@@ -102,15 +129,27 @@ export default function DiscountCodeInput({ orderAmount, onDiscountApplied, clas
 
   const [removeDiscountSession] = useMutation(REMOVE_DISCOUNT_SESSION, {
     onCompleted: (data) => {
-      console.log('Discount session removed successfully:', data);
+      console.log('✅ Discount session removed successfully:', data?.removeDiscountSession?.success);
     },
     onError: (error) => {
-      console.error('Error removing discount session:', error);
+      console.error('⚠️ Error removing discount session (non-blocking):', error.message);
+      // Don't block the UI for backend session cleanup errors
     }
   });
 
   const handleValidate = async () => {
     if (!discountCode.trim()) return;
+
+    // Check if store credits are being used
+    if (hasStoreCredits) {
+      setValidationResult({
+        valid: false,
+        message: 'Cannot apply discount codes with store credit. Remove store credit to use discount codes.',
+        showResetOption: false
+      });
+      setHasValidated(true);
+      return;
+    }
 
     // Check if there's a reorder discount active
     if (hasReorderDiscount) {
@@ -124,9 +163,13 @@ export default function DiscountCodeInput({ orderAmount, onDiscountApplied, clas
 
     // Check if there's already a different discount applied
     if (currentAppliedDiscount && currentAppliedDiscount.code !== discountCode.toUpperCase()) {
+      console.log('🚫 DiscountCodeInput: Preventing multiple discount codes');
+      console.log('   Current:', currentAppliedDiscount.code);
+      console.log('   Trying:', discountCode.toUpperCase());
       setValidationResult({
         valid: false,
-        message: `Cannot apply multiple discount codes. Remove "${currentAppliedDiscount.code}" first to use a different discount code.`
+        message: `Cannot apply multiple discount codes. Remove "${currentAppliedDiscount.code}" first to use a different discount code.`,
+        showResetOption: true
       });
       setHasValidated(true);
       return;
@@ -154,17 +197,80 @@ export default function DiscountCodeInput({ orderAmount, onDiscountApplied, clas
     validateDiscount({
       variables: {
         code: discountCode.toUpperCase(),
-        orderAmount
+        orderAmount,
+        sessionId
       }
     });
   };
 
   const handleRemove = () => {
+    console.log('🔄 DiscountCodeInput: Removing discount');
+    
+    // Clear all local state immediately
     setDiscountCode('');
     setValidationResult(null);
     setHasValidated(false);
+    
+    // Notify parent to clear discount state
     onDiscountApplied(null);
-    removeDiscountSession();
+    
+    // Remove backend session (non-blocking)
+    try {
+      removeDiscountSession({
+        variables: {
+          sessionId
+        }
+      }).catch((error: any) => {
+        console.warn('⚠️ Backend session cleanup failed (non-critical):', error?.message || error);
+      });
+    } catch (error: any) {
+      console.warn('⚠️ Backend session cleanup error (non-critical):', error?.message || error);
+    }
+    
+    console.log('✅ DiscountCodeInput: Discount removed and parent notified');
+  };
+
+  // Force reset function to clear stuck states
+  const handleForceReset = () => {
+    console.log('🔄 FORCE RESET: Clearing all discount state');
+    
+    // Clear all local state
+    setDiscountCode('');
+    setValidationResult(null);
+    setHasValidated(false);
+    
+    // Clear parent state multiple times to ensure it sticks
+    onDiscountApplied(null);
+    
+    // Small delay then notify parent again to make sure
+    setTimeout(() => {
+      onDiscountApplied(null);
+      console.log('✅ FORCE RESET: Secondary parent notification sent');
+    }, 100);
+    
+    // Clear localStorage session
+    localStorage.removeItem('ss_discount_session_id');
+    
+    // Generate new session ID to avoid conflicts
+    const newSessionId = 'xxxx-xxxx-xxxx'.replace(/[x]/g, () => {
+      return (Math.random() * 16 | 0).toString(16);
+    });
+    localStorage.setItem('ss_discount_session_id', newSessionId);
+    
+    // Remove backend session (non-blocking)
+    try {
+      removeDiscountSession({
+        variables: {
+          sessionId
+        }
+      }).catch((error: any) => {
+        console.warn('⚠️ Force reset: Backend session cleanup failed (non-critical):', error?.message || error);
+      });
+    } catch (error: any) {
+      console.warn('⚠️ Force reset: Backend session cleanup error (non-critical):', error?.message || error);
+    }
+    
+    console.log('✅ FORCE RESET: Complete - all state cleared');
   };
 
   const formatDiscountDisplay = () => {
@@ -197,6 +303,33 @@ export default function DiscountCodeInput({ orderAmount, onDiscountApplied, clas
 
   return (
     <div className={`space-y-3 ${className}`}>
+      {/* Show store credit notice if active */}
+      {hasStoreCredits && (
+        <div 
+          className="text-sm px-4 py-3 rounded-lg"
+          style={{
+            background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.4) 0%, rgba(250, 204, 21, 0.25) 50%, rgba(250, 204, 21, 0.1) 100%)',
+            backdropFilter: 'blur(25px) saturate(180%)',
+            border: '1px solid rgba(250, 204, 21, 0.4)',
+            boxShadow: 'rgba(250, 204, 21, 0.15) 0px 4px 16px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+            color: 'rgb(254, 240, 138)'
+          }}
+        >
+          <div className="flex items-center space-x-2">
+            <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/>
+              <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd"/>
+            </svg>
+            <span className="font-medium">
+              Store Credit Active
+            </span>
+          </div>
+          <div className="text-xs mt-1 opacity-90">
+            Cannot apply discount codes while using store credit.
+          </div>
+        </div>
+      )}
+
       {/* Show reorder discount notice if active */}
       {hasReorderDiscount && (
         <div 
@@ -232,7 +365,7 @@ export default function DiscountCodeInput({ orderAmount, onDiscountApplied, clas
             value={discountCode}
             onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
             onKeyDown={(e) => e.key === 'Enter' && handleValidate()}
-            disabled={validationResult?.valid || hasReorderDiscount}
+            disabled={validationResult?.valid || hasReorderDiscount || hasStoreCredits}
             className="w-full rounded-xl px-4 py-3 pl-11 text-white text-sm placeholder-white/60 focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ 
               background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(255, 255, 255, 0.02) 100%)',
@@ -250,7 +383,7 @@ export default function DiscountCodeInput({ orderAmount, onDiscountApplied, clas
         {!validationResult?.valid ? (
           <button
             onClick={handleValidate}
-            disabled={isValidating || !discountCode.trim() || hasReorderDiscount}
+            disabled={isValidating || !discountCode.trim() || hasReorderDiscount || hasStoreCredits}
             className="px-6 py-3 rounded-xl font-semibold text-white text-sm transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg hover:shadow-xl"
             style={checkoutButtonStyle}
           >
@@ -303,22 +436,33 @@ export default function DiscountCodeInput({ orderAmount, onDiscountApplied, clas
         >
           {validationResult.valid ? (
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="flex items-center space-x-2 min-w-0 flex-1">
+                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span>{validationResult.message}</span>
+                <span className="text-xs truncate">{validationResult.message}</span>
               </div>
-              <span className="font-semibold">
+              <span className="font-semibold text-xs ml-2 flex-shrink-0">
                 {formatDiscountDisplay()} = -${validationResult.discountAmount.toFixed(2)}
               </span>
             </div>
           ) : (
-            <div className="flex items-center space-x-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              <span>{validationResult.message}</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                <span>{validationResult.message}</span>
+              </div>
+              {validationResult.showResetOption && (
+                <button
+                  onClick={handleForceReset}
+                  className="ml-3 px-3 py-1 text-xs rounded-lg font-medium transition-all hover:bg-red-500/20 border border-red-400/30 text-red-300"
+                  title="Reset discount state"
+                >
+                  Reset
+                </button>
+              )}
             </div>
           )}
         </div>

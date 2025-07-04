@@ -70,7 +70,11 @@ export default function ClearStickers() {
   ];
 
   return (
-    <Layout title="Clear Stickers - Transparent & Professional | Sticker Shuttle">
+    <Layout 
+      title="Clear Stickers - Transparent & Professional | Sticker Shuttle"
+      description="Premium clear stickers with transparent backgrounds that blend seamlessly with any surface - perfect for professional applications and subtle branding."
+      ogImage="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749652825/StickerShuttle_Banner_Clear_dvp0xk.jpg"
+    >
       <style jsx>{`
         .container-style {
           background: rgba(255, 255, 255, 0.05);
@@ -87,6 +91,20 @@ export default function ClearStickers() {
           25% { transform: translateX(-1px) translateY(-1px); }
           50% { transform: translateX(1px) translateY(1px); }
           75% { transform: translateX(-1px) translateY(1px); }
+        }
+        @keyframes stellar-drift {
+          0%, 100% {
+            background-position: 0% 0%, 20% 20%, 40% 60%, 60% 40%, 80% 80%, 10% 30%;
+          }
+          25% {
+            background-position: 20% 30%, 40% 50%, 60% 80%, 80% 60%, 10% 10%, 30% 60%;
+          }
+          50% {
+            background-position: 40% 60%, 60% 80%, 80% 10%, 10% 20%, 30% 40%, 50% 90%;
+          }
+          75% {
+            background-position: 60% 90%, 80% 10%, 10% 40%, 30% 70%, 50% 50%, 70% 20%;
+          }
         }
       `}</style>
       {/* Hero Section with Banner Background */}
@@ -120,7 +138,18 @@ export default function ClearStickers() {
             <div 
               className="absolute inset-0 md:hidden rounded-2xl"
               style={{
-                background: 'linear-gradient(135deg, #4c1d95 0%, #6b21a8 25%, #7c3aed 50%, #8b5cf6 75%, #a855f7 100%)'
+                background: 'linear-gradient(135deg, #0a0a2e 0%, #1a1a4a 25%, #2d1b6b 50%, #4c1d95 75%, #7c3aed 100%)',
+                backgroundImage: `
+                  radial-gradient(ellipse at 25% 30%, rgba(139, 92, 246, 0.5) 0%, transparent 60%),
+                  radial-gradient(ellipse at 75% 70%, rgba(124, 58, 237, 0.4) 0%, transparent 50%),
+                  radial-gradient(ellipse at 50% 20%, rgba(147, 51, 234, 0.3) 0%, transparent 40%),
+                  radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15) 1px, transparent 1px),
+                  radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+                  radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.18) 1px, transparent 1px)
+                `,
+                backgroundSize: '200% 200%, 200% 200%, 200% 200%, 100px 100px, 150px 150px, 80px 80px',
+                animation: 'stellar-drift 8s ease-in-out infinite',
+                backgroundPosition: '0% 0%, 20% 20%, 40% 60%, 60% 40%, 80% 80%, 10% 30%'
               }}
             ></div>
             <div className="text-left md:text-left text-center relative z-10 md:pl-8">

@@ -506,7 +506,7 @@ const updateTransactionOrderId = async (transactionId, orderId) => {
   }
 };
 
-// Earn points/credits from purchase (5% cashback) with $100 limit
+// Earn points/credits from purchase with dynamic rates (5% standard, 10% wholesale) and $100 limit
 const earnPointsFromPurchase = async (userId, orderTotal, orderId) => {
   try {
     if (!userId || userId === 'guest') {
@@ -514,63 +514,59 @@ const earnPointsFromPurchase = async (userId, orderTotal, orderId) => {
       return { success: false, message: 'Guest user - no points earned' };
     }
 
-    // Calculate 5% of the total amount spent
-    const pointsEarned = Math.round((orderTotal * 0.05) * 100) / 100; // Round to 2 decimal places
-    
-    if (pointsEarned <= 0) {
+    if (orderTotal <= 0) {
       console.log('💰 No points to earn from $0 order');
       return { success: false, message: 'No points to earn' };
     }
 
-    console.log(`💰 Attempting to earn ${pointsEarned} points from $${orderTotal} purchase for user ${userId}, order ${orderId}`);
+    console.log(`💰 Attempting to earn credits from $${orderTotal} purchase for user ${userId}, order ${orderId}`);
     
     const client = supabase.getServiceClient();
     
-    // Use the new function that supports credit limits
+    // Use the new dynamic rate function that handles wholesale vs regular customers
     const { data, error } = await client
-      .rpc('add_user_credits_with_limit', {
+      .rpc('add_user_credits_with_dynamic_rate', {
         p_user_id: userId,
-        p_amount: pointsEarned,
-        p_reason: `$${pointsEarned.toFixed(2)} earned from your recent order`,
+        p_order_total: orderTotal,
         p_order_id: orderId,
-        p_created_by: null,
-        p_expires_at: null,
         p_credit_limit: 100.00
       });
     
     if (error) throw error;
     
     // Handle different scenarios based on response
-    if (data.success === false && data.limit_reached) {
-      console.log('🚫 Credit limit reached - no additional credits earned:', data);
-      return {
-        success: false,
-        limitReached: true,
-        currentBalance: data.current_balance,
-        creditLimit: data.credit_limit,
-        message: 'Credit limit reached - no additional credits earned'
-      };
-    } else if (data.success === true && data.limit_reached) {
-      console.log('⚠️ Partial credits earned - limit reached:', data);
-      return {
-        success: true,
-        limitReached: true,
-        pointsEarned: data.amount,
-        totalBalance: data.balance,
-        creditLimit: data.credit_limit,
-        orderId: orderId,
-        message: `$${data.amount.toFixed(2)} earned (limit reached)`
-      };
+    if (data.success === false) {
+      if (data.message === 'Credit limit reached') {
+        console.log('🚫 Credit limit reached - no additional credits earned:', data);
+        return {
+          success: false,
+          limitReached: true,
+          currentBalance: data.current_balance,
+          creditLimit: data.credit_limit,
+          message: 'Credit limit reached - no additional credits earned'
+        };
+      } else {
+        console.log('⚠️ Credits not earned:', data.message);
+        return {
+          success: false,
+          message: data.message || 'Failed to earn credits'
+        };
+      }
     } else {
-      console.log('✅ Points earned successfully:', { pointsEarned: data.amount, orderId });
+      const isWholesale = data.is_wholesale || false;
+      const creditRate = Math.round((data.credit_rate || 0.05) * 100);
+      
+      console.log(`✅ Credits earned successfully: ${data.amount} (${creditRate}% ${isWholesale ? 'wholesale' : 'standard'} rate)`);
+      
       return {
         success: true,
         limitReached: false,
         pointsEarned: data.amount,
-        totalBalance: data.balance,
-        creditLimit: data.credit_limit,
+        totalBalance: data.new_balance,
+        creditRate: data.credit_rate,
+        isWholesale: isWholesale,
         orderId: orderId,
-        message: `$${data.amount.toFixed(2)} earned from your recent order`
+        message: `$${data.amount.toFixed(2)} earned from your recent order (${creditRate}% ${isWholesale ? 'wholesale' : 'standard'} rate)`
       };
     }
   } catch (error) {

@@ -230,6 +230,7 @@ const defaultColumns = [
   { id: 'shape', name: 'Shape', width: 'px-2', align: 'left' },
   { id: 'material', name: 'Material', width: 'px-2', align: 'left' },
   { id: 'size', name: 'Size', width: 'px-2', align: 'left' },
+  { id: 'shipping', name: 'Shipping', width: 'px-2', align: 'left' },
   { id: 'actions', name: 'Actions', width: 'px-4', align: 'center' } // Reduced from px-6
 ];
 
@@ -1103,10 +1104,10 @@ export default function AdminOrders() {
           }
         }
       `}</style>
-      <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#030140' }}>
+      <div className="min-h-screen" style={{ backgroundColor: '#030140' }}>
         {/* Main Content */}
         <div className="pt-8 pb-8">
-          <div className="w-full pl-2 pr-6"> {/* Reduced left padding, keep right padding */}
+          <div className="w-full px-4 xl:px-6"> {/* Consistent padding on all screen sizes */}
             {!selectedOrder ? (
               // Orders List View
               <>
@@ -1237,14 +1238,18 @@ export default function AdminOrders() {
                   </div>
                   
                   {/* Mobile Filter Dropdown */}
-                  <div className="lg:hidden">
+                  <div className="lg:hidden relative">
                     <select
                       value={timeFilter}
                       onChange={(e) => setTimeFilter(e.target.value)}
-                      className="w-full px-4 py-3 rounded-lg text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                      className="w-full px-4 py-3 pr-10 rounded-lg text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all appearance-none cursor-pointer"
                       style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)'
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)',
+                        WebkitAppearance: 'none',
+                        MozAppearance: 'none'
                       }}
                       aria-label="Select time filter"
                     >
@@ -1255,6 +1260,9 @@ export default function AdminOrders() {
                       <option value="90" style={{ backgroundColor: '#030140' }}>Last 90 days</option>
                       <option value="365" style={{ backgroundColor: '#030140' }}>Last year</option>
                     </select>
+                    <svg className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
                   </div>
                 </div>
 
@@ -1356,7 +1364,7 @@ export default function AdminOrders() {
                 {/* Mobile/Tablet Filters */}
                 <div className="xl:hidden mb-3">
                   <div 
-                    className="p-4 rounded-lg"
+                    className="p-3 rounded-lg"
                     style={{
                       background: 'rgba(255, 255, 255, 0.05)',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -1567,7 +1575,7 @@ export default function AdminOrders() {
 
                     return Object.entries(ordersByDate).map(([date, orders]: [string, any]) => (
                       <div key={date}>
-                        <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2 px-2">{date}</h3>
+                        <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2">{date}</h3>
                         <div className="bg-black/20 border-y border-gray-700/50">
                           {orders.map((order: Order, orderIndex: number) => {
                             const firstItem = order.items[0] || {};
@@ -1579,7 +1587,7 @@ export default function AdminOrders() {
                               <div
                                 key={order.id}
                                 onClick={() => selectOrder(order)}
-                                className="flex items-center px-2 py-4 cursor-pointer active:bg-white/5 transition-colors"
+                                className="flex items-center px-4 py-4 cursor-pointer active:bg-white/5 transition-colors"
                                 style={{
                                   borderBottom: orderIndex < orders.length - 1 ? '1px solid rgba(255, 255, 255, 0.08)' : 'none'
                                 }}
@@ -1766,6 +1774,9 @@ export default function AdminOrders() {
                           </th>
                           <th className="px-2 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
                             Size
+                          </th>
+                          <th className="px-2 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                            Shipping
                           </th>
 
                           <th className="px-3 py-3 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider">
@@ -1986,6 +1997,26 @@ export default function AdminOrders() {
                                   <span className="text-gray-500">-</span>
                                 )}
                               </td>
+                              {/* Shipping */}
+                              <td className="px-2 py-4">
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-xs text-gray-300">
+                                    {order.shipping_method || 'UPS Ground'}
+                                  </span>
+                                  <div className="flex gap-1">
+                                    {order.is_express_shipping && (
+                                      <span className="px-2 py-0.5 text-xs font-bold bg-red-500/20 text-red-300 rounded-full border border-red-400/30 animate-pulse">
+                                        🚀 EXPRESS
+                                      </span>
+                                    )}
+                                    {order.is_rush_order && (
+                                      <span className="px-2 py-0.5 text-xs font-bold bg-orange-500/20 text-orange-300 rounded-full border border-orange-400/30">
+                                        ⚡ RUSH
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
 
                               {/* Actions */}
                               <td className="px-6 py-4 text-center">
@@ -2058,7 +2089,7 @@ export default function AdminOrders() {
               <div className="max-w-7xl mx-auto">
                 {/* Mobile/Tablet Header */}
                 <div className="xl:hidden mb-4">
-                  <div className="flex items-center gap-3 px-4 mb-3">
+                  <div className="flex items-center gap-3 mb-3">
                     <button
                       onClick={goBackToOrders}
                       className="p-1"
@@ -2558,7 +2589,13 @@ export default function AdminOrders() {
                           <span className="text-sm font-medium text-white">Shipping Choice</span>
                         </div>
                         <p className="text-sm text-gray-300 ml-6">
-                          {(selectedOrder as any).shipping_method || 'UPS Ground (2-3 Days)'}
+                          {(selectedOrder as any).shipping_method || 'UPS Ground'}
+                          {/* Debug info - remove in production */}
+                          {process.env.NODE_ENV === 'development' && (
+                            <span className="text-xs text-gray-500 ml-2">
+                              (Raw: {JSON.stringify((selectedOrder as any).shipping_method)})
+                            </span>
+                          )}
                           <div className="flex gap-2 mt-1">
                             {(selectedOrder as any).is_express_shipping && (
                               <span className="px-2 py-1 text-xs font-bold bg-red-500/20 text-red-300 rounded-full border border-red-400/30">

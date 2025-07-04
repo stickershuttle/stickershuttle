@@ -15,6 +15,7 @@ interface InvoiceItem {
 
 interface InvoiceData {
   orderNumber: string;
+  id?: string;
   orderDate: string;
   orderStatus: string;
   totalPrice: number;
@@ -61,9 +62,16 @@ const useInvoiceGenerator = (invoiceData: InvoiceData) => {
     console.log('🧾 Starting PDF generation:', action);
     console.log('🧾 Invoice data:', invoiceData);
     
-    // Validate invoice data
-    if (!invoiceData.orderNumber) {
+    // Validate invoice data - improved validation with debugging
+    console.log('🧾 Raw invoice data received:', invoiceData);
+    const orderNumber = invoiceData.orderNumber || invoiceData.id || 'SS-FALLBACK';
+    console.log('🧾 Final order number for invoice:', orderNumber);
+    
+    if (!orderNumber || orderNumber === 'SS-FALLBACK') {
       console.error('❌ Missing order number in invoice data');
+      console.error('❌ Invoice data keys:', Object.keys(invoiceData));
+      console.error('❌ Invoice orderNumber:', invoiceData.orderNumber);
+      console.error('❌ Invoice id:', invoiceData.id);
       alert('Error: Order number is missing. Please refresh the page and try again.');
       return;
     }
@@ -93,13 +101,13 @@ const useInvoiceGenerator = (invoiceData: InvoiceData) => {
         <!-- Header -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 2px solid #030140; padding-bottom: 20px;">
           <div style="flex: 1; display: flex; align-items: center;">
-            <div style="font-size: 24px; font-weight: bold; color: #030140; font-family: Arial, sans-serif;">
-              STICKER SHUTTLE
+            <div style="display: flex; align-items: center;">
+              <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751567428/LogoDarktGreyStickerShuttle_lpvvnc.png" alt="Sticker Shuttle" style="height: 40px; width: auto; margin-right: 10px;" />
             </div>
           </div>
           <div style="text-align: right; flex: 1;">
             <h1 style="margin: 0; color: #030140; font-size: 28px; font-weight: bold;">INVOICE</h1>
-            <p style="margin: 5px 0; color: #666; font-size: 14px;">${invoiceData.orderNumber}</p>
+            <p style="margin: 5px 0; color: #666; font-size: 14px;">${orderNumber}</p>
           </div>
         </div>
 
@@ -203,25 +211,53 @@ const useInvoiceGenerator = (invoiceData: InvoiceData) => {
                   </div>
                 </td>
                 <td style="padding: 12px; border: 1px solid #ddd; vertical-align: top;">
-                  <strong style="color: #030140;">${item.productName}</strong>
-                  ${item.calculatorSelections ? `
-                    <div style="margin-top: 8px; font-size: 11px; color: #666;">
-                      ${Object.entries(item.calculatorSelections)
-                        .filter(([key, value]: [string, any]) => value && (value.displayValue || value.value))
-                        .map(([key, value]: [string, any]) => {
-                          const formatKey = (k: string) => {
-                            switch (k.toLowerCase()) {
-                              case 'sizepreset': return 'Size';
-                              case 'whiteoption': return 'White Base';
-                              case 'whitebase': return 'White Base';
-                              default: return k.charAt(0).toUpperCase() + k.slice(1).replace(/([A-Z])/g, ' $1').trim();
-                            }
-                          };
-                          return `• ${formatKey(key)}: ${value.displayValue || value.value}`;
-                        }).join('<br/>')
+                                    <strong style="color: #030140;">${item.productName}</strong>
+                  ${(() => {
+                    if (!item.calculatorSelections) return '';
+                    
+                    console.log('🧾 Invoice calculator selections for item:', item.productName, item.calculatorSelections);
+                    
+                    const formatKey = (k: string) => {
+                      switch (k.toLowerCase()) {
+                        case 'sizepreset': return 'Size';
+                        case 'whiteoption': return 'White Ink';
+                        case 'whitebase': return 'White Ink';
+                        case 'cut': return 'Shape';
+                        case 'material': return 'Material';
+                        case 'size': return 'Size';
+                        case 'rush': return 'Rush Order';
+                        case 'proof': return 'Proof';
+                        case 'instagram': return 'Instagram';
+                        default: return k.charAt(0).toUpperCase() + k.slice(1).replace(/([A-Z])/g, ' $1').trim();
                       }
-                    </div>
-                  ` : ''}
+                    };
+                    
+                    const specs = Object.entries(item.calculatorSelections)
+                      .filter(([key, value]: [string, any]) => {
+                        const hasValue = value && (
+                          (typeof value === 'object' && (value.displayValue || value.value)) ||
+                          (typeof value === 'string' && value.trim() !== '') ||
+                          (typeof value === 'number') ||
+                          (typeof value === 'boolean')
+                        );
+                        console.log('🧾 Filter check for ' + key + ':', value, 'hasValue:', hasValue);
+                        return hasValue;
+                      })
+                      .map(([key, value]: [string, any]) => {
+                        let displayValue;
+                        if (typeof value === 'object' && value !== null) {
+                          displayValue = value.displayValue || value.value || String(value);
+                        } else {
+                          displayValue = String(value);
+                        }
+                        
+                        console.log('🧾 Displaying ' + key + ':', displayValue);
+                        return '• ' + formatKey(key) + ': ' + displayValue;
+                      })
+                      .join('<br/>');
+                    
+                    return specs ? '<div style="margin-top: 8px; font-size: 11px; color: #666;">' + specs + '</div>' : '';
+                  })()}
                   ${item.customerNotes ? `
                     <div style="margin-top: 8px; font-size: 11px; color: #666; font-style: italic;">
                       Notes: ${item.customerNotes}

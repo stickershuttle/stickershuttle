@@ -19,7 +19,7 @@ import { createPortal } from "react-dom";
 import { GET_USER_CREDIT_BALANCE } from "@/lib/credit-mutations";
 import { useQuery, useMutation } from "@apollo/client";
 import DiscountCodeInput from "@/components/DiscountCodeInput";
-import { UPDATE_USER_PROFILE_NAMES, CREATE_USER_PROFILE } from "@/lib/profile-mutations";
+import { UPDATE_USER_PROFILE_NAMES, CREATE_USER_PROFILE, GET_USER_PROFILE } from "@/lib/profile-mutations";
 import { TRACK_KLAVIYO_EVENT } from "@/lib/klaviyo-mutations";
 import { CREATE_SHARED_CART } from "@/lib/admin-mutations";
 
@@ -435,6 +435,17 @@ export default function CartPage() {
     variables: { userId: user?.id || '' },
     skip: !user?.id,
   });
+
+  // Query for user profile to get wholesale status
+  const { data: profileData } = useQuery(GET_USER_PROFILE, {
+    variables: { userId: user?.id || '' },
+    skip: !user?.id,
+  });
+
+  const userProfile = profileData?.getUserProfile;
+  const isWholesale = userProfile?.isWholesaleCustomer || false;
+  const creditRate = isWholesale ? 10 : 5;
+  const creditRateDecimal = isWholesale ? 0.10 : 0.05;
 
   // Mutations for user profile
   const [updateUserProfileNames] = useMutation(UPDATE_USER_PROFILE_NAMES);
@@ -2028,9 +2039,9 @@ export default function CartPage() {
                       <div className="flex justify-between text-green-400 text-sm font-medium mt-3 pt-3 border-t border-white/10">
                         <span className="flex items-center gap-2">
                           <span>💰</span>
-                          Store Credit Earned (5%)
+                          Store Credit Earned ({creditRate}%{isWholesale && ' Wholesale'})
                         </span>
-                        <span>+${(finalTotal * 0.05).toFixed(2)}</span>
+                        <span>+${(finalTotal * creditRateDecimal).toFixed(2)}</span>
                       </div>
                     )}
                   </div>
@@ -2038,7 +2049,7 @@ export default function CartPage() {
                   {/* Store Credit Section */}
                   {user && userCredits > 0 && (
                     <div 
-                      className="rounded-2xl overflow-hidden mb-4"
+                      className={`rounded-2xl overflow-hidden mb-4 ${appliedDiscount ? 'opacity-50 pointer-events-none' : ''}`}
                       style={{
                         background: userCredits >= 100 
                           ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.6) 0%, rgba(248, 113, 113, 0.4) 25%, rgba(254, 202, 202, 0.25) 50%, rgba(239, 68, 68, 0.15) 75%, rgba(254, 202, 202, 0.1) 100%)'
@@ -2051,6 +2062,13 @@ export default function CartPage() {
                       }}
                     >
                       <div className="px-6 py-4">
+                        {appliedDiscount && (
+                          <div className="mb-3 p-2 rounded-lg bg-red-500/20 border border-red-400/30">
+                            <p className="text-red-200 text-xs text-center">
+                              🚫 Cannot use store credit with discount codes. Remove "{appliedDiscount.code}" to use store credit.
+                            </p>
+                          </div>
+                        )}
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-3">
                             <span className="text-2xl">{userCredits >= 100 ? '🚨' : '🎉'}</span>
@@ -2059,7 +2077,7 @@ export default function CartPage() {
                                 ${userCredits.toFixed(2)} Store Credit
                               </h3>
                               <p className={`text-sm ${userCredits >= 100 ? 'text-red-300' : 'text-yellow-300'}`}>
-                                {userCredits >= 100 ? 'Limit reached ($100.00)' : 'Available to use'}
+                                {userCredits >= 100 ? 'Limit reached ($100.00)' : appliedDiscount ? 'Cannot use with discount' : 'Available to use'}
                               </p>
                               {userCredits >= 100 && (
                                 <p className="text-red-200 text-xs mt-1">
@@ -2074,23 +2092,29 @@ export default function CartPage() {
                             type="number"
                             min="0"
                             max={Math.min(safeParseFloat(userCredits, 0), safeParseFloat(afterDiscounts, 0))}
-                            value={safeParseFloat(creditToApply, 0)}
+                            value={appliedDiscount ? '' : (creditToApply > 0 ? safeParseFloat(creditToApply, 0) : '')}
                             onChange={(e) => {
-                              const value = safeParseFloat(e.target.value, 0);
-                              const safeUserCredits = safeParseFloat(userCredits, 0);
-                              const safeAfterDiscounts = safeParseFloat(afterDiscounts, 0);
-                              setCreditToApply(Math.min(value, safeUserCredits, safeAfterDiscounts));
+                              if (!appliedDiscount) {
+                                const value = safeParseFloat(e.target.value, 0);
+                                const safeUserCredits = safeParseFloat(userCredits, 0);
+                                const safeAfterDiscounts = safeParseFloat(afterDiscounts, 0);
+                                setCreditToApply(Math.min(value, safeUserCredits, safeAfterDiscounts));
+                              }
                             }}
-                            className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/50 focus:outline-none focus:border-yellow-400 focus:bg-white/10 transition-all store-credit-input"
-                            placeholder="Type amount..."
+                            disabled={appliedDiscount !== null}
+                            className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/50 focus:outline-none focus:border-yellow-400 focus:bg-white/10 transition-all store-credit-input disabled:opacity-50 disabled:cursor-not-allowed"
+                            placeholder={appliedDiscount ? "Disabled" : "Enter amount..."}
                           />
                           <button
                             onClick={() => {
-                              const safeUserCredits = safeParseFloat(userCredits, 0);
-                              const safeAfterDiscounts = safeParseFloat(afterDiscounts, 0);
-                              setCreditToApply(Math.min(safeUserCredits, safeAfterDiscounts));
+                              if (!appliedDiscount) {
+                                const safeUserCredits = safeParseFloat(userCredits, 0);
+                                const safeAfterDiscounts = safeParseFloat(afterDiscounts, 0);
+                                setCreditToApply(Math.min(safeUserCredits, safeAfterDiscounts));
+                              }
                             }}
-                            className="px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105"
+                            disabled={appliedDiscount !== null}
+                            className="px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                             style={{
                               background: userCredits >= 100 
                                 ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.5) 0%, rgba(248, 113, 113, 0.35) 50%, rgba(254, 202, 202, 0.2) 100%)'
@@ -2112,11 +2136,12 @@ export default function CartPage() {
                   {/* Discount Code Section */}
                   <div className="mb-6">
                     <DiscountCodeInput
-                      orderAmount={subtotal - reorderDiscount}
+                      orderAmount={subtotal}
                       onDiscountApplied={setAppliedDiscount}
                       currentAppliedDiscount={appliedDiscount}
                       hasReorderDiscount={hasReorderItems}
                       reorderDiscountAmount={reorderDiscount}
+                      hasStoreCredits={creditToApply > 0}
                       className="w-full"
                     />
                   </div>
@@ -2436,6 +2461,7 @@ export default function CartPage() {
                         className="cart-checkout-button-trigger"
                         creditsToApply={safeParseFloat(creditToApply, 0)}
                         discountCode={appliedDiscount?.code}
+                        discountAmount={appliedDiscount?.amount}
                         isBlindShipment={isBlindShipment}
                         guestCheckoutData={!user ? { firstName: guestCheckoutData.firstName, lastName: guestCheckoutData.lastName, email: guestCheckoutData.email } : undefined}
                         onCheckoutStart={() => {

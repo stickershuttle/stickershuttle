@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Upload, Instagram, Clock } from 'lucide-react';
 import { uploadToCloudinary, validateFile, CloudinaryUploadResult, UploadProgress, CalculatorMetadata } from '@/utils/cloudinary';
 import AIFileImage from './AIFileImage';
+import { getSupabase } from '@/lib/supabase';
 
 const VinylBannerCalculator: React.FC = () => {
   const [selectedSize, setSelectedSize] = useState<string>('3x5');
@@ -21,6 +22,10 @@ const VinylBannerCalculator: React.FC = () => {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadLater, setUploadLater] = useState<boolean>(false);
 
+  // User and profile states
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+
   const bannerSizes = [
     { value: '2x4', label: '2\' × 4\'', sqFt: 8, popular: false },
     { value: '3x5', label: '3\' × 5\'', sqFt: 15, popular: true },
@@ -32,6 +37,46 @@ const VinylBannerCalculator: React.FC = () => {
     { value: 'hemmed-grommeted', label: 'Hemmed & Grommeted (Standard)', priceMultiplier: 1.0 },
     { value: 'no-finishing', label: 'No Finishing (Raw Edges)', priceMultiplier: 0.85 }
   ];
+
+  // Fetch user and profile data
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const supabase = await getSupabase();
+        
+        // Get current user
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        setUser(currentUser);
+        
+        if (currentUser) {
+          // Get user profile
+          const { data: profileData } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .single();
+          
+          setProfile(profileData);
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
+    fetchUserData();
+  }, [])
+
+  // Calculate dynamic credit rate based on wholesale status
+  const getCreditRate = () => {
+    if (!profile) return 0.05; // Default 5% for non-logged in users
+    
+    // Check if user is wholesale and approved
+    if (profile.is_wholesale_customer && profile.wholesale_status === 'approved') {
+      return profile.wholesale_credit_rate || 0.10; // Use profile rate or default 10%
+    }
+    
+    return 0.05; // Default 5% for regular users
+  }
 
   const getTierPricing = (sqFt: number): number => {
     if (sqFt <= 10) return 4.50;
@@ -820,7 +865,7 @@ const VinylBannerCalculator: React.FC = () => {
                        }}>
                     <span className="flex items-center justify-start gap-1.5 text-yellow-200">
                       <i className="fas fa-coins text-yellow-300"></i>
-                      You'll earn ${(pricing.total * 0.05).toFixed(2)} in store credit on this order!
+                                              You'll earn ${(pricing.total * getCreditRate()).toFixed(2)} in store credit on this order!
                     </span>
                   </div>
                 </div>

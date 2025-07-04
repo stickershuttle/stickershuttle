@@ -138,7 +138,11 @@ export default function Home() {
           "https://api.stripe.com"
         ]}
       />
-      <Layout title="Sticker Shuttle - Custom Stickers & Vinyl Signs | Fast 24hr Printing">
+      <Layout 
+      title="Sticker Shuttle - Custom Stickers & Vinyl Signs | Fast 24hr Printing"
+      description="Custom stickers, vinyl banners, and decals with fast shipping. Professional quality printing for business, personal, and promotional use. Order now!"
+      ogImage="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751382016/StickerShuttle_Banner_Main_nlzoro.png"
+    >
         {/* Sitewide Alert Banner */}
         <SitewideAlert />
         

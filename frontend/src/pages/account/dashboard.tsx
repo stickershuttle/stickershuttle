@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { getSupabase } from '../../lib/supabase';
 import { useDashboardData } from '../../hooks/useDashboardData';
 import OrderInvoice from '../../components/OrderInvoice';
-import { useLazyQuery, useMutation, gql, useApolloClient } from '@apollo/client';
+import { useLazyQuery, useMutation, useQuery, gql, useApolloClient } from '@apollo/client';
 import { GET_ORDER_BY_ID } from '../../lib/order-mutations';
 import { 
   GET_USER_CREDIT_BALANCE, 
@@ -14,7 +14,8 @@ import {
   GET_USER_EARNED_CREDITS_BY_ORDER
 } from '../../lib/credit-mutations';
 import { SYNC_CUSTOMER_TO_KLAVIYO } from '../../lib/klaviyo-mutations';
-import { UPDATE_USER_PROFILE_PHOTO, UPDATE_USER_PROFILE_BANNER } from '../../lib/profile-mutations';
+import { UPDATE_USER_PROFILE_PHOTO, UPDATE_USER_PROFILE_BANNER, GET_USER_PROFILE } from '../../lib/profile-mutations';
+import { GET_WHOLESALE_CLIENTS, GET_CLIENT_ORDERS, CREATE_WHOLESALE_CLIENT, UPDATE_WHOLESALE_CLIENT, DELETE_WHOLESALE_CLIENT } from '../../lib/wholesale-client-mutations';
 import AIFileImage from '../../components/AIFileImage';
 import FileUploadToEmail from '../../components/FileUploadToEmail';
 
@@ -71,7 +72,7 @@ import {
 
 // Using real order data only - no more sample/demo data
 
-type DashboardView = 'default' | 'all-orders' | 'financial' | 'items-analysis' | 'design-vault' | 'proofs' | 'order-details' | 'settings' | 'support';
+type DashboardView = 'default' | 'all-orders' | 'financial' | 'items-analysis' | 'design-vault' | 'clients' | 'proofs' | 'order-details' | 'settings' | 'support';
 
 // Order type interface
 interface OrderItem {
@@ -181,6 +182,79 @@ function Dashboard() {
   
   // Klaviyo integration
   const [syncToKlaviyo] = useMutation(SYNC_CUSTOMER_TO_KLAVIYO);
+
+  // Wholesale client management queries and mutations
+  const [getWholesaleClients] = useLazyQuery(GET_WHOLESALE_CLIENTS, {
+    onCompleted: (data) => {
+      setWholesaleClients(data.getWholesaleClients || []);
+      setClientsLoading(false);
+    },
+    onError: (error) => {
+      console.error('Error fetching wholesale clients:', error);
+      setClientsLoading(false);
+    }
+  });
+
+  const [getClientOrders] = useLazyQuery(GET_CLIENT_ORDERS, {
+    onCompleted: (data) => {
+      if (data.getClientOrders && expandedClient) {
+        setClientOrders((prev: {[clientId: string]: any[]}) => ({
+          ...prev,
+          [expandedClient]: data.getClientOrders
+        }));
+      }
+    },
+    onError: (error) => {
+      console.error('Error fetching client orders:', error);
+    }
+  });
+
+  const [createWholesaleClient] = useMutation(CREATE_WHOLESALE_CLIENT, {
+    onCompleted: (data) => {
+      if (data.createWholesaleClient.success) {
+        setWholesaleClients((prev: any[]) => [...prev, data.createWholesaleClient.client]);
+        setShowCreateClientForm(false);
+        setNewClientData({
+          clientName: '',
+          clientEmail: '',
+          clientPhone: '',
+          clientCompany: '',
+          clientAddress: '',
+          notes: ''
+        });
+        setActionNotification({
+          message: 'Client created successfully!',
+          type: 'success'
+        });
+      }
+      setCreatingClient(false);
+    },
+    onError: (error) => {
+      console.error('Error creating client:', error);
+      setCreatingClient(false);
+      setActionNotification({
+        message: 'Failed to create client',
+        type: 'error'
+      });
+    }
+  });
+
+  const [updateWholesaleClient] = useMutation(UPDATE_WHOLESALE_CLIENT);
+  const [deleteWholesaleClient] = useMutation(DELETE_WHOLESALE_CLIENT);
+
+  // Fetch user profile to check wholesale status
+  const { data: profileData } = useQuery(GET_USER_PROFILE, {
+    variables: { userId: (user as any)?.id },
+    skip: !(user as any)?.id,
+    onCompleted: (data: any) => {
+      console.log('👤 Profile data loaded:', data);
+      if (data?.getUserProfile) {
+        console.log('👤 Setting profile:', data.getUserProfile);
+        console.log('👤 Wholesale status:', data.getUserProfile.wholesaleStatus);
+        setProfile(data.getUserProfile);
+      }
+    }
+  });
 
   // File upload state
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -313,6 +387,22 @@ function Dashboard() {
   const [showCreditNotification, setShowCreditNotification] = useState(false);
   const [showAnimatedCounter, setShowAnimatedCounter] = useState(false);
   const [expandedPillButton, setExpandedPillButton] = useState<string | null>(null);
+
+  // Wholesale client management state
+  const [wholesaleClients, setWholesaleClients] = useState<any[]>([]);
+  const [clientsLoading, setClientsLoading] = useState(false);
+  const [expandedClient, setExpandedClient] = useState<string | null>(null);
+  const [clientOrders, setClientOrders] = useState<{[clientId: string]: any[]}>({});
+  const [showCreateClientForm, setShowCreateClientForm] = useState(false);
+  const [newClientData, setNewClientData] = useState({
+    clientName: '',
+    clientEmail: '',
+    clientPhone: '',
+    clientCompany: '',
+    clientAddress: '',
+    notes: ''
+  });
+  const [creatingClient, setCreatingClient] = useState(false);
 
   // Add invoice data state and hook at top level
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
@@ -488,6 +578,69 @@ function Dashboard() {
         border: 1px solid rgba(255, 255, 255, 0.1) !important;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
         backdrop-filter: blur(12px) !important;
+      }
+
+      /* Mobile optimization */
+      @media (max-width: 768px) {
+        .mobile-edge-to-edge {
+          margin-left: calc(-50vw + 50%);
+          margin-right: calc(-50vw + 50%);
+          width: 100vw;
+          max-width: none;
+        }
+        
+        .mobile-container {
+          padding-left: 1rem !important;
+          padding-right: 1rem !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+        
+        .mobile-content {
+          padding-left: 0.75rem !important;
+          padding-right: 0.75rem !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+        
+        .mobile-centered {
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: center !important;
+          width: 100% !important;
+          margin: 0 auto !important;
+        }
+        
+        .mobile-full-width {
+          width: 100% !important;
+          max-width: 100% !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
+        }
+        
+        .dashboard-mobile-layout {
+          padding-left: 1rem !important;
+          padding-right: 1rem !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+        
+        /* Force mobile order cards to be centered */
+        .mobile-order-card {
+          margin-left: auto !important;
+          margin-right: auto !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          padding-left: 0.75rem !important;
+          padding-right: 0.75rem !important;
+        }
       }
     `;
     document.head.appendChild(style);
@@ -2417,12 +2570,16 @@ function Dashboard() {
     }
   };
 
+  // Add calculator selections popup state
+  const [showCalculatorSelectionsPopup, setShowCalculatorSelectionsPopup] = useState(false);
+  const [selectedOrderForPopup, setSelectedOrderForPopup] = useState<any>(null);
+
   const handleViewOrderDetails = (order: any) => {
-    console.log('📋 Opening details view for order:', order.id);
+    console.log('📋 Opening calculator selections popup for order:', order.id);
     
-    // Navigate to the order details page which will redirect back with proper URL structure
-    const orderNumber = order.orderNumber || order.id;
-    router.push(`/account/order/${orderNumber}`);
+    // Set the selected order for the popup
+    setSelectedOrderForPopup(order);
+    setShowCalculatorSelectionsPopup(true);
   };
 
   const handleProofAction = async (action: 'approve' | 'request_changes', orderId: string, proofId: string) => {
@@ -3108,6 +3265,8 @@ function Dashboard() {
         return renderItemsAnalysisView();
       case 'design-vault':
         return renderDesignVaultView();
+      case 'clients':
+        return renderClientsView();
       case 'proofs':
         return renderProofsView();
       case 'order-details':
@@ -3121,12 +3280,359 @@ function Dashboard() {
     }
   };
 
+    // Load wholesale clients when needed (moved to top level to follow Rules of Hooks)
+  React.useEffect(() => {
+    if (currentView === 'clients' && (user as any)?.id && (profile?.wholesale_status === 'approved' || profile?.wholesaleStatus === 'approved' || profile?.isWholesaleCustomer)) {
+      setClientsLoading(true);
+      getWholesaleClients({ variables: { userId: (user as any).id } });
+    }
+  }, [currentView, (user as any)?.id, profile?.wholesale_status, profile?.wholesaleStatus, profile?.isWholesaleCustomer, getWholesaleClients]);
+
+  const renderClientsView = () => {
+
+    const handleCreateClient = async () => {
+      if (!newClientData.clientName.trim()) {
+        setActionNotification({
+          message: 'Client name is required',
+          type: 'error'
+        });
+        return;
+      }
+
+      setCreatingClient(true);
+      try {
+        await createWholesaleClient({
+          variables: {
+            input: newClientData
+          }
+        });
+      } catch (error) {
+        console.error('Error creating client:', error);
+      }
+    };
+
+    const handleToggleClientOrders = (clientId: string) => {
+      if (expandedClient === clientId) {
+        setExpandedClient(null);
+      } else {
+        setExpandedClient(clientId);
+        if (!clientOrders[clientId]) {
+          getClientOrders({ variables: { clientId } });
+        }
+      }
+    };
+
+    return (
+      <div className="space-y-6 mobile-content">
+        <div className="flex items-center justify-between mobile-container">
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#22c55e' }}>
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              <path d="M16 12c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 1c-1.33 0-4 .67-4 2v1h8v-1c0-1.33-2.67-2-4-2z"/>
+            </svg>
+            Client Management
+          </h2>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => console.log('🔍 DEBUG - Current profile data:', profile)}
+              className="text-yellow-400 hover:text-yellow-300 font-medium transition-colors duration-200 text-xs px-2 py-1 border border-yellow-400 rounded"
+            >
+              Debug Profile
+            </button>
+            <button 
+              onClick={() => setCurrentView('default')}
+              className="text-purple-400 hover:text-purple-300 font-medium transition-colors duration-200 text-sm"
+            >
+              ← Back to Dashboard
+            </button>
+          </div>
+        </div>
+
+        {/* Client Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mobile-container">
+          <div className="container-style p-6">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-green-400 mb-2">
+                {wholesaleClients.length}
+              </div>
+              <div className="text-sm text-gray-300">Total Clients</div>
+            </div>
+          </div>
+          
+          <div className="container-style p-6">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-blue-400 mb-2">
+                {wholesaleClients.reduce((sum, client) => sum + client.orderCount, 0)}
+              </div>
+              <div className="text-sm text-gray-300">Total Orders</div>
+            </div>
+          </div>
+          
+          <div className="container-style p-6">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-purple-400 mb-2">
+                ${wholesaleClients.reduce((sum, client) => sum + client.totalSpent, 0).toFixed(2)}
+              </div>
+              <div className="text-sm text-gray-300">Total Revenue</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Add Client Button */}
+        <div className="mobile-container">
+          <button
+            onClick={() => setShowCreateClientForm(true)}
+            className="w-full md:w-auto px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 flex items-center justify-center gap-2"
+            style={{
+              background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+              backdropFilter: 'blur(25px) saturate(180%)',
+              border: '1px solid rgba(34, 197, 94, 0.4)',
+              boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+            }}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Add New Client
+          </button>
+        </div>
+
+        {/* Create Client Form */}
+        {showCreateClientForm && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="container-style max-w-md w-full p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-white">Add New Client</h3>
+                                 <button
+                   onClick={() => setShowCreateClientForm(false)}
+                   className="text-gray-400 hover:text-white"
+                   title="Close form"
+                   aria-label="Close client form"
+                 >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Client Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={newClientData.clientName}
+                    onChange={(e) => setNewClientData(prev => ({ ...prev, clientName: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-400"
+                    placeholder="Enter client name"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={newClientData.clientEmail}
+                    onChange={(e) => setNewClientData(prev => ({ ...prev, clientEmail: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-400"
+                    placeholder="client@company.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={newClientData.clientPhone}
+                    onChange={(e) => setNewClientData(prev => ({ ...prev, clientPhone: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-400"
+                    placeholder="(555) 123-4567"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Company
+                  </label>
+                  <input
+                    type="text"
+                    value={newClientData.clientCompany}
+                    onChange={(e) => setNewClientData(prev => ({ ...prev, clientCompany: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-400"
+                    placeholder="Company name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Notes
+                  </label>
+                  <textarea
+                    value={newClientData.notes}
+                    onChange={(e) => setNewClientData(prev => ({ ...prev, notes: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-400 h-20 resize-none"
+                    placeholder="Additional notes about this client"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowCreateClientForm(false)}
+                  className="flex-1 px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateClient}
+                  disabled={creatingClient || !newClientData.clientName.trim()}
+                  className="flex-1 px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(34, 197, 94, 0.4)',
+                    boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                  }}
+                >
+                  {creatingClient ? 'Creating...' : 'Create Client'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Clients List */}
+        <div className="mobile-container mobile-full-width">
+          {clientsLoading ? (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-lg mb-2">Loading clients...</div>
+            </div>
+          ) : wholesaleClients.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-lg mb-2">No clients yet</div>
+              <p className="text-gray-500 text-sm">Add your first client to get started with order management.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {wholesaleClients.map((client) => (
+                <div
+                  key={client.id}
+                  className="container-style p-6 space-y-4"
+                >
+                  {/* Client Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-white">{client.clientName}</h3>
+                      {client.clientCompany && (
+                        <p className="text-sm text-gray-300">{client.clientCompany}</p>
+                      )}
+                      <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
+                        {client.clientEmail && <span>{client.clientEmail}</span>}
+                        {client.clientPhone && <span>{client.clientPhone}</span>}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-gray-300">
+                        {client.orderCount} orders • ${client.totalSpent.toFixed(2)}
+                      </div>
+                      <button
+                        onClick={() => handleToggleClientOrders(client.id)}
+                        className="mt-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                          backdropFilter: 'blur(25px) saturate(180%)',
+                          border: '1px solid rgba(59, 130, 246, 0.4)',
+                          boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                          color: 'white'
+                        }}
+                      >
+                        {expandedClient === client.id ? 'Hide Orders' : 'View Orders'}
+                        <svg 
+                          className={`w-4 h-4 transition-transform duration-200 ${expandedClient === client.id ? 'rotate-180' : ''}`}
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Client Orders */}
+                  {expandedClient === client.id && (
+                    <div className="border-t border-white/10 pt-4">
+                      {clientOrders[client.id] ? (
+                        clientOrders[client.id].length === 0 ? (
+                          <div className="text-center py-8">
+                            <div className="text-gray-400">No orders yet for this client</div>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <h4 className="font-semibold text-white flex items-center gap-2">
+                              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M6 2C4.9 2 4 2.9 4 4v16c0 .6.4 1 1 1 .2 0 .5-.1.7-.3L9 18l3.3 2.7c.4.4 1 .4 1.4 0L17 18l3.3 2.7c.2.2.5.3.7.3.6 0 1-.4 1-1V4c0-1.1-.9-2-2-2H6zm2 5h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h4c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1z"/>
+                              </svg>
+                              Orders ({clientOrders[client.id].length})
+                            </h4>
+                            {clientOrders[client.id].map((order) => (
+                              <div
+                                key={order.id}
+                                className="bg-white/5 rounded-lg p-4 border border-white/10"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="font-medium text-white">
+                                      Order #{order.orderNumber}
+                                    </div>
+                                    <div className="text-sm text-gray-300">
+                                      {new Date(order.orderCreatedAt).toLocaleDateString()}
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="font-semibold text-white">
+                                      ${order.totalPrice.toFixed(2)}
+                                    </div>
+                                    <div className="text-sm text-gray-400">
+                                      {order.items.length} items
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="mt-2 text-sm text-gray-300">
+                                  Status: {order.orderStatus}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      ) : (
+                        <div className="text-center py-8">
+                          <div className="text-gray-400">Loading orders...</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderAllOrdersView = () => {
     // Show all orders in My Orders view
     
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-6 mobile-content">
+        <div className="flex items-center justify-between mobile-container">
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
             <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
               <path d="M6 2C4.9 2 4 2.9 4 4v16c0 .6.4 1 1 1 .2 0 .5-.1.7-.3L9 18l3.3 2.7c.4.4 1 .4 1.4 0L17 18l3.3 2.7c.2.2.5.3.7.3.6 0 1-.4 1-1V4c0-1.1-.9-2-2-2H6zm2 5h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h8c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1zm0 3h4c.6 0 1 .4 1 1s-.4 1-1 1H8c-.6 0-1-.4-1-1s.4-1 1-1z"/>
@@ -3142,7 +3648,7 @@ function Dashboard() {
         </div>
         
         {/* Order Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mobile-container">
           <div className="container-style p-6">
             <div className="text-center">
               <div className="text-3xl font-bold text-blue-400 mb-2">
@@ -3173,7 +3679,7 @@ function Dashboard() {
         
         {/* Orders List - Matching Active Orders Layout */}
         <div 
-          className="rounded-2xl overflow-hidden"
+          className="rounded-2xl overflow-hidden mobile-container mobile-full-width"
           style={{
             background: 'rgba(255, 255, 255, 0.05)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -3182,7 +3688,7 @@ function Dashboard() {
           }}
         >
           {/* Table Header - Desktop Only */}
-          <div className="hidden md:block px-6 py-3 border-b border-white/10 bg-white/5">
+          <div className="hidden md:block px-3 md:px-6 py-3 border-b border-white/10 bg-white/5">
             <div className="grid grid-cols-16 gap-4 text-xs font-semibold text-gray-300 uppercase tracking-wider">
               <div className="col-span-3">Preview</div>
               <div className="col-span-2">ORDER #</div>
@@ -3204,7 +3710,7 @@ function Dashboard() {
               
               return (
                 <div key={order.id}>
-                  <div className="px-6 py-4 hover:bg-white/5 transition-colors duration-200">
+                  <div className="px-3 md:px-6 py-4 hover:bg-white/5 transition-colors duration-200">
                     {/* Desktop Row Layout */}
                     <div className="hidden md:grid grid-cols-16 gap-4 items-center">
                       
@@ -3408,8 +3914,8 @@ function Dashboard() {
                     </div>
 
                     {/* Mobile Card Layout */}
-                    <div className="md:hidden">
-                      <div className="bg-white/5 rounded-lg p-4 border border-white/10 space-y-4">
+                    <div className="md:hidden mobile-order-card">
+                      <div className="bg-white/5 rounded-lg p-4 border border-white/10 space-y-4 w-full max-w-full mx-auto mobile-centered">
                         {/* Header Row */}
                         <div className="flex items-center justify-between">
                           <div className="font-semibold text-white text-base">
@@ -4281,6 +4787,7 @@ function Dashboard() {
       design: string;
       timesOrdered: number;
       lastOrderId: string;
+      lastOrderDate?: string;
     }> = [];
     orders.forEach(order => {
       order.items.forEach(item => {
@@ -4296,7 +4803,8 @@ function Dashboard() {
             design: item.design || '',
             timesOrdered: orders.reduce((count, o) => 
               count + o.items.filter(i => i.name === item.name).reduce((sum, i) => sum + i.quantity, 0), 0),
-            lastOrderId: order.id
+            lastOrderId: order.id,
+            lastOrderDate: order.date
           });
         }
       });
@@ -4356,7 +4864,13 @@ function Dashboard() {
                   />
                 </div>
                 <h3 className="font-semibold text-white mb-2">{design.name}</h3>
-                <p className="text-xs text-gray-400 mb-4">{design.design} • Ordered {design.timesOrdered} times</p>
+                <p className="text-xs text-gray-400 mb-4">
+                  {design.design} • Last ordered on {design.lastOrderDate ? new Date(design.lastOrderDate).toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric',
+                    year: 'numeric'
+                  }) : 'Unknown'}
+                </p>
                 
                 <div className="space-y-2">
                   <button className="w-full py-2 px-3 rounded-lg text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
@@ -6248,119 +6762,6 @@ function Dashboard() {
                         </div>
                       )}
 
-                      {/* Order Timeline - Moved inside item */}
-                      <div className="bg-black/20 rounded-lg p-4 border border-white/5">
-                        <h5 className="text-sm font-semibold text-gray-400 mb-3">Order Timeline</h5>
-                        
-                        <div className="relative">
-                          {/* Timeline Line */}
-                          <div className="absolute left-1 top-2 bottom-2 w-0.5 bg-white/10"></div>
-                          
-                          <div className="space-y-3">
-                            {/* Order Placed */}
-                            <div className="flex items-start gap-3">
-                              <div className="w-2 h-2 rounded-full bg-green-400 mt-1.5 flex-shrink-0 relative z-10"></div>
-                              <div className="flex-1">
-                                <p className="text-white font-medium text-sm">Order Placed</p>
-                                <p className="text-gray-400 text-xs">
-                                  {new Date(selectedOrderForInvoice.orderCreatedAt || selectedOrderForInvoice.date).toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Proof Activities */}
-                            {selectedOrderForInvoice.proofs && selectedOrderForInvoice.proofs.length > 0 && (
-                              <>
-                                <div className="flex items-start gap-3">
-                                  <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 flex-shrink-0 relative z-10"></div>
-                                  <div className="flex-1">
-                                    <p className="text-white font-medium text-sm">Design proofs created</p>
-                                    <p className="text-gray-400 text-xs">Your custom design has been prepared for review</p>
-                                  </div>
-                                </div>
-                                
-                                {selectedOrderForInvoice.proof_sent_at && (
-                                  <div className="flex items-start gap-3">
-                                    <div className="w-2 h-2 rounded-full bg-purple-400 mt-1.5 flex-shrink-0 relative z-10"></div>
-                                    <div className="flex-1">
-                                      <p className="text-white font-medium text-sm">Proofs sent for approval</p>
-                                      <p className="text-gray-400 text-xs">
-                                        {new Date(selectedOrderForInvoice.proof_sent_at).toLocaleDateString('en-US', {
-                                          month: 'short',
-                                          day: 'numeric',
-                                          hour: '2-digit',
-                                          minute: '2-digit'
-                                        })}
-                                      </p>
-                                    </div>
-                                  </div>
-                                )}
-                              </>
-                            )}
-
-                            {/* Production Status */}
-                            {(selectedOrderForInvoice.orderStatus === 'in production' || selectedOrderForInvoice.orderStatus === 'processing') && (
-                              <div className="flex items-start gap-3">
-                                <div className="w-2 h-2 rounded-full bg-yellow-400 mt-1.5 flex-shrink-0 relative z-10"></div>
-                                <div className="flex-1">
-                                  <p className="text-white font-medium text-sm">In production</p>
-                                  <p className="text-gray-400 text-xs">Your order is being manufactured</p>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Shipped */}
-                            {selectedOrderForInvoice.trackingNumber && (
-                              <div className="flex items-start gap-3">
-                                <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 flex-shrink-0 relative z-10"></div>
-                                <div className="flex-1">
-                                  <p className="text-white font-medium text-sm">Shipping label created</p>
-                                  <p className="text-gray-400 text-xs">Tracking: {selectedOrderForInvoice.trackingNumber}</p>
-                                  <p className="text-gray-400 text-xs">Ready for carrier pickup</p>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* In Transit */}
-                            {(selectedOrderForInvoice.orderStatus === 'in_transit' || selectedOrderForInvoice.orderStatus === 'shipped') && selectedOrderForInvoice.trackingNumber && (
-                              <div className="flex items-start gap-3">
-                                <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 flex-shrink-0 relative z-10"></div>
-                                <div className="flex-1">
-                                  <p className="text-white font-medium text-sm">Package in transit</p>
-                                  <p className="text-gray-400 text-xs">Your package is on its way to you</p>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Out for Delivery */}
-                            {(selectedOrderForInvoice.orderStatus === 'out_for_delivery' || selectedOrderForInvoice.orderStatus === 'out for delivery') && (
-                              <div className="flex items-start gap-3">
-                                <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse mt-1.5 flex-shrink-0 relative z-10"></div>
-                                <div className="flex-1">
-                                  <p className="text-white font-medium text-sm">Out for delivery</p>
-                                  <p className="text-gray-400 text-xs">Your package will be delivered today</p>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Delivered */}
-                            {selectedOrderForInvoice.orderStatus === 'delivered' && (
-                              <div className="flex items-start gap-3">
-                                <div className="w-2 h-2 rounded-full bg-green-400 mt-1.5 flex-shrink-0 relative z-10"></div>
-                                <div className="flex-1">
-                                  <p className="text-white font-medium text-sm">Order delivered</p>
-                                  <p className="text-gray-400 text-xs">Your order has been successfully delivered</p>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -7346,6 +7747,36 @@ function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Wholesale Approval Message */}
+      {profile?.wholesale_status === 'approved' && (
+        <div className="mb-6 p-4 rounded-xl bg-blue-500/20 border-2 border-blue-400/50 animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-blue-300 font-bold text-lg">🎉 Wholesale Account Approved!</h3>
+              <p className="text-blue-200 text-sm">
+                Congratulations! Your wholesale account has been approved. You now earn 10% store credit on all orders.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                // Update user profile to mark they've seen the message
+                setProfile((prev: any) => ({ ...prev, wholesale_status: 'approved_seen' }));
+              }}
+              className="text-blue-300 hover:text-blue-100 transition-colors"
+              title="Close notification"
+              aria-label="Close wholesale approval notification"
+            >
+              <i className="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Animated Credit Counter */}
       {showAnimatedCounter && creditNotifications.length > 0 && (
@@ -7910,8 +8341,23 @@ function Dashboard() {
                       
                       {/* Order Column */}
                       <div className="col-span-2">
-                        <div className="font-semibold text-white text-sm">
-                          {getOrderDisplayNumber(order)}
+                        <div className="flex flex-col gap-1">
+                          <div className="font-semibold text-white text-sm">
+                            {getOrderDisplayNumber(order)}
+                          </div>
+                          {/* Desktop Shipping Urgency Indicators */}
+                          <div className="flex gap-1">
+                            {order._fullOrderData?.is_express_shipping && (
+                              <span className="px-2 py-0.5 text-xs font-bold bg-red-500/20 text-red-300 rounded-full border border-red-400/30 animate-pulse">
+                                🚀 EXPRESS
+                              </span>
+                            )}
+                            {order._fullOrderData?.is_rush_order && (
+                              <span className="px-2 py-0.5 text-xs font-bold bg-orange-500/20 text-orange-300 rounded-full border border-orange-400/30">
+                                ⚡ RUSH
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -8037,8 +8483,23 @@ function Dashboard() {
                       <div className="bg-white/5 rounded-lg p-4 border border-white/10 space-y-4">
                         {/* Header Row */}
                         <div className="flex items-center justify-between">
-                          <div className="font-semibold text-white text-base">
-                            {getOrderDisplayNumber(order)}
+                          <div className="flex flex-col gap-1">
+                            <div className="font-semibold text-white text-base">
+                              {getOrderDisplayNumber(order)}
+                            </div>
+                            {/* Mobile Shipping Urgency Indicators */}
+                            <div className="flex gap-1">
+                              {order._fullOrderData?.is_express_shipping && (
+                                <span className="px-2 py-0.5 text-xs font-bold bg-red-500/20 text-red-300 rounded-full border border-red-400/30 animate-pulse">
+                                  🚀 EXPRESS
+                                </span>
+                              )}
+                              {order._fullOrderData?.is_rush_order && (
+                                <span className="px-2 py-0.5 text-xs font-bold bg-orange-500/20 text-orange-300 rounded-full border border-orange-400/30">
+                                  ⚡ RUSH
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <div className="text-sm font-semibold text-white">
                             ${order.total}
@@ -8559,7 +9020,7 @@ function Dashboard() {
           )}
           {/* Header Section */}
           <div className="pt-6 pb-6">
-            <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
+            <div className="w-full px-4 sm:px-6 md:w-[90%] xl:w-[95%] 2xl:w-[75%] md:mx-auto">
               {/* Header - Banner with Profile */}
               <div 
                 className={`relative rounded-xl p-4 md:p-6 shadow-xl mb-6 overflow-hidden cursor-pointer group ${
@@ -8923,36 +9384,64 @@ function Dashboard() {
                 </div>
               </div>
 
-              {/* Proof Alert Banner */}
-              {orders.filter(order => order.status === 'Proof Review Needed' || order.status === 'Reviewing Changes').length > 0 && (
-                <div 
-                  className="rounded-xl p-4 shadow-xl mb-6 cursor-pointer transition-all duration-300 hover:scale-[1.02]"
-                  style={{
-                    backgroundColor: 'rgba(249, 115, 22, 0.1)',
-                    backdropFilter: 'blur(20px)',
-                    border: '2px solid rgba(249, 115, 22, 0.3)',
-                    boxShadow: '0 0 12px rgba(249, 115, 22, 0.1)'
-                  }}
-                  onClick={() => setCurrentView('proofs')}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-3 h-3 bg-orange-500 rounded-full animate-pulse"></div>
-                          <div>
-                        <h3 className="text-orange-300 font-semibold text-sm">
-                          ⚠️ Alert! You have {orders.filter(order => order.status === 'Proof Review Needed').length} proof(s) to approve
-                        </h3>
-                        <p className="text-orange-200 text-xs">
-                          Click here to approve or request changes
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-orange-300 text-xl">
-                      →
-                    </div>
-                  </div>
-                </div>
-              )}
+                    {/* Proof Alert Banner */}
+      {orders.filter(order => order.status === 'Proof Review Needed' || order.status === 'Reviewing Changes').length > 0 && (
+        <div 
+          className="rounded-xl p-4 shadow-xl mb-6 cursor-pointer transition-all duration-300 hover:scale-[1.02]"
+          style={{
+            backgroundColor: 'rgba(249, 115, 22, 0.1)',
+            backdropFilter: 'blur(20px)',
+            border: '2px solid rgba(249, 115, 22, 0.3)',
+            boxShadow: '0 0 12px rgba(249, 115, 22, 0.1)'
+          }}
+          onClick={() => setCurrentView('proofs')}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-3 h-3 bg-orange-500 rounded-full animate-pulse"></div>
+                  <div>
+                <h3 className="text-orange-300 font-semibold text-sm">
+                  ⚠️ Alert! You have {orders.filter(order => order.status === 'Proof Review Needed').length} proof(s) to approve
+                </h3>
+                <p className="text-orange-200 text-xs">
+                  Click here to approve or request changes
+                </p>
+              </div>
+            </div>
+            <div className="text-orange-300 text-xl">
+              →
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Express Shipping Alert Banner */}
+      {orders.filter(order => 
+        (order.status !== 'Delivered' && order.status !== 'Cancelled') &&
+        (order._fullOrderData?.is_express_shipping || order._fullOrderData?.is_rush_order)
+      ).length > 0 && (
+        <div 
+          className="rounded-xl p-4 shadow-xl mb-6 transition-all duration-300"
+          style={{
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            backdropFilter: 'blur(20px)',
+            border: '2px solid rgba(239, 68, 68, 0.3)',
+            boxShadow: '0 0 12px rgba(239, 68, 68, 0.1)'
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+            <div>
+              <h3 className="text-red-300 font-semibold text-sm">
+                🚀 Express Processing Alert!
+              </h3>
+              <p className="text-red-200 text-xs">
+                We're aware you've paid for expedited shipping and are processing your order with urgency.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
 
 
@@ -9041,7 +9530,8 @@ function Dashboard() {
                       boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
                       backdropFilter: 'blur(12px)',
                       WebkitBackdropFilter: 'blur(12px)' as any
-                    }}>
+                    }}
+                  >
                     <div className="flex items-center gap-2 lg:gap-3">
                       <div className="p-1.5 lg:p-2 rounded-lg bg-transparent">
                         <svg className="w-5 lg:w-7 h-5 lg:h-7" fill="currentColor" viewBox="0 0 24 24"
@@ -9075,7 +9565,8 @@ function Dashboard() {
                       boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
                       backdropFilter: 'blur(12px)',
                       WebkitBackdropFilter: 'blur(12px)' as any
-                    }}>
+                    }}
+                  >
                     <div className="flex items-center gap-2 lg:gap-3">
                       <div className="p-1.5 lg:p-2 rounded-lg bg-transparent">
                         <svg className="w-5 lg:w-7 h-5 lg:h-7" fill="currentColor" viewBox="0 0 24 24"
@@ -9125,6 +9616,51 @@ function Dashboard() {
                     </div>
                   </button>
 
+                  {/* Clients - Only show for approved wholesale customers */}
+                  {(() => {
+                                         console.log('🔍 Checking wholesale status:', { 
+                       profile, 
+                       wholesale_status: profile?.wholesale_status,
+                       wholesaleStatus: profile?.wholesaleStatus,
+                       isWholesaleCustomer: profile?.isWholesaleCustomer,
+                       isApproved: profile?.wholesale_status === 'approved' || profile?.wholesaleStatus === 'approved' || profile?.isWholesaleCustomer
+                     });
+                     return (profile?.wholesale_status === 'approved' || profile?.wholesaleStatus === 'approved' || profile?.isWholesaleCustomer);
+                  })() && (
+                    <button 
+                      onClick={() => updateCurrentView('clients')}
+                      className={`block p-3 lg:p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden ${
+                        currentView === 'clients' ? 'rounded-2xl' : 'container-style'
+                      }`}
+                      style={currentView === 'clients' ? {
+                        background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        WebkitBackdropFilter: 'blur(25px) saturate(180%)' as any,
+                        border: '1px solid rgba(34, 197, 94, 0.4)',
+                        boxShadow: '0 4px 16px rgba(34, 197, 94, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                      } : {
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)',
+                        WebkitBackdropFilter: 'blur(12px)' as any
+                      }}
+                    >
+                      <div className="flex items-center gap-2 lg:gap-3">
+                        <div className="p-1.5 lg:p-2 rounded-lg bg-transparent">
+                          <svg className="w-5 lg:w-7 h-5 lg:h-7" fill="currentColor" viewBox="0 0 24 24"
+                               style={{ color: '#22c55e', filter: 'drop-shadow(0 4px 12px rgba(34, 197, 94, 0.15))' }}>
+                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                            <path d="M16 12c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 1c-1.33 0-4 .67-4 2v1h8v-1c0-1.33-2.67-2-4-2z"/>
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-semibold text-white text-xs lg:text-sm truncate">Clients</h4>
+                          <p className="text-xs text-gray-300">{wholesaleClients.length} clients</p>
+                        </div>
+                      </div>
+                    </button>
+                  )}
 
                           </div>
 
@@ -9260,10 +9796,10 @@ function Dashboard() {
 
                 {/* Main Content Area - Full width on mobile */}
                 <div className="col-span-1 lg:col-span-3 space-y-6">
-                  {renderMainContent()}
+                  <div className="w-full mobile-full-width dashboard-mobile-layout">
+                    {renderMainContent()}
+                  </div>
                 </div>
-
-
               </div>
             </div>
           </div>
@@ -9273,7 +9809,7 @@ function Dashboard() {
   </Layout>
 
   {/* Mobile/Tablet Dashboard Navigation Pill */}
-  <div className="lg:hidden fixed bottom-6 left-1/2 transform -translate-x-1/2 z-30">
+  <div className="lg:hidden fixed bottom-6 left-1/2 transform -translate-x-1/2 z-30 mobile-centered">
     <div 
       className="rounded-full px-2 py-2 flex items-center gap-1"
       style={{
@@ -9399,6 +9935,37 @@ function Dashboard() {
           </span>
         )}
       </button>
+
+      {/* Clients - Only show for approved wholesale customers */}
+      {(profile?.wholesale_status === 'approved' || profile?.wholesaleStatus === 'approved' || profile?.isWholesaleCustomer) && (
+        <button
+          onClick={() => {
+            updateCurrentView('clients');
+            setExpandedPillButton(expandedPillButton === 'clients' ? null : 'clients');
+          }}
+          className={`relative flex items-center p-2.5 rounded-full transition-all duration-300 ${
+            currentView === 'clients' 
+              ? 'text-green-300' 
+              : 'text-white hover:text-gray-200'
+          } ${expandedPillButton === 'clients' ? 'gap-2 pr-5' : ''}`}
+        >
+          {currentView === 'clients' && (
+            <div className="absolute inset-px rounded-full" style={{
+              background: 'rgba(34, 197, 94, 0.2)',
+              boxShadow: '0 0 12px rgba(34, 197, 94, 0.5)'
+            }}></div>
+          )}
+          <svg className="w-5 h-5 relative z-10 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            <path d="M16 12c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 1c-1.33 0-4 .67-4 2v1h8v-1c0-1.33-2.67-2-4-2z"/>
+          </svg>
+          {expandedPillButton === 'clients' && (
+            <span className="text-xs font-medium whitespace-nowrap relative z-10 transition-all duration-300">
+              Clients
+            </span>
+          )}
+        </button>
+      )}
       
       {/* Proofs */}
       <button
@@ -9485,6 +10052,466 @@ function Dashboard() {
        </button>
     </div>
   </div>
+
+  {/* Calculator Selections Popup Modal */}
+  {showCalculatorSelectionsPopup && selectedOrderForPopup && (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="max-w-4xl w-full max-h-[90vh] overflow-y-auto rounded-xl shadow-2xl"
+           style={{
+             backgroundColor: 'rgba(3, 1, 64, 0.95)',
+             backdropFilter: 'blur(20px)',
+             border: '1px solid rgba(255, 255, 255, 0.15)'
+           }}>
+        
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-white/10">
+          <div>
+            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+              <svg className="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              Order Details
+            </h2>
+            <p className="text-gray-300 text-sm mt-1">
+              Order #{selectedOrderForPopup.orderNumber || selectedOrderForPopup.id} • ${selectedOrderForPopup.total.toFixed(2)}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowCalculatorSelectionsPopup(false)}
+            className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+            title="Close details"
+          >
+            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-6">
+          {/* Order Info */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
+              <h4 className="text-purple-300 text-sm font-medium mb-1">Order Date</h4>
+              <p className="text-white">
+                {new Date(selectedOrderForPopup.date).toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </p>
+            </div>
+            <div className="p-4 rounded-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
+              <h4 className="text-green-300 text-sm font-medium mb-1">Status</h4>
+              <p className="text-white">{selectedOrderForPopup.status}</p>
+            </div>
+            <div className="p-4 rounded-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
+              <h4 className="text-blue-300 text-sm font-medium mb-1">Total Items</h4>
+              <p className="text-white">{selectedOrderForPopup.items.length}</p>
+            </div>
+          </div>
+
+          {/* Items with Calculator Selections */}
+          <div className="space-y-6">
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <svg className="w-5 h-5 text-orange-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+              </svg>
+              Product Specifications
+            </h3>
+            
+                         {selectedOrderForPopup.items.map((item: any, index: number) => {
+               const itemData = selectedOrderForPopup._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+               const calculatorSelections = itemData.calculatorSelections || itemData.calculator_selections || {};
+               const customFiles = itemData.customFiles || itemData.custom_files || item.customFiles;
+               const firstImage = Array.isArray(customFiles) && customFiles.length > 0 ? customFiles[0] : null;
+               const orderNote = selectedOrderForPopup.orderNote || '';
+               
+               // Debug logging to see what data we have
+               console.log('🔍 Popup Debug - Item Data:', {
+                 itemId: item.id,
+                 calculatorSelections,
+                 hasWhiteOption: !!calculatorSelections.whiteOption,
+                 whiteOptionValue: calculatorSelections.whiteOption,
+                 orderNote: orderNote,
+                 itemData: itemData
+               });
+               
+               // Comprehensive approach to find white option data from all possible sources
+               let selections = calculatorSelections;
+               
+               // First check if white option exists in calculator selections
+               if (!selections.whiteOption) {
+                 // Check all possible order note sources
+                 const allOrderNotes = [
+                   orderNote,
+                   selectedOrderForPopup.orderNote,
+                   selectedOrderForPopup._fullOrderData?.orderNote,
+                   selectedOrderForPopup._fullOrderData?.order_note,
+                   itemData.orderNote,
+                   itemData.order_note
+                 ].filter(Boolean);
+                 
+                 console.log('🔍 All order note sources:', allOrderNotes);
+                 
+                 for (const noteSource of allOrderNotes) {
+                   if (noteSource && typeof noteSource === 'string') {
+                     const whiteOptionMatch = noteSource.match(/⚪ White Option: (.+?)(?:\n|$)/);
+                     if (whiteOptionMatch) {
+                       console.log('🎯 Found white option in order note:', whiteOptionMatch[1]);
+                       selections = {
+                         ...selections,
+                         whiteOption: {
+                           type: 'white-base',
+                           value: whiteOptionMatch[1].trim(),
+                           displayValue: whiteOptionMatch[1].trim(),
+                           priceImpact: 0
+                         }
+                       };
+                       break;
+                     }
+                   }
+                 }
+               }
+               
+               // Also check if white option is stored directly in item data under different keys
+               if (!selections.whiteOption) {
+                 const possibleWhiteOptions = [
+                   itemData.whiteOption,
+                   itemData.white_option,
+                   itemData.whiteInk,
+                   itemData.white_ink,
+                   item.whiteOption,
+                   item.white_option
+                 ].filter(Boolean);
+                 
+                 if (possibleWhiteOptions.length > 0) {
+                   console.log('🎯 Found white option in item data:', possibleWhiteOptions[0]);
+                   const whiteOptionData = possibleWhiteOptions[0];
+                   selections = {
+                     ...selections,
+                     whiteOption: {
+                       type: 'white-base',
+                       value: whiteOptionData.value || whiteOptionData,
+                       displayValue: whiteOptionData.displayValue || whiteOptionData.value || whiteOptionData,
+                       priceImpact: 0
+                     }
+                   };
+                 }
+               }
+               
+               console.log('📊 Final selections object:', selections);
+
+              return (
+                <div key={item.id || index} className="border border-white/10 rounded-lg p-6" style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
+                  {/* Item Header */}
+                  <div className="flex items-start gap-4 mb-6">
+                    {/* Product Image */}
+                    {firstImage && (
+                      <div className="flex-shrink-0">
+                        <div className="w-20 h-20 rounded-lg overflow-hidden border border-white/20 bg-black/20">
+                          <AIFileImage
+                            src={firstImage}
+                            filename={firstImage.split('/').pop()?.split('?')[0] || 'design.jpg'}
+                            alt={item.productName || item.name}
+                            className="w-full h-full object-cover"
+                            size="thumbnail"
+                            showFileType={false}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Item Info */}
+                    <div className="flex-1">
+                      <h4 className="text-lg font-semibold text-white mb-2">{item.productName || item.name}</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                        <div>
+                          <span className="text-gray-400">Quantity:</span>
+                          <span className="text-white ml-2">{item.quantity}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400">Unit Price:</span>
+                          <span className="text-white ml-2">${(item.unitPrice || (item.totalPrice || item.price) / item.quantity).toFixed(2)}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400">Total:</span>
+                          <span className="text-white ml-2">${(item.totalPrice || item.price).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Calculator Selections */}
+                  {Object.keys(selections).length > 0 ? (
+                    <div className="border-t border-white/10 pt-4">
+                      <h5 className="text-lg font-semibold text-purple-300 mb-4 flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                        </svg>
+                        Calculator Selections
+                      </h5>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                                 {/* Cut/Shape */}
+                         {selections.cut?.displayValue && (
+                           <div className="p-3 rounded-lg border border-blue-500/30" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)' }}>
+                             <div className="flex items-center gap-2 mb-2">
+                               <span className="text-lg">✂️</span>
+                               <span className="text-xs text-blue-300 uppercase font-medium">Shape</span>
+                             </div>
+                             <span className="text-white font-medium">{selections.cut.displayValue}</span>
+                           </div>
+                         )}
+
+                                                 {/* Material */}
+                         {selections.material?.displayValue && (
+                           <div className="p-3 rounded-lg border border-green-500/30" style={{ backgroundColor: 'rgba(34, 197, 94, 0.1)' }}>
+                             <div className="flex items-center gap-2 mb-2">
+                               <span className="text-lg">🧻</span>
+                               <span className="text-xs text-green-300 uppercase font-medium">Material</span>
+                             </div>
+                             <span className="text-white font-medium">{selections.material.displayValue}</span>
+                           </div>
+                         )}
+
+                                                 {/* Size */}
+                         {(() => {
+                           const size = selections.size || selections.sizePreset || {};
+                           return (size.width && size.height) || size.displayValue ? (
+                             <div className="p-3 rounded-lg border border-orange-500/30" style={{ backgroundColor: 'rgba(251, 146, 60, 0.1)' }}>
+                               <div className="flex items-center gap-2 mb-2">
+                                 <span className="text-lg">📏</span>
+                                 <span className="text-xs text-orange-300 uppercase font-medium">Size</span>
+                               </div>
+                               <span className="text-white font-medium">
+                                 {size.width && size.height ? `${size.width}" × ${size.height}"` : size.displayValue}
+                               </span>
+                             </div>
+                           ) : null;
+                         })()}
+
+                                                 {/* White Option */}
+                         {selections.whiteOption?.displayValue && (
+                           <div className="p-3 rounded-lg border border-cyan-500/30" style={{ backgroundColor: 'rgba(6, 182, 212, 0.1)' }}>
+                             <div className="flex items-center gap-2 mb-2">
+                               <span className="text-lg">⚪</span>
+                               <span className="text-xs text-cyan-300 uppercase font-medium">White Ink</span>
+                             </div>
+                             <span className="text-white font-medium">{selections.whiteOption.displayValue}</span>
+                           </div>
+                         )}
+
+                                                 {/* Rush Order */}
+                         {(selections.rush?.value || orderNote.includes('🚀 Rush Order')) && (
+                           <div className="p-3 rounded-lg border border-red-500/30" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)' }}>
+                             <div className="flex items-center gap-2 mb-2">
+                               <span className="text-lg">🚀</span>
+                               <span className="text-xs text-red-300 uppercase font-medium">Rush Order</span>
+                             </div>
+                             <span className="text-white font-medium">24-hour production (+40%)</span>
+                           </div>
+                         )}
+
+                                                 {/* Proof Preference */}
+                         {(selections.proof?.value !== undefined || orderNote.includes('proof')) && (
+                           <div className="p-3 rounded-lg border border-yellow-500/30" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)' }}>
+                             <div className="flex items-center gap-2 mb-2">
+                               <span className="text-lg">{selections.proof?.value ? '📧' : '⚡'}</span>
+                               <span className="text-xs text-yellow-300 uppercase font-medium">Proof</span>
+                             </div>
+                             <span className="text-white font-medium">
+                               {selections.proof?.value ? 'Send proof for approval' : 'Skip proof - direct to production'}
+                             </span>
+                           </div>
+                         )}
+
+                                                 {/* Instagram */}
+                         {(selections.instagram?.value || orderNote.includes('📸 Instagram')) && (
+                           <div className="p-3 rounded-lg border border-pink-500/30" style={{ backgroundColor: 'rgba(236, 72, 153, 0.1)' }}>
+                             <div className="flex items-center gap-2 mb-2">
+                               <span className="text-lg">📸</span>
+                               <span className="text-xs text-pink-300 uppercase font-medium">Instagram</span>
+                             </div>
+                             <span className="text-white font-medium">
+                               {selections.instagram?.value ? `@${selections.instagram.value}` : 'Marketing opt-in'}
+                             </span>
+                           </div>
+                         )}
+                      </div>
+
+                      {/* Customer Notes */}
+                      {itemData.customerNotes && (
+                        <div className="mt-4 p-3 rounded-lg border border-blue-500/30" style={{ backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>
+                          <h6 className="text-blue-300 text-sm font-medium mb-2">Customer Notes</h6>
+                          <p className="text-white text-sm">{itemData.customerNotes}</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="border-t border-white/10 pt-4 text-center">
+                      <p className="text-gray-400 text-sm">No calculator selections available for this item</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-white/10">
+                         <button
+               onClick={() => {
+                 console.log('📄 Generating invoice in new tab for order:', selectedOrderForPopup.id);
+                 console.log('📄 Order data for invoice:', selectedOrderForPopup);
+                 
+                 const displayNumber = getOrderDisplayNumber(selectedOrderForPopup);
+                 console.log('📄 Generated display number:', displayNumber);
+                 
+                                   // Prepare invoice data from popup order data with enhanced white option logic
+                  const invoiceData: InvoiceData = {
+                    orderNumber: displayNumber || selectedOrderForPopup.orderNumber || selectedOrderForPopup.order_number || selectedOrderForPopup.id || 'SS-UNKNOWN',
+                    id: selectedOrderForPopup.id,
+                    orderDate: selectedOrderForPopup.orderCreatedAt || selectedOrderForPopup.date,
+                    orderStatus: selectedOrderForPopup.orderStatus || selectedOrderForPopup.status,
+                    totalPrice: selectedOrderForPopup.totalPrice || selectedOrderForPopup.total,
+                    currency: selectedOrderForPopup.currency || 'USD',
+                    subtotal: selectedOrderForPopup.subtotal || selectedOrderForPopup.totalPrice || selectedOrderForPopup.total,
+                    tax: selectedOrderForPopup.tax || 0,
+                    shipping: selectedOrderForPopup.shipping || 0,
+                    items: selectedOrderForPopup.items.map((item: any) => {
+                      const itemData = selectedOrderForPopup._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+                      const orderNote = selectedOrderForPopup.orderNote || '';
+                      
+                      // Use EXACT same logic as popup display for building selections
+                      let selections = itemData.calculatorSelections || itemData.calculator_selections || {};
+                      
+                      // Enhanced fallback logic for white option - EXACT same as popup
+                      const orderNotePattern = /⚪ White Option: (.+?)(?:\n|$)/;
+                      const whiteOptionMatch = orderNote.match(orderNotePattern);
+                      
+                      if (whiteOptionMatch) {
+                        console.log('🎯 Found white option in order note:', whiteOptionMatch[1]);
+                        const whiteValue = whiteOptionMatch[1].trim();
+                        selections = {
+                          ...selections,
+                          whiteOption: {
+                            type: 'white-base',
+                            value: whiteValue,
+                            displayValue: whiteValue,
+                            priceImpact: 0
+                          }
+                        };
+                      }
+                      
+                      // Also check if white option is stored directly in item data under different keys - EXACT same as popup
+                      if (!selections.whiteOption) {
+                        const possibleWhiteOptions = [
+                          itemData.whiteOption,
+                          itemData.white_option,
+                          itemData.whiteInk,
+                          itemData.white_ink,
+                          item.whiteOption,
+                          item.white_option
+                        ].filter(Boolean);
+                        
+                        if (possibleWhiteOptions.length > 0) {
+                          console.log('🎯 Found white option in item data:', possibleWhiteOptions[0]);
+                          const whiteOptionData = possibleWhiteOptions[0];
+                          selections = {
+                            ...selections,
+                            whiteOption: {
+                              type: 'white-base',
+                              value: whiteOptionData.value || whiteOptionData,
+                              displayValue: whiteOptionData.displayValue || whiteOptionData.value || whiteOptionData,
+                              priceImpact: 0
+                            }
+                          };
+                        }
+                      }
+                      
+                      return {
+                        id: item.id,
+                        productName: item.productName || item.name,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice || (item.price / item.quantity),
+                        totalPrice: item.totalPrice || item.price,
+                        customFiles: item.customFiles || itemData.customFiles || itemData.custom_files,
+                        calculatorSelections: selections,
+                        customerNotes: item.customerNotes || itemData.customerNotes
+                      };
+                    }),
+                    trackingNumber: selectedOrderForPopup.trackingNumber,
+                    trackingCompany: selectedOrderForPopup.trackingCompany,
+                    customerEmail: selectedOrderForPopup.customerEmail || (user as any)?.email,
+                    billingAddress: selectedOrderForPopup.billingAddress || selectedOrderForPopup.billing_address || selectedOrderForPopup.shippingAddress,
+                    customerInfo: {
+                      name: (user as any)?.user_metadata?.full_name || (user as any)?.email?.split('@')[0] || 'Customer',
+                      email: (user as any)?.email,
+                    }
+                  };
+                 
+                 // Generate and open invoice in new tab using the same logic as the order details page
+                 setInvoiceData(invoiceData);
+                 setTimeout(() => {
+                   generatePrintPDF();
+                 }, 100);
+               }}
+               className="flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-2"
+               style={{
+                 background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                 backdropFilter: 'blur(25px) saturate(180%)',
+                 border: '1px solid rgba(59, 130, 246, 0.4)',
+                 boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                 color: 'white'
+               }}
+             >
+               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                 <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+               </svg>
+               View Full Invoice
+             </button>
+            <button
+              onClick={() => handleReorder(selectedOrderForPopup.id)}
+              className="flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-2"
+              style={{
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
+                backdropFilter: 'blur(25px) saturate(180%)',
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                boxShadow: 'rgba(245, 158, 11, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                color: 'white'
+              }}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+              </svg>
+              Reorder
+            </button>
+            {selectedOrderForPopup.trackingNumber && (
+              <button
+                onClick={() => handleTrackOrder(selectedOrderForPopup)}
+                className="flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-2"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(180%)',
+                  border: '1px solid rgba(34, 197, 94, 0.4)',
+                  boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                  color: 'white'
+                }}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 010 2h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                </svg>
+                Track Order
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
 
   {/* Contact Form Modal */}
       {showContactForm && (

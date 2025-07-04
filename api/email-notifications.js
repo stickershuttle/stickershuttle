@@ -69,15 +69,15 @@ const getOrderStatusEmailTemplate = (orderData, newStatus) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${statusInfo.subject}</title>
 </head>
-<body style="margin: 0; padding: 20px; background-color: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-height: 100vh;">
+<body style="margin: 0; padding: 20px; background-color: #ffffff; color: #1a1a1a; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; min-height: 100vh;">
   <div style="max-width: 600px; margin: 0 auto; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 16px; overflow: hidden;">
     
     <!-- Header -->
     <div style="background: #f1f3f5; border-bottom: 1px solid #e9ecef; padding: 30px 20px; text-align: center;">
-      <h1 style="color: #1a1a1a; margin: 0; font-size: 22px; font-weight: bold;">
+      <h1 style="margin: 0; font-size: 22px; font-weight: 600; color: #1a1a1a;">
         ${statusInfo.emoji} ${statusInfo.title}
       </h1>
-      <p style="color: #4b5563; margin: 10px 0 0 0; font-size: 16px;">
+      <p style="margin: 10px 0 0 0; font-size: 16px; font-weight: 400; color: #4b5563;">
         Order #${orderData.orderNumber}
       </p>
     </div>
@@ -85,7 +85,7 @@ const getOrderStatusEmailTemplate = (orderData, newStatus) => {
     <!-- Main Content -->
     <div style="padding: 30px 20px;">
       <div style="background: #ffffff; border: 1px solid #e9ecef; border-left: 4px solid ${statusInfo.color}; padding: 20px; margin-bottom: 30px; border-radius: 12px;">
-        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #1a1a1a;">
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #1a1a1a;">
           ${statusInfo.message}
         </p>
       </div>
@@ -93,22 +93,22 @@ const getOrderStatusEmailTemplate = (orderData, newStatus) => {
       <!-- Action Buttons -->
       <div style="text-align: center; margin-bottom: 30px;">
         ${newStatus === 'Building Proof' ? `
-        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background-color: #3B82F6; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
+        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background-color: #3B82F6; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
           View Order Details
         </a>
         ` : ''}
         
         ${newStatus === 'Proof Sent' ? `
-        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background-color: #F59E0B; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
+        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background-color: #F59E0B; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
           Review Proof
         </a>
         ` : ''}
         
         ${newStatus === 'Shipped' || newStatus === 'Out for Delivery' ? `
-        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background-color: #3B82F6; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
+        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background-color: #3B82F6; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
           View Order Details
         </a>
-        <a href="${orderData.trackingUrl || '#'}" style="display: inline-block; background-color: #F59E0B; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
+        <a href="${orderData.trackingUrl || '#'}" style="display: inline-block; background-color: #F59E0B; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
           Track Package
         </a>
         ` : ''}
@@ -116,10 +116,10 @@ const getOrderStatusEmailTemplate = (orderData, newStatus) => {
 
       <!-- Support Section -->
       <div style="border-top: 1px solid #e9ecef; padding-top: 20px; text-align: center;">
-        <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px;">
+        <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 400; color: #4b5563;">
           Questions about your order?
         </p>
-        <a href="${FRONTEND_URL}/contact-us" style="color: #3b82f6; text-decoration: none; font-weight: 600;">
+        <a href="${FRONTEND_URL}/contact-us" style="color: #3b82f6; text-decoration: none; font-weight: 600; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
           Contact Support
         </a>
       </div>
@@ -132,10 +132,10 @@ const getOrderStatusEmailTemplate = (orderData, newStatus) => {
         <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751567428/LogoDarktGreyStickerShuttle_lpvvnc.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
       </div>
       
-      <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px;">
+      <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 400; color: #4b5563;">
         Thank you for choosing Sticker Shuttle!
       </p>
-      <p style="margin: 0; color: #6b7280; font-size: 12px;">
+      <p style="margin: 0; font-size: 12px; font-weight: 400; color: #6b7280;">
         This email was sent to ${orderData.customerEmail} regarding order #${orderData.orderNumber}
       </p>
     </div>
@@ -342,15 +342,15 @@ const getAdminNotificationTemplate = (type, orderData, extraData = {}) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${template.subject}</title>
 </head>
-<body style="margin: 0; padding: 20px; background-color: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-height: 100vh;">
+<body style="margin: 0; padding: 20px; background-color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; min-height: 100vh;">
   <div style="max-width: 600px; margin: 0 auto; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 16px; overflow: hidden;">
     
     <!-- Header -->
     <div style="background: #f1f3f5; border-bottom: 1px solid #e9ecef; padding: 30px 20px; text-align: center;">
-      <h1 style="color: #1a1a1a; margin: 0; font-size: 22px; font-weight: bold;">
+      <h1 style="color: #1a1a1a; margin: 0; font-size: 22px; font-weight: 600;">
         ${template.emoji} ${template.title}
       </h1>
-      <p style="color: #4b5563; margin: 10px 0 0 0; font-size: 16px;">
+      <p style="color: #4b5563; margin: 10px 0 0 0; font-size: 16px; font-weight: 400;">
         Order #${orderData.orderNumber}
       </p>
     </div>
@@ -358,14 +358,14 @@ const getAdminNotificationTemplate = (type, orderData, extraData = {}) => {
     <!-- Main Content -->
     <div style="padding: 30px 20px;">
       <div style="background: #ffffff; border: 1px solid #e9ecef; border-left: 4px solid ${template.color}; padding: 20px; margin-bottom: 30px; border-radius: 12px;">
-        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #1a1a1a;">
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #1a1a1a; font-weight: 400;">
           ${template.message}
         </p>
       </div>
 
       <!-- Order Details -->
       <div style="background: #ffffff; border: 1px solid #e9ecef; padding: 20px; border-radius: 12px; margin-bottom: 30px;">
-        <h3 style="margin: 0 0 15px 0; color: #1a1a1a; font-size: 18px;">Order Details</h3>
+        <h3 style="margin: 0 0 15px 0; color: #1a1a1a; font-size: 18px; font-weight: 600;">Order Details</h3>
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
             <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Order Number:</td>
@@ -404,17 +404,17 @@ const getAdminNotificationTemplate = (type, orderData, extraData = {}) => {
 
       <!-- Action Button -->
       <div style="text-align: center; margin-bottom: 30px;">
-        <a href="${adminPanelUrl}" style="display: inline-block; background-color: ${template.buttonColor}; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0;">
+        <a href="${adminPanelUrl}" style="display: inline-block; background-color: ${template.buttonColor}; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
           ${template.buttonText}
         </a>
       </div>
 
       <!-- Support Section -->
       <div style="border-top: 1px solid #e9ecef; padding-top: 20px; text-align: center;">
-        <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px;">
+        <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px; font-weight: 400;">
           Need to contact the customer?
         </p>
-        <a href="mailto:${orderData.customerEmail}" style="color: #3b82f6; text-decoration: none; font-weight: 600;">
+        <a href="mailto:${orderData.customerEmail}" style="color: #3b82f6; text-decoration: none; font-weight: 600; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
           Send Email
         </a>
       </div>
@@ -427,10 +427,10 @@ const getAdminNotificationTemplate = (type, orderData, extraData = {}) => {
         <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751567428/LogoDarktGreyStickerShuttle_lpvvnc.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
       </div>
       
-      <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px;">
+      <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px; font-weight: 400;">
         Internal Notification - Sticker Shuttle Admin
       </p>
-      <p style="margin: 0; color: #6b7280; font-size: 12px;">
+      <p style="margin: 0; color: #6b7280; font-size: 12px; font-weight: 400;">
         This email was sent to ${adminEmail} regarding order #${orderData.orderNumber}
       </p>
     </div>
@@ -586,7 +586,7 @@ const getUserFileUploadTemplate = (userData, fileName, fileSize, message) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>File Upload from Customer</title>
 </head>
-<body style="margin: 0; padding: 20px; background-color: #030140; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-height: 100vh;">
+<body style="margin: 0; padding: 20px; background-color: #030140; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; min-height: 100vh;">
   <div style="max-width: 600px; margin: 0 auto; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset; backdrop-filter: blur(12px); border-radius: 16px; overflow: hidden;">
     
     <!-- Header -->
@@ -820,8 +820,14 @@ const isFirstTimeCustomer = async (customerEmail) => {
 
 // Welcome email template for first-time customers
 const getWelcomeEmailTemplate = (orderData) => {
+  // Extract first name from order data
+  const firstName = orderData.customerFirstName || 
+                   orderData.customer_first_name || 
+                   orderData.firstName || 
+                   (orderData.customerEmail ? orderData.customerEmail.split('@')[0] : 'friend');
+
   return {
-    subject: `🚀 Welcome to Sticker Shuttle! Order #${orderData.orderNumber} confirmed`,
+    subject: `🎉 Welcome to Sticker Shuttle! Order #${orderData.orderNumber} confirmed`,
     html: `
 <!DOCTYPE html>
 <html>
@@ -830,15 +836,15 @@ const getWelcomeEmailTemplate = (orderData) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Welcome to Sticker Shuttle!</title>
 </head>
-<body style="margin: 0; padding: 20px; background-color: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-height: 100vh;">
+<body style="margin: 0; padding: 20px; background-color: #ffffff; color: #1a1a1a; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; min-height: 100vh;">
   <div style="max-width: 600px; margin: 0 auto; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 16px; overflow: hidden;">
     
     <!-- Header -->
     <div style="background: #f1f3f5; border-bottom: 1px solid #e9ecef; padding: 30px 20px; text-align: center;">
-      <h1 style="color: #1a1a1a; margin: 0; font-size: 28px; font-weight: bold;">
-        🎉 You did it!
+      <h1 style="margin: 0; font-size: 28px; font-weight: 600; color: #1a1a1a;">
+        🎉 You did it, ${firstName}!
       </h1>
-      <p style="color: #4b5563; margin: 10px 0 0 0; font-size: 18px;">
+      <p style="margin: 10px 0 0 0; font-size: 18px; font-weight: 400; color: #4b5563;">
         Your first order is confirmed!
       </p>
     </div>
@@ -847,44 +853,44 @@ const getWelcomeEmailTemplate = (orderData) => {
     <div style="padding: 30px 20px;">
       <!-- Welcome Message -->
       <div style="background: #ffffff; border: 1px solid #e9ecef; padding: 25px; margin-bottom: 30px; border-radius: 12px; text-align: center;">
-        <h2 style="margin: 0 0 15px 0; color: #1a1a1a; font-size: 22px;">Thank you for trusting us! 🚀</h2>
-        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #4b5563;">
+        <h2 style="margin: 0 0 15px 0; font-size: 22px; font-weight: 600; color: #1a1a1a;">Thank you for choosing us!</h2>
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #4b5563;">
           We're thrilled to have you here! Your order has been received and we'll start working on it right away.
         </p>
       </div>
 
       <!-- Order Details -->
       <div style="background: #ffffff; border: 1px solid #e9ecef; padding: 20px; border-radius: 12px; margin-bottom: 30px;">
-        <h3 style="margin: 0 0 15px 0; color: #1a1a1a; font-size: 18px;">Order Details</h3>
+        <h3 style="margin: 0 0 15px 0; font-size: 18px; font-weight: 600; color: #1a1a1a;">Order Details</h3>
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
-            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Order Number:</td>
-            <td style="padding: 8px 0; color: #1a1a1a; font-weight: 600;">#${orderData.orderNumber}</td>
+            <td style="padding: 8px 0; font-weight: 500; color: #4b5563;">Order Number:</td>
+            <td style="padding: 8px 0; font-weight: 600; color: #1a1a1a;">#${orderData.orderNumber}</td>
           </tr>
           <tr>
-            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Order Total:</td>
-            <td style="padding: 8px 0; color: #10b981; font-weight: 600;">$${orderData.totalPrice?.toFixed(2) || 'N/A'}</td>
+            <td style="padding: 8px 0; font-weight: 500; color: #4b5563;">Order Total:</td>
+            <td style="padding: 8px 0; font-weight: 600; color: #10b981;">$${orderData.totalPrice?.toFixed(2) || 'N/A'}</td>
           </tr>
           <tr>
-            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Status:</td>
-            <td style="padding: 8px 0; color: #3b82f6; font-weight: 600;">Processing</td>
+            <td style="padding: 8px 0; font-weight: 500; color: #4b5563;">Status:</td>
+            <td style="padding: 8px 0; font-weight: 600; color: #3b82f6;">Processing</td>
           </tr>
         </table>
       </div>
 
       <!-- Action Button -->
       <div style="text-align: center; margin-bottom: 30px;">
-        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background-color: #3B82F6; color: #ffffff; padding: 15px 40px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px;">
+        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background-color: #3B82F6; color: #ffffff; padding: 15px 40px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
           Track Your Order
         </a>
       </div>
 
       <!-- Support Section -->
       <div style="border-top: 1px solid #e9ecef; padding-top: 20px; text-align: center;">
-        <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px;">
+        <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px; font-weight: 400;">
           Questions about your order or need help?
         </p>
-        <a href="${FRONTEND_URL}/contact-us" style="color: #3b82f6; text-decoration: none; font-weight: 600;">
+        <a href="${FRONTEND_URL}/contact-us" style="color: #3b82f6; text-decoration: none; font-weight: 600; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
           Contact Support
         </a>
       </div>
@@ -897,10 +903,10 @@ const getWelcomeEmailTemplate = (orderData) => {
         <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751567428/LogoDarktGreyStickerShuttle_lpvvnc.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
       </div>
       
-      <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px;">
+      <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px; font-weight: 400;">
         Thank you for choosing Sticker Shuttle!
       </p>
-      <p style="margin: 0; color: #6b7280; font-size: 12px;">
+      <p style="margin: 0; color: #6b7280; font-size: 12px; font-weight: 400;">
         This email was sent to ${orderData.customerEmail} regarding order #${orderData.orderNumber}
       </p>
     </div>
@@ -1012,6 +1018,122 @@ const sendWelcomeEmail = async (orderData) => {
   }
 };
 
+// Wholesale approval email template
+const getWholesaleApprovalEmailTemplate = (userData) => {
+  return {
+    subject: `🎉 Welcome to Wholesale! Your 10% store credit is now active`,
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to Wholesale!</title>
+</head>
+<body style="margin: 0; padding: 20px; background-color: #ffffff; color: #1a1a1a; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; min-height: 100vh;">
+  <div style="max-width: 600px; margin: 0 auto; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 16px; overflow: hidden;">
+    
+    <!-- Header -->
+    <div style="background: #f1f3f5; border-bottom: 1px solid #e9ecef; padding: 30px 20px; text-align: center;">
+      <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #1a1a1a;">
+        🎉 Welcome to Wholesale!
+      </h1>
+      <p style="margin: 10px 0 0 0; font-size: 16px; font-weight: 400; color: #4b5563;">
+        Your application has been approved
+      </p>
+    </div>
+
+    <!-- Main Content -->
+    <div style="padding: 30px 20px;">
+      <div style="background: #ffffff; border: 1px solid #e9ecef; border-left: 4px solid #10B981; padding: 20px; margin-bottom: 30px; border-radius: 12px;">
+        <p style="margin: 0 0 15px 0; font-size: 18px; line-height: 1.6; font-weight: 600; color: #1a1a1a;">
+          Hi ${userData.firstName || 'there'}!
+        </p>
+        <p style="margin: 0 0 15px 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #1a1a1a;">
+          Great news! Your wholesale application for <strong>${userData.companyName || 'your company'}</strong> has been approved.
+        </p>
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #1a1a1a;">
+          You now earn <strong>10% store credit</strong> on every order instead of the regular 5%. This upgraded rate is already active on your account!
+        </p>
+      </div>
+
+      <!-- Benefits Section -->
+      <div style="background: #ffffff; border: 1px solid #e9ecef; padding: 20px; margin-bottom: 30px; border-radius: 12px;">
+        <h3 style="margin: 0 0 15px 0; font-size: 18px; font-weight: 600; color: #1a1a1a;">Your Wholesale Benefits:</h3>
+        <ul style="margin: 0; padding-left: 20px; font-size: 16px; line-height: 1.8; color: #1a1a1a;">
+          <li><strong>10% store credit</strong> on every order (was 5%)</li>
+          <li>Credits automatically applied after order completion</li>
+          <li>Use credits on future orders to save money</li>
+          <li>$100 maximum credit balance</li>
+        </ul>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="text-align: center; margin-bottom: 30px;">
+        <a href="${FRONTEND_URL}/cart" style="display: inline-block; background-color: #10B981; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+          Start Shopping
+        </a>
+        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background-color: #3B82F6; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+          View Account
+        </a>
+      </div>
+
+      <!-- Support Section -->
+      <div style="border-top: 1px solid #e9ecef; padding-top: 20px; text-align: center;">
+        <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 400; color: #4b5563;">
+          Questions about your wholesale benefits?
+        </p>
+        <a href="${FRONTEND_URL}/contact-us" style="color: #3b82f6; text-decoration: none; font-weight: 600; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+          Contact Support
+        </a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background: #f1f3f5; border-top: 1px solid #e9ecef; padding: 20px; text-align: center;">
+      <!-- Logo -->
+      <div style="margin-bottom: 15px;">
+        <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751567428/LogoDarktGreyStickerShuttle_lpvvnc.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
+      </div>
+      
+      <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 400; color: #4b5563;">
+        Thank you for choosing Sticker Shuttle!
+      </p>
+      <p style="margin: 0; font-size: 12px; font-weight: 400; color: #6b7280;">
+        This email was sent to ${userData.email} regarding your wholesale application
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+    `
+  };
+};
+
+// Send wholesale approval email
+const sendWholesaleApprovalEmail = async (userData) => {
+  try {
+    console.log('📧 Sending wholesale approval email to:', userData.email);
+    
+    if (!userData.email) {
+      console.log('❌ No email provided for wholesale approval notification');
+      return { success: false, error: 'No email provided' };
+    }
+
+    const template = getWholesaleApprovalEmailTemplate(userData);
+    const result = await sendEmail(userData.email, template.subject, template.html);
+    
+    if (result.success) {
+      console.log(`✅ Wholesale approval email sent to ${userData.email}`);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('❌ Error sending wholesale approval email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendOrderStatusNotification,
   sendOrderStatusNotificationEnhanced,
@@ -1021,5 +1143,6 @@ module.exports = {
   sendAdminNewOrderNotification,
   sendAdminProofActionNotification,
   sendEmail,
-  sendUserFileUpload
+  sendUserFileUpload,
+  sendWholesaleApprovalEmail
 }; 

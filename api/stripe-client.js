@@ -76,7 +76,7 @@ class StripeClient {
                   productId: item.productId,
                   sku: item.sku,
                   // Store only essential selections in product metadata (500 char limit)
-                  // Full selections will be in orderNote in session metadata
+                  // Full selections will be in orderNote in session metadata (truncated to 450 chars)
                   size: item.calculatorSelections?.size?.displayValue || '',
                   material: item.calculatorSelections?.material?.displayValue || '',
                   cut: item.calculatorSelections?.cut?.displayValue || '',
@@ -102,7 +102,7 @@ class StripeClient {
           orderId: orderData.orderId,
           userId: orderData.userId || 'guest',
           customerOrderId: orderData.customerOrderId || '',
-          orderSummary: orderData.orderNote || '',
+          orderNote: (orderData.orderNote || '').substring(0, 450), // Truncate to 450 chars to stay under 500 limit (full note saved in DB)
           itemCount: orderData.cartMetadata?.itemCount?.toString() || '0',
           originalTotalAmount: orderData.cartMetadata?.subtotalAmount || '0.00',
           discountCode: orderData.cartMetadata?.discountCode || '',
@@ -196,7 +196,7 @@ class StripeClient {
 
     try {
       const session = await this.stripe.checkout.sessions.retrieve(sessionId, {
-        expand: ['line_items.data.price.product', 'customer', 'payment_intent']
+        expand: ['line_items.data.price.product', 'customer', 'payment_intent', 'shipping_cost.shipping_rate']
       });
       return session;
     } catch (error) {
