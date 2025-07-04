@@ -578,7 +578,342 @@ const earnPointsFromPurchase = async (userId, orderTotal, orderId) => {
   }
 };
 
+// Restore credits for abandoned checkout sessions
+const restoreCreditsForAbandonedCheckout = async (sessionId, reason) => {
+  try {
+    const client = supabase.getServiceClient();
+    
+    console.log('🔄 Attempting to restore credits for abandoned checkout session:', sessionId);
+    
+    // Find orders with this session ID that are still "Awaiting Payment"
+    const { data: orders, error: orderError } = await client
+      .from('orders_main')
+      .select('id, user_id, credits_applied, credit_transaction_id, order_status, created_at')
+      .eq('stripe_session_id', sessionId)
+      .eq('order_status', 'Awaiting Payment');
+    
+    if (orderError) {
+      console.error('❌ Error finding orders for session:', orderError);
+      return { success: false, error: orderError.message };
+    }
+    
+    if (!orders || orders.length === 0) {
+      console.log('ℹ️ No pending orders found for session:', sessionId);
+      return { success: true, message: 'No pending orders found' };
+    }
+    
+    let restoredCredits = 0;
+    const restoredOrders = [];
+    
+    for (const order of orders) {
+      const creditsApplied = parseFloat(order.credits_applied) || 0;
+      
+      if (creditsApplied > 0 && order.credit_transaction_id) {
+        console.log(`🔄 Restoring ${creditsApplied} credits for order ${order.id}`);
+        
+        // Reverse the credit transaction
+        const reverseResult = await reverseTransaction(
+          order.credit_transaction_id,
+          reason || `Abandoned checkout session ${sessionId}`
+        );
+        
+        if (reverseResult.success) {
+          restoredCredits += creditsApplied;
+          restoredOrders.push(order.id);
+          
+          // Update the order to clear credit tracking
+          await client
+            .from('orders_main')
+            .update({
+              credits_applied: 0,
+              credit_transaction_id: null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', order.id);
+          
+          console.log(`✅ Successfully restored ${creditsApplied} credits for order ${order.id}`);
+        } else {
+          console.error(`❌ Failed to restore credits for order ${order.id}:`, reverseResult.error);
+        }
+      }
+    }
+    
+    return {
+      success: true,
+      restoredCredits,
+      restoredOrders,
+      message: `Restored ${restoredCredits} credits for ${restoredOrders.length} orders`
+    };
+  } catch (error) {
+    console.error('❌ Error restoring credits for abandoned checkout:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
 
+// Cleanup abandoned checkout sessions and restore credits
+const cleanupAbandonedCheckouts = async (maxAgeHours = 24) => {
+  try {
+    const client = supabase.getServiceClient();
+    
+    console.log(`🧹 Starting cleanup of abandoned checkouts older than ${maxAgeHours} hours`);
+    
+    // Find orders that are "Awaiting Payment" with session IDs older than maxAgeHours
+    const cutoffTime = new Date();
+    cutoffTime.setHours(cutoffTime.getHours() - maxAgeHours);
+    
+    const { data: abandonedOrders, error: orderError } = await client
+      .from('orders_main')
+      .select('id, user_id, stripe_session_id, credits_applied, credit_transaction_id, created_at')
+      .eq('order_status', 'Awaiting Payment')
+      .not('stripe_session_id', 'is', null)
+      .gt('credits_applied', 0)
+      .lt('created_at', cutoffTime.toISOString());
+    
+    if (orderError) {
+      console.error('❌ Error finding abandoned orders:', orderError);
+      return { success: false, error: orderError.message };
+    }
+    
+    if (!abandonedOrders || abandonedOrders.length === 0) {
+      console.log('✅ No abandoned checkouts found requiring cleanup');
+      return { success: true, message: 'No abandoned checkouts found' };
+    }
+    
+    console.log(`🔍 Found ${abandonedOrders.length} abandoned orders with credits to restore`);
+    
+    let totalRestored = 0;
+    const restoredSessions = [];
+    
+    // Group orders by session ID to avoid duplicate API calls
+    const sessionGroups = {};
+    abandonedOrders.forEach(order => {
+      if (!sessionGroups[order.stripe_session_id]) {
+        sessionGroups[order.stripe_session_id] = [];
+      }
+      sessionGroups[order.stripe_session_id].push(order);
+    });
+    
+    // Process each session group
+    for (const [sessionId, orders] of Object.entries(sessionGroups)) {
+      console.log(`🔄 Processing abandoned session ${sessionId} with ${orders.length} orders`);
+      
+      const restoreResult = await restoreCreditsForAbandonedCheckout(
+        sessionId,
+        `Cleanup: Session abandoned for ${maxAgeHours}+ hours`
+      );
+      
+      if (restoreResult.success) {
+        totalRestored += restoreResult.restoredCredits || 0;
+        restoredSessions.push(sessionId);
+      }
+    }
+    
+    console.log(`✅ Cleanup completed: Restored ${totalRestored} credits across ${restoredSessions.length} sessions`);
+    
+    return {
+      success: true,
+      totalRestored,
+      restoredSessions: restoredSessions.length,
+      message: `Restored ${totalRestored} credits from ${restoredSessions.length} abandoned sessions`
+    };
+  } catch (error) {
+    console.error('❌ Error during abandoned checkout cleanup:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+// Reserve credits for checkout (mark as pending instead of deducting)
+const reserveCreditsForCheckout = async ({ userId, amount, reason, sessionId, transactionType }) => {
+  try {
+    const client = supabase.getServiceClient();
+    
+    // Get current balance first
+    const currentBalance = await getUserCreditBalance(userId);
+    const safeCurrentBalance = parseFloat(currentBalance.balance) || 0;
+    const safeAmount = parseFloat(amount) || 0;
+    
+    if (safeCurrentBalance < safeAmount) {
+      return {
+        success: false,
+        error: 'Insufficient credit balance',
+        availableBalance: safeCurrentBalance
+      };
+    }
+    
+    // Create a pending credit transaction (reserve credits without deducting)
+    const { data, error } = await client
+      .from('credits')
+      .insert({
+        user_id: userId,
+        amount: -safeAmount, // Negative amount for reservation
+        balance: safeCurrentBalance, // Balance stays the same (not deducted yet)
+        reason: reason || 'Credit reservation for checkout',
+        transaction_type: transactionType || 'reservation_pending_payment',
+        order_id: null, // Will be updated when order is created
+        session_id: sessionId, // Track the Stripe session
+        created_at: new Date().toISOString()
+      })
+      .select('*')
+      .single();
+    
+    if (error) throw error;
+    
+    return {
+      success: true,
+      reservationId: data.id,
+      reservedAmount: safeAmount,
+      availableBalance: safeCurrentBalance,
+      message: 'Credits reserved for checkout'
+    };
+  } catch (error) {
+    console.error('Error reserving credits for checkout:', error);
+    return {
+      success: false,
+      error: error.message,
+      availableBalance: 0
+    };
+  }
+};
+
+// Confirm credit reservation (actually deduct the credits)
+const confirmCreditReservation = async (reservationId, orderId) => {
+  try {
+    const client = supabase.getServiceClient();
+    
+    // Get the reservation
+    const { data: reservation, error: fetchError } = await client
+      .from('credits')
+      .select('*')
+      .eq('id', reservationId)
+      .eq('transaction_type', 'reservation_pending_payment')
+      .single();
+    
+    if (fetchError || !reservation) {
+      throw new Error('Reservation not found or already processed');
+    }
+    
+    const userId = reservation.user_id;
+    const reservedAmount = Math.abs(reservation.amount);
+    
+    // Get current balance
+    const currentBalance = await getUserCreditBalance(userId);
+    const safeCurrentBalance = parseFloat(currentBalance.balance) || 0;
+    
+    // Actually deduct the credits now
+    const newBalance = safeCurrentBalance - reservedAmount;
+    
+    // Update the reservation to become a confirmed deduction
+    const { error: updateError } = await client
+      .from('credits')
+      .update({
+        balance: newBalance,
+        transaction_type: 'deduction_confirmed',
+        order_id: orderId,
+        reason: `Credit applied to order ${orderId}`,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', reservationId);
+    
+    if (updateError) throw updateError;
+    
+    return {
+      success: true,
+      deductedAmount: reservedAmount,
+      newBalance: newBalance,
+      message: 'Credit reservation confirmed and deducted'
+    };
+  } catch (error) {
+    console.error('Error confirming credit reservation:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+// Cancel credit reservation (restore to available)
+const cancelCreditReservation = async (reservationId, reason) => {
+  try {
+    const client = supabase.getServiceClient();
+    
+    // Delete the reservation record (since balance was never actually changed)
+    const { error } = await client
+      .from('credits')
+      .delete()
+      .eq('id', reservationId)
+      .eq('transaction_type', 'reservation_pending_payment');
+    
+    if (error) throw error;
+    
+    return {
+      success: true,
+      message: reason || 'Credit reservation cancelled'
+    };
+  } catch (error) {
+    console.error('Error cancelling credit reservation:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+// Cleanup expired credit reservations
+const cleanupExpiredReservations = async (maxAgeHours = 24) => {
+  try {
+    const client = supabase.getServiceClient();
+    
+    console.log(`🧹 Cleaning up expired credit reservations older than ${maxAgeHours} hours`);
+    
+    // Find expired reservations
+    const cutoffTime = new Date();
+    cutoffTime.setHours(cutoffTime.getHours() - maxAgeHours);
+    
+    const { data: expiredReservations, error } = await client
+      .from('credits')
+      .select('*')
+      .eq('transaction_type', 'reservation_pending_payment')
+      .lt('created_at', cutoffTime.toISOString());
+    
+    if (error) throw error;
+    
+    if (!expiredReservations || expiredReservations.length === 0) {
+      console.log('✅ No expired credit reservations found');
+      return { success: true, message: 'No expired reservations found' };
+    }
+    
+    console.log(`🔍 Found ${expiredReservations.length} expired credit reservations`);
+    
+    // Delete expired reservations
+    const { error: deleteError } = await client
+      .from('credits')
+      .delete()
+      .eq('transaction_type', 'reservation_pending_payment')
+      .lt('created_at', cutoffTime.toISOString());
+    
+    if (deleteError) throw deleteError;
+    
+    console.log(`✅ Cleaned up ${expiredReservations.length} expired credit reservations`);
+    
+    return {
+      success: true,
+      cleanedUp: expiredReservations.length,
+      message: `Cleaned up ${expiredReservations.length} expired credit reservations`
+    };
+  } catch (error) {
+    console.error('Error cleaning up expired reservations:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
 
 module.exports = {
   initializeWithSupabase,
@@ -594,5 +929,11 @@ module.exports = {
   reverseTransaction,
   confirmTransaction,
   updateTransactionOrderId,
-  earnPointsFromPurchase
+  earnPointsFromPurchase,
+  restoreCreditsForAbandonedCheckout,
+  cleanupAbandonedCheckouts,
+  reserveCreditsForCheckout,
+  confirmCreditReservation,
+  cancelCreditReservation,
+  cleanupExpiredReservations
 }; 

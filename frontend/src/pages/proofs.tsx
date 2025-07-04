@@ -83,6 +83,7 @@ const UPDATE_PROOF_STATUS = gql`
 
 interface Proof {
   id: string;
+  orderItemId?: string;
   proofUrl: string;
   proofTitle: string;
   uploadedAt: string;
@@ -503,12 +504,75 @@ export default function ProofsPage() {
 
             {/* Side-by-Side Proofs Layout */}
             <div className="space-y-8">
+              {/* Order-level proof approval progress */}
+              {selectedOrder.proofs.length > 1 && (
+                <div className="container-style p-6 mb-6">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center"
+                           style={{
+                             background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                             backdropFilter: 'blur(25px) saturate(180%)',
+                             border: '1px solid rgba(59, 130, 246, 0.4)',
+                             boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                           }}>
+                        <svg className="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-white mb-1">
+                        Proof Approval Progress
+                      </h3>
+                      <p className="text-gray-300 text-sm mb-3">
+                        You have approved {selectedOrder.proofs.filter(p => p.status === 'approved').length}/{selectedOrder.proofs.length} proofs for this order
+                      </p>
+                      
+                      {/* Progress bar */}
+                      <div className="w-full bg-white/10 rounded-full h-2 mb-2">
+                        <div 
+                          className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+                          style={{ 
+                            width: `${(selectedOrder.proofs.filter(p => p.status === 'approved').length / selectedOrder.proofs.length) * 100}%` 
+                          }}
+                        ></div>
+                      </div>
+                      
+                      {selectedOrder.proofs.every(p => p.status === 'approved') ? (
+                        <p className="text-green-400 text-sm font-medium">
+                          ✅ All proofs approved! Your order is now in production.
+                        </p>
+                      ) : (
+                        <p className="text-yellow-400 text-sm font-medium">
+                          ⏳ Please approve all proofs to proceed with production.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {selectedOrder.proofs.map((proof: Proof, index: number) => (
                 <div key={proof.id} className="container-style p-6">
                   {/* Proof Header - Hide filename, add green check */}
                   <div className="flex justify-between items-start mb-6">
                     <div>
-                      <h3 className="text-xl font-semibold text-white">Design Proof #{index + 1}</h3>
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-xl font-semibold text-white">Design Proof #{index + 1}</h3>
+                        {proof.orderItemId && (() => {
+                          const linkedItem = selectedOrder.items?.find(item => item.id === proof.orderItemId);
+                          return linkedItem ? (
+                            <span className="px-3 py-1 text-sm font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-full">
+                              {linkedItem.productName} × {linkedItem.quantity}
+                            </span>
+                          ) : (
+                            <span className="px-3 py-1 text-sm font-medium bg-gray-500/20 text-gray-400 border border-gray-500/30 rounded-full">
+                              Item-specific
+                            </span>
+                          );
+                        })()}
+                      </div>
                       <div className="flex items-center gap-2 mt-1">
                         <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -825,7 +889,12 @@ export default function ProofsPage() {
                                 </div>
                                 <div className="flex-1">
                                   <h3 className="text-white font-semibold mb-1">Approve This Proof</h3>
-                                  <p className="text-green-300 text-sm">This design looks perfect, proceed with production</p>
+                                  <p className="text-green-300 text-sm">
+                                    {selectedOrder.proofs.length > 1 && selectedOrder.proofs.some(p => p.id !== proof.id && p.status !== 'approved') 
+                                      ? 'Approve this design (you\'ll still need to approve other proofs)'
+                                      : 'This design looks perfect, proceed with production'
+                                    }
+                                  </p>
                                 </div>
                               </div>
                             </div>
@@ -1148,19 +1217,58 @@ export default function ProofsPage() {
                     ))}
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm text-gray-400">Proof Status:</span>
-                    <div className="flex gap-2">
-                      {order.proofs.map((proof: Proof) => (
-                        <span
-                          key={proof.id}
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(proof.status)}`}
-                        >
-                          {getStatusText(proof.status)}
+                  {/* Approval Progress */}
+                  {order.proofs.length > 1 ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-400">Approval Progress:</span>
+                        <span className="text-sm font-medium text-white">
+                          {order.proofs.filter(p => p.status === 'approved').length}/{order.proofs.length} approved
                         </span>
-                      ))}
+                      </div>
+                      
+                      {/* Progress bar */}
+                      <div className="w-full bg-white/10 rounded-full h-2">
+                        <div 
+                          className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-500"
+                          style={{ 
+                            width: `${(order.proofs.filter(p => p.status === 'approved').length / order.proofs.length) * 100}%` 
+                          }}
+                        ></div>
+                      </div>
+                      
+                      {/* Status message */}
+                      {order.proofs.every(p => p.status === 'approved') ? (
+                        <div className="flex items-center gap-2 text-green-400 text-sm">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          All proofs approved - Order in production
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-yellow-400 text-sm">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Waiting for approval on {order.proofs.filter(p => p.status !== 'approved').length} proof{order.proofs.filter(p => p.status !== 'approved').length !== 1 ? 's' : ''}
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm text-gray-400">Proof Status:</span>
+                      <div className="flex gap-2">
+                        {order.proofs.map((proof: Proof) => (
+                          <span
+                            key={proof.id}
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(proof.status)}`}
+                          >
+                            {getStatusText(proof.status)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

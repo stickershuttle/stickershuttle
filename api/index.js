@@ -598,6 +598,10 @@ const typeDefs = gql`
     addUserCredits(input: AddUserCreditsInput!): AddUserCreditsResult!
     addCreditsToAllUsers(amount: Float!, reason: String!): AddCreditsToAllUsersResult!
     applyCreditsToOrder(orderId: ID!, amount: Float!): ApplyCreditsResult!
+    
+    # Credit restoration for abandoned checkouts
+    restoreCreditsForAbandonedCheckout(sessionId: String!, reason: String): RestoreCreditsResult!
+    cleanupAbandonedCheckouts(maxAgeHours: Int): CleanupResult!
 
     # Shared cart mutations
     createSharedCart(input: CreateSharedCartInput!): SharedCartResult!
@@ -620,6 +624,10 @@ const typeDefs = gql`
     createWholesaleClient(input: CreateWholesaleClientInput!): WholesaleClientResult!
     updateWholesaleClient(clientId: ID!, input: UpdateWholesaleClientInput!): WholesaleClientResult!
     deleteWholesaleClient(clientId: ID!): WholesaleClientResult!
+    
+    # Order assignment mutations
+    assignOrderToClient(orderId: ID!, clientId: ID!): OrderAssignmentResult!
+    unassignOrderFromClient(orderId: ID!): OrderAssignmentResult!
     
     # Blog mutations
     insert_blog_posts_one(object: BlogPostInput!): BlogPost!
@@ -775,6 +783,18 @@ const typeDefs = gql`
     client: WholesaleClient
   }
 
+  type OrderAssignmentResult {
+    success: Boolean!
+    message: String
+    order: OrderAssignmentOrder
+  }
+
+  type OrderAssignmentOrder {
+    id: ID!
+    orderNumber: String!
+    wholesaleClientId: ID
+  }
+
   input CreateWholesaleClientInput {
     clientName: String!
     clientEmail: String
@@ -914,6 +934,7 @@ const typeDefs = gql`
   type OrderProof {
     id: ID!
     orderId: ID!
+    orderItemId: ID
     proofUrl: String!
     proofPublicId: String!
     proofTitle: String
@@ -1339,6 +1360,7 @@ const typeDefs = gql`
   }
 
   input OrderProofInput {
+    orderItemId: ID
     proofUrl: String!
     proofPublicId: String!
     proofTitle: String
@@ -1541,6 +1563,22 @@ const typeDefs = gql`
   type ApplyCreditsResult {
     success: Boolean!
     remainingBalance: Float
+    error: String
+  }
+
+  type RestoreCreditsResult {
+    success: Boolean!
+    restoredCredits: Float
+    restoredOrders: [String!]
+    message: String
+    error: String
+  }
+
+  type CleanupResult {
+    success: Boolean!
+    totalRestored: Float
+    restoredSessions: Int
+    message: String
     error: String
   }
 
@@ -1782,6 +1820,7 @@ const resolvers = {
 
   OrderProof: {
     orderId: (parent) => parent.orderId || parent.order_id,
+    orderItemId: (parent) => parent.orderItemId || parent.order_item_id,
     proofUrl: (parent) => parent.proofUrl || parent.proof_url,
     proofPublicId: (parent) => parent.proofPublicId || parent.proof_public_id,
     proofTitle: (parent) => parent.proofTitle || parent.proof_title,
@@ -4006,6 +4045,7 @@ const resolvers = {
         const newProof = {
           id: `proof_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           orderId: orderId,
+          orderItemId: proofData.orderItemId || null, // Link to specific order item
           proofUrl: proofData.proofUrl,
           proofPublicId: proofData.proofPublicId,
           proofTitle: proofData.proofTitle || 'Proof',
@@ -4089,13 +4129,28 @@ const resolvers = {
        // Check if all proofs are approved
        const allApproved = updatedProofs.every(proof => proof.status === 'approved');
        
+       // For item-specific proofs, also check if all items have at least one approved proof
+       const proofsWithItems = updatedProofs.filter(proof => proof.orderItemId);
+       const proofsWithoutItems = updatedProofs.filter(proof => !proof.orderItemId);
+       
+       let allItemsHaveApprovedProofs = true;
+       if (proofsWithItems.length > 0) {
+         // Get unique order item IDs that have proofs
+         const itemIds = [...new Set(proofsWithItems.map(proof => proof.orderItemId))];
+         
+         // Check if each item has at least one approved proof
+         allItemsHaveApprovedProofs = itemIds.every(itemId => 
+           proofsWithItems.some(proof => proof.orderItemId === itemId && proof.status === 'approved')
+         );
+       }
+       
        // Update order with modified proofs and potentially the order-level proof status
        const updateData = { 
          proofs: updatedProofs 
        };
        
-       // If all proofs are approved, update the order-level proof status AND order status
-       if (allApproved) {
+       // If all proofs are approved AND all items have approved proofs, update the order-level proof status
+       if (allApproved && allItemsHaveApprovedProofs) {
          updateData.proof_status = 'approved';
          updateData.order_status = 'Printing'; // Set order to printing when all proofs approved
        } else if (status === 'changes_requested') {
@@ -4577,12 +4632,27 @@ const resolvers = {
        // Check if all proofs are approved
        const allApproved = updatedProofs.every(proof => proof.status === 'approved');
        
+       // For item-specific proofs, also check if all items have at least one approved proof
+       const proofsWithItems = updatedProofs.filter(proof => proof.orderItemId);
+       const proofsWithoutItems = updatedProofs.filter(proof => !proof.orderItemId);
+       
+       let allItemsHaveApprovedProofs = true;
+       if (proofsWithItems.length > 0) {
+         // Get unique order item IDs that have proofs
+         const itemIds = [...new Set(proofsWithItems.map(proof => proof.orderItemId))];
+         
+         // Check if each item has at least one approved proof
+         allItemsHaveApprovedProofs = itemIds.every(itemId => 
+           proofsWithItems.some(proof => proof.orderItemId === itemId && proof.status === 'approved')
+         );
+       }
+       
        // Update order with approved proof
        const { data: updatedOrder, error: updateError } = await client
          .from('orders_main')
          .update({ 
            proofs: updatedProofs,
-           ...(allApproved && { 
+           ...((allApproved && allItemsHaveApprovedProofs) && { 
              proof_status: 'approved',
              order_status: 'Printing' // Changed from 'Ready for Production' to 'Printing'
            })
@@ -6452,6 +6522,37 @@ const resolvers = {
       }
     },
 
+    // Credit restoration resolvers
+    restoreCreditsForAbandonedCheckout: async (_, { sessionId, reason }, context) => {
+      try {
+        // Admin authentication required
+        requireAdminAuth(context.user);
+        
+        return await creditHandlers.restoreCreditsForAbandonedCheckout(sessionId, reason);
+      } catch (error) {
+        console.error('❌ Error restoring credits for abandoned checkout:', error);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+    },
+
+    cleanupAbandonedCheckouts: async (_, { maxAgeHours = 24 }, context) => {
+      try {
+        // Admin authentication required
+        requireAdminAuth(context.user);
+        
+        return await creditHandlers.cleanupAbandonedCheckouts(maxAgeHours);
+      } catch (error) {
+        console.error('❌ Error cleaning up abandoned checkouts:', error);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+    },
+
     // Shared cart mutations
     createSharedCart: async (_, { input }, context) => {
       try {
@@ -7518,6 +7619,146 @@ const resolvers = {
         };
       }
     },
+
+    assignOrderToClient: async (_, { orderId, clientId }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        console.log('🔗 Assigning order to client:', { orderId, clientId });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Order service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Verify the client belongs to this user
+        const { data: existingClient, error: clientError } = await client
+          .from('wholesale_clients')
+          .select('*')
+          .eq('id', clientId)
+          .eq('wholesale_user_id', user.id)
+          .single();
+
+        if (clientError || !existingClient) {
+          throw new Error('Client not found or access denied');
+        }
+
+        // Verify the order belongs to this user
+        const { data: existingOrder, error: orderError } = await client
+          .from('orders_main')
+          .select('*')
+          .eq('id', orderId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (orderError || !existingOrder) {
+          throw new Error('Order not found or access denied');
+        }
+
+        // Update the order to assign it to the client
+        const { data: updatedOrder, error: updateError } = await client
+          .from('orders_main')
+          .update({
+            wholesale_client_id: clientId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', orderId)
+          .select('*')
+          .single();
+
+        if (updateError) {
+          console.error('❌ Error assigning order to client:', updateError);
+          throw new Error(`Failed to assign order: ${updateError.message}`);
+        }
+
+        console.log('✅ Successfully assigned order to client');
+        
+        return {
+          success: true,
+          message: 'Order assigned to client successfully',
+          order: {
+            id: updatedOrder.id,
+            orderNumber: updatedOrder.order_number,
+            wholesaleClientId: updatedOrder.wholesale_client_id
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in assignOrderToClient:', error);
+        return {
+          success: false,
+          message: error.message,
+          order: null
+        };
+      }
+    },
+
+    unassignOrderFromClient: async (_, { orderId }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        console.log('🔗 Unassigning order from client:', orderId);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Order service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Verify the order belongs to this user
+        const { data: existingOrder, error: orderError } = await client
+          .from('orders_main')
+          .select('*')
+          .eq('id', orderId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (orderError || !existingOrder) {
+          throw new Error('Order not found or access denied');
+        }
+
+        // Update the order to remove client assignment
+        const { data: updatedOrder, error: updateError } = await client
+          .from('orders_main')
+          .update({
+            wholesale_client_id: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', orderId)
+          .select('*')
+          .single();
+
+        if (updateError) {
+          console.error('❌ Error unassigning order from client:', updateError);
+          throw new Error(`Failed to unassign order: ${updateError.message}`);
+        }
+
+        console.log('✅ Successfully unassigned order from client');
+        
+        return {
+          success: true,
+          message: 'Order unassigned from client successfully',
+          order: {
+            id: updatedOrder.id,
+            orderNumber: updatedOrder.order_number,
+            wholesaleClientId: updatedOrder.wholesale_client_id
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in unassignOrderFromClient:', error);
+        return {
+          success: false,
+          message: error.message,
+          order: null
+        };
+      }
+    },
     
     // Blog mutation resolvers
     insert_blog_posts_one: async (_, { object }) => {
@@ -7719,465 +7960,44 @@ const resolvers = {
       }
     },
     
-    delete_blog_categories_by_pk: async (_, { id }) => {
+    // Credit restoration resolvers
+    restoreCreditsForAbandonedCheckout: async (_, { sessionId, reason }, context) => {
       try {
-        console.log('🗑️ Deleting blog category:', id);
+        const { userId } = await getAuthenticatedUser(context);
         
-        if (!supabaseClient.isReady()) {
-          throw new Error('Blog service is currently unavailable');
+        // Check if user is admin
+        const isAdmin = await checkAdminPermission(userId);
+        if (!isAdmin) {
+          throw new Error('Admin access required');
         }
         
-        const client = supabaseClient.getServiceClient();
-        
-        // Get the category before deleting
-        const { data: categoryToDelete, error: fetchError } = await client
-          .from('blog_categories')
-          .select('*')
-          .eq('id', id)
-          .single();
-        
-        if (fetchError) {
-          console.error('❌ Error fetching blog category to delete:', fetchError);
-          return null;
-        }
-        
-        // Delete the category
-        const { error } = await client
-          .from('blog_categories')
-          .delete()
-          .eq('id', id);
-        
-        if (error) {
-          console.error('❌ Error deleting blog category:', error);
-          throw new Error(error.message);
-        }
-        
-        console.log('✅ Blog category deleted:', id);
-        return categoryToDelete;
+        return await creditHandlers.restoreCreditsForAbandonedCheckout(sessionId, reason);
       } catch (error) {
-        console.error('❌ Error in delete_blog_categories_by_pk:', error);
-        throw error;
-      }
-    },
-
-    // Klaviyo Mutations
-    subscribeToKlaviyo: async (_, { email, listId }, context) => {
-      const { user } = context;
-      if (!user) {
-        throw new AuthenticationError('Authentication required');
-      }
-
-      try {
-        const result = await klaviyoClient.subscribeToList(email, listId);
-        return {
-          success: result.success,
-          message: 'Successfully subscribed to Klaviyo',
-          profileId: result.profileId,
-          error: null
-        };
-      } catch (error) {
-        console.error('Error subscribing to Klaviyo:', error);
+        console.error('❌ Error restoring credits for abandoned checkout:', error);
         return {
           success: false,
-          message: 'Failed to subscribe to Klaviyo',
-          profileId: null,
           error: error.message
         };
       }
     },
 
-    unsubscribeFromKlaviyo: async (_, { email, listId }, context) => {
-      const { user } = context;
-      if (!user) {
-        throw new AuthenticationError('Authentication required');
-      }
-
+    cleanupAbandonedCheckouts: async (_, { maxAgeHours = 24 }, context) => {
       try {
-        const result = await klaviyoClient.unsubscribeFromList(email, listId);
-        return {
-          success: result.success,
-          message: 'Successfully unsubscribed from Klaviyo',
-          profileId: result.profileId,
-          error: null
-        };
-      } catch (error) {
-        console.error('Error unsubscribing from Klaviyo:', error);
-        return {
-          success: false,
-          message: 'Failed to unsubscribe from Klaviyo',
-          profileId: null,
-          error: error.message
-        };
-      }
-    },
-
-    syncCustomerToKlaviyo: async (_, { customerData }, context) => {
-      const { user } = context;
-      if (!user) {
-        throw new AuthenticationError('Authentication required');
-      }
-
-      try {
-        const result = await klaviyoClient.syncCustomerToKlaviyo(customerData);
-        return {
-          success: result.success,
-          message: result.success ? 'Customer synced to Klaviyo successfully' : 'Failed to sync customer to Klaviyo',
-          profileId: null,
-          error: result.error || null
-        };
-      } catch (error) {
-        console.error('Error syncing customer to Klaviyo:', error);
-        return {
-          success: false,
-          message: 'Failed to sync customer to Klaviyo',
-          profileId: null,
-          error: error.message
-        };
-      }
-    },
-
-    bulkSyncCustomersToKlaviyo: async (_, { customers }, context) => {
-      const { user } = context;
-      if (!user) {
-        throw new AuthenticationError('Authentication required');
-      }
-
-      try {
-        const result = await klaviyoClient.bulkSyncCustomers(customers);
-        return {
-          success: result.success,
-          failed: result.failed,
-          total: customers.length,
-          errors: result.errors
-        };
-      } catch (error) {
-        console.error('Error bulk syncing customers to Klaviyo:', error);
-        return {
-          success: 0,
-          failed: customers.length,
-          total: customers.length,
-          errors: [{ email: 'bulk_sync_error', error: error.message }]
-        };
-      }
-    },
-
-    updateCustomerSubscription: async (_, { email, subscribed }, context) => {
-      const { user } = context;
-      if (!user) {
-        throw new AuthenticationError('Authentication required');
-      }
-
-      try {
-        // Update in local database
-        const client = supabaseClient.getServiceClient();
-        const { data: customer, error } = await client
-          .from('customers')
-          .update({ marketing_opt_in: subscribed })
-          .eq('email', email)
-          .select('*')
-          .single();
-
-        if (error) {
-          throw new Error(`Failed to update customer subscription: ${error.message}`);
-        }
-
-        // Sync with Klaviyo
-        if (subscribed) {
-          await klaviyoClient.subscribeToList(email);
-        } else {
-          await klaviyoClient.unsubscribeFromList(email);
-        }
-
-        return {
-          success: true,
-          message: `Customer ${subscribed ? 'subscribed' : 'unsubscribed'} successfully`,
-          customer: {
-            id: customer.id,
-            email: customer.email,
-            firstName: customer.first_name,
-            lastName: customer.last_name,
-            city: customer.city,
-            state: customer.state,
-            country: customer.country,
-            totalOrders: customer.total_orders,
-            totalSpent: customer.total_spent,
-            averageOrderValue: customer.average_order_value,
-            marketingOptIn: customer.marketing_opt_in,
-            lastOrderDate: customer.last_order_date,
-            firstOrderDate: customer.first_order_date,
-            orders: []
-          }
-        };
-      } catch (error) {
-        console.error('Error updating customer subscription:', error);
-        return {
-          success: false,
-          message: 'Failed to update customer subscription',
-          customer: null
-        };
-      }
-    },
-
-    trackKlaviyoEvent: async (_, { email, eventName, properties }, context) => {
-      // Note: We're removing the authentication requirement here because
-      // we need to track events for guest users too (e.g., abandoned carts)
-      // The email parameter is sufficient for tracking
-
-      try {
-        const result = await klaviyoClient.trackEvent(email, eventName, properties);
-        return {
-          success: result.success,
-          message: result.success ? 'Event tracked successfully' : 'Failed to track event',
-          profileId: null,
-          error: result.error || null
-        };
-      } catch (error) {
-        console.error('Error tracking Klaviyo event:', error);
-        return {
-          success: false,
-          message: 'Failed to track event',
-          profileId: null,
-          error: error.message
-        };
-      }
-    },
-
-    syncAllCustomersToKlaviyo: async (_, args, context) => {
-      const { user } = context;
-      if (!user) {
-        throw new AuthenticationError('Authentication required');
-      }
-
-      try {
-        // Get all customers from database
-        const client = supabaseClient.getServiceClient();
-        const { data: customers, error } = await client
-          .from('customers')
-          .select('*');
-
-        if (error) {
-          throw new Error(`Failed to fetch customers: ${error.message}`);
-        }
-
-        // Format customers for Klaviyo
-        const klaviyoCustomers = customers.map(customer => ({
-          email: customer.email,
-          firstName: customer.first_name,
-          lastName: customer.last_name,
-          phone: customer.phone,
-          city: customer.city,
-          state: customer.state,
-          country: customer.country,
-          totalOrders: customer.total_orders,
-          totalSpent: customer.total_spent,
-          averageOrderValue: customer.average_order_value,
-          firstOrderDate: customer.first_order_date,
-          lastOrderDate: customer.last_order_date,
-          marketingOptIn: customer.marketing_opt_in
-        }));
-
-        const result = await klaviyoClient.bulkSyncCustomers(klaviyoCustomers);
-        return {
-          success: result.success,
-          failed: result.failed,
-          total: klaviyoCustomers.length,
-          errors: result.errors
-        };
-      } catch (error) {
-        console.error('Error syncing all customers to Klaviyo:', error);
-        return {
-          success: 0,
-          failed: 0,
-          total: 0,
-          errors: [{ email: 'sync_all_error', error: error.message }]
-        };
-      }
-    },
-
-    // Sitewide Alert mutations
-    createSitewideAlert: async (_, { input }, context) => {
-      const { user } = context;
-      if (!user) {
-        throw new AuthenticationError('Authentication required');
-      }
-
-      try {
-        if (!supabaseClient.isReady()) {
-          throw new Error('Alert service is currently unavailable');
-        }
-
-        const client = supabaseClient.getServiceClient();
-        const { data: alert, error } = await client
-          .from('sitewide_alerts')
-          .insert({
-            title: input.title,
-            message: input.message,
-            background_color: input.backgroundColor || '#FFD700',
-            text_color: input.textColor || '#030140',
-            link_url: input.linkUrl,
-            link_text: input.linkText,
-            is_active: input.isActive || false,
-            start_date: input.startDate,
-            end_date: input.endDate,
-            created_by: user.email
-          })
-          .select('*')
-          .single();
-
-        if (error) {
-          console.error('❌ Error creating alert:', error);
-          throw new Error('Failed to create alert');
-        }
-
-        return {
-          id: String(alert.id),
-          title: alert.title,
-          message: alert.message,
-          backgroundColor: alert.background_color,
-          textColor: alert.text_color,
-          linkUrl: alert.link_url,
-          linkText: alert.link_text,
-          isActive: alert.is_active,
-          startDate: alert.start_date,
-          endDate: alert.end_date,
-          createdAt: alert.created_at,
-          updatedAt: alert.updated_at,
-          createdBy: alert.created_by
-        };
-      } catch (error) {
-        console.error('Error creating sitewide alert:', error);
-        throw new Error(error.message);
-      }
-    },
-
-    updateSitewideAlert: async (_, { id, input }, context) => {
-      const { user } = context;
-      if (!user) {
-        throw new AuthenticationError('Authentication required');
-      }
-
-      try {
-        if (!supabaseClient.isReady()) {
-          throw new Error('Alert service is currently unavailable');
-        }
-
-        const client = supabaseClient.getServiceClient();
-        const updateData = {};
+        const { userId } = await getAuthenticatedUser(context);
         
-        if (input.title !== undefined) updateData.title = input.title;
-        if (input.message !== undefined) updateData.message = input.message;
-        if (input.backgroundColor !== undefined) updateData.background_color = input.backgroundColor;
-        if (input.textColor !== undefined) updateData.text_color = input.textColor;
-        if (input.linkUrl !== undefined) updateData.link_url = input.linkUrl;
-        if (input.linkText !== undefined) updateData.link_text = input.linkText;
-        if (input.isActive !== undefined) updateData.is_active = input.isActive;
-        if (input.startDate !== undefined) updateData.start_date = input.startDate;
-        if (input.endDate !== undefined) updateData.end_date = input.endDate;
-
-        const { data: alert, error } = await client
-          .from('sitewide_alerts')
-          .update(updateData)
-          .eq('id', id)
-          .select('*')
-          .single();
-
-        if (error) {
-          console.error('❌ Error updating alert:', error);
-          throw new Error('Failed to update alert');
+        // Check if user is admin
+        const isAdmin = await checkAdminPermission(userId);
+        if (!isAdmin) {
+          throw new Error('Admin access required');
         }
-
+        
+        return await creditHandlers.cleanupAbandonedCheckouts(maxAgeHours);
+      } catch (error) {
+        console.error('❌ Error cleaning up abandoned checkouts:', error);
         return {
-          id: String(alert.id),
-          title: alert.title,
-          message: alert.message,
-          backgroundColor: alert.background_color,
-          textColor: alert.text_color,
-          linkUrl: alert.link_url,
-          linkText: alert.link_text,
-          isActive: alert.is_active,
-          startDate: alert.start_date,
-          endDate: alert.end_date,
-          createdAt: alert.created_at,
-          updatedAt: alert.updated_at,
-          createdBy: alert.created_by
+          success: false,
+          error: error.message
         };
-      } catch (error) {
-        console.error('Error updating sitewide alert:', error);
-        throw new Error(error.message);
-      }
-    },
-
-    deleteSitewideAlert: async (_, { id }, context) => {
-      const { user } = context;
-      if (!user) {
-        throw new AuthenticationError('Authentication required');
-      }
-
-      try {
-        if (!supabaseClient.isReady()) {
-          throw new Error('Alert service is currently unavailable');
-        }
-
-        const client = supabaseClient.getServiceClient();
-        const { error } = await client
-          .from('sitewide_alerts')
-          .delete()
-          .eq('id', id);
-
-        if (error) {
-          console.error('❌ Error deleting alert:', error);
-          throw new Error('Failed to delete alert');
-        }
-
-        return true;
-      } catch (error) {
-        console.error('Error deleting sitewide alert:', error);
-        throw new Error(error.message);
-      }
-    },
-
-    toggleSitewideAlert: async (_, { id, isActive }, context) => {
-      const { user } = context;
-      if (!user) {
-        throw new AuthenticationError('Authentication required');
-      }
-
-      try {
-        if (!supabaseClient.isReady()) {
-          throw new Error('Alert service is currently unavailable');
-        }
-
-        const client = supabaseClient.getServiceClient();
-        const { data: alert, error } = await client
-          .from('sitewide_alerts')
-          .update({ is_active: isActive })
-          .eq('id', id)
-          .select('*')
-          .single();
-
-        if (error) {
-          console.error('❌ Error toggling alert:', error);
-          throw new Error('Failed to toggle alert');
-        }
-
-        return {
-          id: String(alert.id),
-          title: alert.title,
-          message: alert.message,
-          backgroundColor: alert.background_color,
-          textColor: alert.text_color,
-          linkUrl: alert.link_url,
-          linkText: alert.link_text,
-          isActive: alert.is_active,
-          startDate: alert.start_date,
-          endDate: alert.end_date,
-          createdAt: alert.created_at,
-          updatedAt: alert.updated_at,
-          createdBy: alert.created_by
-        };
-      } catch (error) {
-        console.error('Error toggling sitewide alert:', error);
-        throw new Error(error.message);
       }
     }
   }

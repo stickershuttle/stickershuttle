@@ -127,8 +127,6 @@ export const APPLY_CREDITS_TO_ORDER = gql`
   }
 `;
 
-
-
 // Get earned points/credits per order for the user
 export const GET_USER_EARNED_CREDITS_BY_ORDER = gql`
   query GetUserEarnedCreditsByOrder($userId: String!) {
@@ -142,6 +140,32 @@ export const GET_USER_EARNED_CREDITS_BY_ORDER = gql`
         orderNumber
         createdAt
       }
+    }
+  }
+`;
+
+// Restore credits for abandoned checkout
+export const RESTORE_CREDITS_FOR_ABANDONED_CHECKOUT = gql`
+  mutation RestoreCreditsForAbandonedCheckout($sessionId: String!, $reason: String) {
+    restoreCreditsForAbandonedCheckout(sessionId: $sessionId, reason: $reason) {
+      success
+      restoredCredits
+      restoredOrders
+      message
+      error
+    }
+  }
+`;
+
+// Cleanup abandoned checkouts
+export const CLEANUP_ABANDONED_CHECKOUTS = gql`
+  mutation CleanupAbandonedCheckouts($maxAgeHours: Int) {
+    cleanupAbandonedCheckouts(maxAgeHours: $maxAgeHours) {
+      success
+      totalRestored
+      restoredSessions
+      message
+      error
     }
   }
 `; 

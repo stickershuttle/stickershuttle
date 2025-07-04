@@ -106,4 +106,34 @@ export const DELETE_WHOLESALE_CLIENT = gql`
       }
     }
   }
+`;
+
+// Assign order to client
+export const ASSIGN_ORDER_TO_CLIENT = gql`
+  mutation AssignOrderToClient($orderId: ID!, $clientId: ID!) {
+    assignOrderToClient(orderId: $orderId, clientId: $clientId) {
+      success
+      message
+      order {
+        id
+        orderNumber
+        wholesaleClientId
+      }
+    }
+  }
+`;
+
+// Unassign order from client
+export const UNASSIGN_ORDER_FROM_CLIENT = gql`
+  mutation UnassignOrderFromClient($orderId: ID!) {
+    unassignOrderFromClient(orderId: $orderId) {
+      success
+      message
+      order {
+        id
+        orderNumber
+        wholesaleClientId
+      }
+    }
+  }
 `; 

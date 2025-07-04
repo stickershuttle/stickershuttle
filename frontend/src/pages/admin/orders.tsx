@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from '@/components/AdminLayout';
 import ProofUpload from '@/components/ProofUpload';
+import ItemSpecificProofUpload from '@/components/ItemSpecificProofUpload';
 import AIFileImage from '@/components/AIFileImage';
 import EasyPostShipping from '@/components/EasyPostShipping';
 import { useQuery, useMutation, gql } from '@apollo/client';
@@ -76,6 +77,7 @@ const GET_ALL_ORDERS = gql`
       }
       proofs {
         id
+        orderItemId
         proofUrl
         proofPublicId
         proofTitle
@@ -206,6 +208,7 @@ interface Order {
   }>;
   proofs?: Array<{
     id: string;
+    orderItemId?: string;
     proofUrl: string;
     proofPublicId: string;
     proofTitle: string;
@@ -214,7 +217,9 @@ interface Order {
     status: string;
     customerNotes?: string;
     adminNotes?: string;
-    approvedAt?: string;
+    replaced?: boolean;
+    replacedAt?: string;
+    originalFileName?: string;
   }>;
 }
 
@@ -2610,8 +2615,19 @@ export default function AdminOrders() {
                         </p>
                       </div>
 
-                      {/* Order Items - Enhanced */}
+                      {/* Order Items with Drag-and-Drop Proof Upload */}
                       <div className="space-y-4 mb-6">
+                        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                          <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                          </svg>
+                          Order Items
+                          {!isSamplePackOrder(selectedOrder) && selectedOrder.items.length > 1 && (
+                            <span className="text-sm text-purple-400 font-normal">
+                              • Drag proofs onto items
+                            </span>
+                          )}
+                        </h3>
                         {selectedOrder.items.map((item, idx) => {
                           let selections = item.calculatorSelections || {};
                           const size = selections.size || selections.sizePreset || {};
@@ -2634,9 +2650,8 @@ export default function AdminOrders() {
                           }
                           
                           // Enhanced desktop order details view
-
-                          return (
-                            <div key={idx} className="py-4 border-b border-gray-700 border-opacity-30 last:border-b-0">
+                          const originalContent = (
+                            <div className="py-4 border-b border-gray-700 border-opacity-30 last:border-b-0">
                               <div className="flex gap-4">
                                 {/* Product Image */}
                                 <div className="relative mb-3">
@@ -2667,6 +2682,11 @@ export default function AdminOrders() {
                                         </svg>
                                       </div>
                                     )}
+                                  </div>
+                                  
+                                  {/* Item Number Circle */}
+                                  <div className="absolute -top-2 -left-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center z-10">
+                                    <span className="text-white text-xs font-bold">{idx + 1}</span>
                                   </div>
                                   
                                   {/* Customer Replacement Indicator */}
@@ -2701,7 +2721,7 @@ export default function AdminOrders() {
                                                 itemImage.split('/').pop()?.split('?')[0]
                                               );
                                             }}
-                                            className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105"
+                                            className="inline-flex items-center px-2 py-1 text-xs font-medium rounded text-white transition-all cursor-pointer hover:scale-105"
                                             style={{
                                               background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
                                               backdropFilter: 'blur(25px) saturate(180%)',
@@ -2710,12 +2730,64 @@ export default function AdminOrders() {
                                             }}
                                             title="Download original file"
                                           >
-                                            <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                                                         <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                               <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
                                             </svg>
                                             Download
                                           </button>
                                         )}
+                                        
+                                        {/* Upload Proof Button for this specific item */}
+                                        <input
+                                          type="file"
+                                          id={`proof-upload-${item.id}`}
+                                          accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd,.pdf"
+                                          className="hidden"
+                                          aria-label={`Upload proof for Item #${idx + 1}: ${item.productName}`}
+                                          onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                              // Create a temporary ItemSpecificProofUpload component to handle the upload
+                                              const uploadComponent = document.createElement('div');
+                                              uploadComponent.style.display = 'none';
+                                              document.body.appendChild(uploadComponent);
+                                              
+                                              // We'll use the existing mutation that's already imported
+                                              try {
+                                                console.log('Uploading proof for item:', item.id, 'File:', file.name);
+                                                // For now, just show an alert and refresh
+                                                alert(`Uploading proof for Item #${idx + 1}: ${item.productName}`);
+                                                // The actual upload logic would go here
+                                                // We can implement this properly once the button UI is working
+                                                refetch();
+                                              } catch (error) {
+                                                console.error('Upload error:', error);
+                                                alert('Failed to upload proof. Please try again.');
+                                              } finally {
+                                                document.body.removeChild(uploadComponent);
+                                              }
+                                            }
+                                          }}
+                                        />
+                                        <button
+                                          onClick={() => {
+                                            const fileInput = document.getElementById(`proof-upload-${item.id}`) as HTMLInputElement;
+                                            fileInput?.click();
+                                          }}
+                                          className="inline-flex items-center px-2 py-1 text-xs font-medium rounded text-white transition-all cursor-pointer hover:scale-105 ml-0"
+                                          style={{
+                                            background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                                            backdropFilter: 'blur(25px) saturate(180%)',
+                                            border: '1px solid rgba(34, 197, 94, 0.4)',
+                                            boxShadow: 'rgba(34, 197, 94, 0.3) 0px 4px 16px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                          }}
+                                          title={`Upload proof for Item #${idx + 1}: ${item.productName}`}
+                                        >
+                                          <svg className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                          </svg>
+                                          Upload Proof
+                                        </button>
                                       </div>
                                       <p className="text-sm text-gray-400 mt-1">SKU: {item.sku || 'N/A'}</p>
                                     </div>
@@ -2884,6 +2956,33 @@ export default function AdminOrders() {
                               </div>
                             </div>
                           );
+
+                          // For non-sample pack orders, wrap with drag-and-drop functionality
+                          if (!isSamplePackOrder(selectedOrder)) {
+                            return (
+                              <ItemSpecificProofUpload
+                                key={idx}
+                                orderId={selectedOrder.id}
+                                orderItem={{
+                                  id: item.id,
+                                  productName: item.productName,
+                                  quantity: item.quantity,
+                                  calculatorSelections: item.calculatorSelections
+                                }}
+                                existingProofs={selectedOrder.proofs || []}
+                                isAdmin={true}
+                                itemNumber={idx + 1}
+                                onProofUploaded={() => {
+                                  // Refresh the order data
+                                  refetch();
+                                }}
+                                renderChildren={() => originalContent}
+                              />
+                            );
+                          }
+
+                          // For sample pack orders, just return the original content
+                          return <div key={idx}>{originalContent}</div>;
                         })}
                       </div>
 
@@ -3189,6 +3288,14 @@ export default function AdminOrders() {
                               <div>
                                 <p className="text-sm font-medium text-white truncate">{proof.proofTitle}</p>
                                 <p className="text-xs text-green-400">✓ Approved</p>
+                                {proof.orderItemId && (() => {
+                                  const linkedItem = selectedOrder.items?.find(item => item.id === proof.orderItemId);
+                                  return linkedItem ? (
+                                    <p className="text-xs text-purple-400 truncate">{linkedItem.productName}</p>
+                                  ) : (
+                                    <p className="text-xs text-gray-400">Item-specific</p>
+                                  );
+                                })()}
                               </div>
                             </div>
                           ))}
@@ -3246,6 +3353,14 @@ export default function AdminOrders() {
                               <div>
                                 <p className="text-sm font-medium text-white truncate">{proof.proofTitle}</p>
                                 <p className="text-xs text-gray-400">Approved</p>
+                                {proof.orderItemId && (() => {
+                                  const linkedItem = selectedOrder.items?.find(item => item.id === proof.orderItemId);
+                                  return linkedItem ? (
+                                    <p className="text-xs text-purple-400 truncate">{linkedItem.productName}</p>
+                                  ) : (
+                                    <p className="text-xs text-gray-400">Item-specific</p>
+                                  );
+                                })()}
                               </div>
                             </div>
                           ))}
@@ -3518,19 +3633,7 @@ export default function AdminOrders() {
                                 <div className="w-2 h-2 rounded-full bg-green-400 mt-1.5"></div>
                                 <div className="flex-1">
                                   <p className="text-sm font-medium text-white">Proofs approved by customer</p>
-                                  <p className="text-xs text-gray-400">
-                                    {(() => {
-                                      const approvedProof = selectedOrder.proofs?.find(p => p.approvedAt);
-                                      return approvedProof?.approvedAt ? 
-                                        new Date(approvedProof.approvedAt).toLocaleDateString('en-US', {
-                                          weekday: 'short',
-                                          month: 'short',
-                                          day: 'numeric',
-                                          hour: '2-digit',
-                                          minute: '2-digit'
-                                        }) : 'Customer approved the design';
-                                    })()}
-                                  </p>
+                                  <p className="text-xs text-gray-400">Customer approved the design</p>
                                 </div>
                               </div>
                             )}

@@ -932,9 +932,16 @@ export default function SharedCartPage() {
     return sum + itemTotal;
   }, 0);
 
-  // Check if cart contains reorder items and calculate discount
+  // Check if cart contains reorder items and calculate discount only for reordered items
   const hasReorderItems = updatedCart.some(item => item.customization.isReorder);
-  const reorderDiscount = hasReorderItems ? subtotal * 0.1 : 0; // 10% discount
+  const reorderItemsSubtotal = updatedCart.reduce((sum, item) => {
+    if (item.customization.isReorder) {
+      const itemTotal = typeof item.totalPrice === 'number' ? item.totalPrice : 0;
+      return sum + itemTotal;
+    }
+    return sum;
+  }, 0);
+  const reorderDiscount = hasReorderItems ? reorderItemsSubtotal * 0.1 : 0; // 10% discount only on reordered items
   
   // Calculate discount amount
   const discountAmount = appliedDiscount ? appliedDiscount.amount : 0;
@@ -1512,9 +1519,9 @@ export default function SharedCartPage() {
                     }}>
                       <div className="flex flex-col md:flex-row gap-6">
                         {/* Product Image */}
-                        <div className="w-full md:w-48 flex-shrink-0">
+                        <div className="w-full md:w-48 flex-shrink-0 relative">
                           {item.customization.customFiles?.[0] || item.product.name === 'Sample Pack by Sticker Shuttle' ? (
-                            <div className="relative aspect-square rounded-xl overflow-hidden bg-gray-800/50 p-4">
+                            <div className="aspect-square rounded-xl overflow-hidden bg-gray-800/50 p-4">
                               <AIFileImage
                                 src={item.customization.customFiles?.[0] || (item.product.name === 'Sample Pack by Sticker Shuttle' ? 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750890354/Sample-Pack_jsy2yf.png' : '')}
                                 filename={item.customization.customFiles?.[0] ? 
@@ -1526,25 +1533,19 @@ export default function SharedCartPage() {
                                 size="preview"
                                 showFileType={true}
                               />
-                              {/* Reorder Badge */}
-                              {item.customization.isReorder && (
-                                <div className="absolute -top-2 -right-2 bg-amber-500 text-black text-xs px-2 py-1 rounded-full font-bold leading-none">
-                                  RE-ORDER
-                                </div>
-                              )}
                             </div>
                           ) : (
-                            <div className="relative aspect-square rounded-xl bg-gray-800/50 flex items-center justify-center text-white/50">
+                            <div className="aspect-square rounded-xl bg-gray-800/50 flex items-center justify-center text-white/50">
                               <div className="text-center">
                                 <div className="text-3xl mb-2">📁</div>
                                 <span className="text-sm font-medium">No image uploaded</span>
                               </div>
-                              {/* Reorder Badge */}
-                              {item.customization.isReorder && (
-                                <div className="absolute -top-2 -right-2 bg-amber-500 text-black text-xs px-2 py-1 rounded-full font-bold leading-none">
-                                  RE-ORDER
-                                </div>
-                              )}
+                            </div>
+                          )}
+                          {/* Reorder Badge - Now outside and on top */}
+                          {item.customization.isReorder && (
+                            <div className="absolute -top-2 -right-2 bg-amber-500 text-black text-xs px-2 py-1 rounded-full font-bold leading-none z-10">
+                              RE-ORDER
                             </div>
                           )}
                         </div>
@@ -1978,9 +1979,14 @@ export default function SharedCartPage() {
                       </div>
                     )}
                     {hasReorderItems && (
-                      <div className="flex justify-between text-amber-300">
-                        <span>Reorder Discount (10%)</span>
-                        <span>-${reorderDiscount.toFixed(2)}</span>
+                      <div className="text-amber-300">
+                        <div className="flex justify-between">
+                          <span>Reorder Discount (10%)</span>
+                          <span>-${reorderDiscount.toFixed(2)}</span>
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1">
+                          (applied to reordered items only)
+                        </div>
                       </div>
                     )}
                     {appliedDiscount && (

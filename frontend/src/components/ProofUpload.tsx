@@ -156,6 +156,7 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
   const [pdfAnalysisResults, setPdfAnalysisResults] = useState<{[key: string]: any}>({});
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [noteText, setNoteText] = useState<string>('');
+
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replaceFileInputRef = useRef<HTMLInputElement>(null);
@@ -240,22 +241,18 @@ export default function ProofUpload({ orderId, onProofUploaded, proofStatus, exi
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    console.log('🎯 Drag over');
     setDragActive(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
-    console.log('🎯 Drag leave');
     setDragActive(false);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    console.log('📥 Drop event triggered');
     setDragActive(false);
     const files = Array.from(e.dataTransfer.files);
-    console.log('📥 Dropped files:', files.length, files);
     handleFiles(files);
   };
 
@@ -450,6 +447,8 @@ Please try re-uploading or contact support.`);
           }
         }
       });
+
+
 
       // Remove the temporary upload item since it's now saved to database
       setProofFiles(prev => prev.filter(p => p.id !== proofId));
@@ -941,7 +940,7 @@ Please try re-uploading or contact support.`);
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6">      
       {/* Cut Line Selection - Simplified */}
       {!hideCutLinesSection && isAdmin && (
         <div className="mb-6 p-4 rounded-lg" style={{
@@ -1006,21 +1005,39 @@ Please try re-uploading or contact support.`);
           >
             <div className="flex items-start gap-4">
               {/* Preview */}
-              {proof.proofUrl ? (
-                <FilePreview 
-                  fileUrl={proof.proofUrl} 
-                  fileName={proof.proofTitle || 'Design Proof'} 
-                  size="medium" 
-                />
-              ) : (
-                <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
-                  <div className="w-full h-full flex items-center justify-center">
-                    <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
+              <div className="relative">
+                {proof.proofUrl ? (
+                  <FilePreview 
+                    fileUrl={proof.proofUrl} 
+                    fileName={proof.proofTitle || 'Design Proof'} 
+                    size="medium" 
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
+                    <div className="w-full h-full flex items-center justify-center">
+                      <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+                
+                {/* Item Number Circle for item-specific proofs */}
+                {proof.orderItemId && (() => {
+                  const itemIndex = orderItems?.findIndex(item => item.id === proof.orderItemId);
+                  
+                  return itemIndex !== undefined && itemIndex >= 0 ? (
+                    <div className="absolute -top-2 -left-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center z-10">
+                      <span className="text-white text-xs font-bold">{itemIndex + 1}</span>
+                    </div>
+                  ) : (
+                    // Fallback: Show a generic indicator if we can't find the item
+                    <div className="absolute -top-2 -left-2 w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center z-10">
+                      <span className="text-white text-xs font-bold">?</span>
+                    </div>
+                  );
+                })()}
+              </div>
 
               {/* File Info */}
               <div className="flex-1">
@@ -1028,6 +1045,22 @@ Please try re-uploading or contact support.`);
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium text-white">{proof.proofTitle || 'Design Proof'}</p>
+                      {proof.orderItemId && (() => {
+                        const linkedItem = orderItems?.find(item => item.id === proof.orderItemId);
+                        const itemIndex = orderItems?.findIndex(item => item.id === proof.orderItemId);
+                        return linkedItem ? (
+                          <span className="px-2 py-0.5 text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-full flex items-center gap-1">
+                            <span className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                              <span className="text-white text-xs font-bold">{(itemIndex !== undefined ? itemIndex : 0) + 1}</span>
+                            </span>
+                            {linkedItem.productName}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 text-xs font-medium bg-gray-500/20 text-gray-400 border border-gray-500/30 rounded-full">
+                            Item-specific
+                          </span>
+                        );
+                      })()}
                       {proof.replaced && (
                         <span className="px-2 py-0.5 text-xs font-medium bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-full">
                           Replaced
@@ -1350,6 +1383,8 @@ Please try re-uploading or contact support.`);
             }`}
             style={{
               backgroundColor: dragActive ? 'rgba(156, 163, 175, 0.1)' : 'transparent',
+              position: 'relative',
+              zIndex: 1, // Lower than ItemSpecificProofUpload components
               ...(dragActive ? {} : {
                 '&:hover': {
                   backgroundColor: 'rgba(156, 163, 175, 0.02)'
@@ -1370,6 +1405,7 @@ Please try re-uploading or contact support.`);
                 e.currentTarget.style.backgroundColor = 'transparent';
               }
             }}
+            data-drop-zone="general"
           >
             <div className="flex flex-col items-center">
               <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
