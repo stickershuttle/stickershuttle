@@ -636,6 +636,23 @@ async function handleCheckoutSessionCompleted(session) {
         if (!transactionError && transactionResult) {
           console.log('✅ Order updated successfully in transaction');
           updatedOrder = transactionResult;
+          
+          // Update shipping method fields separately since RPC functions don't include them
+          console.log('📦 Updating shipping method fields separately:', {
+            shipping_method: shippingMethodName,
+            is_express_shipping: isExpressShipping,
+            is_rush_order: isRushOrder
+          });
+          
+          await client
+            .from('orders_main')
+            .update({ 
+              shipping_method: shippingMethodName,
+              is_express_shipping: isExpressShipping,
+              is_rush_order: isRushOrder,
+              shipping_address: updateData.shipping_address
+            })
+            .eq('id', existingOrderId);
         } else {
           console.log('⚠️ Transaction function not available, falling back to individual operations...');
           
@@ -662,6 +679,22 @@ async function handleCheckoutSessionCompleted(session) {
             await client
               .from('orders_main')
               .update({ shipping_address: updateData.shipping_address })
+              .eq('id', existingOrderId);
+              
+            // Update shipping method fields separately since RPC functions don't include them
+            console.log('📦 Updating shipping method fields separately:', {
+              shipping_method: shippingMethodName,
+              is_express_shipping: isExpressShipping,
+              is_rush_order: isRushOrder
+            });
+            
+            await client
+              .from('orders_main')
+              .update({ 
+                shipping_method: shippingMethodName,
+                is_express_shipping: isExpressShipping,
+                is_rush_order: isRushOrder
+              })
               .eq('id', existingOrderId);
           } else {
             // Final fallback to standard update if RPC function doesn't exist or fails
