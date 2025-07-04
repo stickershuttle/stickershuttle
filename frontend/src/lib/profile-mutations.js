@@ -1,5 +1,7 @@
 import { gql } from '@apollo/client';
 
+// Profile mutations for user management - Updated to clear build cache
+
 // Update user profile names (for email/password signups)
 export const UPDATE_USER_PROFILE_NAMES = gql`
   mutation UpdateUserProfileNames($userId: ID!, $firstName: String!, $lastName: String!) {
@@ -47,6 +49,12 @@ export const GET_USER_PROFILE = gql`
       bio
       profilePhotoUrl
       bannerImageUrl
+      companyName
+      isWholesaleCustomer
+      wholesaleCreditRate
+      wholesaleMonthlyCustomers
+      wholesaleOrderingFor
+      wholesaleFitExplanation
       createdAt
       updatedAt
     }
@@ -122,6 +130,47 @@ export const UPDATE_USER_PROFILE_COMPREHENSIVE = gql`
         bannerImageUrl
         bannerImagePublicId
         bio
+        updatedAt
+      }
+    }
+  }
+`;
+
+// Create wholesale user profile (for wholesale signups)
+export const CREATE_WHOLESALE_USER_PROFILE = gql`
+  mutation CreateWholesaleUserProfile($userId: ID!, $input: WholesaleUserProfileInput!) {
+    createWholesaleUserProfile(userId: $userId, input: $input) {
+      success
+      message
+      userProfile {
+        id
+        userId
+        firstName
+        lastName
+        companyName
+        isWholesaleCustomer
+        wholesaleCreditRate
+        wholesaleMonthlyCustomers
+        wholesaleOrderingFor
+        wholesaleFitExplanation
+        createdAt
+        updatedAt
+      }
+    }
+  }
+`;
+
+// Update wholesale status
+export const UPDATE_WHOLESALE_STATUS = gql`
+  mutation UpdateWholesaleStatus($userId: ID!, $isWholesaleCustomer: Boolean!, $wholesaleCreditRate: Float) {
+    updateWholesaleStatus(userId: $userId, isWholesaleCustomer: $isWholesaleCustomer, wholesaleCreditRate: $wholesaleCreditRate) {
+      success
+      message
+      userProfile {
+        id
+        userId
+        isWholesaleCustomer
+        wholesaleCreditRate
         updatedAt
       }
     }
