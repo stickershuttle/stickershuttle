@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from '@/components/AdminLayout';
 import { getSupabase } from '../../lib/supabase';
+import DealCalendar from '../../components/DealCalendar';
+import DealModal from '../../components/DealModal';
 
 // Admin emails - same as in orders.tsx
 const ADMIN_EMAILS = ['justin@stickershuttle.com'];
@@ -19,6 +21,10 @@ interface Deal {
     quantity: number;
     price: number;
   };
+  // New scheduling fields
+  startDate?: string;
+  endDate?: string;
+  isScheduled?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -54,6 +60,12 @@ export default function AdminDeals() {
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Calendar and modal state
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalDeal, setModalDeal] = useState<Deal | null>(null);
 
   // Form state
   const [formData, setFormData] = useState<Deal>(defaultDeal);
@@ -221,6 +233,33 @@ export default function AdminDeals() {
     setFormData(defaultDeal);
   };
 
+  // Calendar handlers
+  const handleDateClick = (date: string) => {
+    setSelectedDate(date);
+    setModalDeal(null);
+    setIsModalOpen(true);
+  };
+
+  const handleDealClick = (deal: Deal) => {
+    setModalDeal(deal);
+    setSelectedDate('');
+    setIsModalOpen(true);
+  };
+
+  const handleModalSave = (deal: Deal) => {
+    if (modalDeal) {
+      // Update existing deal
+      const updatedDeals = deals.map(d => d.id === deal.id ? deal : d);
+      saveDeals(updatedDeals);
+    } else {
+      // Create new deal
+      saveDeals([...deals, deal]);
+    }
+    setIsModalOpen(false);
+    setModalDeal(null);
+    setSelectedDate('');
+  };
+
   if (loading) {
     return (
       <AdminLayout title="Deals Management - Admin">
@@ -339,26 +378,42 @@ export default function AdminDeals() {
           </div>
 
           {/* Header with Create Button */}
-          <div className="mb-6 flex justify-start">
-            {!isEditing && (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-semibold text-white text-sm transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                  backdropFilter: 'blur(25px) saturate(180%)',
-                  border: '1px solid rgba(59, 130, 246, 0.4)',
-                  boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                }}
-              >
-                <div className="flex items-center space-x-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  <span>Create New Deal</span>
-                </div>
-              </button>
-            )}
+          <div className="mb-6 flex justify-between items-center">
+            <div className="flex space-x-4">
+              {!isEditing && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-semibold text-white text-sm transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                  }}
+                >
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Create New Deal</span>
+                  </div>
+                </button>
+              )}
+            </div>
+            
+            <button
+              onClick={() => setShowCalendar(!showCalendar)}
+              className={`px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-semibold text-white text-sm transition-all duration-300 ${
+                showCalendar ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-600 hover:bg-gray-700'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span>{showCalendar ? 'Hide Calendar' : 'Show Calendar'}</span>
+              </div>
+            </button>
           </div>
 
           {/* Deal Form */}
@@ -516,6 +571,18 @@ export default function AdminDeals() {
             </div>
           )}
 
+          {/* Deal Calendar */}
+          {showCalendar && (
+            <div className="mb-8">
+              <DealCalendar
+                deals={deals}
+                onDateClick={handleDateClick}
+                onDealClick={handleDealClick}
+                selectedDate={selectedDate}
+              />
+            </div>
+          )}
+
           {/* Existing Deals */}
           <div className="glass-container overflow-hidden">
             <div className="px-4 md:px-6 py-4 border-b border-gray-700">
@@ -661,6 +728,19 @@ export default function AdminDeals() {
               )}
             </div>
           </div>
+
+          {/* Deal Modal */}
+          <DealModal
+            isOpen={isModalOpen}
+            onClose={() => {
+              setIsModalOpen(false);
+              setModalDeal(null);
+              setSelectedDate('');
+            }}
+            onSave={handleModalSave}
+            selectedDate={selectedDate}
+            existingDeal={modalDeal}
+          />
         </div>
       </div>
     </AdminLayout>

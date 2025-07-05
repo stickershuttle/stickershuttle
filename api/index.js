@@ -511,6 +511,8 @@ const typeDefs = gql`
     # Admin wholesale queries
     getPendingWholesaleApplications: [UserProfile!]!
     getAllWholesaleCustomers: [UserProfile!]!
+    getWholesaleAnalytics: WholesaleAnalytics!
+    getWholesaleTopPerformers(limit: Int): [WholesalePerformer!]!
     
     # Wholesale client management queries
     getWholesaleClients(userId: ID!): [WholesaleClient!]!
@@ -619,6 +621,7 @@ const typeDefs = gql`
     # Admin wholesale mutations
     approveWholesaleApplication(userId: ID!, approvedBy: ID!): WholesaleApprovalResult!
     rejectWholesaleApplication(userId: ID!, rejectedBy: ID!): WholesaleApprovalResult!
+    updateWholesaleCustomer(userId: ID!, input: UpdateWholesaleCustomerInput!): WholesaleApprovalResult!
     
     # Wholesale client management mutations
     createWholesaleClient(input: CreateWholesaleClientInput!): WholesaleClientResult!
@@ -758,6 +761,48 @@ const typeDefs = gql`
     success: Boolean!
     message: String
     userProfile: UserProfile
+  }
+
+  # Wholesale Analytics Types
+  type WholesaleAnalytics {
+    totalWholesaleCustomers: Int!
+    totalWholesaleRevenue: Float!
+    averageOrderValue: Float!
+    totalOrders: Int!
+    monthlyRevenue: Float!
+    monthlyOrders: Int!
+    growthRate: Float!
+    creditRateDistribution: [CreditRateDistribution!]!
+  }
+
+  type CreditRateDistribution {
+    creditRate: Float!
+    customerCount: Int!
+    percentage: Float!
+  }
+
+  type WholesalePerformer {
+    id: ID!
+    userId: ID!
+    firstName: String
+    lastName: String
+    companyName: String
+    totalOrders: Int!
+    totalRevenue: Float!
+    averageOrderValue: Float!
+    creditRate: Float!
+    lastOrderDate: String
+    monthlyRevenue: Float!
+  }
+
+  input UpdateWholesaleCustomerInput {
+    firstName: String
+    lastName: String
+    companyName: String
+    wholesaleCreditRate: Float
+    wholesaleMonthlyCustomers: String
+    wholesaleOrderingFor: String
+    wholesaleFitExplanation: String
   }
 
   # Wholesale Client Types
@@ -3394,6 +3439,221 @@ const resolvers = {
         return transformedOrders.filter(order => order !== null);
       } catch (error) {
         console.error('❌ Error in getClientOrders:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    // Wholesale analytics queries
+    getWholesaleAnalytics: async (_, args, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        console.log('📊 Fetching wholesale analytics');
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Analytics service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get all wholesale customers
+        const { data: wholesaleCustomers, error: customersError } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('is_wholesale_customer', true);
+
+        if (customersError) {
+          throw new Error(`Failed to fetch wholesale customers: ${customersError.message}`);
+        }
+
+        const totalWholesaleCustomers = wholesaleCustomers?.length || 0;
+        
+        // Get all orders from wholesale customers
+        const wholesaleUserIds = wholesaleCustomers?.map(c => c.user_id) || [];
+        
+        let totalWholesaleRevenue = 0;
+        let totalOrders = 0;
+        let monthlyRevenue = 0;
+        let monthlyOrders = 0;
+        
+        if (wholesaleUserIds.length > 0) {
+          const { data: orders, error: ordersError } = await client
+            .from('orders_main')
+            .select('total_price, order_created_at, user_id')
+            .in('user_id', wholesaleUserIds)
+            .eq('financial_status', 'paid');
+
+          if (ordersError) {
+            console.warn('⚠️ Error fetching wholesale orders:', ordersError);
+          } else {
+            totalOrders = orders?.length || 0;
+            totalWholesaleRevenue = orders?.reduce((sum, order) => sum + (order.total_price || 0), 0) || 0;
+            
+            // Calculate monthly metrics (last 30 days)
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            
+            const monthlyOrdersData = orders?.filter(order => 
+              new Date(order.order_created_at) >= thirtyDaysAgo
+            ) || [];
+            
+            monthlyOrders = monthlyOrdersData.length;
+            monthlyRevenue = monthlyOrdersData.reduce((sum, order) => sum + (order.total_price || 0), 0);
+          }
+        }
+
+        // Calculate credit rate distribution
+        const creditRateDistribution = {};
+        wholesaleCustomers?.forEach(customer => {
+          const rate = customer.wholesale_credit_rate || 0.05;
+          creditRateDistribution[rate] = (creditRateDistribution[rate] || 0) + 1;
+        });
+
+        const creditRateDistributionArray = Object.entries(creditRateDistribution).map(([rate, count]) => ({
+          creditRate: parseFloat(rate),
+          customerCount: count,
+          percentage: totalWholesaleCustomers > 0 ? (count / totalWholesaleCustomers) * 100 : 0
+        }));
+
+        // Calculate growth rate (simple month-over-month)
+        const sixtyDaysAgo = new Date();
+        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        let previousMonthRevenue = 0;
+        if (wholesaleUserIds.length > 0) {
+          const { data: previousOrders, error: prevOrdersError } = await client
+            .from('orders_main')
+            .select('total_price, order_created_at')
+            .in('user_id', wholesaleUserIds)
+            .eq('financial_status', 'paid')
+            .gte('order_created_at', sixtyDaysAgo.toISOString())
+            .lt('order_created_at', thirtyDaysAgo.toISOString());
+
+          if (!prevOrdersError) {
+            previousMonthRevenue = previousOrders?.reduce((sum, order) => sum + (order.total_price || 0), 0) || 0;
+          }
+        }
+
+        const growthRate = previousMonthRevenue > 0 
+          ? ((monthlyRevenue - previousMonthRevenue) / previousMonthRevenue) * 100 
+          : 0;
+
+        const averageOrderValue = totalOrders > 0 ? totalWholesaleRevenue / totalOrders : 0;
+
+        console.log('✅ Wholesale analytics calculated');
+        
+        return {
+          totalWholesaleCustomers,
+          totalWholesaleRevenue,
+          averageOrderValue,
+          totalOrders,
+          monthlyRevenue,
+          monthlyOrders,
+          growthRate,
+          creditRateDistribution: creditRateDistributionArray
+        };
+      } catch (error) {
+        console.error('❌ Error in getWholesaleAnalytics:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    getWholesaleTopPerformers: async (_, { limit = 10 }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        console.log('🏆 Fetching wholesale top performers');
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Analytics service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get all wholesale customers
+        const { data: wholesaleCustomers, error: customersError } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('is_wholesale_customer', true);
+
+        if (customersError) {
+          throw new Error(`Failed to fetch wholesale customers: ${customersError.message}`);
+        }
+
+        // Calculate performance metrics for each customer
+        const performersWithStats = await Promise.all((wholesaleCustomers || []).map(async (customer) => {
+          try {
+            const { data: orders, error: ordersError } = await client
+              .from('orders_main')
+              .select('total_price, order_created_at')
+              .eq('user_id', customer.user_id)
+              .eq('financial_status', 'paid');
+
+            if (ordersError) {
+              console.warn('⚠️ Error fetching orders for customer:', customer.user_id, ordersError);
+              return null;
+            }
+
+            const totalOrders = orders?.length || 0;
+            const totalRevenue = orders?.reduce((sum, order) => sum + (order.total_price || 0), 0) || 0;
+            const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+            
+            // Get last order date
+            const lastOrderDate = orders?.length > 0 
+              ? orders.reduce((latest, order) => 
+                  new Date(order.order_created_at) > new Date(latest) ? order.order_created_at : latest, 
+                  orders[0].order_created_at
+                )
+              : null;
+
+            // Calculate monthly revenue (last 30 days)
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            
+            const monthlyOrdersData = orders?.filter(order => 
+              new Date(order.order_created_at) >= thirtyDaysAgo
+            ) || [];
+            
+            const monthlyRevenue = monthlyOrdersData.reduce((sum, order) => sum + (order.total_price || 0), 0);
+
+            return {
+              id: customer.id,
+              userId: customer.user_id,
+              firstName: customer.first_name,
+              lastName: customer.last_name,
+              companyName: customer.company_name,
+              totalOrders,
+              totalRevenue,
+              averageOrderValue,
+              creditRate: customer.wholesale_credit_rate || 0.05,
+              lastOrderDate,
+              monthlyRevenue
+            };
+          } catch (err) {
+            console.warn('⚠️ Error processing customer stats:', err);
+            return null;
+          }
+        }));
+
+        // Filter out null results and sort by total revenue
+        const validPerformers = performersWithStats
+          .filter(performer => performer !== null)
+          .sort((a, b) => b.totalRevenue - a.totalRevenue)
+          .slice(0, limit);
+
+        console.log(`✅ Found ${validPerformers.length} top performers`);
+        
+        return validPerformers;
+      } catch (error) {
+        console.error('❌ Error in getWholesaleTopPerformers:', error);
         throw new Error(error.message);
       }
     },
@@ -7347,6 +7607,97 @@ const resolvers = {
         };
       } catch (error) {
         console.error('❌ Error in rejectWholesaleApplication:', error);
+        return {
+          success: false,
+          message: error.message,
+          userProfile: null
+        };
+      }
+    },
+
+    updateWholesaleCustomer: async (_, { userId, input }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        console.log('🔄 Updating wholesale customer:', { userId, input });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Profile service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Verify the customer exists and is a wholesale customer
+        const { data: existingProfile, error: profileError } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('is_wholesale_customer', true)
+          .single();
+
+        if (profileError || !existingProfile) {
+          throw new Error('Wholesale customer not found');
+        }
+
+        // Build update data
+        const updateData = {
+          updated_at: new Date().toISOString()
+        };
+
+        if (input.firstName !== undefined) updateData.first_name = input.firstName;
+        if (input.lastName !== undefined) updateData.last_name = input.lastName;
+        if (input.companyName !== undefined) updateData.company_name = input.companyName;
+        if (input.wholesaleCreditRate !== undefined) updateData.wholesale_credit_rate = input.wholesaleCreditRate;
+        if (input.wholesaleMonthlyCustomers !== undefined) updateData.wholesale_monthly_customers = input.wholesaleMonthlyCustomers;
+        if (input.wholesaleOrderingFor !== undefined) updateData.wholesale_ordering_for = input.wholesaleOrderingFor;
+        if (input.wholesaleFitExplanation !== undefined) updateData.wholesale_fit_explanation = input.wholesaleFitExplanation;
+
+        const { data: updatedProfile, error } = await client
+          .from('user_profiles')
+          .update(updateData)
+          .eq('user_id', userId)
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error updating wholesale customer:', error);
+          throw new Error(`Failed to update customer: ${error.message}`);
+        }
+
+        console.log('✅ Successfully updated wholesale customer');
+        
+        return {
+          success: true,
+          message: 'Wholesale customer updated successfully',
+          userProfile: {
+            id: updatedProfile.id,
+            userId: updatedProfile.user_id,
+            firstName: updatedProfile.first_name,
+            lastName: updatedProfile.last_name,
+            displayName: updatedProfile.display_name,
+            bio: updatedProfile.bio,
+            profilePhotoUrl: updatedProfile.profile_photo_url,
+            bannerImageUrl: updatedProfile.banner_image_url,
+            profilePhotoPublicId: updatedProfile.profile_photo_public_id,
+            bannerImagePublicId: updatedProfile.banner_image_public_id,
+            companyName: updatedProfile.company_name,
+            isWholesaleCustomer: updatedProfile.is_wholesale_customer,
+            wholesaleCreditRate: updatedProfile.wholesale_credit_rate,
+            wholesaleMonthlyCustomers: updatedProfile.wholesale_monthly_customers,
+            wholesaleOrderingFor: updatedProfile.wholesale_ordering_for,
+            wholesaleFitExplanation: updatedProfile.wholesale_fit_explanation,
+            wholesaleStatus: updatedProfile.wholesale_status,
+            wholesaleApprovedAt: updatedProfile.wholesale_approved_at,
+            wholesaleApprovedBy: updatedProfile.wholesale_approved_by,
+            createdAt: updatedProfile.created_at,
+            updatedAt: updatedProfile.updated_at
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in updateWholesaleCustomer:', error);
         return {
           success: false,
           message: error.message,

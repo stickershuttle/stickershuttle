@@ -4,6 +4,9 @@ import { gql } from '@apollo/client';
 import AdminLayout from '../../components/AdminLayout';
 import { useRouter } from 'next/router';
 import { getSupabase } from '../../lib/supabase';
+import WholesaleStatsCard from '../../components/WholesaleStatsCard';
+import WholesaleEditModal from '../../components/WholesaleEditModal';
+import { GET_WHOLESALE_ANALYTICS, GET_WHOLESALE_TOP_PERFORMERS } from '../../lib/wholesale-analytics-mutations';
 
 // GraphQL Queries and Mutations
 const GET_PENDING_WHOLESALE_APPLICATIONS = gql`
@@ -86,8 +89,10 @@ const REJECT_WHOLESALE_APPLICATION = gql`
 const WholesaleAdmin = () => {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState('pending');
+  const [activeTab, setActiveTab] = useState('analytics');
   const [processing, setProcessing] = useState<string | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
 
   // Fetch pending applications
   const { data: pendingData, loading: pendingLoading, refetch: refetchPending } = useQuery(
@@ -102,6 +107,23 @@ const WholesaleAdmin = () => {
     GET_ALL_WHOLESALE_CUSTOMERS,
     {
       pollInterval: 60000, // Refresh every minute
+    }
+  );
+
+  // Fetch wholesale analytics
+  const { data: analyticsData, loading: analyticsLoading, refetch: refetchAnalytics } = useQuery(
+    GET_WHOLESALE_ANALYTICS,
+    {
+      pollInterval: 300000, // Refresh every 5 minutes
+    }
+  );
+
+  // Fetch top performers
+  const { data: performersData, loading: performersLoading, refetch: refetchPerformers } = useQuery(
+    GET_WHOLESALE_TOP_PERFORMERS,
+    {
+      variables: { limit: 10 },
+      pollInterval: 300000, // Refresh every 5 minutes
     }
   );
 
@@ -182,6 +204,17 @@ const WholesaleAdmin = () => {
     }
   };
 
+  const handleEditCustomer = (customer: any) => {
+    setSelectedCustomer(customer);
+    setEditModalOpen(true);
+  };
+
+  const handleUpdateComplete = () => {
+    refetchAll();
+    refetchAnalytics();
+    refetchPerformers();
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -227,6 +260,22 @@ const WholesaleAdmin = () => {
           }}
         >
           <button
+            onClick={() => setActiveTab('analytics')}
+            className={`flex-1 py-3 px-6 text-sm font-medium rounded-lg transition-all ${
+              activeTab === 'analytics'
+                ? 'text-white'
+                : 'text-gray-300 hover:text-white'
+            }`}
+            style={activeTab === 'analytics' ? {
+              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+              backdropFilter: 'blur(25px) saturate(180%)',
+              border: '1px solid rgba(59, 130, 246, 0.4)',
+              boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+            } : {}}
+          >
+            📊 Analytics
+          </button>
+          <button
             onClick={() => setActiveTab('pending')}
             className={`flex-1 py-3 px-6 text-sm font-medium rounded-lg transition-all ${
               activeTab === 'pending'
@@ -264,6 +313,148 @@ const WholesaleAdmin = () => {
             All Wholesale Customers ({allCustomers.length})
           </button>
         </div>
+
+        {/* Analytics Tab */}
+        {activeTab === 'analytics' && (
+          <div>
+            <h2 className="text-xl font-semibold text-white mb-6">
+              📊 Wholesale Analytics
+            </h2>
+            
+            {analyticsLoading ? (
+              <div className="text-center text-gray-300 py-8">Loading analytics...</div>
+            ) : (
+              <div className="space-y-8">
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <WholesaleStatsCard
+                    title="Total Customers"
+                    value={analyticsData?.getWholesaleAnalytics?.totalWholesaleCustomers || 0}
+                    icon={<span>👥</span>}
+                  />
+                  <WholesaleStatsCard
+                    title="Total Revenue"
+                    value={`$${(analyticsData?.getWholesaleAnalytics?.totalWholesaleRevenue || 0).toLocaleString()}`}
+                    icon={<span>💰</span>}
+                  />
+                  <WholesaleStatsCard
+                    title="Avg Order Value"
+                    value={`$${(analyticsData?.getWholesaleAnalytics?.averageOrderValue || 0).toFixed(2)}`}
+                    icon={<span>📈</span>}
+                  />
+                  <WholesaleStatsCard
+                    title="Total Orders"
+                    value={analyticsData?.getWholesaleAnalytics?.totalOrders || 0}
+                    icon={<span>📦</span>}
+                  />
+                </div>
+
+                {/* Monthly Performance */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <WholesaleStatsCard
+                    title="Monthly Revenue"
+                    value={`$${(analyticsData?.getWholesaleAnalytics?.monthlyRevenue || 0).toLocaleString()}`}
+                    subtitle="Last 30 days"
+                    icon={<span>📊</span>}
+                    trend={{
+                      value: analyticsData?.getWholesaleAnalytics?.growthRate || 0,
+                      isPositive: (analyticsData?.getWholesaleAnalytics?.growthRate || 0) >= 0
+                    }}
+                  />
+                  <WholesaleStatsCard
+                    title="Monthly Orders"
+                    value={analyticsData?.getWholesaleAnalytics?.monthlyOrders || 0}
+                    subtitle="Last 30 days"
+                    icon={<span>🛒</span>}
+                  />
+                  <WholesaleStatsCard
+                    title="Growth Rate"
+                    value={`${(analyticsData?.getWholesaleAnalytics?.growthRate || 0).toFixed(1)}%`}
+                    subtitle="Month over month"
+                    icon={<span>📈</span>}
+                    trend={{
+                      value: analyticsData?.getWholesaleAnalytics?.growthRate || 0,
+                      isPositive: (analyticsData?.getWholesaleAnalytics?.growthRate || 0) >= 0
+                    }}
+                  />
+                </div>
+
+                {/* Credit Rate Distribution */}
+                {analyticsData?.getWholesaleAnalytics?.creditRateDistribution && (
+                  <div
+                    className="p-6 rounded-xl"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                      backdropFilter: 'blur(12px)'
+                    }}
+                  >
+                    <h3 className="text-lg font-semibold text-white mb-4">Credit Rate Distribution</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {analyticsData.getWholesaleAnalytics.creditRateDistribution.map((rate: any) => (
+                        <div key={rate.creditRate} className="text-center">
+                          <div className="text-2xl font-bold text-white">
+                            {(rate.creditRate * 100).toFixed(0)}%
+                          </div>
+                          <div className="text-sm text-gray-300">
+                            {rate.customerCount} customers
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {rate.percentage.toFixed(1)}% of total
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Top Performers */}
+                <div
+                  className="p-6 rounded-xl"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                    backdropFilter: 'blur(12px)'
+                  }}
+                >
+                  <h3 className="text-lg font-semibold text-white mb-4">🏆 Top Performers</h3>
+                  
+                  {performersLoading ? (
+                    <div className="text-center text-gray-300 py-4">Loading top performers...</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {performersData?.getWholesaleTopPerformers?.map((performer: any, index: number) => (
+                        <div key={performer.id} className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
+                          <div className="flex items-center space-x-4">
+                            <div className="flex items-center justify-center w-8 h-8 bg-blue-500/20 text-blue-300 rounded-full text-sm font-bold">
+                              {index + 1}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-white">
+                                {performer.firstName} {performer.lastName}
+                              </div>
+                              <div className="text-sm text-gray-300">{performer.companyName}</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold text-white">
+                              ${performer.totalRevenue.toLocaleString()}
+                            </div>
+                            <div className="text-sm text-gray-300">
+                              {performer.totalOrders} orders • ${performer.averageOrderValue.toFixed(2)} avg
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Pending Applications Tab */}
         {activeTab === 'pending' && (
@@ -398,6 +589,20 @@ const WholesaleAdmin = () => {
                           </div>
                         </div>
                       </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleEditCustomer(customer)}
+                          className="px-4 py-2 rounded-lg font-medium text-white transition-colors"
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                            backdropFilter: 'blur(25px) saturate(180%)',
+                            border: '1px solid rgba(59, 130, 246, 0.4)',
+                            boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          }}
+                        >
+                          Edit
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -405,6 +610,14 @@ const WholesaleAdmin = () => {
             )}
           </div>
         )}
+
+        {/* Edit Modal */}
+        <WholesaleEditModal
+          isOpen={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          customer={selectedCustomer}
+          onUpdate={handleUpdateComplete}
+        />
       </div>
     </AdminLayout>
   );

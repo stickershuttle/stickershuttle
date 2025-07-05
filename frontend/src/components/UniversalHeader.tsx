@@ -37,6 +37,24 @@ export default function UniversalHeader() {
     let isMounted = true;
     let authSubscription: any = null;
     
+    // Listen for profile updates from other components
+    const handleProfileUpdate = (event: CustomEvent) => {
+      if (isMounted && event.detail) {
+        console.log('🔄 Universal Header received profile update:', event.detail);
+        setProfile((prev: any) => {
+          const updated = {
+            ...prev,
+            ...event.detail
+          };
+          console.log('📸 Universal Header profile updated:', updated);
+          return updated;
+        });
+      }
+    };
+
+    // Add event listener for profile updates
+    window.addEventListener('profileUpdated', handleProfileUpdate as EventListener);
+    
     // Enhanced authentication state management with subscription
     const initializeAuth = async () => {
       if (typeof window === 'undefined') return;
@@ -138,7 +156,13 @@ export default function UniversalHeader() {
           .single();
 
         if (isMounted && !error && profileData) {
-          setProfile(profileData);
+          setProfile((prevProfile: any) => {
+            // If we already have profile data, merge instead of replacing to avoid overwriting updates
+            if (prevProfile) {
+              return { ...prevProfile, ...profileData };
+            }
+            return profileData;
+          });
           // Fetch credit balance
           fetchCreditBalance(userId, supabase);
         }
@@ -199,6 +223,8 @@ export default function UniversalHeader() {
       if (authSubscription?.data?.subscription) {
         authSubscription.data.subscription.unsubscribe();
       }
+      // Remove profile update event listener
+      window.removeEventListener('profileUpdated', handleProfileUpdate as EventListener);
     };
   }, []);
 
