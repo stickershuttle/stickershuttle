@@ -52,7 +52,42 @@ class StripeClient {
         finalTotal: originalTotal - discountAmount
       });
 
-      const session = await this.stripe.checkout.sessions.create({
+      // Check for tax exemption status
+      const isTaxExempt = orderData.customerTaxExempt || false;
+      console.log('🏛️ Tax exemption status:', { isTaxExempt, customerEmail: orderData.customerEmail });
+
+      // Create/update customer if tax exemption is needed
+      let customerId = null;
+      if (orderData.userId && orderData.userId !== 'guest') {
+        try {
+          // Create or update customer with tax exemption status
+          const customerData = {
+            email: orderData.customerEmail,
+            tax_exempt: isTaxExempt ? 'exempt' : 'none',
+            metadata: {
+              userId: orderData.userId,
+              isTaxExempt: isTaxExempt.toString()
+            }
+          };
+
+          if (orderData.existingCustomerId) {
+            // Update existing customer
+            await this.stripe.customers.update(orderData.existingCustomerId, customerData);
+            customerId = orderData.existingCustomerId;
+          } else {
+            // Create new customer
+            const customer = await this.stripe.customers.create(customerData);
+            customerId = customer.id;
+          }
+
+          console.log('✅ Customer tax status updated:', { customerId, taxExempt: isTaxExempt });
+        } catch (customerError) {
+          console.warn('⚠️ Error managing customer tax status:', customerError);
+          // Continue without customer ID - guest checkout
+        }
+      }
+
+      const sessionConfig = {
         payment_method_types: ['card'],
         line_items: orderData.lineItems.map(item => {
           // Apply discount proportionally to each item
@@ -97,7 +132,6 @@ class StripeClient {
         mode: 'payment',
         success_url: `${orderData.successUrl}?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: orderData.cancelUrl,
-        customer_email: orderData.customerEmail,
         metadata: {
           orderId: orderData.orderId,
           userId: orderData.userId || 'guest',
@@ -107,11 +141,27 @@ class StripeClient {
           originalTotalAmount: orderData.cartMetadata?.subtotalAmount || '0.00',
           discountCode: orderData.cartMetadata?.discountCode || '',
           discountAmount: orderData.cartMetadata?.discountAmount || '0.00',
-          totalAmount: orderData.cartMetadata?.totalAmount || '0.00'
+          totalAmount: orderData.cartMetadata?.totalAmount || '0.00',
+          isTaxExempt: isTaxExempt.toString()
         },
         shipping_address_collection: {
           allowed_countries: ['US', 'CA'], // Add more countries as needed
         },
+        // Enable automatic tax calculation
+        automatic_tax: {
+          enabled: true
+        }
+      };
+
+      // Add customer information
+      if (customerId) {
+        sessionConfig.customer = customerId;
+      } else {
+        sessionConfig.customer_email = orderData.customerEmail;
+      }
+
+      const session = await this.stripe.checkout.sessions.create({
+        ...sessionConfig,
         shipping_options: [
           {
             shipping_rate_data: {

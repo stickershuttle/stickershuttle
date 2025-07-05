@@ -100,6 +100,14 @@ body:not(.admin-page) {
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
+.glassmorphism-button {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%);
+  backdrop-filter: blur(25px) saturate(180%);
+  -webkit-backdrop-filter: blur(25px) saturate(180%);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  box-shadow: rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset;
+}
+
 /* Updated header button with glassmorphism and #1a144a tint */
 .headerButton {
   background: linear-gradient(135deg, rgba(26, 20, 74, 0.35) 0%, rgba(26, 20, 74, 0.15) 100%);

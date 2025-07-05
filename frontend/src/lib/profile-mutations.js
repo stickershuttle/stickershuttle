@@ -21,8 +21,8 @@ export const UPDATE_USER_PROFILE_NAMES = gql`
 
 // Create user profile (for new signups)
 export const CREATE_USER_PROFILE = gql`
-  mutation CreateUserProfile($userId: ID!, $firstName: String, $lastName: String) {
-    createUserProfile(userId: $userId, firstName: $firstName, lastName: $lastName) {
+  mutation CreateUserProfile($userId: ID!, $firstName: String, $lastName: String, $phoneNumber: String, $companyWebsite: String) {
+    createUserProfile(userId: $userId, firstName: $firstName, lastName: $lastName, phoneNumber: $phoneNumber, companyWebsite: $companyWebsite) {
       success
       message
       userProfile {
@@ -55,6 +55,12 @@ export const GET_USER_PROFILE = gql`
       wholesaleMonthlyCustomers
       wholesaleOrderingFor
       wholesaleFitExplanation
+      isTaxExempt
+      taxExemptId
+      taxExemptReason
+      taxExemptExpiresAt
+      taxExemptUpdatedAt
+      taxExemptUpdatedBy
       createdAt
       updatedAt
     }
@@ -171,6 +177,30 @@ export const UPDATE_WHOLESALE_STATUS = gql`
         userId
         isWholesaleCustomer
         wholesaleCreditRate
+        updatedAt
+      }
+    }
+  }
+`;
+
+// Update tax exemption status
+export const UPDATE_TAX_EXEMPTION = gql`
+  mutation UpdateTaxExemption($userId: ID!, $input: TaxExemptionInput!) {
+    updateTaxExemption(userId: $userId, input: $input) {
+      success
+      message
+      userProfile {
+        id
+        userId
+        firstName
+        lastName
+        companyName
+        isTaxExempt
+        taxExemptId
+        taxExemptReason
+        taxExemptExpiresAt
+        taxExemptUpdatedAt
+        taxExemptUpdatedBy
         updatedAt
       }
     }

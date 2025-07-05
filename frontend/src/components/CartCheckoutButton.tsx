@@ -264,7 +264,7 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
         shippingAddress,
         null, // billing address
         '', // No automatic order note
-        discountCode || undefined,
+        discountCode,
         discountAmount || undefined,
         creditsToApply || 0, // Pass credits to apply
         isBlindShipment // Pass blind shipment flag

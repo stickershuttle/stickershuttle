@@ -78,7 +78,6 @@ export default function SEOHead({
       <meta name="keywords" content={keywords} />
       <meta name="robots" content={robots} />
       <meta name="author" content="Sticker Shuttle" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
       
       {/* Canonical URL */}
       <link rel="canonical" href={finalCanonical} />
@@ -133,17 +132,6 @@ export default function SEOHead({
       {prefetch.map((url, index) => (
         <link key={index} rel="prefetch" href={url} />
       ))}
-      
-      {/* Preload critical resources */}
-      <link
-        rel="preload"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Rubik:wght@300;400;500;600;700;800;900&display=swap"
-        as="style"
-      />
-      <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Rubik:wght@300;400;500;600;700;800;900&display=swap"
-        rel="stylesheet"
-      />
       
       {/* Structured Data */}
       <script

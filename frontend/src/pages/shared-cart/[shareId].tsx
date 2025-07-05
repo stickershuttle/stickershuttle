@@ -600,6 +600,22 @@ export default function SharedCartPage() {
     // No sharing functionality for shared carts
   };
 
+  // Add missing functions as stubs since shared carts are read-only
+  const removeFromCart = (itemId: string) => {
+    // Read-only: Show message or redirect to actual cart
+    console.log('Cannot remove items from shared cart');
+  };
+
+  const handleQuantityChange = (itemId: string, newQuantity: number) => {
+    // Read-only: Show message or redirect to actual cart
+    console.log('Cannot change quantity in shared cart');
+  };
+
+  const clearCart = () => {
+    // Read-only: Show message or redirect to actual cart
+    console.log('Cannot clear shared cart');
+  };
+
   // Handle proof preference change
   const handleProofChange = (itemId: string, sendProof: boolean) => {
     const item = updatedCart.find(item => item.id === itemId);

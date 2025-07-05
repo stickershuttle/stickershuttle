@@ -1,5 +1,6 @@
 import "@/styles/globals.css";
 import type { AppProps } from "next/app";
+import Head from "next/head";
 import { CartProvider } from "@/components/CartContext";
 import { ApolloProvider } from '@apollo/client';
 import client from '@/lib/apollo-client';
@@ -38,7 +39,11 @@ Sentry.init({
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
-    <Sentry.ErrorBoundary fallback={({ error, resetError }) => (
+    <>
+      <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+      </Head>
+      <Sentry.ErrorBoundary fallback={({ error, resetError }) => (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
         <div className="text-center p-8 max-w-md mx-auto">
           <div className="mb-6">
@@ -77,5 +82,6 @@ export default function App({ Component, pageProps }: AppProps) {
         </ApolloProvider>
       </PostHogProvider>
     </Sentry.ErrorBoundary>
+    </>
   );
 }

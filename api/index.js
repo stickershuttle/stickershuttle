@@ -1,9 +1,8 @@
-// Immediate startup logging
-console.log('🚀 Starting Sticker Shuttle API...');
-console.log('📍 Current directory:', process.cwd());
-console.log('🌍 Environment:', process.env.NODE_ENV || 'not set');
-console.log('🔌 PORT:', process.env.PORT || 'not set (will use 4000)');
-console.log('🏭 Railway environment:', process.env.RAILWAY_ENVIRONMENT || 'not set');
+// Startup logging
+console.log('🚀 Sticker Shuttle API starting...');
+if (process.env.NODE_ENV !== 'production') {
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'} | Port: ${process.env.PORT || 4000}`);
+}
 
 // Load environment variables - Railway provides them directly
 // Only load dotenv in development (Railway provides env vars directly in production)
@@ -14,8 +13,6 @@ require('dotenv').config();
 // Initialize Sentry error monitoring (must be first)
 // TEMPORARILY DISABLED FOR DEBUGGING
 let Sentry = { captureException: () => {} }; // Mock Sentry
-
-console.log('🔍 Sentry temporarily disabled for debugging');
 
 const { ApolloServer } = require('@apollo/server');
 const { expressMiddleware } = require('@apollo/server/express4');
@@ -87,25 +84,33 @@ const trackingEnhancer = new EasyPostTrackingEnhancer(easyPostClient);
 // Initialize credit handlers with Supabase client
 creditHandlers.initializeWithSupabase(supabaseClient);
 
-// Log initial status of all services
-console.log('🚀 Initial service status:');
-console.log('  - Supabase:', supabaseClient.isReady() ? '✅ Ready' : '❌ Not configured');
-console.log('  - Stripe:', stripeClient.isReady() ? '✅ Ready' : '❌ Not configured');
-console.log('  - EasyPost:', easyPostClient.isReady() ? '✅ Ready' : '❌ Not configured');
+// Check service status  
+const services = {
+  supabase: supabaseClient.isReady(),
+  stripe: stripeClient.isReady(),
+  easypost: easyPostClient.isReady()
+};
+const readyCount = Object.values(services).filter(Boolean).length;
+console.log(`📋 Services ready: ${readyCount}/3 (${Object.entries(services).filter(([k,v]) => v).map(([k]) => k).join(', ') || 'none'})`);
+if (readyCount < 3) {
+  console.warn('⚠️ Missing services:', Object.entries(services).filter(([k,v]) => !v).map(([k]) => k).join(', '));
+}
 
 // Initialize Express app
 const app = express();
 
 // Trust proxy headers (required for Railway and other proxied environments)
-app.set('trust proxy', true);
-
-console.log('✅ Express app initialized');
+// Configure trust proxy more securely for Railway
+if (process.env.NODE_ENV === 'production') {
+  // In production (Railway), trust the first proxy
+  app.set('trust proxy', 1);
+} else {
+  // In development, trust localhost
+  app.set('trust proxy', 'loopback');
+}
 
 // Add immediate health check - before any middleware
 app.get('/health', (req, res) => {
-  console.log('💚 Health check requested (early handler)');
-  
-  // Set a timeout to ensure response is sent
   res.setTimeout(5000, () => {
     console.log('⚠️ Health check timeout!');
   });
@@ -159,15 +164,25 @@ app.get('/test', (req, res) => {
   });
 });
 
-// Add request logging middleware with response time tracking
+// Add request logging middleware (development only or errors)
 app.use((req, res, next) => {
   const start = Date.now();
-  console.log(`📨 ${new Date().toISOString()} - ${req.method} ${req.path}`);
   
-  // Log when response is sent
+  // Only log in development or for specific paths
+  const shouldLog = process.env.NODE_ENV !== 'production' || 
+                   req.path.startsWith('/webhooks') || 
+                   req.path.startsWith('/graphql');
+  
+  if (shouldLog && req.path !== '/health') {
+    console.log(`${req.method} ${req.path}`);
+  }
+  
+  // Log errors or slow requests
   res.on('finish', () => {
     const duration = Date.now() - start;
-    console.log(`✅ Response sent for ${req.method} ${req.path} - ${res.statusCode} in ${duration}ms`);
+    if (res.statusCode >= 400 || duration > 1000) {
+      console.log(`${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`);
+    }
   });
   
   next();
@@ -229,7 +244,9 @@ const corsOptions = {
     if (isAllowed) {
       callback(null, true);
     } else {
-      console.warn('⚠️ CORS blocked origin:', origin);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('⚠️ CORS blocked:', origin);
+      }
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -319,6 +336,27 @@ app.use('/webhooks', webhookLimiter);
 // Add upload routes
 app.use('/api', uploadRoutes);
 
+// Add placeholder image route
+app.get('/api/placeholder/:width/:height', (req, res) => {
+  const { width, height } = req.params;
+  const w = parseInt(width) || 64;
+  const h = parseInt(height) || 64;
+  
+  // Generate a simple SVG placeholder
+  const svg = `
+    <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100%" height="100%" fill="#f3f4f6"/>
+      <text x="50%" y="50%" text-anchor="middle" dy="0.3em" font-family="Arial, sans-serif" font-size="12" fill="#6b7280">
+        ${w}x${h}
+      </text>
+    </svg>
+  `;
+  
+  res.setHeader('Content-Type', 'image/svg+xml');
+  res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+  res.send(svg);
+});
+
 // Add Stripe webhook routes (before body parsing middleware)
 app.use('/webhooks', stripeWebhookHandlers);
 
@@ -327,33 +365,20 @@ app.use('/webhooks', stripeWebhookHandlers);
 
 // Add EasyPost webhook endpoint with enhanced tracking
 app.post('/webhooks/easypost', express.raw({ type: 'application/json' }), async (req, res) => {
-  console.log('📦 EasyPost webhook received');
-  
   try {
     const event = req.body;
     const eventData = JSON.parse(event.toString());
     
-    console.log('🔍 EasyPost Event:', {
-      type: eventData.description,
-      object: eventData.result?.object,
-      trackingCode: eventData.result?.tracking_code,
-      status: eventData.result?.status,
-      carrier: eventData.result?.carrier
-    });
-    
     // Handle tracker updates with enhanced processing
     if (eventData.result && eventData.result.object === 'Tracker') {
       const tracker = eventData.result;
-      
-      console.log(`📍 Enhanced tracking update: ${tracker.tracking_code} -> ${tracker.status}`);
+      console.log(`📦 Tracking update: ${tracker.tracking_code} -> ${tracker.status}`);
       
       // Use enhanced tracking processor
       const success = await trackingEnhancer.processTrackingUpdate(tracker);
       
-      if (success) {
-        console.log('✅ Tracking update processed successfully');
-      } else {
-        console.warn('⚠️ Tracking update processing failed');
+      if (!success) {
+        console.warn('⚠️ Tracking update failed for:', tracker.tracking_code);
       }
     }
     
@@ -366,14 +391,13 @@ app.post('/webhooks/easypost', express.raw({ type: 'application/json' }), async 
 
 // Health check with more details (overrides the simple one)
 app.get('/health/detailed', (req, res) => {
-  console.log('💚 Detailed health check requested');
   res.status(200).json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
     service: 'Sticker Shuttle API',
     environment: process.env.NODE_ENV || 'development',
     port: process.env.PORT || 4000,
-    easypostConfigured: easyPostClient.isReady() // Added EasyPost status check
+    easypostConfigured: easyPostClient.isReady()
   });
 });
 
@@ -391,7 +415,6 @@ app.get('/info', (req, res) => {
 
 // Add Sentry test endpoint
 app.get('/debug-sentry', (req, res) => {
-  console.log('🐛 Testing Sentry error capture...');
   throw new Error('This is a test error for Sentry!');
 });
 
@@ -439,10 +462,12 @@ app.get('/easypost/status', (req, res) => {
 
   // Try to check if we can reinitialize
   if (!easyPostClient.isReady() && process.env.EASYPOST_API_KEY) {
-    console.log('🔄 EasyPost not ready, attempting reinit from status endpoint...');
     easyPostClient.init();
     diagnostics.reinit_attempted = true;
     diagnostics.reinit_result = easyPostClient.isReady();
+    if (diagnostics.reinit_result) {
+      console.log('🔄 EasyPost reconnected');
+    }
   }
 
   res.json(diagnostics);
@@ -610,7 +635,7 @@ const typeDefs = gql`
     
     # User Profile mutations
     updateUserProfileNames(userId: ID!, firstName: String!, lastName: String!): UserProfileResult!
-    createUserProfile(userId: ID!, firstName: String, lastName: String): UserProfileResult!
+    createUserProfile(userId: ID!, firstName: String, lastName: String, phoneNumber: String, companyWebsite: String): UserProfileResult!
     createWholesaleUserProfile(userId: ID!, input: WholesaleUserProfileInput!): UserProfileResult!
     updateUserProfilePhoto(userId: ID!, photoUrl: String!, photoPublicId: String): UserProfileResult!
     updateUserProfileBanner(userId: ID!, bannerUrl: String, bannerPublicId: String, bannerTemplate: String, bannerTemplateId: Int): UserProfileResult!
@@ -622,6 +647,9 @@ const typeDefs = gql`
     approveWholesaleApplication(userId: ID!, approvedBy: ID!): WholesaleApprovalResult!
     rejectWholesaleApplication(userId: ID!, rejectedBy: ID!): WholesaleApprovalResult!
     updateWholesaleCustomer(userId: ID!, input: UpdateWholesaleCustomerInput!): WholesaleApprovalResult!
+    
+    # Tax exemption mutations
+    updateTaxExemption(userId: ID!, input: TaxExemptionInput!): UserProfileResult!
     
     # Wholesale client management mutations
     createWholesaleClient(input: CreateWholesaleClientInput!): WholesaleClientResult!
@@ -655,6 +683,9 @@ const typeDefs = gql`
     updateSitewideAlert(id: ID!, input: UpdateSitewideAlertInput!): SitewideAlert!
     deleteSitewideAlert(id: ID!): Boolean!
     toggleSitewideAlert(id: ID!, isActive: Boolean!): SitewideAlert!
+    
+    # Mutation to update order item files
+    updateOrderItemFiles(orderId: ID!, itemId: ID!, customFiles: [String!]!): CustomerOrder
   }
 
   type Customer {
@@ -732,6 +763,8 @@ const typeDefs = gql`
     lastName: String
     displayName: String
     bio: String
+    phoneNumber: String
+    companyWebsite: String
     profilePhotoUrl: String
     bannerImageUrl: String
     profilePhotoPublicId: String
@@ -747,6 +780,12 @@ const typeDefs = gql`
     wholesaleStatus: String
     wholesaleApprovedAt: String
     wholesaleApprovedBy: String
+    isTaxExempt: Boolean
+    taxExemptId: String
+    taxExemptReason: String
+    taxExemptExpiresAt: String
+    taxExemptUpdatedAt: String
+    taxExemptUpdatedBy: String
     createdAt: String!
     updatedAt: String!
   }
@@ -875,11 +914,20 @@ const typeDefs = gql`
   input WholesaleUserProfileInput {
     firstName: String!
     lastName: String!
+    phoneNumber: String!
+    companyWebsite: String!
     companyName: String!
     wholesaleMonthlyCustomers: String!
     wholesaleOrderingFor: String!
     wholesaleFitExplanation: String!
     signupCreditAmount: Float
+  }
+
+  input TaxExemptionInput {
+    isTaxExempt: Boolean!
+    taxExemptId: String
+    taxExemptReason: String
+    taxExemptExpiresAt: String
   }
 
   type Address {
@@ -3083,6 +3131,12 @@ const resolvers = {
           wholesaleStatus: profile.wholesale_status,
           wholesaleApprovedAt: profile.wholesale_approved_at,
           wholesaleApprovedBy: profile.wholesale_approved_by,
+          isTaxExempt: profile.is_tax_exempt || false,
+          taxExemptId: profile.tax_exempt_id,
+          taxExemptReason: profile.tax_exempt_reason,
+          taxExemptExpiresAt: profile.tax_exempt_expires_at,
+          taxExemptUpdatedAt: profile.tax_exempt_updated_at,
+          taxExemptUpdatedBy: profile.tax_exempt_updated_by,
           createdAt: profile.created_at,
           updatedAt: profile.updated_at
         };
@@ -3143,6 +3197,12 @@ const resolvers = {
           wholesaleStatus: profile.wholesale_status,
           wholesaleApprovedAt: profile.wholesale_approved_at,
           wholesaleApprovedBy: profile.wholesale_approved_by,
+          isTaxExempt: profile.is_tax_exempt || false,
+          taxExemptId: profile.tax_exempt_id,
+          taxExemptReason: profile.tax_exempt_reason,
+          taxExemptExpiresAt: profile.tax_exempt_expires_at,
+          taxExemptUpdatedAt: profile.tax_exempt_updated_at,
+          taxExemptUpdatedBy: profile.tax_exempt_updated_by,
           createdAt: profile.created_at,
           updatedAt: profile.updated_at
         }));
@@ -3201,6 +3261,12 @@ const resolvers = {
           wholesaleStatus: profile.wholesale_status,
           wholesaleApprovedAt: profile.wholesale_approved_at,
           wholesaleApprovedBy: profile.wholesale_approved_by,
+          isTaxExempt: profile.is_tax_exempt || false,
+          taxExemptId: profile.tax_exempt_id,
+          taxExemptReason: profile.tax_exempt_reason,
+          taxExemptExpiresAt: profile.tax_exempt_expires_at,
+          taxExemptUpdatedAt: profile.tax_exempt_updated_at,
+          taxExemptUpdatedBy: profile.tax_exempt_updated_by,
           createdAt: profile.created_at,
           updatedAt: profile.updated_at
         }));
@@ -5475,7 +5541,50 @@ const resolvers = {
           errors.push('Order tracking service is not available');
         }
 
-        // Step 3: Create Stripe checkout session
+        // Step 3: Check tax exemption status
+        let customerTaxExempt = false;
+        let existingCustomerId = null;
+        
+        if (input.userId && input.userId !== 'guest' && supabaseClient.isReady()) {
+          try {
+            console.log('🏛️ Checking tax exemption status for user:', input.userId);
+            
+            const client = supabaseClient.getServiceClient();
+            const { data: userProfile, error: profileError } = await client
+              .from('user_profiles')
+              .select('is_tax_exempt, tax_exempt_expires_at')
+              .eq('user_id', input.userId)
+              .single();
+            
+            if (profileError) {
+              console.warn('⚠️ Could not fetch user profile for tax exemption check:', profileError);
+            } else if (userProfile) {
+              customerTaxExempt = userProfile.is_tax_exempt || false;
+              
+              // Check if tax exemption has expired
+              if (customerTaxExempt && userProfile.tax_exempt_expires_at) {
+                const expirationDate = new Date(userProfile.tax_exempt_expires_at);
+                const now = new Date();
+                if (now > expirationDate) {
+                  console.log('⚠️ Tax exemption has expired for user:', input.userId);
+                  customerTaxExempt = false;
+                }
+              }
+              
+              console.log('🏛️ Tax exemption status determined:', { 
+                userId: input.userId, 
+                isTaxExempt: customerTaxExempt,
+                expiresAt: userProfile.tax_exempt_expires_at 
+              });
+            }
+          } catch (taxExemptError) {
+            console.error('❌ Error checking tax exemption status:', taxExemptError);
+            // Default to not exempt on error
+            customerTaxExempt = false;
+          }
+        }
+
+        // Step 4: Create Stripe checkout session
         if (stripeClient.isReady() && errors.length === 0) {
           try {
             console.log('🔍 Stripe client is ready, creating checkout session...');
@@ -5538,6 +5647,8 @@ const resolvers = {
               customerEmail: input.customerInfo.email,
               userId: input.userId,
               customerOrderId: customerOrder?.id,
+              customerTaxExempt: customerTaxExempt, // Pass tax exemption status
+              existingCustomerId: existingCustomerId, // Pass existing customer ID if available
               // Generate detailed order note with all selections including white options
               orderNote: generateOrderNote(input.cartItems),
               cartMetadata: {
@@ -7190,9 +7301,9 @@ const resolvers = {
       }
     },
 
-    createUserProfile: async (_, { userId, firstName, lastName }) => {
+    createUserProfile: async (_, { userId, firstName, lastName, phoneNumber, companyWebsite }) => {
       try {
-        console.log('👤 Creating user profile:', { userId, firstName, lastName });
+        console.log('👤 Creating user profile:', { userId, firstName, lastName, phoneNumber, companyWebsite });
         
         if (!supabaseClient.isReady()) {
           throw new Error('Profile service is currently unavailable');
@@ -7215,6 +7326,8 @@ const resolvers = {
             first_name: firstName,
             last_name: lastName,
             display_name: displayName,
+            phone_number: phoneNumber,
+            company_website: companyWebsite,
             profile_photo_url: randomAvatar,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -7241,6 +7354,8 @@ const resolvers = {
             lastName: profile.last_name,
             displayName: profile.display_name,
             bio: profile.bio,
+            phoneNumber: profile.phone_number,
+            companyWebsite: profile.company_website,
             profilePhotoUrl: profile.profile_photo_url,
             bannerImageUrl: profile.banner_image_url,
             profilePhotoPublicId: profile.profile_photo_public_id,
@@ -7553,6 +7668,8 @@ const resolvers = {
             first_name: input.firstName,
             last_name: input.lastName,
             display_name: displayName,
+            phone_number: input.phoneNumber,
+            company_website: input.companyWebsite,
             company_name: input.companyName,
             is_wholesale_customer: true,
             wholesale_credit_rate: wholesaleCreditRate,
@@ -7609,6 +7726,8 @@ const resolvers = {
             lastName: profile.last_name,
             displayName: profile.display_name,
             bio: profile.bio,
+            phoneNumber: profile.phone_number,
+            companyWebsite: profile.company_website,
             profilePhotoUrl: profile.profile_photo_url,
             bannerImageUrl: profile.banner_image_url,
             profilePhotoPublicId: profile.profile_photo_public_id,
@@ -7944,6 +8063,110 @@ const resolvers = {
         };
       } catch (error) {
         console.error('❌ Error in updateWholesaleCustomer:', error);
+        return {
+          success: false,
+          message: error.message,
+          userProfile: null
+        };
+      }
+    },
+
+    // Tax exemption mutations
+    updateTaxExemption: async (_, { userId, input }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        console.log('🏛️ Updating tax exemption for user:', { userId, input });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Profile service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Verify the customer exists
+        const { data: existingProfile, error: profileError } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        if (profileError || !existingProfile) {
+          throw new Error('User profile not found');
+        }
+
+        // Build update data
+        const updateData = {
+          is_tax_exempt: input.isTaxExempt,
+          tax_exempt_updated_at: new Date().toISOString(),
+          tax_exempt_updated_by: user.id,
+          updated_at: new Date().toISOString()
+        };
+
+        // Only update these fields if provided
+        if (input.taxExemptId !== undefined) updateData.tax_exempt_id = input.taxExemptId;
+        if (input.taxExemptReason !== undefined) updateData.tax_exempt_reason = input.taxExemptReason;
+        if (input.taxExemptExpiresAt !== undefined) updateData.tax_exempt_expires_at = input.taxExemptExpiresAt;
+
+        // If setting to non-exempt, clear exemption fields
+        if (!input.isTaxExempt) {
+          updateData.tax_exempt_id = null;
+          updateData.tax_exempt_reason = null;
+          updateData.tax_exempt_expires_at = null;
+        }
+
+        const { data: updatedProfile, error } = await client
+          .from('user_profiles')
+          .update(updateData)
+          .eq('user_id', userId)
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error updating tax exemption:', error);
+          throw new Error(`Failed to update tax exemption: ${error.message}`);
+        }
+
+        console.log('✅ Successfully updated tax exemption');
+        
+        return {
+          success: true,
+          message: 'Tax exemption updated successfully',
+          userProfile: {
+            id: updatedProfile.id,
+            userId: updatedProfile.user_id,
+            firstName: updatedProfile.first_name,
+            lastName: updatedProfile.last_name,
+            displayName: updatedProfile.display_name,
+            bio: updatedProfile.bio,
+            profilePhotoUrl: updatedProfile.profile_photo_url,
+            bannerImageUrl: updatedProfile.banner_image_url,
+            profilePhotoPublicId: updatedProfile.profile_photo_public_id,
+            bannerImagePublicId: updatedProfile.banner_image_public_id,
+            companyName: updatedProfile.company_name,
+            isWholesaleCustomer: updatedProfile.is_wholesale_customer,
+            wholesaleCreditRate: updatedProfile.wholesale_credit_rate,
+            wholesaleMonthlyCustomers: updatedProfile.wholesale_monthly_customers,
+            wholesaleOrderingFor: updatedProfile.wholesale_ordering_for,
+            wholesaleFitExplanation: updatedProfile.wholesale_fit_explanation,
+            wholesaleStatus: updatedProfile.wholesale_status,
+            wholesaleApprovedAt: updatedProfile.wholesale_approved_at,
+            wholesaleApprovedBy: updatedProfile.wholesale_approved_by,
+            isTaxExempt: updatedProfile.is_tax_exempt || false,
+            taxExemptId: updatedProfile.tax_exempt_id,
+            taxExemptReason: updatedProfile.tax_exempt_reason,
+            taxExemptExpiresAt: updatedProfile.tax_exempt_expires_at,
+            taxExemptUpdatedAt: updatedProfile.tax_exempt_updated_at,
+            taxExemptUpdatedBy: updatedProfile.tax_exempt_updated_by,
+            createdAt: updatedProfile.created_at,
+            updatedAt: updatedProfile.updated_at
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in updateTaxExemption:', error);
         return {
           success: false,
           message: error.message,
@@ -8586,6 +8809,74 @@ const resolvers = {
           error: error.message
         };
       }
+    },
+
+    // Mutation to update order item files
+    updateOrderItemFiles: async (_, { orderId, itemId, customFiles }, context) => {
+      try {
+        console.log('📤 Updating order item files:', { orderId, itemId, customFiles });
+        
+        // Get the order first to verify it exists
+        const { data: order, error: orderError } = await supabase
+          .from('customer_orders')
+          .select('*, items:customer_order_items(*)')
+          .eq('id', orderId)
+          .single();
+          
+        if (orderError || !order) {
+          throw new Error('Order not found');
+        }
+        
+        // Find the specific item
+        const item = order.items.find(item => item.id === itemId);
+        if (!item) {
+          throw new Error('Order item not found');
+        }
+        
+        // Update the item with new custom files
+        const { error: updateError } = await supabase
+          .from('customer_order_items')
+          .update({ 
+            custom_files: customFiles,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', itemId);
+          
+        if (updateError) {
+          console.error('Error updating order item:', updateError);
+          throw new Error('Failed to update order item files');
+        }
+        
+        // Send email notification to admin
+        try {
+          const emailNotifications = require('./email-notifications');
+          await emailNotifications.sendCustomerArtworkUploadNotification(order, {
+            productName: item.product_name || item.name || 'Custom Sticker',
+            itemId: itemId
+          });
+        } catch (emailError) {
+          console.error('❌ Failed to send artwork upload notification:', emailError);
+          // Don't throw - we still want to return success even if email fails
+        }
+        
+        // Return the updated order with items
+        const { data: updatedOrder, error: fetchError } = await supabase
+          .from('customer_orders')
+          .select('*, items:customer_order_items(*)')
+          .eq('id', orderId)
+          .single();
+          
+        if (fetchError) {
+          throw new Error('Failed to fetch updated order');
+        }
+        
+        console.log('✅ Order item files updated successfully');
+        return updatedOrder;
+        
+      } catch (error) {
+        console.error('Error in updateOrderItemFiles:', error);
+        throw error;
+      }
     }
   }
 };
@@ -8722,9 +9013,6 @@ async function startServer() {
               
               if (!error && authUser) {
                 user = authUser;
-                console.log('✅ Authenticated user:', authUser.email);
-              } else {
-                console.log('⚠️ Invalid auth token');
               }
             } catch (error) {
               console.error('Auth verification error:', error);
@@ -8740,23 +9028,16 @@ async function startServer() {
       })
     );
 
-    console.log(`🚀 GraphQL endpoint configured at /graphql`);
-    
     // Initialize discount manager
     discountManager.init();
     
-    // Check Stripe configuration
-    if (stripeClient.isReady()) {
-      console.log('✅ Stripe payment system is configured');
-    } else {
-      console.log('⚠️  Stripe is not configured - payment features will not work');
-    }
+    // Validate critical services
+    const criticalServices = [];
+    if (!stripeClient.isReady()) criticalServices.push('Stripe');
+    if (!supabaseClient.isReady()) criticalServices.push('Supabase');
     
-    // Check Supabase configuration  
-    if (supabaseClient.isReady()) {
-      console.log('✅ Supabase database is configured');
-    } else {
-      console.log('⚠️  Supabase is not configured - order tracking will not work');
+    if (criticalServices.length > 0) {
+      console.warn('⚠️ Missing critical services:', criticalServices.join(', '));
     }
   } catch (error) {
     console.error('❌ Failed to configure Apollo Server:', error);
@@ -8768,34 +9049,23 @@ async function startServer() {
 const PORT = process.env.PORT || 4000;
 const HOST = '0.0.0.0';
 
-console.log(`🔧 Starting server on ${HOST}:${PORT}...`);
-
 // Add a test endpoint that bypasses all middleware
 app.get('/ping', (req, res) => {
   res.end('pong');
 });
 
 const httpServer = app.listen(PORT, HOST, () => {
-  console.log(`✅ Server is listening on ${HOST}:${PORT}`);
-  console.log(`💚 Health check: http://${HOST}:${PORT}/health`);
-  console.log(`📍 Root endpoint: http://${HOST}:${PORT}/`);
-  console.log(`🏓 Ping endpoint: http://${HOST}:${PORT}/ping`);
-  
-  // Log all Railway environment variables
-  console.log('🚂 Railway Environment Variables:');
-  Object.keys(process.env).forEach(key => {
-    if (key.startsWith('RAILWAY')) {
-      console.log(`  ${key}: ${process.env[key]}`);
-    }
-  });
+  console.log(`✅ API server running on port ${PORT}`);
   
   // Now try to start Apollo after the server is already listening
   startServer().then(() => {
-    console.log('✅ Apollo GraphQL started successfully');
+    console.log('✅ GraphQL ready at /graphql');
     
     // Add catch-all route AFTER all other routes are defined
     app.use('*', (req, res) => {
-      console.log(`⚠️ Unhandled route: ${req.method} ${req.originalUrl}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`⚠️ Unhandled route: ${req.method} ${req.originalUrl}`);
+      }
       res.status(404).json({
         error: 'Not found',
         path: req.originalUrl,
@@ -8804,9 +9074,8 @@ const httpServer = app.listen(PORT, HOST, () => {
       });
     });
   }).catch(error => {
-    console.error('❌ Apollo startup failed:', error);
-    console.error('Stack trace:', error.stack);
-    console.log('⚠️ Server is still running with basic endpoints only');
+    console.error('❌ Apollo startup failed:', error.message);
+    console.log('⚠️ Server running with basic endpoints only');
     
     app.get('/emergency-status', (req, res) => {
       res.json({
@@ -8819,60 +9088,48 @@ const httpServer = app.listen(PORT, HOST, () => {
 });
 
 // Handle graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('🛑 Received SIGTERM, shutting down gracefully');
-  await gracefulShutdown();
-});
-
-process.on('SIGINT', async () => {
-  console.log('🛑 Received SIGINT, shutting down gracefully');
-  await gracefulShutdown();
-});
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
 
 // Graceful shutdown function
 async function gracefulShutdown() {
   try {
-    console.log('🧹 Starting graceful shutdown...');
+    console.log('🛑 Shutting down...');
     
     // Stop accepting new connections
     if (httpServer) {
-      console.log('⏹️ Stopping HTTP server...');
       httpServer.close();
     }
     
     // Stop Apollo if it's running
     if (server) {
-      console.log('⏹️ Stopping Apollo Server...');
       await server.stop();
     }
 
     // Cleanup discount manager
-    console.log('💰 Cleaning up discount manager...');
     if (typeof discountManager !== 'undefined' && discountManager.destroy) {
       discountManager.destroy();
     }
 
     // Cleanup analytics
-    console.log('📊 Cleaning up analytics...');
     try {
       const serverAnalytics = require('./business-analytics');
       if (serverAnalytics && serverAnalytics.shutdown) {
         await serverAnalytics.shutdown();
       }
     } catch (e) {
-      console.log('⚠️ Analytics cleanup skipped');
+      // Silent cleanup
     }
 
     // Cleanup database connections
-    console.log('🗄️ Cleaning up database connections...');
     if (supabaseClient && supabaseClient.cleanup) {
       await supabaseClient.cleanup();
     }
 
-    console.log('✅ Graceful shutdown completed');
+    console.log('✅ Shutdown complete');
     process.exit(0);
   } catch (error) {
-    console.error('❌ Error during graceful shutdown:', error);
+    console.error('❌ Shutdown error:', error.message);
     process.exit(1);
   }
 }

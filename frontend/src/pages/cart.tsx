@@ -313,7 +313,7 @@ const calculateNextTierSavings = (
 // Calculate estimated delivery date (only count business days)
 const calculateDeliveryDate = (totalQuantity: number, hasRushOrder: boolean) => {
   const now = new Date();
-  let productionDays = 2; // 48 hours = 2 business days
+  let productionDays = 2; // Default: 2 business days
   let shippingDays = 3; // Standard shipping (business days)
   let isHighVolume = false;
   
@@ -323,10 +323,15 @@ const calculateDeliveryDate = (totalQuantity: number, hasRushOrder: boolean) => 
     shippingDays = 3; // Standard shipping (business days)
     isHighVolume = true;
   }
-  // 1,000+ stickers get expedited (but not if 5k+)
-  else if (totalQuantity >= 1000) {
-    productionDays = 1;
+  // 1,001-4,999 stickers get expedited shipping
+  else if (totalQuantity >= 1001) {
+    productionDays = 2;
     shippingDays = 1; // Next day air (business days)
+  }
+  // 1,000 stickers or less get 1 day processing
+  else if (totalQuantity <= 1000) {
+    productionDays = 1;
+    shippingDays = 3; // Standard shipping (business days)
   }
   
   // Rush orders reduce production time (but minimum 2 days for 5k+ orders)
@@ -425,6 +430,9 @@ export default function CartPage() {
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   
+  // State to track when user tries to checkout without account
+  const [showAccountRequiredMessage, setShowAccountRequiredMessage] = useState(false);
+  
   // Share cart state
   const [isCreatingSharedCart, setIsCreatingSharedCart] = useState(false);
   const [sharedCartUrl, setSharedCartUrl] = useState<string | null>(null);
@@ -479,6 +487,10 @@ export default function CartPage() {
           const supabase = await getSupabase();
           const { data: { session } } = await supabase.auth.getSession();
           setUser(session?.user || null);
+        // Hide account required message if user is logged in
+        if (session?.user) {
+          setShowAccountRequiredMessage(false);
+        }
         }
       } catch (error) {
         console.error('Error checking user:', error);
@@ -1049,114 +1061,9 @@ export default function CartPage() {
     <Layout title="Your Cart - Sticker Shuttle">
       <section className="pt-7 pb-8">
         <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
-          {/* Login Recommendation - Mobile Banner */}
-          {showLoginBanner && (
-            <div className="mb-6 p-4 rounded-lg backdrop-blur-md md:hidden" style={{
-              background: 'rgba(255, 255, 255, 0.15)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-            }}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex-shrink-0">
-                    <img
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749075558/StickerShuttle_Alien_xfwvvh.svg"
-                      alt="Sticker Shuttle Alien"
-                      className="w-10 h-10 transition-transform duration-300 hover:scale-110"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-white font-medium mb-2">
-                      It's recommended you sign in for the best experience and deals!
-                    </p>
-                    <p className="text-white/80 text-sm mb-2">
-                      Sign up to track orders, manage proofs, get exclusive discounts, and more.
-                    </p>
-                    <div className="flex gap-2">
-                      <a
-                        href="/login"
-                        className="px-3 py-2 text-xs font-medium text-center rounded-lg transition-all duration-200 transform hover:scale-105"
-                        style={{
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
-                          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                          backdropFilter: 'blur(12px)',
-                          color: 'white'
-                        }}
-                      >
-                        Login
-                      </a>
-                      <a
-                        href="/signup"
-                        className="primaryButton px-3 py-2 text-xs font-medium text-center rounded-lg transition-all duration-200 transform hover:scale-105"
-                      >
-                        Sign Up
-                      </a>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowLoginBanner(false)}
-                  className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white/80 hover:text-white transition-colors text-xs backdrop-blur-sm"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    border: '1px solid rgba(255, 255, 255, 0.3)'
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-          )}
 
-          {/* Login Recommendation - Desktop Popup */}
-          {showLoginBanner && (
-            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden md:flex items-center justify-center">
-              <div className="max-w-md mx-4 p-6 rounded-lg backdrop-blur-md" style={{
-                background: 'rgba(255, 255, 255, 0.15)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-              }}>
-                <div className="text-center">
-                  <div className="flex justify-center mb-4">
-                    <img
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749075558/StickerShuttle_Alien_xfwvvh.svg"
-                      alt="Sticker Shuttle Alien"
-                      className="w-16 h-16 transition-transform duration-300 hover:scale-110"
-                    />
-                  </div>
 
-                  <div className="flex gap-3 justify-center mb-4">
-                    <a
-                      href="/login"
-                      className="px-6 md:px-4 py-2 text-sm font-medium text-center rounded-lg transition-all duration-200 transform hover:scale-105"
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                        backdropFilter: 'blur(12px)',
-                        color: 'white'
-                      }}
-                    >
-                      Login
-                    </a>
-                    <a
-                      href="/signup"
-                      className="primaryButton px-6 md:px-4 py-2 text-sm font-medium text-center rounded-lg transition-all duration-200 transform hover:scale-105"
-                    >
-                      Sign Up
-                    </a>
-                  </div>
-                  <button
-                    onClick={() => setShowLoginBanner(false)}
-                    className="text-white/60 hover:text-white transition-colors text-sm underline"
-                  >
-                    Continue without signing in
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <h1 className="text-3xl font-bold text-white">Your Cart</h1>
@@ -2165,10 +2072,16 @@ export default function CartPage() {
                               <input
                                 type="text"
                                 value={guestCheckoutData.firstName}
-                                onChange={(e) => setGuestCheckoutData(prev => ({
-                                  ...prev,
-                                  firstName: e.target.value
-                                }))}
+                                onChange={(e) => {
+                                  setGuestCheckoutData(prev => ({
+                                    ...prev,
+                                    firstName: e.target.value
+                                  }));
+                                  // Hide the account required message when user starts filling the form
+                                  if (showAccountRequiredMessage) {
+                                    setShowAccountRequiredMessage(false);
+                                  }
+                                }}
                                 className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 focus:bg-white/10 transition-all"
                                 placeholder="John"
                                 required
@@ -2235,6 +2148,15 @@ export default function CartPage() {
                               </button>
                             </p>
                           </div>
+                          
+                          {/* Account Required Message */}
+                          {showAccountRequiredMessage && (
+                            <div className="mt-3 p-3 rounded-lg bg-red-500/20 border border-red-500/30">
+                              <p className="text-red-300 text-sm font-medium">
+                                You must create an account before placing an order. This guarantees proper order tracking and communication.
+                              </p>
+                            </div>
+                          )}
                         </>
                       ) : (
                         <>
@@ -2285,23 +2207,26 @@ export default function CartPage() {
                       onClick={async () => {
                         // Validate guest checkout form if user is not logged in
                         if (!user) {
+                          // Show the account required message when they try to checkout
+                          setShowAccountRequiredMessage(true);
+                          
                           if (!isOtpMode) {
                             // Validate sign up form
                             if (!guestCheckoutData.firstName.trim() || !guestCheckoutData.lastName.trim() || !guestCheckoutData.email.trim() || !guestCheckoutData.password.trim()) {
-                              alert('Please fill in all required fields (First Name, Last Name, Email, Password)');
+                              // Just return to show the red message, no popup
                               return;
                             }
                             
                             // Basic email validation
                             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                             if (!emailRegex.test(guestCheckoutData.email)) {
-                              alert('Please enter a valid email address');
+                              // Just return to show the red message, no popup
                               return;
                             }
                             
                             // Basic password validation (at least 6 characters)
                             if (guestCheckoutData.password.length < 6) {
-                              alert('Password must be at least 6 characters long');
+                              // Just return to show the red message, no popup
                               return;
                             }
                             
@@ -2325,7 +2250,7 @@ export default function CartPage() {
                               });
                               
                               if (authError) {
-                                alert(`Error sending verification code: ${authError.message}`);
+                                console.error('Error sending verification code:', authError.message);
                                 setIsSendingOtp(false);
                                 return;
                               }
@@ -2334,7 +2259,7 @@ export default function CartPage() {
                               setIsOtpMode(true);
                             } catch (error: any) {
                               console.error('Error sending OTP:', error);
-                              alert('Failed to send verification code. Please try again.');
+                              // Just log error, don't show popup
                             } finally {
                               setIsSendingOtp(false);
                             }
@@ -2342,7 +2267,7 @@ export default function CartPage() {
                           } else {
                             // Validate OTP
                             if (otpCode.length !== 6) {
-                              alert('Please enter the complete 6-digit verification code');
+                              // Just return - OTP validation happens in the form itself
                               return;
                             }
                             
@@ -2367,7 +2292,7 @@ export default function CartPage() {
                                 });
                                 
                                 if (emailVerifyError) {
-                                  alert(`Invalid verification code: ${emailVerifyError.message}`);
+                                  console.error('Invalid verification code:', emailVerifyError.message);
                                   setIsVerifyingOtp(false);
                                   return;
                                 }
@@ -2410,7 +2335,7 @@ export default function CartPage() {
                               setIsVerifyingOtp(false);
                             } catch (error: any) {
                               console.error('Error verifying OTP:', error);
-                              alert('Failed to verify code. Please try again.');
+                              // Just log error, don't show popup
                               setIsVerifyingOtp(false);
                               return;
                             }

@@ -32,6 +32,8 @@ export default function SignUp() {
     confirmPassword: '',
     firstName: '',
     lastName: '',
+    phoneNumber: '',
+    companyWebsite: '',
     companyName: '',
     isWholesale: false,
     wholesaleMonthlyCustomers: '',
@@ -88,6 +90,8 @@ export default function SignUp() {
     const directLastName = formDataElements.get('lastName') as string;
     const directEmail = formDataElements.get('email') as string;
     const directPassword = formDataElements.get('password') as string;
+    const directPhoneNumber = formDataElements.get('phoneNumber') as string;
+    const directCompanyWebsite = formDataElements.get('companyWebsite') as string;
     const directCompanyName = formDataElements.get('companyName') as string;
     const directIsWholesale = formDataElements.get('isWholesale') === 'on';
     const directWholesaleMonthlyCustomers = formDataElements.get('wholesaleMonthlyCustomers') as string;
@@ -113,6 +117,42 @@ export default function SignUp() {
       setError('Password must be at least 6 characters');
       setLoading(false);
       return;
+    }
+
+    // Wholesale-only validations
+    if (formData.isWholesale) {
+      // Phone number validation
+      if (!formData.phoneNumber.trim()) {
+        console.log('❌ Phone number required for wholesale');
+        setError('Phone number is required for wholesale accounts');
+        setLoading(false);
+        return;
+      }
+
+      // Basic phone number format validation (must contain at least 10 digits)
+      const phoneDigits = formData.phoneNumber.replace(/\D/g, '');
+      if (phoneDigits.length < 10) {
+        console.log('❌ Invalid phone number format');
+        setError('Please enter a valid phone number');
+        setLoading(false);
+        return;
+      }
+
+      // Company website validation
+      if (!formData.companyWebsite.trim()) {
+        console.log('❌ Company website required for wholesale');
+        setError('Company website is required for wholesale accounts');
+        setLoading(false);
+        return;
+      }
+
+      // Basic URL validation
+      if (!formData.companyWebsite.startsWith('http://') && !formData.companyWebsite.startsWith('https://')) {
+        console.log('❌ Invalid company website URL');
+        setError('Please enter a valid website URL (starting with http:// or https://)');
+        setLoading(false);
+        return;
+      }
     }
 
     if (!formData.agreeToTerms) {
@@ -166,11 +206,17 @@ export default function SignUp() {
       
       console.log('🔄 Calling signUp...');
 
-      const metadataToSend = {
+      const metadataToSend: any = {
         first_name: directFirstName,
         last_name: directLastName,
         full_name: `${directFirstName} ${directLastName}`
       };
+      
+      // Only add phone number and company website for wholesale accounts
+      if (formData.isWholesale) {
+        metadataToSend.phone_number = directPhoneNumber;
+        metadataToSend.company_website = directCompanyWebsite;
+      }
       console.log('📦 Metadata being sent:', metadataToSend);
       
       // Sign up with modern Supabase API
@@ -302,6 +348,8 @@ export default function SignUp() {
                 input: {
                   firstName: userFirstName,
                   lastName: userLastName,
+                  phoneNumber: formData.phoneNumber,
+                  companyWebsite: formData.companyWebsite,
                   companyName: formData.companyName,
                   wholesaleMonthlyCustomers: formData.wholesaleMonthlyCustomers,
                   wholesaleOrderingFor: formData.wholesaleOrderingFor,
@@ -317,7 +365,9 @@ export default function SignUp() {
               variables: {
                 userId: data.user.id,
                 firstName: userFirstName,
-                lastName: userLastName
+                lastName: userLastName,
+                phoneNumber: null, // Regular users don't provide phone number
+                companyWebsite: null // Regular users don't provide company website
               }
             });
             console.log('✅ Regular profile created successfully!');
@@ -643,7 +693,7 @@ export default function SignUp() {
               >
                 <div className="flex-1">
                   <h3 className="text-white font-medium text-lg">Wholesale Account</h3>
-                  <p className="text-gray-300 text-sm">Get 2.5% store credit + 15% off all orders + $25 welcome bonus</p>
+                  <p className="text-gray-300 text-sm">Get 15% off orders + $25 welcome bonus</p>
                 </div>
                 <button
                   type="button"
@@ -722,6 +772,8 @@ export default function SignUp() {
                 />
               </div>
 
+
+
               {/* Wholesale Questions (shown only when toggle is on) */}
               {formData.isWholesale && (
                 <div className="space-y-4 p-4 rounded-xl border border-blue-500/30 bg-blue-500/5">
@@ -743,6 +795,40 @@ export default function SignUp() {
                       onChange={handleInputChange}
                       className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                       placeholder="Your Company Name"
+                      required={formData.isWholesale}
+                    />
+                  </div>
+
+                  {/* Phone Number */}
+                  <div>
+                    <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-300 mb-2">
+                      Phone Number *
+                    </label>
+                    <input
+                      type="tel"
+                      id="phoneNumber"
+                      name="phoneNumber"
+                      value={formData.phoneNumber}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      placeholder="(555) 123-4567"
+                      required={formData.isWholesale}
+                    />
+                  </div>
+
+                  {/* Company Website */}
+                  <div>
+                    <label htmlFor="companyWebsite" className="block text-sm font-medium text-gray-300 mb-2">
+                      Company Website *
+                    </label>
+                    <input
+                      type="url"
+                      id="companyWebsite"
+                      name="companyWebsite"
+                      value={formData.companyWebsite}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      placeholder="https://yourcompany.com"
                       required={formData.isWholesale}
                     />
                   </div>
@@ -1015,7 +1101,7 @@ export default function SignUp() {
                     >
                       <div className="flex-1">
                         <h3 className="text-white font-medium text-lg">Wholesale Account</h3>
-                        <p className="text-gray-300 text-sm">Get 10% store credit + $25 welcome bonus</p>
+                        <p className="text-gray-300 text-sm">Get 15% off orders + $25 welcome bonus</p>
                       </div>
                       <button
                         type="button"
@@ -1094,6 +1180,8 @@ export default function SignUp() {
                       />
                     </div>
 
+
+
                     {/* Wholesale Questions (shown only when toggle is on) */}
                     {formData.isWholesale && (
                       <div className="space-y-4 p-4 rounded-xl border border-blue-500/30 bg-blue-500/5">
@@ -1115,6 +1203,40 @@ export default function SignUp() {
                             onChange={handleInputChange}
                             className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                             placeholder="Your Company Name"
+                            required={formData.isWholesale}
+                          />
+                        </div>
+
+                        {/* Phone Number */}
+                        <div>
+                          <label htmlFor="phoneNumber-desktop" className="block text-sm font-medium text-gray-300 mb-2">
+                            Phone Number *
+                          </label>
+                          <input
+                            type="tel"
+                            id="phoneNumber-desktop"
+                            name="phoneNumber"
+                            value={formData.phoneNumber}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                            placeholder="(555) 123-4567"
+                            required={formData.isWholesale}
+                          />
+                        </div>
+
+                        {/* Company Website */}
+                        <div>
+                          <label htmlFor="companyWebsite-desktop" className="block text-sm font-medium text-gray-300 mb-2">
+                            Company Website *
+                          </label>
+                          <input
+                            type="url"
+                            id="companyWebsite-desktop"
+                            name="companyWebsite"
+                            value={formData.companyWebsite}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                            placeholder="https://yourcompany.com"
                             required={formData.isWholesale}
                           />
                         </div>

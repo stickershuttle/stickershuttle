@@ -98,4 +98,55 @@ export const GET_ALL_SHARED_CARTS = gql`
       error
     }
   }
+`;
+
+// Get all wholesale customers for admin management
+export const GET_ALL_WHOLESALE_CUSTOMERS = gql`
+  query GetAllWholesaleCustomers {
+    getAllWholesaleCustomers {
+      id
+      userId
+      firstName
+      lastName
+      companyName
+      isWholesaleCustomer
+      wholesaleCreditRate
+      wholesaleMonthlyCustomers
+      wholesaleOrderingFor
+      wholesaleFitExplanation
+      wholesaleStatus
+      wholesaleApprovedAt
+      wholesaleApprovedBy
+      isTaxExempt
+      taxExemptId
+      taxExemptReason
+      taxExemptExpiresAt
+      taxExemptUpdatedAt
+      taxExemptUpdatedBy
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+// Get all customers for tax exemption management
+export const GET_ALL_CUSTOMERS_WITH_PROFILES = gql`
+  query GetAllCustomersWithProfiles {
+    getAllWholesaleCustomers {
+      id
+      userId
+      firstName
+      lastName
+      companyName
+      isWholesaleCustomer
+      isTaxExempt
+      taxExemptId
+      taxExemptReason
+      taxExemptExpiresAt
+      taxExemptUpdatedAt
+      taxExemptUpdatedBy
+      createdAt
+      updatedAt
+    }
+  }
 `; 

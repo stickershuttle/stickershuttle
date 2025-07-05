@@ -186,10 +186,10 @@ export default function GlitterStickers() {
 
               {/* Desktop Title and Subtitle */}
               <div className="hidden md:block mb-4">
-                <h1 className="text-3xl sm:text-4xl md:text-5xl leading-none mb-2 text-navy-900" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
+                <h1 className="text-3xl sm:text-4xl md:text-5xl leading-none mb-2 text-gray-800" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
                   Glitter Stickers
                 </h1>
-                <p className="text-navy-900 text-base font-semibold">
+                <p className="text-gray-800 text-base font-semibold">
                   Dazzling sparkle and shine. Shimmering brilliance.
                 </p>
               </div>
@@ -227,15 +227,15 @@ export default function GlitterStickers() {
 
               {/* Mobile Title and Subtitle */}
               <div className="md:hidden mb-4 text-center">
-                <h1 className="text-4xl leading-none whitespace-nowrap mb-2 text-navy-900" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
+                <h1 className="text-4xl leading-none whitespace-nowrap mb-2 text-gray-800" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
                   Glitter Stickers
                 </h1>
-                <p className="text-navy-900 text-sm font-semibold">
+                <p className="text-gray-800 text-sm font-semibold">
                   Dazzling sparkle and shine. Shimmering brilliance.
                 </p>
               </div>
               {/* Desktop Description */}
-              <p className="hidden md:block text-base sm:text-lg mb-6 text-navy-900 font-semibold max-w-3xl">
+              <p className="hidden md:block text-base sm:text-lg mb-6 text-gray-800 font-semibold max-w-3xl">
                 Dazzling glitter stickers that sparkle and catch the light beautifully - perfect for making your designs shine with eye-catching brilliance.
               </p>
               

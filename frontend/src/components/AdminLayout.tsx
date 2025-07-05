@@ -149,6 +149,16 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
             icon: null
           });
         }
+      } else if (segments[1] === 'tax-exemptions') {
+        breadcrumbs.push({
+          label: 'Tax Exemptions',
+          href: '/admin/tax-exemptions',
+          icon: (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          )
+        });
       } else if (segments[1] === 'discounts') {
         breadcrumbs.push({
           label: 'Discounts',
@@ -616,6 +626,33 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                   </svg>
                   Shared Carts
+                </a>
+
+                {/* Tax Exemptions */}
+                <a
+                  href="/admin/tax-exemptions"
+                  className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
+                    router.asPath.startsWith('/admin/tax-exemptions')
+                      ? 'text-white bg-slate-500/15 border-l-3 border-slate-500'
+                      : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                  }`}
+                  onMouseEnter={(e) => {
+                    if (!router.asPath.startsWith('/admin/tax-exemptions')) {
+                      e.currentTarget.style.backgroundColor = 'rgba(100, 116, 139, 0.1)';
+                      e.currentTarget.style.color = '#94A3B8';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!router.asPath.startsWith('/admin/tax-exemptions')) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '';
+                    }
+                  }}
+                >
+                  <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Tax Exemptions
                 </a>
 
                 {/* Divider */}

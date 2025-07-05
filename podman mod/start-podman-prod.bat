@@ -1,3 +1,0 @@
-@echo off
-echo Starting Sticker Shuttle production environment with Podman...
-podman compose -f podman-compose.yml up --build 

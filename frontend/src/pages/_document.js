@@ -4,7 +4,11 @@ export default function Document() {
   return (
     <Html lang="en">
       <Head>
-        {/* Google Fonts */}
+        {/* Preconnect to font domains for performance */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        
+        {/* Google Fonts - moved to document for better performance */}
         <link
           href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Rubik:wght@300;400;500;600;700;800;900&family=VT323&display=swap"
           rel="stylesheet"
@@ -25,13 +29,12 @@ export default function Document() {
         <link rel="apple-touch-icon" href="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591675/Asset_8_mhjgsx.svg?v=2" />
         <link rel="icon" sizes="16x16 32x32 48x48" href="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591675/Asset_8_mhjgsx.svg?v=2" />
         
-        {/* Meta tags */}
+        {/* SEO Meta tags */}
         <meta name="description" content="Custom stickers, labels, and decals - High quality printing with fast shipping" />
         <meta name="keywords" content="stickers, custom stickers, labels, decals, printing" />
         <meta name="author" content="Sticker Shuttle" />
         
-        {/* Mobile Web App Meta Tags */}
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+        {/* Mobile Web App Meta Tags (removed viewport - handled in _app.tsx) */}
         <meta name="theme-color" content="#030140" id="theme-color-meta" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

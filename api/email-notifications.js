@@ -952,7 +952,7 @@ const sendOrderStatusNotificationEnhanced = async (orderData, newStatus) => {
       const isFirstTime = await isFirstTimeCustomer(normalizedOrderData.customerEmail);
       
       if (isFirstTime) {
-        console.log(`🎉 First-time customer detected for ${normalizedOrderData.customerEmail}, sending welcome email`);
+        console.log(`🎉 First-time customer detected for ${normalizedOrderData.customerEmail}, sending welcome email and scheduling thank you email`);
         
         // Send welcome email
         const welcomeTemplate = getWelcomeEmailTemplate(normalizedOrderData);
@@ -960,12 +960,25 @@ const sendOrderStatusNotificationEnhanced = async (orderData, newStatus) => {
         
         if (welcomeResult.success) {
           console.log(`✅ Welcome email sent for order ${normalizedOrderData.orderNumber}`);
-          // If this is the 'paid' status notification, don't send another email
-          if (newStatus === 'paid') {
-            return welcomeResult;
-          }
         } else {
           console.error(`❌ Welcome email failed for order ${normalizedOrderData.orderNumber}:`, welcomeResult.error);
+        }
+        
+        // Schedule thank you email for 12 hours later (regardless of welcome email success)
+        try {
+          const scheduleResult = await scheduleFirstOrderThankYou(normalizedOrderData);
+          if (scheduleResult.success) {
+            console.log(`✅ Thank you email scheduled for order ${normalizedOrderData.orderNumber}`);
+          } else {
+            console.error(`❌ Failed to schedule thank you email for order ${normalizedOrderData.orderNumber}:`, scheduleResult.error);
+          }
+        } catch (scheduleError) {
+          console.error(`❌ Error scheduling thank you email for order ${normalizedOrderData.orderNumber}:`, scheduleError);
+        }
+        
+        // If this is the 'paid' status notification, don't send another email
+        if (newStatus === 'paid') {
+          return welcomeResult;
         }
       } else {
         console.log(`🔄 Returning customer detected for ${normalizedOrderData.customerEmail}, skipping welcome email`);
@@ -994,6 +1007,7 @@ const sendWelcomeEmail = async (orderData) => {
     const normalizedOrderData = {
       orderNumber: orderData.order_number || orderData.orderNumber || orderData.id || 'N/A',
       customerEmail: orderData.customer_email || orderData.customerEmail || orderData.guest_email || orderData.guestEmail,
+      customerFirstName: orderData.customer_first_name || orderData.customerFirstName || orderData.firstName,
       totalPrice: orderData.total_price || orderData.totalPrice || 0
     };
     
@@ -1009,6 +1023,18 @@ const sendWelcomeEmail = async (orderData) => {
     
     if (result.success) {
       console.log(`✅ Welcome email sent for order ${normalizedOrderData.orderNumber}`);
+      
+      // Also schedule thank you email for 12 hours later
+      try {
+        const scheduleResult = await scheduleFirstOrderThankYou(normalizedOrderData);
+        if (scheduleResult.success) {
+          console.log(`✅ Thank you email scheduled for order ${normalizedOrderData.orderNumber}`);
+        } else {
+          console.error(`❌ Failed to schedule thank you email for order ${normalizedOrderData.orderNumber}:`, scheduleResult.error);
+        }
+      } catch (scheduleError) {
+        console.error(`❌ Error scheduling thank you email for order ${normalizedOrderData.orderNumber}:`, scheduleError);
+      }
     }
     
     return result;
@@ -1134,6 +1160,342 @@ const sendWholesaleApprovalEmail = async (userData) => {
   }
 };
 
+// Template for customer artwork upload notification
+const getCustomerArtworkUploadTemplate = (orderData, itemData) => {
+  const adminEmail = 'orbit@stickershuttle.com';
+  const adminPanelUrl = `${FRONTEND_URL}/admin/orders/${orderData.orderNumber}`;
+  
+  return {
+    subject: `🎨 Customer Uploaded Artwork - Order #${orderData.orderNumber}`,
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Uploaded Artwork</title>
+</head>
+<body style="margin: 0; padding: 20px; background-color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; min-height: 100vh;">
+  <div style="max-width: 600px; margin: 0 auto; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 16px; overflow: hidden;">
+    
+    <!-- Header -->
+    <div style="background: #f1f3f5; border-bottom: 1px solid #e9ecef; padding: 30px 20px; text-align: center;">
+      <h1 style="color: #1a1a1a; margin: 0; font-size: 22px; font-weight: 600;">
+        🎨 Customer Uploaded Artwork
+      </h1>
+      <p style="color: #4b5563; margin: 10px 0 0 0; font-size: 16px; font-weight: 400;">
+        Order #${orderData.orderNumber}
+      </p>
+    </div>
+
+    <!-- Main Content -->
+    <div style="padding: 30px 20px;">
+      <div style="background: #ffffff; border: 1px solid #e9ecef; border-left: 4px solid #3B82F6; padding: 20px; margin-bottom: 30px; border-radius: 12px;">
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #1a1a1a; font-weight: 400;">
+          A customer has uploaded artwork for their order. This was an order where they initially skipped the artwork upload.
+        </p>
+      </div>
+
+      <!-- Order Details -->
+      <div style="background: #ffffff; border: 1px solid #e9ecef; padding: 20px; border-radius: 12px; margin-bottom: 30px;">
+        <h3 style="margin: 0 0 15px 0; color: #1a1a1a; font-size: 18px; font-weight: 600;">Order Details</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Order Number:</td>
+            <td style="padding: 8px 0; color: #1a1a1a; font-weight: 600;">#${orderData.orderNumber}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Customer:</td>
+            <td style="padding: 8px 0; color: #1a1a1a; font-weight: 600;">${orderData.customerName || orderData.customerEmail || 'N/A'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Email:</td>
+            <td style="padding: 8px 0; color: #1a1a1a; font-weight: 600;">${orderData.customerEmail || 'N/A'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Product:</td>
+            <td style="padding: 8px 0; color: #1a1a1a; font-weight: 600;">${itemData.productName || 'Custom Sticker'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #4b5563; font-weight: 500;">Upload Time:</td>
+            <td style="padding: 8px 0; color: #1a1a1a; font-weight: 600;">${new Date().toLocaleString()}</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Action Button -->
+      <div style="text-align: center; margin-bottom: 30px;">
+        <a href="${adminPanelUrl}" style="display: inline-block; background-color: #3B82F6; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+          View Order & Artwork
+        </a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background: #f1f3f5; border-top: 1px solid #e9ecef; padding: 20px; text-align: center;">
+      <!-- Logo -->
+      <div style="margin-bottom: 15px;">
+        <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751567428/LogoDarktGreyStickerShuttle_lpvvnc.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
+      </div>
+      
+      <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px; font-weight: 400;">
+        Internal Notification - Sticker Shuttle Admin
+      </p>
+      <p style="margin: 0; color: #6b7280; font-size: 12px; font-weight: 400;">
+        This email was sent to ${adminEmail} regarding order #${orderData.orderNumber}
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+    `
+  };
+};
+
+// Send notification when customer uploads artwork
+const sendCustomerArtworkUploadNotification = async (orderData, itemData) => {
+  try {
+    const adminEmail = 'orbit@stickershuttle.com';
+    
+    // Normalize order data
+    const normalizedOrderData = {
+      orderNumber: orderData.order_number || orderData.orderNumber || orderData.id || 'N/A',
+      customerEmail: orderData.customer_email || orderData.customerEmail || orderData.guest_email || orderData.guestEmail,
+      customerName: `${orderData.customer_first_name || orderData.customerFirstName || ''} ${orderData.customer_last_name || orderData.customerLastName || ''}`.trim() || orderData.customer_email || orderData.customerEmail,
+      totalPrice: orderData.total_price || orderData.totalPrice || 0
+    };
+    
+    console.log(`📧 Sending artwork upload notification for order ${normalizedOrderData.orderNumber}`);
+    
+    const template = getCustomerArtworkUploadTemplate(normalizedOrderData, itemData);
+    const result = await sendEmail(adminEmail, template.subject, template.html);
+    
+    if (result.success) {
+      console.log(`✅ Artwork upload notification sent to admin for order ${normalizedOrderData.orderNumber}`);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('❌ Error sending artwork upload notification:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Thank you email template for first-time customers (12 hours after order)
+const getFirstOrderThankYouTemplate = (orderData) => {
+  // Extract first name from order data
+  const firstName = orderData.customerFirstName || 
+                   orderData.customer_first_name || 
+                   orderData.firstName || 
+                   (orderData.customerEmail ? orderData.customerEmail.split('@')[0] : 'friend');
+
+  return {
+    subject: `Thank you for your support, ${firstName}!`,
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thank you for your support!</title>
+</head>
+<body style="margin: 0; padding: 20px; background-color: #ffffff; color: #1a1a1a; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; min-height: 100vh;">
+  <div style="max-width: 600px; margin: 0 auto; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 16px; overflow: hidden;">
+    
+    <!-- Header -->
+    <div style="background: #f1f3f5; border-bottom: 1px solid #e9ecef; padding: 30px 20px; text-align: center;">
+      <h1 style="margin: 0; font-size: 26px; font-weight: 600; color: #1a1a1a;">
+        Hi ${firstName},
+      </h1>
+    </div>
+
+    <!-- Main Content -->
+    <div style="padding: 30px 20px;">
+      <!-- Personal Message -->
+      <div style="background: #ffffff; border: 1px solid #e9ecef; padding: 25px; margin-bottom: 30px; border-radius: 12px;">
+        <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #1a1a1a;">
+          We seriously value every one of our customers, so I wanted to send a quick note to say thank you for supporting our business.
+        </p>
+        <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #1a1a1a;">
+          Sometimes it can feel like a lot running a small business, but every time an order comes through like yours it makes it that much easier! :)
+        </p>
+        <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #1a1a1a;">
+          If you have any questions before your order arrives, please reach out. We're always happy to help in any way we can.
+        </p>
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #1a1a1a;">
+          We hope to make more for you soon!
+        </p>
+      </div>
+
+      <!-- Signature -->
+      <div style="background: #ffffff; border: 1px solid #e9ecef; padding: 25px; margin-bottom: 30px; border-radius: 12px;">
+        <p style="margin: 0 0 10px 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #1a1a1a;">
+          Thanks,
+        </p>
+        <p style="margin: 0 0 5px 0; font-size: 18px; font-weight: 600; color: #1a1a1a;">
+          Justin Fowler
+        </p>
+        <p style="margin: 0 0 10px 0; font-size: 16px; font-weight: 400; color: #4b5563;">
+          Owner @ Sticker Shuttle
+        </p>
+        <a href="https://www.stickershuttle.com" style="color: #3b82f6; text-decoration: none; font-weight: 500; font-size: 16px;">
+          www.stickershuttle.com
+        </a>
+      </div>
+
+      <!-- Action Button -->
+      <div style="text-align: center; margin-bottom: 30px;">
+        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background-color: #3B82F6; color: #ffffff; padding: 15px 40px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+          Track Your Order
+        </a>
+      </div>
+
+      <!-- Support Section -->
+      <div style="border-top: 1px solid #e9ecef; padding-top: 20px; text-align: center;">
+        <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px; font-weight: 400;">
+          Questions about your order or need help?
+        </p>
+        <a href="${FRONTEND_URL}/contact-us" style="color: #3b82f6; text-decoration: none; font-weight: 600; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+          Contact Support
+        </a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background: #f1f3f5; border-top: 1px solid #e9ecef; padding: 20px; text-align: center;">
+      <!-- Logo -->
+      <div style="margin-bottom: 15px;">
+        <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751567428/LogoDarktGreyStickerShuttle_lpvvnc.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
+      </div>
+      
+      <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px; font-weight: 400;">
+        Thank you for choosing Sticker Shuttle!
+      </p>
+      <p style="margin: 0; color: #6b7280; font-size: 12px; font-weight: 400;">
+        This email was sent to ${orderData.customerEmail} regarding your recent order
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+    `
+  };
+};
+
+// Schedule a thank you email for first-time customers (12 hours after order)
+const scheduleFirstOrderThankYou = async (orderData) => {
+  try {
+    // Normalize order data
+    const normalizedOrderData = {
+      orderNumber: orderData.order_number || orderData.orderNumber || orderData.id || 'N/A',
+      customerEmail: orderData.customer_email || orderData.customerEmail || orderData.guest_email || orderData.guestEmail,
+      customerFirstName: orderData.customer_first_name || orderData.customerFirstName || orderData.firstName,
+      totalPrice: orderData.total_price || orderData.totalPrice || 0
+    };
+
+    if (!normalizedOrderData.customerEmail) {
+      console.log('❌ No customer email found for scheduled thank you email');
+      return { success: false, error: 'No customer email' };
+    }
+
+    // Get database client
+    const { getSupabaseServiceClient } = require('./supabase-client');
+    const client = getSupabaseServiceClient();
+
+    // Check if we've already scheduled this email in the database
+    const { data: existingEmail, error: checkError } = await client
+      .from('thank_you_email_tracking')
+      .select('id, email_status')
+      .eq('customer_email', normalizedOrderData.customerEmail)
+      .eq('order_number', normalizedOrderData.orderNumber)
+      .single();
+
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 means no rows found
+      console.error('❌ Error checking existing thank you email:', checkError);
+      return { success: false, error: 'Database error checking existing email' };
+    }
+
+    if (existingEmail) {
+      console.log(`⏰ Thank you email already scheduled for ${normalizedOrderData.customerEmail}, order ${normalizedOrderData.orderNumber} (status: ${existingEmail.email_status})`);
+      return { success: true, message: 'Already scheduled' };
+    }
+
+    // Insert tracking record
+    const { error: insertError } = await client
+      .from('thank_you_email_tracking')
+      .insert({
+        customer_email: normalizedOrderData.customerEmail,
+        order_number: normalizedOrderData.orderNumber,
+        order_id: orderData.id || null,
+        email_status: 'scheduled'
+      });
+
+    if (insertError) {
+      console.error('❌ Error inserting thank you email tracking record:', insertError);
+      return { success: false, error: 'Database error inserting tracking record' };
+    }
+
+    console.log(`⏰ Scheduling thank you email for ${normalizedOrderData.customerEmail}, order ${normalizedOrderData.orderNumber} (12 hours from now)`);
+
+    // Schedule the email for 12 hours from now
+    const delayMs = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
+    
+    setTimeout(async () => {
+      try {
+        console.log(`📧 Sending scheduled thank you email to ${normalizedOrderData.customerEmail}, order ${normalizedOrderData.orderNumber}`);
+        
+        const template = getFirstOrderThankYouTemplate(normalizedOrderData);
+        const result = await sendEmail(normalizedOrderData.customerEmail, template.subject, template.html);
+        
+        // Update tracking record in database
+        try {
+          const { error: updateError } = await client
+            .from('thank_you_email_tracking')
+            .update({
+              sent_at: new Date().toISOString(),
+              email_status: result.success ? 'sent' : 'failed'
+            })
+            .eq('customer_email', normalizedOrderData.customerEmail)
+            .eq('order_number', normalizedOrderData.orderNumber);
+
+          if (updateError) {
+            console.error('❌ Error updating thank you email tracking record:', updateError);
+          }
+        } catch (dbError) {
+          console.error('❌ Database error updating thank you email tracking:', dbError);
+        }
+        
+        if (result.success) {
+          console.log(`✅ Scheduled thank you email sent successfully to ${normalizedOrderData.customerEmail}, order ${normalizedOrderData.orderNumber}`);
+        } else {
+          console.error(`❌ Scheduled thank you email failed for ${normalizedOrderData.customerEmail}, order ${normalizedOrderData.orderNumber}:`, result.error);
+        }
+      } catch (error) {
+        console.error(`❌ Error sending scheduled thank you email to ${normalizedOrderData.customerEmail}, order ${normalizedOrderData.orderNumber}:`, error);
+        
+        // Update tracking record to failed
+        try {
+          await client
+            .from('thank_you_email_tracking')
+            .update({
+              sent_at: new Date().toISOString(),
+              email_status: 'failed'
+            })
+            .eq('customer_email', normalizedOrderData.customerEmail)
+            .eq('order_number', normalizedOrderData.orderNumber);
+        } catch (dbError) {
+          console.error('❌ Database error updating failed thank you email tracking:', dbError);
+        }
+      }
+    }, delayMs);
+
+    return { success: true, message: 'Thank you email scheduled for 12 hours' };
+  } catch (error) {
+    console.error('❌ Error scheduling thank you email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendOrderStatusNotification,
   sendOrderStatusNotificationEnhanced,
@@ -1144,5 +1506,7 @@ module.exports = {
   sendAdminProofActionNotification,
   sendEmail,
   sendUserFileUpload,
-  sendWholesaleApprovalEmail
+  sendWholesaleApprovalEmail,
+  sendCustomerArtworkUploadNotification,
+  scheduleFirstOrderThankYou
 }; 

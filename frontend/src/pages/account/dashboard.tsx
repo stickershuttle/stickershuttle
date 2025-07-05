@@ -17,6 +17,7 @@ import { SYNC_CUSTOMER_TO_KLAVIYO } from '../../lib/klaviyo-mutations';
 import { UPDATE_USER_PROFILE_PHOTO, UPDATE_USER_PROFILE_BANNER, GET_USER_PROFILE } from '../../lib/profile-mutations';
 import { GET_WHOLESALE_CLIENTS, GET_CLIENT_ORDERS, CREATE_WHOLESALE_CLIENT, UPDATE_WHOLESALE_CLIENT, DELETE_WHOLESALE_CLIENT, ASSIGN_ORDER_TO_CLIENT, UNASSIGN_ORDER_FROM_CLIENT } from '../../lib/wholesale-client-mutations';
 import AIFileImage from '../../components/AIFileImage';
+import OrderItemFileUpload from '../../components/OrderItemFileUpload';
 import FileUploadToEmail from '../../components/FileUploadToEmail';
 
 
@@ -467,7 +468,7 @@ function Dashboard() {
         0% {
           background-position: 0% 0%, 20% 20%, 40% 60%, 60% 40%, 80% 80%, 10% 30%;
         }
-        20% {
+        25% {
           background-position: 30% 40%, 50% 10%, 70% 60%, 90% 80%, 20% 100%, 40% 50%;
         }
         40% {
@@ -3571,7 +3572,7 @@ function Dashboard() {
                             
                             return (
                               <div key={`preview-${item.id}-${index}`} className="flex-shrink-0">
-                                {productImage ? (
+                                {productImage && productImage.trim() !== '' ? (
                                   <div 
                                     className="w-12 h-12 rounded-lg bg-white/10 border border-white/20 p-1 flex items-center justify-center cursor-pointer hover:border-blue-400/60 transition-all duration-200 hover:scale-105 relative"
                                     onClick={() => {
@@ -3597,15 +3598,16 @@ function Dashboard() {
                                     )}
                                   </div>
                                 ) : (
-                                  <div className="w-12 h-12 rounded-lg bg-gray-600 flex items-center justify-center text-gray-400 border border-white/20 text-lg relative">
-                                    📄
-                                    {/* Re-Order Pill */}
-                                    {itemData.isReorder && (
-                                      <div className="absolute -top-1 -right-1 bg-amber-500 text-black text-xs px-1 py-0.5 rounded-full text-[8px] font-bold leading-none">
-                                        RE
-                                      </div>
-                                    )}
-                                  </div>
+                                  <OrderItemFileUpload 
+                                    orderId={String(order.id)}
+                                    itemId={String(item.id)}
+                                    onUploadComplete={(fileUrl) => {
+                                      console.log('File uploaded:', fileUrl);
+                                      // Refresh orders to show the new file
+                                      refreshOrders();
+                                    }}
+                                    className="w-12 h-12"
+                                  />
                                 )}
                               </div>
                             );
@@ -3823,7 +3825,7 @@ function Dashboard() {
 
                             return (
                               <div key={index} className="w-16 h-16 rounded-lg overflow-hidden border border-white/10 bg-black/20">
-                                {productImage ? (
+                                {productImage && productImage.trim() !== '' ? (
                                   <AIFileImage
                                     src={productImage}
                                     filename={productImage.split('/').pop()?.split('?')[0] || 'design.jpg'}
@@ -3833,7 +3835,16 @@ function Dashboard() {
                                     showFileType={false}
                                   />
                                 ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-lg">📄</div>
+                                  <OrderItemFileUpload 
+                                    orderId={String(order.id)}
+                                    itemId={String(item.id)}
+                                    onUploadComplete={(fileUrl) => {
+                                      console.log('File uploaded:', fileUrl);
+                                      // Refresh orders to show the new file
+                                      refreshOrders();
+                                    }}
+                                    className="w-full h-full"
+                                  />
                                 )}
                               </div>
                             );
@@ -4204,9 +4215,16 @@ function Dashboard() {
                                 />
                               </div>
                             ) : (
-                              <div className="w-20 h-20 rounded-lg bg-gray-600 flex items-center justify-center text-gray-400 border border-white/20 text-2xl">
-                                📄
-                              </div>
+                              <OrderItemFileUpload 
+                                orderId={String(recentOrder.id)}
+                                itemId={String(recentOrder.items[0]?.id)}
+                                onUploadComplete={(fileUrl) => {
+                                  console.log('File uploaded:', fileUrl);
+                                  // Refresh orders to show the new file
+                                  refreshOrders();
+                                }}
+                                className="w-20 h-20"
+                              />
                             )}
                           </div>
                           
@@ -4679,8 +4697,9 @@ function Dashboard() {
         // Create a unique key based on image URL to ensure we capture all unique designs
         const imageKey = productImage || item.image || '';
         
-        // Only process items with valid images
-        if (imageKey && imageKey.trim() !== '') {
+        // Only process items with uploaded files (customFiles) - exclude items without artwork
+        const hasUploadedFile = itemData.customFiles?.[0] || item.customFiles?.[0];
+        if (imageKey && imageKey.trim() !== '' && hasUploadedFile) {
           // Check if we already have this specific design (by image URL)
           const existingDesign = designs.find(d => d.image === imageKey);
           
@@ -7150,8 +7169,8 @@ function Dashboard() {
                   {/* Item Header */}
                   <div className="flex items-start gap-4 mb-6">
                     {/* Product Image */}
-                    {firstImage && (
-                      <div className="flex-shrink-0">
+                    <div className="flex-shrink-0">
+                      {firstImage ? (
                         <div className="w-20 h-20 rounded-lg overflow-hidden border border-white/20 bg-black/20">
                           <AIFileImage
                             src={firstImage}
@@ -7162,8 +7181,27 @@ function Dashboard() {
                             showFileType={false}
                           />
                         </div>
-                      </div>
-                    )}
+                      ) : (
+                        <OrderItemFileUpload 
+                          orderId={String(selectedOrderForPopup.id)}
+                          itemId={String(item.id)}
+                          onUploadComplete={(fileUrl) => {
+                            console.log('File uploaded:', fileUrl);
+                            // Refresh orders to show the new file
+                            refreshOrders();
+                            // Close the popup to refresh data
+                            setSelectedOrderForPopup(null);
+                            setTimeout(() => {
+                              // Re-select the order to show updated data
+                              const updatedOrder = orders.find(o => o.id === selectedOrderForPopup.id);
+                              if (updatedOrder) {
+                                setSelectedOrderForPopup(updatedOrder);
+                              }
+                            }, 500);
+                          }}
+                        />
+                      )}
+                    </div>
                     
                     {/* Item Info */}
                     <div className="flex-1">
@@ -8772,7 +8810,7 @@ function Dashboard() {
                             
                             return (
                               <div key={`preview-${item.id}-${index}`} className="flex-shrink-0">
-                                {productImage ? (
+                                {productImage && productImage.trim() !== '' ? (
                                   <div 
                                     className="w-12 h-12 rounded-lg bg-white/10 border border-white/20 p-1 flex items-center justify-center cursor-pointer hover:border-blue-400/60 transition-all duration-200 hover:scale-105 relative"
                                     onClick={() => {
@@ -8798,15 +8836,16 @@ function Dashboard() {
                                     )}
                                   </div>
                                 ) : (
-                                  <div className="w-12 h-12 rounded-lg bg-gray-600 flex items-center justify-center text-gray-400 border border-white/20 text-lg relative">
-                                    📄
-                                    {/* Re-Order Pill */}
-                                    {itemData.isReorder && (
-                                      <div className="absolute -top-1 -right-1 bg-amber-500 text-black text-xs px-1 py-0.5 rounded-full text-[8px] font-bold leading-none">
-                                        RE
-                                      </div>
-                                    )}
-                                  </div>
+                                  <OrderItemFileUpload 
+                                    orderId={String(order.id)}
+                                    itemId={String(item.id)}
+                                    onUploadComplete={(fileUrl) => {
+                                      console.log('File uploaded:', fileUrl);
+                                      // Refresh orders to show the new file
+                                      refreshOrders();
+                                    }}
+                                    className="w-12 h-12"
+                                  />
                                 )}
                               </div>
                             );
@@ -8989,7 +9028,7 @@ function Dashboard() {
 
                             return (
                               <div key={index} className="w-16 h-16 rounded-lg overflow-hidden border border-white/10 bg-black/20">
-                                {productImage ? (
+                                {productImage && productImage.trim() !== '' ? (
                                   <AIFileImage
                                     src={productImage}
                                     filename={productImage.split('/').pop()?.split('?')[0] || 'design.jpg'}
@@ -8999,7 +9038,16 @@ function Dashboard() {
                                     showFileType={false}
                                   />
                                 ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-lg">📄</div>
+                                  <OrderItemFileUpload 
+                                    orderId={String(order.id)}
+                                    itemId={String(item.id)}
+                                    onUploadComplete={(fileUrl) => {
+                                      console.log('File uploaded:', fileUrl);
+                                      // Refresh orders to show the new file
+                                      refreshOrders();
+                                    }}
+                                    className="w-full h-full"
+                                  />
                                 )}
                               </div>
                             );
@@ -9883,6 +9931,31 @@ function Dashboard() {
             </div>
             <div className="text-orange-300 text-xl">
               →
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wholesale Application Alert Banner */}
+      {profile && (profile.wholesale_status === 'pending' || profile.wholesaleStatus === 'pending') && (
+        <div 
+          className="rounded-xl p-4 shadow-xl mb-6 transition-all duration-300"
+          style={{
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            backdropFilter: 'blur(20px)',
+            border: '2px solid rgba(59, 130, 246, 0.3)',
+            boxShadow: '0 0 12px rgba(59, 130, 246, 0.1)'
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+            <div>
+              <h3 className="text-blue-300 font-semibold text-sm">
+                📋 Your application for a wholesale account is in review.
+              </h3>
+              <p className="text-blue-200 text-xs">
+                Expect an approval or rejection in your account within 6-8 hours.
+              </p>
             </div>
           </div>
         </div>

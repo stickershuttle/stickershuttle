@@ -248,7 +248,7 @@ export default function UniversalFooter() {
               
               {/* Built with Love and Copyright */}
               <div className="text-gray-300 text-sm flex items-center">
-                Built with <span className="heart-pulse cursor-pointer">❤️</span> by © Sticker Shuttle
+                Built with <span className="heart-pulse cursor-pointer">&nbsp;❤️&nbsp;</span> by © Sticker Shuttle
               </div>
             </div>
           </div>
