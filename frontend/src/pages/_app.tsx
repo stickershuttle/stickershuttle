@@ -5,6 +5,7 @@ import { CartProvider } from "@/components/CartContext";
 import { ApolloProvider } from '@apollo/client';
 import client from '@/lib/apollo-client';
 import { PostHogProvider } from '@/providers/posthog';
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 // Initialize Sentry error monitoring
 import * as Sentry from "@sentry/react";
@@ -80,6 +81,7 @@ export default function App({ Component, pageProps }: AppProps) {
             <Component {...pageProps} />
           </CartProvider>
         </ApolloProvider>
+        <SpeedInsights />
       </PostHogProvider>
     </Sentry.ErrorBoundary>
     </>
