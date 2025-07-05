@@ -4163,9 +4163,9 @@ function Dashboard() {
 
                   {/* Progress Tracker Subrow */}
                   {renderOrderProgressTracker(order)}
-                              </div>
-                            );
-                          })}
+                </div>
+              );
+            })}
           </div>
         </div>
         
