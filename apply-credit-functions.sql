@@ -3,7 +3,7 @@
 
 -- Add wholesale customer fields to user_profiles table
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS is_wholesale_customer BOOLEAN DEFAULT FALSE;
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS wholesale_credit_rate DECIMAL(5,4) DEFAULT 0.05; -- 5% for regular, 10% for wholesale
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS wholesale_credit_rate DECIMAL(5,4) DEFAULT 0.05; -- 5% for regular, 2.5% for wholesale
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS wholesale_monthly_customers TEXT;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS wholesale_ordering_for TEXT;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS wholesale_fit_explanation TEXT;

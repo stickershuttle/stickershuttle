@@ -716,6 +716,17 @@ function Dashboard() {
     }
   }, [profile, user]);
 
+  // Fetch wholesale clients when profile indicates user is wholesale
+  useEffect(() => {
+    if (profile && (profile.wholesale_status === 'approved' || 
+                    profile.wholesaleStatus === 'approved' || 
+                    profile.isWholesaleCustomer)) {
+      console.log('📋 Profile loaded and user is wholesale, fetching clients...');
+      setClientsLoading(true);
+      getWholesaleClients();
+    }
+  }, [profile, getWholesaleClients]);
+
   // Initialize settings form data when profile loads
   useEffect(() => {
     if (profile || user) {
@@ -1678,88 +1689,7 @@ function Dashboard() {
       }
     },
 
-    // Business Themed Templates with Emojis
-    {
-      id: 3,
-      name: 'Bakery Vibes',
-      category: 'business',
-      style: {
-        background: 'linear-gradient(135deg, #fef3c7 0%, #fed7aa 50%, #fecaca 100%)'
-      },
-      emojis: ['🧁', '🍰', '🥖', '🥐', '🍪', '🎂']
-    },
-    {
-      id: 4,
-      name: 'Barber Shop',
-      category: 'business',
-      style: {
-        background: 'linear-gradient(135deg, #1f2937 0%, #374151 50%, #4b5563 100%)'
-      },
-      emojis: ['✂️', '💈', '🪒', '👨‍🦲', '💇‍♂️', '🧔']
-    },
-    {
-      id: 5,
-      name: 'Fashion Store',
-      category: 'business',
-      style: {
-        background: 'linear-gradient(135deg, #ec4899 0%, #be185d 50%, #9d174d 100%)'
-      },
-      emojis: ['👗', '👔', '👠', '👜', '💄', '👑']
-    },
-    {
-      id: 6,
-      name: 'Candle Shop',
-      category: 'business',
-      style: {
-        background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)'
-      },
-      emojis: ['🕯️', '🔥', '✨', '🌙', '💫', '🌟']
-    },
-    {
-      id: 7,
-      name: 'Flower Shop',
-      category: 'business',
-      style: {
-        background: 'linear-gradient(135deg, #fda4af 0%, #fb7185 50%, #f43f5e 100%)'
-      },
-      emojis: ['🌸', '🌺', '🌻', '🌹', '🌷', '💐']
-    },
-    {
-      id: 8,
-      name: 'Coffee Shop',
-      category: 'business',
-      style: {
-        background: 'linear-gradient(135deg, #a78bfa 0%, #8b5cf6 50%, #7c3aed 100%)'
-      },
-      emojis: ['☕', '🧁', '🥐', '📚', '💻', '🎵']
-    },
-    {
-      id: 9,
-      name: 'Gym & Fitness',
-      category: 'business',
-      style: {
-        background: 'linear-gradient(135deg, #f97316 0%, #ea580c 50%, #dc2626 100%)'
-      },
-      emojis: ['💪', '🏋️‍♀️', '🏃‍♂️', '⚡', '🔥', '🏆']
-    },
-    {
-      id: 10,
-      name: 'Pet Care',
-      category: 'business',
-      style: {
-        background: 'linear-gradient(135deg, #34d399 0%, #10b981 50%, #059669 100%)'
-      },
-      emojis: ['🐕', '🐈', '🐾', '❤️', '🦴', '🎾']
-    },
-    {
-      id: 11,
-      name: 'Tech Startup',
-      category: 'business',
-      style: {
-        background: 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 50%, #2563eb 100%)'
-      },
-      emojis: ['💻', '📱', '⚡', '🚀', '💡', '🔧']
-    },
+
 
 
 
@@ -1855,169 +1785,43 @@ function Dashboard() {
         animation: 'none'
       }
     },
-
-    // Additional Business Templates  
     {
       id: 20,
-      name: 'Music Studio',
-      category: 'business',
+      name: 'Space Mission 51A',
+      category: 'cosmic',
       style: {
-        background: 'linear-gradient(135deg, #4c1d95 0%, #7c3aed 50%, #a855f7 100%)'
-      },
-      emojis: ['🎵', '🎤', '🎸', '🥁', '🎹', '🎧']
+        backgroundImage: 'url(https://images-assets.nasa.gov/image/51A-90014/51A-90014~medium.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center 10%',
+        backgroundRepeat: 'no-repeat'
+      }
     },
     {
       id: 21,
-      name: 'Restaurant',
-      category: 'business',
+      name: 'Spacewalk EVA',
+      category: 'cosmic',
       style: {
-        background: 'linear-gradient(135deg, #b91c1c 0%, #dc2626 50%, #ef4444 100%)'
-      },
-      emojis: ['🍕', '🍔', '🍜', '🥗', '🍷', '👨‍🍳']
+        backgroundImage: 'url(https://www.nasa.gov/wp-content/uploads/2025/05/54491190142-00f171b6dd-o.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }
     },
     {
       id: 22,
-      name: 'Spa & Wellness',
-      category: 'business',
+      name: 'Cosmic Archive',
+      category: 'cosmic',
       style: {
-        background: 'linear-gradient(135deg, #065f46 0%, #059669 50%, #10b981 100%)'
-      },
-      emojis: ['🧘‍♀️', '💆‍♀️', '🌿', '🕯️', '🛁', '✨']
-    },
-    {
-      id: 23,
-      name: 'Auto Repair',
-      category: 'business',
-      style: {
-        background: 'linear-gradient(135deg, #374151 0%, #4b5563 50%, #6b7280 100%)'
-      },
-      emojis: ['🔧', '🚗', '⚙️', '🛠️', '🔩', '🚙']
-    },
-    {
-      id: 24,
-      name: 'Photography',
-      category: 'business',
-      style: {
-        background: 'linear-gradient(135deg, #581c87 0%, #7c2d12 50%, #a21caf 100%)'
-      },
-      emojis: ['📸', '📷', '🌅', '💡', '🎭', '✨']
-    },
-    {
-      id: 25,
-      name: 'Real Estate',
-      category: 'business',
-      style: {
-        background: 'linear-gradient(135deg, #0c4a6e 0%, #0369a1 50%, #0284c7 100%)'
-      },
-      emojis: ['🏠', '🏢', '🔑', '📋', '💼', '🏘️']
-    },
-    {
-      id: 26,
-      name: 'Education',
-      category: 'business',
-      style: {
-        background: 'linear-gradient(135deg, #14532d 0%, #166534 50%, #15803d 100%)'
-      },
-      emojis: ['📚', '🎓', '✏️', '📝', '🍎', '🧑‍🏫']
-    },
-    {
-      id: 27,
-      name: 'Travel Agency',
-      category: 'business',
-      style: {
-        background: 'linear-gradient(135deg, #0f766e 0%, #0d9488 50%, #14b8a6 100%)'
-      },
-      emojis: ['✈️', '🌍', '🗺️', '🏖️', '🎒', '📍']
-    },
-    {
-      id: 28,
-      name: 'Legal Services',
-      category: 'business',
-      style: {
-        background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #3730a3 100%)'
-      },
-      emojis: ['⚖️', '📋', '🏛️', '📜', '✍️', '💼']
-    },
-
-    // Neon Cyber Effects
-    {
-      id: 29,
-      name: 'Neon Grid',
-      category: 'cyber',
-      style: {
-        background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%)',
-        backgroundImage: `
-          linear-gradient(rgba(0, 255, 255, 0.1) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(0, 255, 255, 0.1) 1px, transparent 1px)
-        `,
-        backgroundSize: '20px 20px',
-        boxShadow: 'inset 0 0 50px rgba(0, 255, 255, 0.1)'
-      }
-    },
-    {
-      id: 30,
-      name: 'Deep Space',
-      category: 'cyber',
-      style: {
-        background: 'linear-gradient(135deg, #000000 0%, #050514 25%, #0a0a1f 50%, #0f0f2a 75%, #141435 100%)',
-        backgroundImage: `
-          radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.3) 1px, transparent 1px),
-          radial-gradient(circle at 60% 20%, rgba(255, 255, 255, 0.2) 1px, transparent 1px),
-          radial-gradient(circle at 80% 60%, rgba(255, 255, 255, 0.4) 1px, transparent 1px),
-          radial-gradient(circle at 30% 80%, rgba(255, 255, 255, 0.3) 1px, transparent 1px),
-          radial-gradient(circle at 90% 40%, rgba(255, 255, 255, 0.2) 1px, transparent 1px)
-        `,
-        backgroundSize: '200px 200px, 300px 300px, 250px 250px, 180px 180px, 320px 320px',
-        animation: 'twinkling-stars 12s ease-in-out infinite'
-      }
-    },
-    {
-      id: 31,
-      name: 'Nebula Cloud',
-      category: 'cyber',
-      style: {
-        background: 'linear-gradient(135deg, #1a0d2e 0%, #2d1b4e 25%, #4a2c6b 50%, #6b3d88 75%, #8b4ea5 100%)',
-        backgroundImage: `
-          radial-gradient(ellipse at 20% 70%, rgba(138, 43, 226, 0.4) 0%, transparent 60%),
-          radial-gradient(ellipse at 80% 30%, rgba(75, 0, 130, 0.3) 0%, transparent 50%),
-          radial-gradient(ellipse at 40% 40%, rgba(199, 21, 133, 0.3) 0%, transparent 40%),
-          radial-gradient(ellipse at 60% 80%, rgba(138, 43, 226, 0.2) 0%, transparent 50%)
-        `
+        backgroundImage: 'url(https://images-assets.nasa.gov/image/GSFC_20171208_Archive_e001983/GSFC_20171208_Archive_e001983~medium.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
       }
     },
 
-    {
-      id: 32,
-      name: 'Galactic Dust',
-      category: 'cyber',
-      style: {
-        background: 'linear-gradient(135deg, #050210 0%, #0a0515 25%, #150a25 50%, #200f35 75%, #2a1445 100%)',
-        backgroundImage: `
-          radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
-          radial-gradient(circle at 30% 40%, rgba(138, 43, 226, 0.2) 2px, transparent 2px),
-          radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
-          radial-gradient(circle at 50% 70%, rgba(75, 0, 130, 0.15) 1px, transparent 1px),
-          radial-gradient(circle at 85% 80%, rgba(255, 255, 255, 0.12) 1px, transparent 1px)
-        `,
-        backgroundSize: '100px 100px, 150px 150px, 80px 80px, 120px 120px, 90px 90px',
-        animation: 'cosmic-dust 18s ease-in-out infinite'
-      }
-    },
-    {
-      id: 33,
-      name: 'Cosmic Galaxy',
-      category: 'cyber',
-      style: {
-        background: 'radial-gradient(circle at 20% 80%, #120078 0%, #9d0191 30%, #1a0033 70%, #000 100%)',
-        backgroundImage: `
-          radial-gradient(circle at 70% 70%, rgba(138, 43, 226, 0.4) 0%, transparent 50%),
-          radial-gradient(circle at 20% 80%, rgba(75, 0, 130, 0.3) 0%, transparent 40%),
-          radial-gradient(circle at 40% 20%, rgba(255,255,255,0.1) 0%, transparent 20%)
-        `,
-        backgroundSize: '100% 100%, 300px 300px, 200px 200px, 150px 150px',
-        animation: 'gradient-shift 15s ease-in-out infinite'
-      }
-    },
+
+
+
 
   ];
 
@@ -3147,12 +2951,6 @@ function Dashboard() {
             Client Management
           </h2>
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => console.log('🔍 DEBUG - Current profile data:', profile)}
-              className="text-yellow-400 hover:text-yellow-300 font-medium transition-colors duration-200 text-xs px-2 py-1 border border-yellow-400 rounded"
-            >
-              Debug Profile
-            </button>
             <button 
               onClick={() => setCurrentView('default')}
               className="text-purple-400 hover:text-purple-300 font-medium transition-colors duration-200 text-sm"
@@ -5106,7 +4904,7 @@ function Dashboard() {
     }
 
     // Calculate proof approval status for summary
-    const approvedProofs = proofs.filter(proof => proof.status === 'approved').length;
+    const approvedProofs = proofs.filter((proof: any) => proof.status === 'approved').length;
     const totalProofs = proofs.length;
     const allProofsApproved = approvedProofs === totalProofs;
     const hasMultipleProofs = totalProofs > 1;
@@ -9800,7 +9598,7 @@ function Dashboard() {
                       JSON.stringify(t.style) === JSON.stringify(templateData)
                     );
                     
-                    if (selectedTemplate?.emojis) {
+                    if (selectedTemplate && 'emojis' in selectedTemplate && selectedTemplate.emojis) {
                       // Create a shuffled array to avoid duplicates next to each other
                       const shuffleArray = (array: string[]) => {
                         const shuffled = [...array];
@@ -9844,7 +9642,7 @@ function Dashboard() {
                       const rows = 2; // Reduced from 3 to 2
                       const cols = 4; // Reduced from 5 to 4 for 25% fewer emojis
                       const totalPositions = rows * cols;
-                      const distributedEmojis = createDistributedEmojis(selectedTemplate.emojis, totalPositions);
+                      const distributedEmojis = createDistributedEmojis(selectedTemplate.emojis as string[], totalPositions);
                       
                       return (
                         <div className="absolute inset-0 pointer-events-none z-5">
@@ -9907,7 +9705,7 @@ function Dashboard() {
                               zIndex: 0
                             }}
                           >
-                            {selectedTemplate.emojis[Math.floor(Math.random() * selectedTemplate.emojis.length)]}
+                            {(selectedTemplate.emojis as string[])[Math.floor(Math.random() * (selectedTemplate.emojis as string[]).length)]}
                           </span>
                         </div>
                       );
@@ -10291,26 +10089,10 @@ function Dashboard() {
                     </div>
                   </button>
 
-                  {/* Clients - Only show for approved wholesale customers */}
-                  {(() => {
-                     // Only show clients tab if profile is loaded and user is approved wholesale customer
-                     if (!profile || loading) return false;
-                     
-                     const isWholesaleApproved = profile.wholesale_status === 'approved' || 
-                                               profile.wholesaleStatus === 'approved' || 
-                                               profile.isWholesaleCustomer;
-                     
-                     console.log('🔍 Checking wholesale status:', { 
-                       profile, 
-                       loading,
-                       wholesale_status: profile.wholesale_status,
-                       wholesaleStatus: profile.wholesaleStatus,
-                       isWholesaleCustomer: profile.isWholesaleCustomer,
-                       isApproved: isWholesaleApproved
-                     });
-                     
-                     return isWholesaleApproved;
-                  })() && (
+                  {/* Clients - Only show for wholesale customers */}
+                  {profile && (profile.wholesale_status === 'approved' || 
+                              profile.wholesaleStatus === 'approved' || 
+                              profile.isWholesaleCustomer) && (
                     <button 
                       onClick={() => updateCurrentView('clients')}
                       className={`block p-3 lg:p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden ${
@@ -10619,14 +10401,10 @@ function Dashboard() {
         )}
       </button>
 
-      {/* Clients - Only show for approved wholesale customers */}
-      {(() => {
-        // Only show clients tab if profile is loaded and user is approved wholesale customer
-        if (!profile || loading) return false;
-        return profile.wholesale_status === 'approved' || 
-               profile.wholesaleStatus === 'approved' || 
-               profile.isWholesaleCustomer;
-      })() && (
+      {/* Clients - Only show for wholesale customers */}
+      {profile && (profile.wholesale_status === 'approved' || 
+                  profile.wholesaleStatus === 'approved' || 
+                  profile.isWholesaleCustomer) && (
         <button
           onClick={() => {
             updateCurrentView('clients');
@@ -11084,111 +10862,15 @@ function Dashboard() {
                             </div>
                           )}
                           <div className="absolute inset-0 bg-black/20"></div>
-                          <div className="absolute bottom-2 left-2 text-white text-sm font-medium">
-                            {template.name}
-                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Business Templates */}
-                <div>
-                  <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <span className="text-yellow-400">💼</span>
-                    Business Templates
-                  </h4>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {bannerTemplates.filter(template => template.category === 'business').map((template) => (
-                      <div
-                        key={template.id}
-                        className={`relative rounded-lg overflow-hidden transform transition-all duration-200 border border-white/10 ${
-                          uploadingBanner 
-                            ? 'opacity-50 cursor-not-allowed' 
-                            : 'cursor-pointer hover:scale-105 hover:border-yellow-400/50'
-                        }`}
-                        onClick={() => {
-                          if (!uploadingBanner) {
-                            handleSelectBannerTemplate(template);
-                          }
-                        }}
-                      >
-                        <div 
-                          className="w-full relative"
-                          style={{
-                            ...template.style,
-                            aspectRatio: '5.2/1', // Match the actual banner ratio
-                            minHeight: '60px' // Minimum height for readability
-                          }}
-                        >
-                          {/* Show sample icons for business templates */}
-                          {template.emojis && (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="flex gap-2 text-2xl opacity-70 filter drop-shadow-sm">
-                                {template.emojis.slice(0, 3).map((emoji, index) => (
-                                  <span 
-                                    key={index}
-                                    className="transform hover:scale-110 transition-transform duration-200"
-                                    style={{
-                                      textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
-                                      filter: 'contrast(1.1) saturate(1.2)'
-                                    }}
-                                  >
-                                    {emoji}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          <div className="absolute inset-0 bg-black/20"></div>
-                          <div className="absolute bottom-2 left-2 text-white text-sm font-medium">
-                            {template.name}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
 
-                {/* Cyber Templates */}
-                <div>
-                  <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <span className="text-cyan-400">🔮</span>
-                    Cyber Templates
-                  </h4>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {bannerTemplates.filter(template => template.category === 'cyber').map((template) => (
-                      <div
-                        key={template.id}
-                        className={`relative rounded-lg overflow-hidden transform transition-all duration-200 border border-white/10 ${
-                          uploadingBanner 
-                            ? 'opacity-50 cursor-not-allowed' 
-                            : 'cursor-pointer hover:scale-105 hover:border-cyan-400/50'
-                        }`}
-                        onClick={() => {
-                          if (!uploadingBanner) {
-                            handleSelectBannerTemplate(template);
-                          }
-                        }}
-                      >
-                        <div 
-                          className="w-full relative"
-                          style={{
-                            ...template.style,
-                            aspectRatio: '5.2/1', // Match the actual banner ratio
-                            minHeight: '60px' // Minimum height for readability
-                          }}
-                        >
-                          <div className="absolute inset-0 bg-black/20"></div>
-                          <div className="absolute bottom-2 left-2 text-white text-sm font-medium">
-                            {template.name}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+
+
               </div>
               
               <div className="mt-8 text-center">

@@ -741,57 +741,100 @@ const VinylBannerCalculator: React.FC = () => {
 
           {/* Additional Options */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-              <div className="flex items-center">
-                <Clock className="h-5 w-5 text-orange-400 mr-2" />
-                <span className="text-white text-sm">
-                  Rush Order ({(() => {
-                    const quantity = selectedQuantity === 'Custom' ? parseInt(customQuantity) || 1 : parseInt(selectedQuantity);
-                    return quantity >= 10 ? '2 days' : '24 hrs';
-                  })()})
-                </span>
+            {/* Rush Order Toggle */}
+            <div>
+              <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+                   style={{
+                     background: rushOrder 
+                       ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(239, 68, 68, 0.15) 50%, rgba(239, 68, 68, 0.05) 100%)'
+                       : 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.15) 50%, rgba(59, 130, 246, 0.05) 100%)',
+                     border: rushOrder 
+                       ? '1px solid rgba(239, 68, 68, 0.4)'
+                       : '1px solid rgba(59, 130, 246, 0.4)',
+                     backdropFilter: 'blur(12px)'
+                   }}>
+                <button
+                  onClick={() => setRushOrder(!rushOrder)}
+                  title={rushOrder ? "Switch to standard production" : "Enable rush order"}
+                  className={`w-12 h-6 rounded-full transition-colors ${
+                    rushOrder ? 'bg-red-500' : 'bg-blue-500'
+                  }`}
+                >
+                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                    rushOrder ? 'translate-x-7' : 'translate-x-1'
+                  }`} />
+                </button>
+                <label className={`text-sm font-medium ${rushOrder ? 'text-red-200' : 'text-blue-200'}`}>
+                  {rushOrder ? '🚀 Rush Order (+35%)' : '🕒 Standard Production Time'}
+                </label>
               </div>
-              <button
-                onClick={() => setRushOrder(!rushOrder)}
-                title={rushOrder ? "Disable rush order" : "Enable rush order"}
-                className={`w-12 h-6 rounded-full transition-colors ${
-                  rushOrder ? 'bg-orange-500' : 'bg-white/20'
-                }`}
-              >
-                <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                  rushOrder ? 'translate-x-7' : 'translate-x-1'
-                }`} />
-              </button>
+              
+              {/* Rush Order Disclaimer - right under rush order toggle */}
+              {rushOrder && (
+                <div className="mt-3 text-xs text-white/70 leading-relaxed">
+                  *Rush Orders are prioritized in our production queue and completed within 24 hours. Orders under 10 banners are completed on time. If you have a tight deadline or specific concerns, feel free to contact us.
+                </div>
+              )}
             </div>
 
-            <div className="bg-white/5 rounded-lg">
-              <div className="flex items-center justify-between p-3">
-                <div className="flex items-center">
-                  <Instagram className="h-5 w-5 text-pink-400 mr-2" />
-                  <span className="text-white text-sm">Tag on Instagram</span>
-                </div>
+            {/* Instagram Post Option */}
+            <div>
+              <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+                   style={{
+                     background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                     border: '1px solid rgba(147, 51, 234, 0.4)',
+                     backdropFilter: 'blur(12px)'
+                   }}>
                 <button
                   onClick={() => setPostToInstagram(!postToInstagram)}
-                  title={postToInstagram ? "Disable Instagram tagging" : "Enable Instagram tagging"}
+                  title={postToInstagram ? "Disable Instagram posting" : "Enable Instagram posting"}
                   className={`w-12 h-6 rounded-full transition-colors ${
-                    postToInstagram ? 'bg-pink-500' : 'bg-white/20'
+                    postToInstagram ? 'bg-purple-500' : 'bg-white/20'
                   }`}
                 >
                   <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
                     postToInstagram ? 'translate-x-7' : 'translate-x-1'
                   }`} />
                 </button>
+                <Instagram className="h-5 w-5 text-purple-400" />
+                <label className="text-sm font-medium text-purple-200">
+                  Post this order to Instagram
+                </label>
               </div>
               
+              {/* Instagram handle input - right under Instagram toggle */}
               {postToInstagram && (
-                <div className="px-3 pb-3">
-                  <input
-                    type="text"
-                    placeholder="Enter your Instagram username"
-                    value={instagramUsername}
-                    onChange={(e) => setInstagramUsername(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent text-sm"
-                  />
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-white text-xl">@</span>
+                    <div className="flex-grow p-3 rounded-lg backdrop-blur-md"
+                         style={{
+                           background: 'rgba(255, 255, 255, 0.05)',
+                           border: '1px solid rgba(255, 255, 255, 0.1)',
+                           boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                         }}>
+                      <input
+                        type="text"
+                        placeholder="Enter your Instagram handle"
+                        value={instagramUsername}
+                        onChange={(e) => setInstagramUsername(e.target.value)}
+                        className="w-full bg-transparent text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-purple-400/50 transition-all border-0"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-xs text-white/70 italic">
+                    You are opting in to let Sticker Shuttle post and tag you in the making of your stickers on their Instagram.
+                  </div>
+                  <div className="text-xs">
+                    <a 
+                      href="https://www.instagram.com/stickershuttle/" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-purple-300 hover:text-purple-200 underline"
+                    >
+                      Follow @stickershuttle • 24.9k followers
+                    </a>
+                  </div>
                 </div>
               )}
             </div>
@@ -849,15 +892,15 @@ const VinylBannerCalculator: React.FC = () => {
                 )}
                 
                 <div className="border-t border-white/20 pt-2 mt-3">
-                  <div className="flex justify-between text-white font-semibold text-lg">
-                    <span>Total</span>
-                    <span>${pricing.total.toFixed(2)}</span>
+                  <div className="flex justify-between text-white font-semibold text-xl">
+                    <span>Total:</span>
+                    <span className="text-green-200">${pricing.total.toFixed(2)}</span>
                   </div>
                   <div className="text-right text-gray-300 text-sm">
                     ${pricing.perUnit.toFixed(2)} per banner
                   </div>
                   {/* Store Credit Notification */}
-                  <div className="mt-3 px-3 py-1.5 rounded-lg text-xs font-medium text-left"
+                  <div className="mt-3 mb-2 px-3 py-1.5 rounded-lg text-xs font-medium text-left"
                        style={{
                          background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.15) 50%, rgba(255, 215, 0, 0.05) 100%)',
                          border: '1px solid rgba(255, 215, 0, 0.4)',
@@ -865,7 +908,7 @@ const VinylBannerCalculator: React.FC = () => {
                        }}>
                     <span className="flex items-center justify-start gap-1.5 text-yellow-200">
                       <i className="fas fa-coins text-yellow-300"></i>
-                                              You'll earn ${(pricing.total * getCreditRate()).toFixed(2)} in store credit on this order!
+                      You'll earn ${(pricing.total * getCreditRate()).toFixed(2)} in store credit on this order!
                     </span>
                   </div>
                 </div>

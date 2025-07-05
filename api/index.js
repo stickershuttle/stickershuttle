@@ -6813,6 +6813,252 @@ const resolvers = {
       }
     },
 
+    // Klaviyo mutations
+    subscribeToKlaviyo: async (_, { email, listId }) => {
+      try {
+        if (!klaviyoClient || !klaviyoClient.isReady()) {
+          throw new Error('Klaviyo service is currently unavailable');
+        }
+
+        const result = await klaviyoClient.subscribeToList(email, listId);
+        return {
+          success: result.success,
+          message: result.success ? 'Successfully subscribed to Klaviyo' : 'Failed to subscribe to Klaviyo',
+          error: result.error || null,
+          profileId: result.profileId || null
+        };
+      } catch (error) {
+        console.error('❌ Error in subscribeToKlaviyo:', error);
+        return {
+          success: false,
+          message: 'Failed to subscribe to Klaviyo',
+          error: error.message,
+          profileId: null
+        };
+      }
+    },
+
+    unsubscribeFromKlaviyo: async (_, { email, listId }) => {
+      try {
+        if (!klaviyoClient || !klaviyoClient.isReady()) {
+          throw new Error('Klaviyo service is currently unavailable');
+        }
+
+        const result = await klaviyoClient.unsubscribeFromList(email, listId);
+        return {
+          success: result.success,
+          message: result.success ? 'Successfully unsubscribed from Klaviyo' : 'Failed to unsubscribe from Klaviyo',
+          error: result.error || null,
+          profileId: result.profileId || null
+        };
+      } catch (error) {
+        console.error('❌ Error in unsubscribeFromKlaviyo:', error);
+        return {
+          success: false,
+          message: 'Failed to unsubscribe from Klaviyo',
+          error: error.message,
+          profileId: null
+        };
+      }
+    },
+
+    syncCustomerToKlaviyo: async (_, { customerData }) => {
+      try {
+        if (!klaviyoClient || !klaviyoClient.isReady()) {
+          throw new Error('Klaviyo service is currently unavailable');
+        }
+
+        console.log('🔄 Syncing customer to Klaviyo:', customerData.email);
+        
+        const result = await klaviyoClient.syncCustomerToKlaviyo(customerData);
+        return {
+          success: result.success,
+          message: result.success ? 'Successfully synced customer to Klaviyo' : 'Failed to sync customer to Klaviyo',
+          error: result.error || null
+        };
+      } catch (error) {
+        console.error('❌ Error in syncCustomerToKlaviyo:', error);
+        return {
+          success: false,
+          message: 'Failed to sync customer to Klaviyo',
+          error: error.message
+        };
+      }
+    },
+
+    bulkSyncCustomersToKlaviyo: async (_, { customers }) => {
+      try {
+        if (!klaviyoClient || !klaviyoClient.isReady()) {
+          throw new Error('Klaviyo service is currently unavailable');
+        }
+
+        console.log('🔄 Bulk syncing customers to Klaviyo, count:', customers.length);
+        
+        const result = await klaviyoClient.bulkSyncCustomers(customers);
+        return {
+          success: result.success,
+          failed: result.failed,
+          total: customers.length,
+          errors: result.errors || []
+        };
+      } catch (error) {
+        console.error('❌ Error in bulkSyncCustomersToKlaviyo:', error);
+        return {
+          success: 0,
+          failed: customers.length,
+          total: customers.length,
+          errors: [{ email: 'unknown', error: error.message }]
+        };
+      }
+    },
+
+    updateCustomerSubscription: async (_, { email, subscribed }) => {
+      try {
+        if (!klaviyoClient || !klaviyoClient.isReady()) {
+          throw new Error('Klaviyo service is currently unavailable');
+        }
+
+        // Update in Klaviyo
+        const klaviyoResult = subscribed
+          ? await klaviyoClient.subscribeToList(email)
+          : await klaviyoClient.unsubscribeFromList(email);
+
+        // Update in local database if available
+        let customer = null;
+        if (supabaseClient.isReady()) {
+          try {
+            const client = supabaseClient.getServiceClient();
+            const { data: updatedCustomer, error } = await client
+              .from('user_profiles')
+              .update({ 
+                marketing_opt_in: subscribed,
+                updated_at: new Date().toISOString()
+              })
+              .eq('email', email)
+              .select('id, email, marketing_opt_in')
+              .single();
+
+            if (!error && updatedCustomer) {
+              customer = {
+                id: updatedCustomer.id,
+                email: updatedCustomer.email,
+                marketingOptIn: updatedCustomer.marketing_opt_in
+              };
+            }
+          } catch (dbError) {
+            console.warn('⚠️ Failed to update local database:', dbError);
+          }
+        }
+
+        return {
+          success: klaviyoResult.success,
+          message: klaviyoResult.success 
+            ? `Successfully ${subscribed ? 'subscribed' : 'unsubscribed'} customer`
+            : `Failed to ${subscribed ? 'subscribe' : 'unsubscribe'} customer`,
+          customer: customer
+        };
+      } catch (error) {
+        console.error('❌ Error in updateCustomerSubscription:', error);
+        return {
+          success: false,
+          message: 'Failed to update customer subscription',
+          customer: null
+        };
+      }
+    },
+
+    trackKlaviyoEvent: async (_, { email, eventName, properties }) => {
+      try {
+        if (!klaviyoClient || !klaviyoClient.isReady()) {
+          throw new Error('Klaviyo service is currently unavailable');
+        }
+
+        console.log('📊 Tracking Klaviyo event:', { email, eventName });
+        
+        const result = await klaviyoClient.trackEvent(email, eventName, properties);
+        return {
+          success: result.success,
+          message: result.success ? 'Successfully tracked event' : 'Failed to track event',
+          error: result.error || null
+        };
+      } catch (error) {
+        console.error('❌ Error in trackKlaviyoEvent:', error);
+        return {
+          success: false,
+          message: 'Failed to track event',
+          error: error.message
+        };
+      }
+    },
+
+    syncAllCustomersToKlaviyo: async (_, args, context) => {
+      try {
+        // Check if user is admin
+        const { user } = context;
+        requireAdminAuth(user);
+
+        if (!klaviyoClient || !klaviyoClient.isReady()) {
+          throw new Error('Klaviyo service is currently unavailable');
+        }
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        console.log('🔄 Starting sync of all customers to Klaviyo...');
+        
+        // Get all customers from database
+        const client = supabaseClient.getServiceClient();
+        const { data: customers, error } = await client
+          .from('user_profiles')
+          .select(`
+            user_id,
+            first_name,
+            last_name,
+            email,
+            marketing_opt_in,
+            created_at,
+            updated_at
+          `)
+          .not('email', 'is', null);
+
+        if (error) {
+          throw new Error(`Failed to fetch customers: ${error.message}`);
+        }
+
+        // Convert to Klaviyo format
+        const klaviyoCustomers = customers.map(customer => ({
+          email: customer.email,
+          firstName: customer.first_name,
+          lastName: customer.last_name,
+          marketingOptIn: customer.marketing_opt_in,
+          createdAt: customer.created_at,
+          updatedAt: customer.updated_at
+        }));
+
+        console.log(`📊 Found ${klaviyoCustomers.length} customers to sync`);
+        
+        const result = await klaviyoClient.bulkSyncCustomers(klaviyoCustomers);
+        
+        console.log('✅ Bulk sync completed:', result);
+        
+        return {
+          success: result.success,
+          failed: result.failed,
+          total: klaviyoCustomers.length,
+          errors: result.errors || []
+        };
+      } catch (error) {
+        console.error('❌ Error in syncAllCustomersToKlaviyo:', error);
+        return {
+          success: 0,
+          failed: 0,
+          total: 0,
+          errors: [{ email: 'unknown', error: error.message }]
+        };
+      }
+    },
+
     // Shared cart mutations
     createSharedCart: async (_, { input }, context) => {
       try {
@@ -7400,7 +7646,7 @@ const resolvers = {
         // Update wholesale status and credit rate
         const updateData = {
           is_wholesale_customer: isWholesaleCustomer,
-          wholesale_credit_rate: wholesaleCreditRate || (isWholesaleCustomer ? 0.10 : 0.05),
+          wholesale_credit_rate: wholesaleCreditRate || (isWholesaleCustomer ? 0.025 : 0.05),
           updated_at: new Date().toISOString()
         };
         
@@ -7465,10 +7711,10 @@ const resolvers = {
 
         const client = supabaseClient.getServiceClient();
         
-        // Update wholesale status to approved with 10% credit rate
+        // Update wholesale status to approved with 2.5% credit rate
         const updateData = {
           wholesale_status: 'approved',
-          wholesale_credit_rate: 0.10, // Upgrade to 10% 
+          wholesale_credit_rate: 0.025, // Upgrade to 2.5% 
           wholesale_approved_at: new Date().toISOString(),
           wholesale_approved_by: approvedBy,
           updated_at: new Date().toISOString()
@@ -8314,13 +8560,8 @@ const resolvers = {
     // Credit restoration resolvers
     restoreCreditsForAbandonedCheckout: async (_, { sessionId, reason }, context) => {
       try {
-        const { userId } = await getAuthenticatedUser(context);
-        
-        // Check if user is admin
-        const isAdmin = await checkAdminPermission(userId);
-        if (!isAdmin) {
-          throw new Error('Admin access required');
-        }
+        // Admin authentication required
+        requireAdminAuth(context.user);
         
         return await creditHandlers.restoreCreditsForAbandonedCheckout(sessionId, reason);
       } catch (error) {
@@ -8334,13 +8575,8 @@ const resolvers = {
 
     cleanupAbandonedCheckouts: async (_, { maxAgeHours = 24 }, context) => {
       try {
-        const { userId } = await getAuthenticatedUser(context);
-        
-        // Check if user is admin
-        const isAdmin = await checkAdminPermission(userId);
-        if (!isAdmin) {
-          throw new Error('Admin access required');
-        }
+        // Admin authentication required
+        requireAdminAuth(context.user);
         
         return await creditHandlers.cleanupAbandonedCheckouts(maxAgeHours);
       } catch (error) {

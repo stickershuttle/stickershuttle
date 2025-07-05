@@ -109,10 +109,26 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     
     // Check if user is wholesale and approved
     if (profile.is_wholesale_customer && profile.wholesale_status === 'approved') {
-      return profile.wholesale_credit_rate || 0.10; // Use profile rate or default 10%
+      return profile.wholesale_credit_rate || 0.025; // Use profile rate or default 2.5%
     }
     
     return 0.05; // Default 5% for regular users
+  }
+
+  // Check if user is wholesale approved
+  const isWholesaleApproved = () => {
+    if (!profile) return false;
+    return profile.is_wholesale_customer && profile.wholesale_status === 'approved';
+  }
+
+  // Calculate wholesale discount (15% off)
+  const calculateWholesaleDiscount = (originalPrice: number) => {
+    if (!isWholesaleApproved()) return { discountAmount: 0, finalPrice: originalPrice };
+    
+    const discountAmount = originalPrice * 0.15; // 15% discount
+    const finalPrice = originalPrice - discountAmount;
+    
+    return { discountAmount, finalPrice };
   }
 
   // Auto-expand textarea when additionalNotes changes
@@ -123,6 +139,14 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
       textarea.style.height = Math.max(50, textarea.scrollHeight) + 'px';
     }
   }, [additionalNotes])
+
+  // Reset Instagram options for wholesale users
+  useEffect(() => {
+    if (isWholesaleApproved() && postToInstagram) {
+      setPostToInstagram(false);
+      setInstagramHandle('');
+    }
+  }, [profile, postToInstagram])
 
   // Pricing data for different sizes
   const getPriceDataForSize = (sizeInches: number) => {
@@ -568,6 +592,11 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     const quantity = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity);
     const { total, perSticker } = calculatePrice(quantity, area, rushOrder);
 
+    // Apply wholesale discount if applicable
+    const { discountAmount, finalPrice } = calculateWholesaleDiscount(total);
+    const finalUnitPrice = isWholesaleApproved() ? finalPrice / quantity : perSticker;
+    const finalTotalPrice = isWholesaleApproved() ? finalPrice : total;
+
     return {
       id: generateCartItemId(),
       product: {
@@ -577,7 +606,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
         category: "vinyl-stickers" as const,
         description: "Premium custom vinyl stickers with durable, weatherproof material",
         shortDescription: "Premium vinyl stickers built to last",
-        basePrice: perSticker,
+        basePrice: finalUnitPrice,
         pricingModel: "per-unit" as const,
         images: [],
         defaultImage: "",
@@ -588,40 +617,52 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
-      customization: {
-        productId: "vinyl-stickers",
-        selections: {
-          cut: { type: "shape" as const, value: selectedCut, displayValue: selectedCut, priceImpact: 0 },
-          material: { type: "finish" as const, value: selectedMaterial, displayValue: selectedMaterial, priceImpact: 0 },
-          size: { 
-            type: "size-preset" as const, 
-            value: selectedSize === "Custom size" ? `${customWidth}"x${customHeight}"` : selectedSize,
-            displayValue: selectedSize === "Custom size" ? `${customWidth}"x${customHeight}"` : selectedSize,
-            priceImpact: 0 
-          },
-          proof: { type: "finish" as const, value: sendProof, displayValue: sendProof ? "Send Proof" : "No Proof", priceImpact: 0 },
-          rush: { type: "finish" as const, value: rushOrder, displayValue: rushOrder ? "Rush Order" : "Standard", priceImpact: rushOrder ? total * 0.4 : 0 },
-          ...(postToInstagram && {
-            instagram: { 
-              type: "finish" as const, 
-              value: instagramHandle, 
-              displayValue: instagramHandle ? `@${instagramHandle}` : "Instagram Opt-in", 
+              customization: {
+          productId: "vinyl-stickers",
+          selections: {
+            cut: { type: "shape" as const, value: selectedCut, displayValue: selectedCut, priceImpact: 0 },
+            material: { type: "finish" as const, value: selectedMaterial, displayValue: selectedMaterial, priceImpact: 0 },
+            size: { 
+              type: "size-preset" as const, 
+              value: selectedSize === "Custom size" ? `${customWidth}"x${customHeight}"` : selectedSize,
+              displayValue: selectedSize === "Custom size" ? `${customWidth}"x${customHeight}"` : selectedSize,
               priceImpact: 0 
-            }
-          })
+            },
+            proof: { type: "finish" as const, value: sendProof, displayValue: sendProof ? "Send Proof" : "No Proof", priceImpact: 0 },
+            rush: { type: "finish" as const, value: rushOrder, displayValue: rushOrder ? "Rush Order" : "Standard", priceImpact: rushOrder ? finalTotalPrice * 0.4 : 0 },
+            ...(postToInstagram && !isWholesaleApproved() && {
+              instagram: { 
+                type: "finish" as const, 
+                value: instagramHandle, 
+                displayValue: instagramHandle ? `@${instagramHandle}` : "Instagram Opt-in", 
+                priceImpact: 0 
+              }
+            }),
+            ...(isWholesaleApproved() && {
+              wholesale: {
+                type: "finish" as const,
+                value: true,
+                displayValue: "15% Wholesale Discount",
+                priceImpact: -discountAmount
+              }
+            })
+          },
+          totalPrice: finalTotalPrice,
+          customFiles: uploadedFile ? [uploadedFile.secure_url] : [],
+          notes: additionalNotes.trim(),
+          instagramOptIn: postToInstagram && !isWholesaleApproved(),
+          additionalInfo: {
+            instagramHandle: (postToInstagram && !isWholesaleApproved()) ? instagramHandle : undefined,
+            uploadLater: uploadLater,
+            ...(isWholesaleApproved() && {
+              originalPrice: total,
+              wholesaleDiscount: discountAmount
+            })
+          }
         },
-        totalPrice: total,
-        customFiles: uploadedFile ? [uploadedFile.secure_url] : [],
-        notes: additionalNotes.trim(),
-        instagramOptIn: postToInstagram,
-        additionalInfo: {
-          instagramHandle: postToInstagram ? instagramHandle : undefined,
-          uploadLater: uploadLater
-        }
-      },
-      quantity: quantity,
-      unitPrice: perSticker,
-      totalPrice: total,
+        quantity: quantity,
+        unitPrice: finalUnitPrice,
+        totalPrice: finalTotalPrice,
       addedAt: new Date().toISOString()
     };
   };
@@ -1047,68 +1088,182 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
               )}
               {totalPrice && (
                 <div className="mt-3 space-y-1">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-white/80">Total:</span>
-                      <span className="px-3 py-1 text-sm font-medium rounded-full border backdrop-blur-md bg-green-500/20 text-green-200 border-green-400/30">
-                        {totalPrice}
-                      </span>
+                  {/* Wholesale pricing display */}
+                  {isWholesaleApproved() && totalPrice && (
+                    <div className="mb-3 p-3 rounded-lg text-sm"
+                         style={{
+                           background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(34, 197, 94, 0.15) 50%, rgba(34, 197, 94, 0.05) 100%)',
+                           border: '1px solid rgba(34, 197, 94, 0.4)',
+                           backdropFilter: 'blur(12px)'
+                         }}>
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center text-white/80">
+                          <span>Competitive Price:</span>
+                          <span>{totalPrice}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-orange-300 font-medium">
+                          <span>Aggressive Price:</span>
+                          <span>${(parseFloat(totalPrice.replace('$', '')) * 1.3).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-red-300 font-medium">
+                          <span>Homerun Price:</span>
+                          <span>${(parseFloat(totalPrice.replace('$', '')) * 1.5).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-green-300 font-medium">
+                          <span>Your Price:</span>
+                          <span>${calculateWholesaleDiscount(parseFloat(totalPrice.replace('$', ''))).finalPrice.toFixed(2)}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-1 text-xs font-medium rounded-full border backdrop-blur-md bg-purple-500/20 text-purple-200 border-purple-400/50">
-                        {costPerSticker}
-                      </span>
-                      {(() => {
-                        const area = calculateArea(selectedSize, customWidth, customHeight)
-                        const qty = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
-                        
-                        if (area > 0 && qty > 0) {
-                          let discount = 0
-                          if (realPricingData && realPricingData.quantityDiscounts && qty > 50) {
-                            let applicableQuantity = 50;
-                            for (const row of realPricingData.quantityDiscounts) {
-                              if (qty >= row.quantity) {
-                                applicableQuantity = row.quantity;
-                              } else {
-                                break;
-                              }
-                            }
+                  )}
+                  
+                  <div className="flex justify-between items-center">
+                    {/* For wholesale accounts, flip the layout */}
+                    {isWholesaleApproved() ? (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="px-2 py-1 text-xs font-medium rounded-lg border text-purple-200 relative"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                              border: '1px solid rgba(147, 51, 234, 0.4)',
+                              backdropFilter: 'blur(12px)'
+                            }}
+                          >
+                            {(() => {
+                              const originalPrice = parseFloat(totalPrice.replace('$', ''));
+                              const finalPrice = calculateWholesaleDiscount(originalPrice).finalPrice;
+                              const quantity = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity);
+                              return `$${(finalPrice / quantity).toFixed(2)}/ea.`;
+                            })()}
+                          </span>
+                          {(() => {
+                            const area = calculateArea(selectedSize, customWidth, customHeight)
+                            const qty = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
                             
-                            const quantityRow = realPricingData.quantityDiscounts.find(row => row.quantity === applicableQuantity);
-                            if (quantityRow) {
-                              const availableSqInches = Object.keys(quantityRow.discounts)
-                                .map(k => parseInt(k))
-                                .sort((a, b) => a - b);
-                              
-                              let applicableSqInches = availableSqInches[0];
-                              for (const sqIn of availableSqInches) {
-                                if (area >= sqIn) {
-                                  applicableSqInches = sqIn;
-                                } else {
-                                  break;
+                            if (area > 0 && qty > 0) {
+                              let discount = 0
+                              if (realPricingData && realPricingData.quantityDiscounts && qty > 50) {
+                                let applicableQuantity = 50;
+                                for (const row of realPricingData.quantityDiscounts) {
+                                  if (qty >= row.quantity) {
+                                    applicableQuantity = row.quantity;
+                                  } else {
+                                    break;
+                                  }
+                                }
+                                
+                                const quantityRow = realPricingData.quantityDiscounts.find(row => row.quantity === applicableQuantity);
+                                if (quantityRow) {
+                                  const availableSqInches = Object.keys(quantityRow.discounts)
+                                    .map(k => parseInt(k))
+                                    .sort((a, b) => a - b);
+                                  
+                                  let applicableSqInches = availableSqInches[0];
+                                  for (const sqIn of availableSqInches) {
+                                    if (area >= sqIn) {
+                                      applicableSqInches = sqIn;
+                                    } else {
+                                      break;
+                                    }
+                                  }
+                                  
+                                  const discountDecimal = quantityRow.discounts[applicableSqInches] || 0;
+                                  discount = discountDecimal * 100;
                                 }
                               }
                               
-                              const discountDecimal = quantityRow.discounts[applicableSqInches] || 0;
-                              discount = discountDecimal * 100;
+                              if (discount > 0.5) {
+                                return (
+                                  <span className="text-sm font-medium text-green-300">
+                                    {Math.round(discount)}% off
+                                  </span>
+                                )
+                              }
                             }
-                          }
-                          
-                          if (discount > 0.5) {
-                            return (
-                              <span className="text-sm font-medium text-green-300">
-                                {Math.round(discount)}% off
-                              </span>
-                            )
-                          }
-                        }
-                        return null
-                      })()}
-                    </div>
+                            return null
+                          })()}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-semibold text-white/80">Total:</span>
+                          <span className="text-lg font-medium text-green-200">
+                            ${calculateWholesaleDiscount(parseFloat(totalPrice.replace('$', ''))).finalPrice.toFixed(2)}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      /* Regular customer layout */
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-semibold text-white/80">Total:</span>
+                          <span className="text-lg font-medium text-green-200">
+                            {totalPrice}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="px-2 py-1 text-xs font-medium rounded-lg border text-purple-200 relative"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                              border: '1px solid rgba(147, 51, 234, 0.4)',
+                              backdropFilter: 'blur(12px)'
+                            }}
+                          >
+                            {costPerSticker}
+                          </span>
+                          {(() => {
+                            const area = calculateArea(selectedSize, customWidth, customHeight)
+                            const qty = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
+                            
+                            if (area > 0 && qty > 0) {
+                              let discount = 0
+                              if (realPricingData && realPricingData.quantityDiscounts && qty > 50) {
+                                let applicableQuantity = 50;
+                                for (const row of realPricingData.quantityDiscounts) {
+                                  if (qty >= row.quantity) {
+                                    applicableQuantity = row.quantity;
+                                  } else {
+                                    break;
+                                  }
+                                }
+                                
+                                const quantityRow = realPricingData.quantityDiscounts.find(row => row.quantity === applicableQuantity);
+                                if (quantityRow) {
+                                  const availableSqInches = Object.keys(quantityRow.discounts)
+                                    .map(k => parseInt(k))
+                                    .sort((a, b) => a - b);
+                                  
+                                  let applicableSqInches = availableSqInches[0];
+                                  for (const sqIn of availableSqInches) {
+                                    if (area >= sqIn) {
+                                      applicableSqInches = sqIn;
+                                    } else {
+                                      break;
+                                    }
+                                  }
+                                  
+                                  const discountDecimal = quantityRow.discounts[applicableSqInches] || 0;
+                                  discount = discountDecimal * 100;
+                                }
+                              }
+                              
+                              if (discount > 0.5) {
+                                return (
+                                  <span className="text-sm font-medium text-green-300">
+                                    {Math.round(discount)}% off
+                                  </span>
+                                )
+                              }
+                            }
+                            return null
+                          })()}
+                        </div>
+                      </>
+                    )}
                   </div>
                   {/* Store Credit Notification */}
                   {totalPrice && (
-                    <div className="mt-2 px-3 py-1.5 rounded-lg text-xs font-medium text-left"
+                    <div className="mt-2 mb-2 px-3 py-1.5 rounded-lg text-xs font-medium text-left"
                          style={{
                            background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.15) 50%, rgba(255, 215, 0, 0.05) 100%)',
                            border: '1px solid rgba(255, 215, 0, 0.4)',
@@ -1116,12 +1271,18 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
                          }}>
                       <span className="flex items-center justify-start gap-1.5 text-yellow-200">
                         <i className="fas fa-coins text-yellow-300"></i>
-                        You'll earn ${(parseFloat(totalPrice.replace('$', '')) * getCreditRate()).toFixed(2)} in store credit on this order!
+                        You'll earn ${(() => {
+                          const originalPrice = parseFloat(totalPrice.replace('$', ''));
+                          const finalPrice = isWholesaleApproved() 
+                            ? calculateWholesaleDiscount(originalPrice).finalPrice 
+                            : originalPrice;
+                          return (finalPrice * getCreditRate()).toFixed(2);
+                        })()} in store credit on this order!
                       </span>
                     </div>
                   )}
                   {/* Reserve space for rush order fee text to prevent layout shift */}
-                  <div className="h-4">
+                  <div className="h-4 mb-2">
                     {rushOrder && (
                       <div className="text-xs text-red-300 font-medium transition-opacity duration-300">
                         *Rush Order Fee Applied
@@ -1392,79 +1553,74 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
                     {/* Rush Order Disclaimer - right under rush order toggle */}
                     {rushOrder && (
                       <div className="mt-3 text-xs text-white/70 leading-relaxed">
-                        *Rush Orders are put in front of the queue and normally completed within 24 hours, but not guaranteed. If you're concerned about your order being completed in time, please{" "}
-                        <a 
-                          href="/contact" 
-                          className="text-purple-300 hover:text-purple-200 underline"
-                        >
-                          reach out here
-                        </a>
-                        . Most orders under 3,000 stickers will be completed on time.
+                        *Rush Orders are prioritized in our production queue and completed within 24 hours. Orders under 3,000 stickers are usually completed on time. If you have a tight deadline or specific concerns, feel free to contact us.
                       </div>
                     )}
                   </div>
 
-                  {/* Instagram Post Option */}
-                  <div>
-                    <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
-                         style={{
-                           background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
-                           border: '1px solid rgba(147, 51, 234, 0.4)',
-                           backdropFilter: 'blur(12px)'
-                         }}>
-                      <button
-                        onClick={() => setPostToInstagram(!postToInstagram)}
-                        title={postToInstagram ? "Disable Instagram posting" : "Enable Instagram posting"}
-                        className={`w-12 h-6 rounded-full transition-colors ${
-                          postToInstagram ? 'bg-purple-500' : 'bg-white/20'
-                        }`}
-                      >
-                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                          postToInstagram ? 'translate-x-7' : 'translate-x-1'
-                        }`} />
-                      </button>
-                      <Instagram className="h-5 w-5 text-purple-400" />
-                      <label className="text-sm font-medium text-purple-200">
-                        Post my order to Instagram
-                      </label>
-                    </div>
-                    
-                    {/* Instagram handle input - right under Instagram toggle */}
-                    {postToInstagram && (
-                      <div className="mt-3 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-white text-xl">@</span>
-                          <div className="flex-grow p-3 rounded-lg backdrop-blur-md"
-                               style={{
-                                 background: 'rgba(255, 255, 255, 0.05)',
-                                 border: '1px solid rgba(255, 255, 255, 0.1)',
-                                 boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
-                               }}>
-                            <input
-                              type="text"
-                              placeholder="Enter your Instagram handle"
-                              value={instagramHandle}
-                              onChange={(e) => setInstagramHandle(e.target.value)}
-                              className="w-full bg-transparent text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-purple-400/50 transition-all border-0"
-                            />
+                  {/* Instagram Post Option - Hidden for wholesale users */}
+                  {!isWholesaleApproved() && (
+                    <div>
+                      <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+                           style={{
+                             background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                             border: '1px solid rgba(147, 51, 234, 0.4)',
+                             backdropFilter: 'blur(12px)'
+                           }}>
+                        <button
+                          onClick={() => setPostToInstagram(!postToInstagram)}
+                          title={postToInstagram ? "Disable Instagram posting" : "Enable Instagram posting"}
+                          className={`w-12 h-6 rounded-full transition-colors ${
+                            postToInstagram ? 'bg-purple-500' : 'bg-white/20'
+                          }`}
+                        >
+                          <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                            postToInstagram ? 'translate-x-7' : 'translate-x-1'
+                          }`} />
+                        </button>
+                        <Instagram className="h-5 w-5 text-purple-400" />
+                        <label className="text-sm font-medium text-purple-200">
+                          Post this order to Instagram
+                        </label>
+                      </div>
+                      
+                      {/* Instagram handle input - right under Instagram toggle */}
+                      {postToInstagram && (
+                        <div className="mt-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-white text-xl">@</span>
+                            <div className="flex-grow p-3 rounded-lg backdrop-blur-md"
+                                 style={{
+                                   background: 'rgba(255, 255, 255, 0.05)',
+                                   border: '1px solid rgba(255, 255, 255, 0.1)',
+                                   boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                                 }}>
+                              <input
+                                type="text"
+                                placeholder="Enter your Instagram handle"
+                                value={instagramHandle}
+                                onChange={(e) => setInstagramHandle(e.target.value)}
+                                className="w-full bg-transparent text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-purple-400/50 transition-all border-0"
+                              />
+                            </div>
+                          </div>
+                          <div className="text-xs text-white/70 italic">
+                            You are opting in to let Sticker Shuttle post and tag you in the making of your stickers on their Instagram.
+                          </div>
+                          <div className="text-xs">
+                            <a 
+                              href="https://www.instagram.com/stickershuttle/" 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-purple-300 hover:text-purple-200 underline"
+                            >
+                              Follow @stickershuttle • 24.9k followers
+                            </a>
                           </div>
                         </div>
-                        <div className="text-xs text-white/70 italic">
-                          *Most reels are posted within a week or two of your order being delivered. We may reach out to post it sooner.
-                        </div>
-                        <div className="text-xs">
-                          <a 
-                            href="https://www.instagram.com/stickershuttle/" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-purple-300 hover:text-purple-200 underline"
-                          >
-                            Follow @stickershuttle
-                          </a>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Additional Instructions Section - moved here */}
                   <div>

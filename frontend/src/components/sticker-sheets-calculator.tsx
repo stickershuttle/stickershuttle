@@ -1097,21 +1097,32 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                 <div className={`mt-3 space-y-1 ${customSizeError ? 'opacity-40' : ''}`}>
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-white/80">Total:</span>
-                      <span className={`px-3 py-1 text-sm font-medium rounded-full border backdrop-blur-md ${
+                      <span className="text-lg font-semibold text-white/80">Total:</span>
+                      <span className={`text-lg font-medium ${
                         customSizeError 
-                          ? 'bg-blue-500/20 text-blue-200 border-blue-400/30' 
-                          : 'bg-green-500/20 text-green-200 border-green-400/30'
+                          ? 'text-blue-200' 
+                          : 'text-green-200'
                       }`}>
                         {customSizeError ? 'Min 6 sq in required' : totalPrice}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full border backdrop-blur-md ${
-                        customSizeError
-                          ? 'bg-blue-500/20 text-blue-200 border-blue-400/50'
-                          : 'bg-purple-500/20 text-purple-200 border-purple-400/50'
-                      }`}>
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-lg border relative ${
+                          customSizeError
+                            ? 'text-blue-200'
+                            : 'text-purple-200'
+                        }`}
+                        style={{
+                          background: customSizeError 
+                            ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.15) 50%, rgba(59, 130, 246, 0.05) 100%)'
+                            : 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                          border: customSizeError
+                            ? '1px solid rgba(59, 130, 246, 0.4)'
+                            : '1px solid rgba(147, 51, 234, 0.4)',
+                          backdropFilter: 'blur(12px)'
+                        }}
+                      >
                         {customSizeError ? 'Invalid size' : costPerSticker}
                       </span>
                       {(() => {
@@ -1164,7 +1175,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                   </div>
                   {/* Store Credit Notification */}
                   {totalPrice && !customSizeError && (
-                    <div className="mt-2 px-3 py-1.5 rounded-lg text-xs font-medium text-left"
+                    <div className="mt-2 mb-2 px-3 py-1.5 rounded-lg text-xs font-medium text-left"
                          style={{
                            background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.15) 50%, rgba(255, 215, 0, 0.05) 100%)',
                            border: '1px solid rgba(255, 215, 0, 0.4)',
@@ -1177,7 +1188,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                     </div>
                   )}
                   {/* Reserve space for rush order fee text to prevent layout shift */}
-                  <div className="h-4">
+                  <div className="h-4 mb-2">
                     {rushOrder && (
                       <div className="text-xs text-red-300 font-medium transition-opacity duration-300">
                         *Rush Order Fee Applied
@@ -1543,14 +1554,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                     {/* Rush Order Disclaimer - right under rush order toggle */}
                     {rushOrder && (
                       <div className="mt-3 text-xs text-white/70 leading-relaxed">
-                        *Rush Orders are put in front of the queue and normally completed within 24 hours, but not guaranteed. If you're concerned about your order being completed in time, please{" "}
-                        <a 
-                          href="/contact" 
-                          className="text-purple-300 hover:text-purple-200 underline"
-                        >
-                          reach out here
-                        </a>
-                        . Most orders under 3,000 stickers will be completed on time.
+                        *Rush Orders are prioritized in our production queue and completed within 24 hours. Orders under 3,000 stickers are usually completed on time. If you have a tight deadline or specific concerns, feel free to contact us.
                       </div>
                     )}
                   </div>
@@ -1576,7 +1580,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                       </button>
                       <Instagram className="h-5 w-5 text-purple-400" />
                       <label className="text-sm font-medium text-purple-200">
-                        Post my order to Instagram
+                        Post this order to Instagram
                       </label>
                     </div>
                     
@@ -1601,7 +1605,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                           </div>
                         </div>
                         <div className="text-xs text-white/70 italic">
-                          *Most reels are posted within a week or two of your order being delivered. We may reach out to post it sooner.
+                          You are opting in to let Sticker Shuttle post and tag you in the making of your stickers on their Instagram.
                         </div>
                         <div className="text-xs">
                           <a 
@@ -1610,11 +1614,42 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                             rel="noopener noreferrer"
                             className="text-purple-300 hover:text-purple-200 underline"
                           >
-                            Follow @stickershuttle
+                            Follow @stickershuttle • 24.9k followers
                           </a>
                         </div>
                       </div>
                     )}
+                  </div>
+
+                  {/* Additional Instructions Section - moved here */}
+                  <div>
+                    <div className="p-3 rounded-xl backdrop-blur-md"
+                         style={{
+                           background: 'rgba(255, 255, 255, 0.05)',
+                           border: '1px solid rgba(255, 255, 255, 0.1)',
+                           boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                         }}>
+                      <textarea
+                        value={additionalNotes}
+                        onChange={(e) => {
+                          setAdditionalNotes(e.target.value);
+                          // Auto-expand functionality
+                          setTimeout(() => {
+                            e.target.style.height = 'auto';
+                            e.target.style.height = Math.max(50, e.target.scrollHeight) + 'px';
+                          }, 0);
+                        }}
+                        className="w-full min-h-[50px] rounded-xl border-0 p-3 resize-none bg-transparent text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-purple-400/50 transition-all appearance-none overflow-hidden"
+                        placeholder={isMobile ? "Additional instructions here..." : "Enter any additional instructions here..."}
+                        style={{ 
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'none',
+                          height: additionalNotes ? 'auto' : '50px',
+                          minHeight: '50px',
+                          lineHeight: '1.4'
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

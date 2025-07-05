@@ -361,12 +361,11 @@ export default function StickerSheets() {
         </div>
       </section>
 
-      {/* Four-Column Use Cases Section */}
-      <section className="pb-8">
+      {/* Four-Column Use Cases Section - Temporarily disabled */}
+      {/* <section className="pb-8">
         <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
             
-            {/* Helmet - Small (2") */}
             <div className="container-style p-4 lg:p-6 transition-colors duration-200">
               <div className="text-center">
                 <div className="w-32 h-32 mx-auto mb-4 rounded-lg overflow-hidden">
@@ -381,7 +380,6 @@ export default function StickerSheets() {
               </div>
             </div>
 
-            {/* Bottle - Medium (3") */}
             <div className="container-style p-4 lg:p-6 transition-colors duration-200">
               <div className="text-center">
                 <div className="w-32 h-32 mx-auto mb-4 rounded-lg overflow-hidden">
@@ -396,7 +394,6 @@ export default function StickerSheets() {
               </div>
             </div>
 
-            {/* Skateboard - Large (4") */}
             <div className="container-style p-4 lg:p-6 transition-colors duration-200">
               <div className="text-center">
                 <div className="w-32 h-32 mx-auto mb-4 rounded-lg overflow-hidden">
@@ -411,7 +408,6 @@ export default function StickerSheets() {
               </div>
             </div>
 
-            {/* Cooler - X-Large (5") */}
             <div className="container-style p-4 lg:p-6 transition-colors duration-200">
               <div className="text-center">
                 <div className="w-32 h-32 mx-auto mb-4 rounded-lg overflow-hidden">
@@ -428,7 +424,7 @@ export default function StickerSheets() {
 
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Login/Signup Section - Only show when user is logged out */}
       {!loading && !user && (

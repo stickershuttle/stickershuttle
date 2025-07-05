@@ -643,7 +643,7 @@ export default function SignUp() {
               >
                 <div className="flex-1">
                   <h3 className="text-white font-medium text-lg">Wholesale Account</h3>
-                  <p className="text-gray-300 text-sm">Get 10% store credit + $25 welcome bonus</p>
+                  <p className="text-gray-300 text-sm">Get 2.5% store credit + 15% off all orders + $25 welcome bonus</p>
                 </div>
                 <button
                   type="button"

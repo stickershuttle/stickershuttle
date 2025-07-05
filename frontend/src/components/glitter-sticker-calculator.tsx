@@ -1059,13 +1059,20 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                 <div className="mt-3 space-y-1">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-white/80">Total:</span>
-                      <span className="px-3 py-1 text-sm font-medium rounded-full border backdrop-blur-md bg-green-500/20 text-green-200 border-green-400/30">
+                      <span className="text-lg font-semibold text-white/80">Total:</span>
+                      <span className="text-lg font-medium text-green-200">
                         {totalPrice}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="px-2 py-1 text-xs font-medium rounded-full border backdrop-blur-md bg-purple-500/20 text-purple-200 border-purple-400/50">
+                      <span
+                        className="px-2 py-1 text-xs font-medium rounded-lg border text-purple-200 relative"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                          border: '1px solid rgba(147, 51, 234, 0.4)',
+                          backdropFilter: 'blur(12px)'
+                        }}
+                      >
                         {costPerSticker}
                       </span>
                       {(() => {
@@ -1118,7 +1125,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                   </div>
                   {/* Store Credit Notification */}
                   {totalPrice && (
-                    <div className="mt-2 px-3 py-1.5 rounded-lg text-xs font-medium text-left"
+                    <div className="mt-2 mb-2 px-3 py-1.5 rounded-lg text-xs font-medium text-left"
                          style={{
                            background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.15) 50%, rgba(255, 215, 0, 0.05) 100%)',
                            border: '1px solid rgba(255, 215, 0, 0.4)',
@@ -1131,7 +1138,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                     </div>
                   )}
                   {/* Reserve space for rush order fee text to prevent layout shift */}
-                  <div className="h-4">
+                  <div className="h-4 mb-2">
                     {rushOrder && (
                       <div className="text-xs text-red-300 font-medium transition-opacity duration-300">
                         *Rush Order Fee Applied
@@ -1497,14 +1504,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                     {/* Rush Order Disclaimer - right under rush order toggle */}
                     {rushOrder && (
                       <div className="mt-3 text-xs text-white/70 leading-relaxed">
-                        *Rush Orders are put in front of the queue and normally completed within 24 hours, but not guaranteed. If you're concerned about your order being completed in time, please{" "}
-                        <a 
-                          href="/contact" 
-                          className="text-purple-300 hover:text-purple-200 underline"
-                        >
-                          reach out here
-                        </a>
-                        . Most orders under 3,000 stickers will be completed on time.
+                        *Rush Orders are prioritized in our production queue and completed within 24 hours. Orders under 3,000 stickers are usually completed on time. If you have a tight deadline or specific concerns, feel free to contact us.
                       </div>
                     )}
                   </div>
@@ -1530,7 +1530,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                       </button>
                       <Instagram className="h-5 w-5 text-purple-400" />
                       <label className="text-sm font-medium text-purple-200">
-                        Post my order to Instagram
+                        Post this order to Instagram
                       </label>
                     </div>
                     
@@ -1555,7 +1555,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                           </div>
                         </div>
                         <div className="text-xs text-white/70 italic">
-                          *Most reels are posted within a week or two of your order being delivered. We may reach out to post it sooner.
+                          You are opting in to let Sticker Shuttle post and tag you in the making of your stickers on their Instagram.
                         </div>
                         <div className="text-xs">
                           <a 
@@ -1564,7 +1564,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                             rel="noopener noreferrer"
                             className="text-purple-300 hover:text-purple-200 underline"
                           >
-                            Follow @stickershuttle
+                            Follow @stickershuttle • 24.9k followers
                           </a>
                         </div>
                       </div>
