@@ -1496,24 +1496,6 @@ const scheduleFirstOrderThankYou = async (orderData) => {
   }
 };
 
-module.exports = {
-  sendOrderStatusNotification,
-  sendOrderStatusNotificationEnhanced,
-  sendWelcomeEmail,
-  isFirstTimeCustomer,
-  sendProofNotification,
-  sendAdminNewOrderNotification,
-  sendAdminProofActionNotification,
-  sendEmail,
-  sendUserFileUpload,
-  sendWholesaleApprovalEmail,
-  sendCustomerArtworkUploadNotification,
-  scheduleFirstOrderThankYou,
-  addContactToResendAudience,
-  updateContactInResendAudience,
-  bulkSyncUsersToResendAudience
-};
-
 // Add contact to Resend audience
 const addContactToResendAudience = async (email, firstName = '', lastName = '', audienceId = null) => {
   if (!RESEND_API_KEY) {
@@ -1758,4 +1740,22 @@ const bulkSyncUsersToResendAudience = async (audienceId = null) => {
     console.error('❌ Error in bulk sync to Resend audience:', error);
     return { success: false, error: error.message };
   }
+};
+
+module.exports = {
+  sendOrderStatusNotification,
+  sendOrderStatusNotificationEnhanced,
+  sendWelcomeEmail,
+  isFirstTimeCustomer,
+  sendProofNotification,
+  sendAdminNewOrderNotification,
+  sendAdminProofActionNotification,
+  sendEmail,
+  sendUserFileUpload,
+  sendWholesaleApprovalEmail,
+  sendCustomerArtworkUploadNotification,
+  scheduleFirstOrderThankYou,
+  addContactToResendAudience,
+  updateContactInResendAudience,
+  bulkSyncUsersToResendAudience
 }; 
