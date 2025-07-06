@@ -7839,30 +7839,32 @@ const resolvers = {
 
         const client = supabaseClient.getServiceClient();
         
-        // Use the enhanced function that supports templates
-        const { data, error } = await client.rpc('update_user_banner_image', {
-          p_user_id: userId,
-          p_banner_image_url: bannerUrl,
-          p_banner_image_public_id: bannerPublicId,
-          p_banner_template: bannerTemplate,
-          p_banner_template_id: bannerTemplateId
+        // Use direct table update instead of problematic RPC function
+        const updateData = {
+          banner_image_url: bannerUrl,
+          banner_image_public_id: bannerPublicId,
+          banner_template: bannerTemplate,
+          banner_template_id: bannerTemplateId,
+          updated_at: new Date().toISOString()
+        };
+
+        // Remove null/undefined values
+        Object.keys(updateData).forEach(key => {
+          if (updateData[key] === undefined) {
+            delete updateData[key];
+          }
         });
+
+        const { data: profile, error } = await client
+          .from('user_profiles')
+          .update(updateData)
+          .eq('user_id', userId)
+          .select('*')
+          .single();
 
         if (error) {
           console.error('❌ Error updating profile banner:', error);
           throw new Error(`Failed to update profile banner: ${error.message}`);
-        }
-
-        // Fetch the updated profile
-        const { data: profile, error: fetchError } = await client
-          .from('user_profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .single();
-
-        if (fetchError) {
-          console.error('❌ Error fetching updated profile:', fetchError);
-          throw new Error('Profile banner updated but failed to fetch result');
         }
 
         console.log('✅ Successfully updated profile banner');
