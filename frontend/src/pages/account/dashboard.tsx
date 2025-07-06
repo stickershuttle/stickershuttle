@@ -1004,9 +1004,9 @@ function Dashboard() {
     }
   }, [currentView, orders, creditBalance, lifetimeCredits]);
 
-  // Handle URL query parameters for view navigation - only on initial mount
+  // Handle URL query parameters for view navigation - respond to URL changes
   useEffect(() => {
-    // Only run on initial mount to set the view from URL
+    // Run when router is ready or when query changes
     if (router.isReady) {
       const requestedView = router.query.view as string;
       const orderNumber = router.query.orderNumber as string;
@@ -1015,11 +1015,19 @@ function Dashboard() {
         const validViews: DashboardView[] = ['default', 'all-orders', 'financial', 'items-analysis', 'design-vault', 'proofs', 'order-details', 'settings', 'support'];
         
         if (validViews.includes(requestedView as DashboardView)) {
-          setCurrentView(requestedView as DashboardView);
+          // Only update if the view is actually different
+          if (currentView !== requestedView) {
+            setCurrentView(requestedView as DashboardView);
+          }
+        }
+      } else {
+        // If no view query parameter, default to 'default'
+        if (currentView !== 'default') {
+          setCurrentView('default');
         }
       }
     }
-  }, [router.isReady]); // Only depend on router.isReady to run once on mount
+  }, [router.isReady, router.query.view, router.query.orderNumber]); // Listen for URL changes
 
   // Separate effect to handle order selection based on current view
   useEffect(() => {
@@ -1062,6 +1070,20 @@ function Dashboard() {
     
     // Load saved support form draft when switching to support view
     if (view === 'support') {
+      // Auto-fill with user data first
+      const displayName = profile?.first_name || 
+                         profile?.email?.split('@')[0] || 
+                         (user as any)?.email?.split('@')[0] || '';
+      
+      const userEmail = profile?.email || (user as any)?.email || '';
+      
+      setContactFormData(prev => ({
+        ...prev,
+        name: displayName,
+        email: userEmail
+      }));
+      
+      // Then load saved draft if it exists (will override auto-filled data)
       const savedDraft = localStorage.getItem('supportFormDraft');
       if (savedDraft) {
         try {
@@ -1398,11 +1420,11 @@ function Dashboard() {
   const handleProfilePhotoUpload = async (file: File) => {
     if (!user) return;
     
-    // Rate limiting: Prevent actions within 3 seconds of last action
+    // Rate limiting: Prevent actions within 1 second of last action
     const now = Date.now();
-    if (now - lastProfileActionTime.current < 3000) {
+    if (now - lastProfileActionTime.current < 1000) {
       console.log('Rate limiting: Too soon since last action, skipping...');
-      alert('⏰ Please wait a moment between profile updates to prevent overloading our servers.');
+      alert('⏰ Please wait a moment between profile updates.');
       return;
     }
     
@@ -1418,15 +1440,9 @@ function Dashboard() {
         return;
       }
 
-      // Add delay to prevent rate limiting
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
       // Upload to Cloudinary
       const { uploadToCloudinary } = await import('../../utils/cloudinary');
       const result = await uploadToCloudinary(file, undefined, undefined, 'profile-photos');
-
-      // Additional delay before GraphQL mutation
-      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Update profile using GraphQL mutation
       const { data, errors } = await client.mutate({
@@ -2125,22 +2141,47 @@ function Dashboard() {
     e.preventDefault();
     setIsSubmittingContact(true);
     
-    // Simulate form submission
-    setTimeout(() => {
+    try {
+      // Send the form data to the contact API
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(contactFormData)
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        // Success
+        setContactSubmitted(true);
+        console.log('✅ Contact form submitted successfully');
+        
+        // Reset form after 3 seconds
+        setTimeout(() => {
+          setContactSubmitted(false);
+          setShowContactForm(false);
+          setContactFormData(prev => ({
+            ...prev,
+            subject: '',
+            message: '',
+            relatedOrder: ''
+          }));
+          // Clear saved draft
+          localStorage.removeItem('supportFormDraft');
+        }, 3000);
+      } else {
+        // Error
+        console.error('❌ Contact form submission failed:', result.message);
+        alert(result.message || 'Failed to send message. Please try again.');
+        setIsSubmittingContact(false);
+      }
+    } catch (error) {
+      console.error('❌ Contact form submission error:', error);
+      alert('Failed to send message. Please check your internet connection and try again.');
       setIsSubmittingContact(false);
-      setContactSubmitted(true);
-      // Reset form after 3 seconds
-      setTimeout(() => {
-        setContactSubmitted(false);
-        setShowContactForm(false);
-        setContactFormData(prev => ({
-          ...prev,
-          subject: '',
-          message: '',
-          relatedOrder: ''
-        }));
-      }, 3000);
-    }, 1500);
+    }
   };
 
   const handleContactChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -7856,10 +7897,11 @@ function Dashboard() {
                   >
                     Change Photo
                   </button>
-                  {                profile?.profile_photo_url && (
+
+                  {profile?.profile_photo_url && (
                     <button
                       onClick={async () => {
-                        if (!user || !confirm('Are you sure you want to reset your profile photo to a default avatar?')) return;
+                        if (!user || !confirm('Are you sure you want to reset your profile photo to a different random avatar?')) return;
                         
                         setUploadingProfilePhoto(true);
                         try {
@@ -7899,7 +7941,7 @@ function Dashboard() {
                           }));
                           
                           setSettingsNotification({
-                            message: 'Profile photo reset to default avatar',
+                            message: 'Profile photo reset to new random avatar',
                             type: 'success'
                           });
                           setTimeout(() => setSettingsNotification(null), 3000);
@@ -7922,7 +7964,7 @@ function Dashboard() {
                         boxShadow: 'rgba(59, 130, 246, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                       }}
                     >
-                      Reset to Default
+                      New Random Avatar
                     </button>
                   )}
                 </div>

@@ -1062,10 +1062,10 @@ const getWholesaleApprovalEmailTemplate = (userData) => {
     <!-- Header -->
     <div style="background: #f1f3f5; border-bottom: 1px solid #e9ecef; padding: 30px 20px; text-align: center;">
       <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #1a1a1a;">
-        🎉 Welcome to Wholesale!
+        🎉 Welcome to the Team!
       </h1>
       <p style="margin: 10px 0 0 0; font-size: 16px; font-weight: 400; color: #4b5563;">
-        Your application has been approved
+        Your wholesale application has been approved
       </p>
     </div>
 
@@ -1079,7 +1079,7 @@ const getWholesaleApprovalEmailTemplate = (userData) => {
           Great news! Your wholesale application for <strong>${userData.companyName || 'your company'}</strong> has been approved.
         </p>
         <p style="margin: 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #1a1a1a;">
-          You now earn <strong>10% store credit</strong> on every order instead of the regular 5%. This upgraded rate is already active on your account!
+          You now get access to <strong>15% off and 2.5% store credit</strong> on every order. This discount and store credit has been added to your account! We've also added $25 to your account as a welcoming bonus. Enjoy!
         </p>
       </div>
 
@@ -1087,7 +1087,8 @@ const getWholesaleApprovalEmailTemplate = (userData) => {
       <div style="background: #ffffff; border: 1px solid #e9ecef; padding: 20px; margin-bottom: 30px; border-radius: 12px;">
         <h3 style="margin: 0 0 15px 0; font-size: 18px; font-weight: 600; color: #1a1a1a;">Your Wholesale Benefits:</h3>
         <ul style="margin: 0; padding-left: 20px; font-size: 16px; line-height: 1.8; color: #1a1a1a;">
-          <li><strong>10% store credit</strong> on every order (was 5%)</li>
+          <li><strong>15% off</strong> on every order.</li>  
+          <li><strong>2.5% store credit</strong> on every order.</li>
           <li>Credits automatically applied after order completion</li>
           <li>Use credits on future orders to save money</li>
           <li>$100 maximum credit balance</li>
@@ -1740,22 +1741,4 @@ const bulkSyncUsersToResendAudience = async (audienceId = null) => {
     console.error('❌ Error in bulk sync to Resend audience:', error);
     return { success: false, error: error.message };
   }
-};
-
-module.exports = {
-  sendOrderStatusNotification,
-  sendOrderStatusNotificationEnhanced,
-  sendWelcomeEmail,
-  isFirstTimeCustomer,
-  sendProofNotification,
-  sendAdminNewOrderNotification,
-  sendAdminProofActionNotification,
-  sendEmail,
-  sendUserFileUpload,
-  sendWholesaleApprovalEmail,
-  sendCustomerArtworkUploadNotification,
-  scheduleFirstOrderThankYou,
-  addContactToResendAudience,
-  updateContactInResendAudience,
-  bulkSyncUsersToResendAudience
 }; 

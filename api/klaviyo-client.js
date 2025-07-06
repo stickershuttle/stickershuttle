@@ -28,7 +28,7 @@ class KlaviyoClient {
     });
   }
 
-  // Check if Klaviyo client is ready to use
+  // Check if Klaviyo client is ready to use (requires API key and default list)
   isReady() {
     const ready = !!(this.apiKey && this.defaultListId);
     
@@ -42,6 +42,50 @@ class KlaviyoClient {
     }
     
     return ready;
+  }
+
+  // Check if Klaviyo client is partially ready (only requires API key)
+  isPartiallyReady() {
+    return !!this.apiKey;
+  }
+
+  // Get detailed configuration status
+  getConfigurationStatus() {
+    const hasApiKey = !!this.apiKey;
+    const hasPublicKey = !!this.publicKey;
+    const hasDefaultList = !!this.defaultListId;
+    const configuredLists = Object.entries(this.lists).filter(([key, id]) => id);
+    
+    const status = {
+      api_key: hasApiKey ? 'configured' : 'missing',
+      public_key: hasPublicKey ? 'configured' : 'missing',
+      default_list: hasDefaultList ? 'configured' : 'missing',
+      configured_lists_count: configuredLists.length,
+      configured_lists: configuredLists.map(([key, id]) => ({
+        type: key,
+        id: id,
+        name: key.charAt(0).toUpperCase() + key.slice(1)
+      })),
+      readiness: {
+        fully_ready: hasApiKey && hasDefaultList,
+        partially_ready: hasApiKey,
+        not_ready: !hasApiKey
+      }
+    };
+    
+    // Determine overall configuration level
+    if (hasApiKey && hasDefaultList) {
+      status.configuration_level = 'complete';
+      status.message = 'Klaviyo is fully configured and ready to use';
+    } else if (hasApiKey) {
+      status.configuration_level = 'partial';
+      status.message = 'Klaviyo is partially configured. API key is set but default list ID is missing.';
+    } else {
+      status.configuration_level = 'none';
+      status.message = 'Klaviyo is not configured. API key is missing.';
+    }
+    
+    return status;
   }
 
   // Create axios instance with proper headers
@@ -61,29 +105,36 @@ class KlaviyoClient {
     try {
       const client = this.getClient();
       
+      // Build attributes object, only including phone_number if it's valid
+      const attributes = {
+        email: profileData.email,
+        first_name: profileData.firstName || '',
+        last_name: profileData.lastName || '',
+        location: {
+          city: profileData.city || '',
+          region: profileData.state || '',
+          country: profileData.country || 'US'
+        },
+        properties: {
+          total_orders: profileData.totalOrders || 0,
+          total_spent: profileData.totalSpent || 0,
+          average_order_value: profileData.averageOrderValue || 0,
+          first_order_date: profileData.firstOrderDate || null,
+          last_order_date: profileData.lastOrderDate || null,
+          marketing_source: 'Sticker Shuttle Website',
+          customer_type: profileData.totalOrders > 1 ? 'returning' : 'new'
+        }
+      };
+
+      // Only add phone_number if it exists and is not empty
+      if (profileData.phone && profileData.phone.trim() !== '') {
+        attributes.phone_number = profileData.phone;
+      }
+
       const payload = {
         data: {
           type: 'profile',
-          attributes: {
-            email: profileData.email,
-            first_name: profileData.firstName || '',
-            last_name: profileData.lastName || '',
-            phone_number: profileData.phone || '',
-            location: {
-              city: profileData.city || '',
-              region: profileData.state || '',
-              country: profileData.country || 'US'
-            },
-            properties: {
-              total_orders: profileData.totalOrders || 0,
-              total_spent: profileData.totalSpent || 0,
-              average_order_value: profileData.averageOrderValue || 0,
-              first_order_date: profileData.firstOrderDate || null,
-              last_order_date: profileData.lastOrderDate || null,
-              marketing_source: 'Sticker Shuttle Website',
-              customer_type: profileData.totalOrders > 1 ? 'returning' : 'new'
-            }
-          }
+          attributes: attributes
         }
       };
 
@@ -726,4 +777,4 @@ class KlaviyoClient {
   }
 }
 
-module.exports = new KlaviyoClient(); 
+module.exports = KlaviyoClient; 

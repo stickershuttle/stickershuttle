@@ -76,7 +76,19 @@ const easyPostClient = require('./easypost-client');
 const EasyPostTrackingEnhancer = require('./easypost-tracking-enhancer');
 const { discountManager } = require('./discount-manager');
 const creditHandlers = require('./credit-handlers');
-const klaviyoClient = require('./klaviyo-client');
+const KlaviyoClient = require('./klaviyo-client');
+const klaviyoClient = new KlaviyoClient();
+
+// Import performance optimizations
+const {
+  rateLimiters,
+  slowDownMiddleware,
+  caches,
+  createCacheMiddleware,
+  performanceMonitor,
+  performanceMiddleware,
+  cacheResolver
+} = require('./performance-optimizations');
 
 // Initialize enhanced tracking
 const trackingEnhancer = new EasyPostTrackingEnhancer(easyPostClient);
@@ -282,55 +294,20 @@ app.use(helmet({
   }
 }));
 
-// Rate limiting configuration
-const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'development' ? 1000 : 100, // More lenient in development
-  message: {
-    error: 'Too many requests from this IP, please try again later.',
-    retryAfter: 900
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => {
-    // Skip rate limiting for health checks and GraphQL in development
-    if (process.env.NODE_ENV === 'development') {
-      return req.path === '/health' || req.path === '/graphql' || req.path === '/health/detailed';
-    }
-    return false;
-  }
-});
+// Enhanced rate limiting and performance monitoring
+app.use(performanceMiddleware);
 
-const strictLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // Limit each IP to 10 uploads per hour
-  message: {
-    error: 'Too many upload attempts from this IP, please try again later.',
-    retryAfter: 3600
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-const webhookLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 1000, // Allow up to 1000 webhook requests per hour
-  message: {
-    error: 'Webhook rate limit exceeded',
-    retryAfter: 3600
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// Apply intelligent slow-down for suspicious activity
+app.use(slowDownMiddleware);
 
 // Apply general rate limiting to all requests
-app.use(generalLimiter);
+app.use(rateLimiters.general);
 
 // Apply strict rate limiting to upload routes
-app.use('/api/upload', strictLimiter);
+app.use('/api/upload', rateLimiters.upload);
 
 // Apply webhook rate limiting to webhook routes
-app.use('/webhooks', webhookLimiter);
+app.use('/webhooks', rateLimiters.read);
 
 // Add Sentry request handling middleware (temporarily commented out)
 // app.use(Sentry.Handlers.requestHandler());
@@ -495,20 +472,252 @@ app.get('/easypost/health', async (req, res) => {
   }
 });
 
+// Add performance monitoring endpoints
+app.get('/performance/stats', (req, res) => {
+  const stats = performanceMonitor.getStats();
+  res.json({
+    performance: stats,
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+app.get('/performance/cache', (req, res) => {
+  const cacheStats = Object.fromEntries(
+    Object.entries(caches).map(([key, cache]) => [key, cache.getStats()])
+  );
+  
+  res.json({
+    caches: cacheStats,
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.post('/performance/cache/clear', (req, res) => {
+  const { cacheType, key } = req.body;
+  
+  if (cacheType && caches[cacheType]) {
+    if (key) {
+      caches[cacheType].delete(key);
+      res.json({ message: `Cleared key "${key}" from ${cacheType} cache` });
+    } else {
+      caches[cacheType].clear();
+      res.json({ message: `Cleared all entries from ${cacheType} cache` });
+    }
+  } else if (!cacheType) {
+    // Clear all caches
+    Object.values(caches).forEach(cache => cache.clear());
+    res.json({ message: 'Cleared all caches' });
+  } else {
+    res.status(400).json({ error: 'Invalid cache type' });
+  }
+});
+
 // Add Klaviyo diagnostic endpoint
 app.get('/klaviyo/status', (req, res) => {
+  const configStatus = klaviyoClient.getConfigurationStatus();
+  const configuredLists = klaviyoClient.getConfiguredLists();
+  
   const diagnostics = {
-    klaviyo_configured: klaviyoClient.isReady(),
+    klaviyo_configured: configStatus.readiness.partially_ready, // True if API key is set
+    klaviyo_fully_configured: configStatus.readiness.fully_ready, // True if API key AND default list
     klaviyo_api_key_set: !!process.env.KLAVIYO_PRIVATE_API_KEY,
     klaviyo_api_key_prefix: process.env.KLAVIYO_PRIVATE_API_KEY ? process.env.KLAVIYO_PRIVATE_API_KEY.substring(0, 8) + '...' : 'NOT SET',
     klaviyo_public_key_set: !!process.env.KLAVIYO_PUBLIC_API_KEY,
     klaviyo_default_list_id: process.env.KLAVIYO_DEFAULT_LIST_ID || 'NOT SET',
-    klaviyo_lists_configured: klaviyoClient.getConfiguredLists(),
+    klaviyo_lists_configured: configuredLists,
+    configuration_details: configStatus,
+    environment_variables: {
+      KLAVIYO_PRIVATE_API_KEY: process.env.KLAVIYO_PRIVATE_API_KEY ? 'Set' : 'Missing',
+      KLAVIYO_PUBLIC_API_KEY: process.env.KLAVIYO_PUBLIC_API_KEY ? 'Set' : 'Missing',
+      KLAVIYO_DEFAULT_LIST_ID: process.env.KLAVIYO_DEFAULT_LIST_ID ? 'Set' : 'Missing',
+      KLAVIYO_WINBACK_LIST_ID: process.env.KLAVIYO_WINBACK_LIST_ID ? 'Set' : 'Missing',
+      KLAVIYO_REPEAT_LIST_ID: process.env.KLAVIYO_REPEAT_LIST_ID ? 'Set' : 'Missing',
+      KLAVIYO_NEWSLETTER_LIST_ID: process.env.KLAVIYO_NEWSLETTER_LIST_ID ? 'Set' : 'Missing'
+    },
+    setup_instructions: {
+      message: configStatus.message,
+      next_steps: configStatus.configuration_level === 'none' ? [
+        'Set KLAVIYO_PRIVATE_API_KEY environment variable',
+        'Set KLAVIYO_PUBLIC_API_KEY environment variable',
+        'Set KLAVIYO_DEFAULT_LIST_ID environment variable'
+      ] : configStatus.configuration_level === 'partial' ? [
+        'Set KLAVIYO_DEFAULT_LIST_ID environment variable',
+        'Optionally set other list IDs (KLAVIYO_WINBACK_LIST_ID, KLAVIYO_REPEAT_LIST_ID, KLAVIYO_NEWSLETTER_LIST_ID)'
+      ] : [
+        'Configuration is complete!',
+        'You can optionally set additional list IDs for advanced segmentation'
+      ]
+    },
     node_env: process.env.NODE_ENV,
     timestamp: new Date().toISOString()
   };
 
   res.json(diagnostics);
+});
+
+// Add Klaviyo test endpoint
+app.get('/klaviyo/test', async (req, res) => {
+  try {
+    if (!klaviyoClient || !klaviyoClient.isPartiallyReady()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Klaviyo client is not ready for testing',
+        issues: {
+          api_key: !process.env.KLAVIYO_PRIVATE_API_KEY ? 'Missing KLAVIYO_PRIVATE_API_KEY' : 'OK',
+          default_list: !process.env.KLAVIYO_DEFAULT_LIST_ID ? 'Missing KLAVIYO_DEFAULT_LIST_ID (optional for basic testing)' : 'OK'
+        },
+        configuration_status: klaviyoClient.getConfigurationStatus(),
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Test basic API connectivity
+    const testResult = await klaviyoClient.getLists();
+    
+    return res.json({
+      success: true,
+      message: 'Klaviyo integration is working correctly',
+      data: {
+        lists_fetched: testResult.length,
+        configured_lists: klaviyoClient.getConfiguredLists(),
+        api_connectivity: 'OK',
+        configuration_status: klaviyoClient.getConfigurationStatus(),
+        available_lists: testResult.map(list => ({
+          id: list.id,
+          name: list.attributes?.name || 'Unknown',
+          created: list.attributes?.created || 'Unknown'
+        }))
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Klaviyo test failed:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Klaviyo test failed',
+      error: error.message,
+      configuration_status: klaviyoClient ? klaviyoClient.getConfigurationStatus() : null,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Add Klaviyo setup guide endpoint
+app.get('/klaviyo/setup', (req, res) => {
+  const configStatus = klaviyoClient.getConfigurationStatus();
+  
+  const setupGuide = {
+    current_status: configStatus,
+    setup_steps: [
+      {
+        step: 1,
+        title: 'Get your Klaviyo API Keys',
+        description: 'Sign in to your Klaviyo account and get your API keys',
+        instructions: [
+          'Go to https://www.klaviyo.com/account#api-keys-tab',
+          'Create a new Private API Key with the following permissions:',
+          '  - Read/Write Lists',
+          '  - Read/Write Profiles',
+          '  - Read/Write Events',
+          '  - Read/Write Segments',
+          'Copy the Private API Key (starts with "pk_")',
+          'Copy the Public API Key (starts with "pk_" but shorter)'
+        ],
+        status: configStatus.api_key === 'configured' ? 'completed' : 'pending'
+      },
+      {
+        step: 2,
+        title: 'Set Environment Variables',
+        description: 'Add the API keys to your environment variables',
+        instructions: [
+          'In your .env file, add:',
+          'KLAVIYO_PRIVATE_API_KEY=your_private_key_here',
+          'KLAVIYO_PUBLIC_API_KEY=your_public_key_here',
+          '',
+          'For Railway deployment, add these in your Railway environment variables:',
+          'https://railway.app/project/your-project/settings/environment'
+        ],
+        status: configStatus.api_key === 'configured' ? 'completed' : 'pending'
+      },
+      {
+        step: 3,
+        title: 'Create and Configure Lists',
+        description: 'Set up your Klaviyo lists for customer segmentation',
+        instructions: [
+          'In your Klaviyo account, create the following lists:',
+          '  - Default List (for general subscribers)',
+          '  - Winback List (for re-engagement campaigns)',
+          '  - Repeat Customer List (for loyal customers)',
+          '  - Newsletter List (for newsletter subscribers)',
+          '',
+          'Copy the List IDs from each list (found in the list URL)',
+          'Add these to your environment variables:',
+          'KLAVIYO_DEFAULT_LIST_ID=your_default_list_id',
+          'KLAVIYO_WINBACK_LIST_ID=your_winback_list_id',
+          'KLAVIYO_REPEAT_LIST_ID=your_repeat_list_id',
+          'KLAVIYO_NEWSLETTER_LIST_ID=your_newsletter_list_id'
+        ],
+        status: configStatus.default_list === 'configured' ? 'completed' : 'pending'
+      },
+      {
+        step: 4,
+        title: 'Test Your Integration',
+        description: 'Verify everything is working correctly',
+        instructions: [
+          'Visit /klaviyo/test to test your API connectivity',
+          'Visit /klaviyo/status to check your configuration status',
+          'Test subscribing/unsubscribing users through your admin panel'
+        ],
+        status: configStatus.configuration_level === 'complete' ? 'completed' : 'pending'
+      }
+    ],
+    environment_variables: {
+      required: {
+        KLAVIYO_PRIVATE_API_KEY: {
+          description: 'Your Klaviyo Private API Key (starts with "pk_")',
+          status: process.env.KLAVIYO_PRIVATE_API_KEY ? 'Set' : 'Missing',
+          example: 'pk_1234567890abcdef...'
+        },
+        KLAVIYO_PUBLIC_API_KEY: {
+          description: 'Your Klaviyo Public API Key (shorter, starts with "pk_")',
+          status: process.env.KLAVIYO_PUBLIC_API_KEY ? 'Set' : 'Missing',
+          example: 'pk_abc123'
+        }
+      },
+      optional: {
+        KLAVIYO_DEFAULT_LIST_ID: {
+          description: 'Default list ID for general subscribers',
+          status: process.env.KLAVIYO_DEFAULT_LIST_ID ? 'Set' : 'Missing',
+          example: 'ABC123'
+        },
+        KLAVIYO_WINBACK_LIST_ID: {
+          description: 'List ID for winback/re-engagement campaigns',
+          status: process.env.KLAVIYO_WINBACK_LIST_ID ? 'Set' : 'Missing',
+          example: 'DEF456'
+        },
+        KLAVIYO_REPEAT_LIST_ID: {
+          description: 'List ID for repeat/loyal customers',
+          status: process.env.KLAVIYO_REPEAT_LIST_ID ? 'Set' : 'Missing',
+          example: 'GHI789'
+        },
+        KLAVIYO_NEWSLETTER_LIST_ID: {
+          description: 'List ID for newsletter subscribers',
+          status: process.env.KLAVIYO_NEWSLETTER_LIST_ID ? 'Set' : 'Missing',
+          example: 'JKL012'
+        }
+      }
+    },
+    help_links: {
+      klaviyo_api_keys: 'https://www.klaviyo.com/account#api-keys-tab',
+      klaviyo_lists: 'https://www.klaviyo.com/lists',
+      klaviyo_docs: 'https://developers.klaviyo.com/en/docs',
+      railway_env: 'https://railway.app/project/your-project/settings/environment'
+    },
+    timestamp: new Date().toISOString()
+  };
+
+  res.json(setupGuide);
 });
 
 // Add Resend audience API endpoint
@@ -7647,30 +7856,32 @@ const resolvers = {
 
         const client = supabaseClient.getServiceClient();
         
-        // Use the enhanced function that supports templates
-        const { data, error } = await client.rpc('update_user_banner_image', {
-          p_user_id: userId,
-          p_banner_image_url: bannerUrl,
-          p_banner_image_public_id: bannerPublicId,
-          p_banner_template: bannerTemplate,
-          p_banner_template_id: bannerTemplateId
+        // Use direct table update instead of problematic RPC function
+        const updateData = {
+          banner_image_url: bannerUrl,
+          banner_image_public_id: bannerPublicId,
+          banner_template: bannerTemplate,
+          banner_template_id: bannerTemplateId,
+          updated_at: new Date().toISOString()
+        };
+
+        // Remove null/undefined values
+        Object.keys(updateData).forEach(key => {
+          if (updateData[key] === undefined) {
+            delete updateData[key];
+          }
         });
+
+        const { data: profile, error } = await client
+          .from('user_profiles')
+          .update(updateData)
+          .eq('user_id', userId)
+          .select('*')
+          .single();
 
         if (error) {
           console.error('❌ Error updating profile banner:', error);
           throw new Error(`Failed to update profile banner: ${error.message}`);
-        }
-
-        // Fetch the updated profile
-        const { data: profile, error: fetchError } = await client
-          .from('user_profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .single();
-
-        if (fetchError) {
-          console.error('❌ Error fetching updated profile:', fetchError);
-          throw new Error('Profile banner updated but failed to fetch result');
         }
 
         console.log('✅ Successfully updated profile banner');

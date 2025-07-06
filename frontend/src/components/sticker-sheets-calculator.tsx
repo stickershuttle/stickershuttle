@@ -15,6 +15,7 @@ import { useCart } from "@/components/CartContext"
 import { generateCartItemId } from "@/types/product"
 import { useRouter } from "next/router"
 import { getSupabase } from "@/lib/supabase"
+import { useDebounceCallback, usePreventRapidCalls } from "@/hooks/useDebounce"
 
 interface BasePricing {
   sqInches: number
@@ -181,7 +182,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
     const quantity =
       selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
 
-    console.log(`\n--- Pricing Update ---`)
+    console.log(`\n--- Sticker Sheets Pricing Update (Debounced) ---`)
     console.log(`Size: ${selectedSize}, Custom Width: ${customWidth}, Custom Height: ${customHeight}`)
     console.log(`Calculated Area: ${area.toFixed(2)} sq inches`)
     console.log(`Quantity: ${quantity}`)
@@ -199,10 +200,13 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
     }
   }, [selectedSize, customWidth, customHeight, selectedQuantity, customQuantity, selectedKissCutOption, rushOrder])
 
+  // Debounced pricing calculation - prevents excessive API calls and calculations
+  const debouncedUpdatePricing = useDebounceCallback(updatePricing, 250)
+
   useEffect(() => {
-    console.log("Recalculating price due to size or quantity change")
-    updatePricing()
-  }, [updatePricing])
+    console.log("📊 Debouncing sticker sheets price calculation due to parameter change")
+    debouncedUpdatePricing()
+  }, [selectedSize, customWidth, customHeight, selectedQuantity, customQuantity, selectedKissCutOption, rushOrder, debouncedUpdatePricing])
 
   // Load reorder data from localStorage if available
   useEffect(() => {
@@ -644,19 +648,24 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
     };
   };
 
-  const handleCheckout = () => {
+  // Optimized cart operations with rapid call prevention
+  const checkoutOperation = useCallback(() => {
     const cartItem = createCartItem();
     addToCart(cartItem);
     // Redirect to cart page for checkout
     router.push('/cart');
-  };
+  }, [createCartItem, addToCart, router]);
 
-  const handleAddToCartAndKeepShopping = () => {
+  const addToCartOperation = useCallback(() => {
     const cartItem = createCartItem();
     addToCart(cartItem);
     // Redirect to products page with success message
     router.push('/products?added=true');
-  };
+  }, [createCartItem, addToCart, router]);
+
+  // Prevent rapid successive clicks on checkout/add to cart
+  const [handleCheckout, isCheckingOut] = usePreventRapidCalls(checkoutOperation, 1500);
+  const [handleAddToCartAndKeepShopping, isAddingToCart] = usePreventRapidCalls(addToCartOperation, 1500);
 
   return (
     <div className="transition-colors duration-200">
