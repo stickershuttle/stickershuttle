@@ -109,6 +109,22 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   console.log('🧹 Apollo cache cleared for development');
 }
 
+// Clear cache on production if there's a cache version mismatch
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+  const CACHE_VERSION = '1.0.1'; // Increment this to force cache clear
+  const storedVersion = localStorage.getItem('apollo-cache-version');
+  
+  if (storedVersion !== CACHE_VERSION) {
+    console.log('🧹 Clearing Apollo cache due to version mismatch');
+    client.clearStore().then(() => {
+      localStorage.setItem('apollo-cache-version', CACHE_VERSION);
+      console.log('✅ Apollo cache cleared and version updated');
+    }).catch(error => {
+      console.error('❌ Failed to clear Apollo cache:', error);
+    });
+  }
+}
+
 // Add a method to clear the cache
 export const clearApolloCache = () => {
   console.log('🧹 Clearing Apollo cache...');

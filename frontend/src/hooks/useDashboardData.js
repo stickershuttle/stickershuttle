@@ -17,12 +17,22 @@ export const useDashboardData = () => {
     data: ordersData,
     loading: queryLoading,
     error: queryError,
-    refetch: refetchOrders
+    refetch: refetchOrders,
+    networkStatus
   } = useQuery(GET_USER_ORDERS, {
     variables: { userId: user?.id || '' },
     skip: !user?.id, // Skip query if no user ID
     fetchPolicy: 'cache-and-network', // Check cache first, then network for fresh data
-    errorPolicy: 'all'
+    errorPolicy: 'all',
+    notifyOnNetworkStatusChange: true, // Track network status changes
+    onError: (error) => {
+      console.error('❌ GET_USER_ORDERS query error:', {
+        message: error.message,
+        graphQLErrors: error.graphQLErrors,
+        networkError: error.networkError,
+        stack: error.stack
+      });
+    }
   });
 
   // Mutation for claiming guest orders
@@ -304,6 +314,20 @@ export const useDashboardData = () => {
       setOrders([]);
     }
   }, [ordersData, queryError, queryLoading, user]);
+
+  // Add network status debugging
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'development') {
+      console.log('🔍 Dashboard Query Network Status:', {
+        networkStatus,
+        loading: queryLoading,
+        hasData: !!ordersData,
+        hasError: !!queryError,
+        userId: user?.id,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, [networkStatus, queryLoading, ordersData, queryError, user?.id]);
 
   // Helper functions to transform data
   const mapOrderStatus = (orderStatus, fulfillmentStatus) => {
