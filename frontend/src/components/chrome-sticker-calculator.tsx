@@ -15,7 +15,6 @@ import { useCart } from "@/components/CartContext"
 import { generateCartItemId } from "@/types/product"
 import { useRouter } from "next/router"
 import { getSupabase } from "@/lib/supabase"
-import { useDebounceCallback, usePreventRapidCalls } from "@/hooks/useDebounce"
 
 interface BasePricing {
   sqInches: number
@@ -208,7 +207,6 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
     }
   }
 
-  // Optimized pricing calculation with debouncing to prevent excessive calculations
   const updatePricing = useCallback(() => {
     // Skip if component not mounted or during SSR
     if (typeof window === 'undefined') {
@@ -219,7 +217,7 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
     const quantity =
       selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
 
-    console.log(`\n--- Chrome Pricing Update (Debounced) ---`)
+    console.log(`\n--- Pricing Update ---`)
     console.log(`Size: ${selectedSize}, Custom Width: ${customWidth}, Custom Height: ${customHeight}`)
     console.log(`Calculated Area: ${area.toFixed(2)} sq inches`)
     console.log(`Quantity: ${quantity}`)
@@ -237,13 +235,10 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
     }
   }, [selectedSize, customWidth, customHeight, selectedQuantity, customQuantity, selectedWhiteOption, rushOrder])
 
-  // Debounced pricing calculation - prevents excessive API calls and calculations
-  const debouncedUpdatePricing = useDebounceCallback(updatePricing, 250)
-
   useEffect(() => {
-    console.log("📊 Debouncing chrome sticker price calculation due to parameter change")
-    debouncedUpdatePricing()
-  }, [selectedSize, customWidth, customHeight, selectedQuantity, customQuantity, selectedWhiteOption, rushOrder, debouncedUpdatePricing])
+    console.log("Recalculating price due to size or quantity change")
+    updatePricing()
+  }, [updatePricing])
 
   // Load reorder data from localStorage if available
   useEffect(() => {
@@ -680,24 +675,19 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
     };
   };
 
-  // Optimized cart operations with rapid call prevention
-  const checkoutOperation = useCallback(() => {
+  const handleCheckout = () => {
     const cartItem = createCartItem();
     addToCart(cartItem);
     // Redirect to cart page for checkout
     router.push('/cart');
-  }, [createCartItem, addToCart, router]);
+  };
 
-  const addToCartOperation = useCallback(() => {
+  const handleAddToCartAndKeepShopping = () => {
     const cartItem = createCartItem();
     addToCart(cartItem);
     // Redirect to products page with success message
     router.push('/products?added=true');
-  }, [createCartItem, addToCart, router]);
-
-  // Prevent rapid successive clicks on checkout/add to cart
-  const [handleCheckout, isCheckingOut] = usePreventRapidCalls(checkoutOperation, 1500);
-  const [handleAddToCartAndKeepShopping, isAddingToCart] = usePreventRapidCalls(addToCartOperation, 1500);
+  };
 
   return (
     <div className="transition-colors duration-200">

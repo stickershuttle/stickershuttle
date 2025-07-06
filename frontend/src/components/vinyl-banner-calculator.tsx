@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Upload, Instagram, Clock } from 'lucide-react';
 import { uploadToCloudinary, validateFile, CloudinaryUploadResult, UploadProgress, CalculatorMetadata } from '@/utils/cloudinary';
 import AIFileImage from './AIFileImage';
 import { getSupabase } from '@/lib/supabase';
-import { useDebounceCallback, usePreventRapidCalls } from '@/hooks/useDebounce';
 
 const VinylBannerCalculator: React.FC = () => {
   const [selectedSize, setSelectedSize] = useState<string>('3x5');
@@ -147,14 +146,9 @@ const VinylBannerCalculator: React.FC = () => {
     }
   };
 
-  const calculatePricing = useCallback(() => {
+  const calculatePricing = () => {
     const sqFt = calculateSquareFootage();
     const quantity = selectedQuantity === 'Custom' ? parseInt(customQuantity) || 1 : parseInt(selectedQuantity);
-    
-    console.log(`\n--- Vinyl Banner Pricing Update (Debounced) ---`);
-    console.log(`Size: ${selectedSize}, Custom: ${customWidth}' × ${customHeight}'`);
-    console.log(`Calculated Area: ${sqFt} sq ft`);
-    console.log(`Quantity: ${quantity}`);
     
     if (sqFt === 0 || (selectedSize === 'custom' && customSizeError) || quantity <= 0) {
       return {
@@ -187,7 +181,7 @@ const VinylBannerCalculator: React.FC = () => {
     
     const total = subtotal - quantityDiscount + rushFee + instagramFee;
 
-    const result = {
+    return {
       basePrice,
       finishingPrice: basePrice * (finishingMultiplier - 1),
       subtotal,
@@ -198,16 +192,9 @@ const VinylBannerCalculator: React.FC = () => {
       perUnit: total / quantity,
       sqFt
     };
-    
-    console.log(`Total Price: $${result.total.toFixed(2)}`);
-    console.log(`Price Per Unit: $${result.perUnit.toFixed(2)}`);
-    
-    return result;
-  }, [selectedSize, customWidth, customHeight, selectedQuantity, customQuantity, selectedFinishing, rushOrder, customSizeError]);
+  };
 
-  // Debounced pricing calculation - prevents excessive computations
-  const debouncedCalculatePricing = useDebounceCallback(calculatePricing, 250);
-  const pricing = debouncedCalculatePricing() || calculatePricing();
+  const pricing = calculatePricing();
 
   const handleFileUpload = async (file: File) => {
     // Reset previous states
@@ -302,8 +289,7 @@ const VinylBannerCalculator: React.FC = () => {
     return null;
   };
 
-  // Optimized cart operations with rapid call prevention
-  const addToCartOperation = useCallback(() => {
+  const handleAddToCart = () => {
     if (pricing.total === 0) return;
     
     const quantity = selectedQuantity === 'Custom' ? parseInt(customQuantity) || 1 : parseInt(selectedQuantity);
@@ -323,10 +309,7 @@ const VinylBannerCalculator: React.FC = () => {
     
     console.log('Adding to cart:', cartItem);
     alert('Added to cart! (Cart functionality to be implemented)');
-  }, [pricing, selectedQuantity, customQuantity, selectedSize, customWidth, customHeight, selectedFinishing, rushOrder, postToInstagram, uploadedFile]);
-
-  // Prevent rapid successive clicks on add to cart
-  const [handleAddToCart, isAddingToCart] = usePreventRapidCalls(addToCartOperation, 1500);
+  };
 
   const handleQuantityChange = (amount: string) => {
     setSelectedQuantity(amount);

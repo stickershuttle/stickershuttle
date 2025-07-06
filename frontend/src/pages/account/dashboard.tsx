@@ -7897,7 +7897,12 @@ function Dashboard() {
                   >
                     Change Photo
                   </button>
-
+                  {/* Debug info (remove in production) */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <div className="text-xs text-gray-400 mt-1">
+                      Debug: profile_photo_url = {profile?.profile_photo_url || 'null'}
+                    </div>
+                  )}
                   {profile?.profile_photo_url && (
                     <button
                       onClick={async () => {

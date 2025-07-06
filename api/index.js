@@ -79,17 +79,6 @@ const creditHandlers = require('./credit-handlers');
 const KlaviyoClient = require('./klaviyo-client');
 const klaviyoClient = new KlaviyoClient();
 
-// Import performance optimizations
-const {
-  rateLimiters,
-  slowDownMiddleware,
-  caches,
-  createCacheMiddleware,
-  performanceMonitor,
-  performanceMiddleware,
-  cacheResolver
-} = require('./performance-optimizations');
-
 // Initialize enhanced tracking
 const trackingEnhancer = new EasyPostTrackingEnhancer(easyPostClient);
 
@@ -294,20 +283,55 @@ app.use(helmet({
   }
 }));
 
-// Enhanced rate limiting and performance monitoring
-app.use(performanceMiddleware);
+// Rate limiting configuration
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.NODE_ENV === 'development' ? 1000 : 100, // More lenient in development
+  message: {
+    error: 'Too many requests from this IP, please try again later.',
+    retryAfter: 900
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for health checks and GraphQL in development
+    if (process.env.NODE_ENV === 'development') {
+      return req.path === '/health' || req.path === '/graphql' || req.path === '/health/detailed';
+    }
+    return false;
+  }
+});
 
-// Apply intelligent slow-down for suspicious activity
-app.use(slowDownMiddleware);
+const strictLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // Limit each IP to 10 uploads per hour
+  message: {
+    error: 'Too many upload attempts from this IP, please try again later.',
+    retryAfter: 3600
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 1000, // Allow up to 1000 webhook requests per hour
+  message: {
+    error: 'Webhook rate limit exceeded',
+    retryAfter: 3600
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Apply general rate limiting to all requests
-app.use(rateLimiters.general);
+app.use(generalLimiter);
 
 // Apply strict rate limiting to upload routes
-app.use('/api/upload', rateLimiters.upload);
+app.use('/api/upload', strictLimiter);
 
 // Apply webhook rate limiting to webhook routes
-app.use('/webhooks', rateLimiters.read);
+app.use('/webhooks', webhookLimiter);
 
 // Add Sentry request handling middleware (temporarily commented out)
 // app.use(Sentry.Handlers.requestHandler());
@@ -469,47 +493,6 @@ app.get('/easypost/health', async (req, res) => {
       error: error.message,
       timestamp: new Date().toISOString()
     });
-  }
-});
-
-// Add performance monitoring endpoints
-app.get('/performance/stats', (req, res) => {
-  const stats = performanceMonitor.getStats();
-  res.json({
-    performance: stats,
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
-
-app.get('/performance/cache', (req, res) => {
-  const cacheStats = Object.fromEntries(
-    Object.entries(caches).map(([key, cache]) => [key, cache.getStats()])
-  );
-  
-  res.json({
-    caches: cacheStats,
-    timestamp: new Date().toISOString()
-  });
-});
-
-app.post('/performance/cache/clear', (req, res) => {
-  const { cacheType, key } = req.body;
-  
-  if (cacheType && caches[cacheType]) {
-    if (key) {
-      caches[cacheType].delete(key);
-      res.json({ message: `Cleared key "${key}" from ${cacheType} cache` });
-    } else {
-      caches[cacheType].clear();
-      res.json({ message: `Cleared all entries from ${cacheType} cache` });
-    }
-  } else if (!cacheType) {
-    // Clear all caches
-    Object.values(caches).forEach(cache => cache.clear());
-    res.json({ message: 'Cleared all caches' });
-  } else {
-    res.status(400).json({ error: 'Invalid cache type' });
   }
 });
 
@@ -7856,32 +7839,30 @@ const resolvers = {
 
         const client = supabaseClient.getServiceClient();
         
-        // Use direct table update instead of problematic RPC function
-        const updateData = {
-          banner_image_url: bannerUrl,
-          banner_image_public_id: bannerPublicId,
-          banner_template: bannerTemplate,
-          banner_template_id: bannerTemplateId,
-          updated_at: new Date().toISOString()
-        };
-
-        // Remove null/undefined values
-        Object.keys(updateData).forEach(key => {
-          if (updateData[key] === undefined) {
-            delete updateData[key];
-          }
+        // Use the enhanced function that supports templates
+        const { data, error } = await client.rpc('update_user_banner_image', {
+          p_user_id: userId,
+          p_banner_image_url: bannerUrl,
+          p_banner_image_public_id: bannerPublicId,
+          p_banner_template: bannerTemplate,
+          p_banner_template_id: bannerTemplateId
         });
-
-        const { data: profile, error } = await client
-          .from('user_profiles')
-          .update(updateData)
-          .eq('user_id', userId)
-          .select('*')
-          .single();
 
         if (error) {
           console.error('❌ Error updating profile banner:', error);
           throw new Error(`Failed to update profile banner: ${error.message}`);
+        }
+
+        // Fetch the updated profile
+        const { data: profile, error: fetchError } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        if (fetchError) {
+          console.error('❌ Error fetching updated profile:', fetchError);
+          throw new Error('Profile banner updated but failed to fetch result');
         }
 
         console.log('✅ Successfully updated profile banner');
