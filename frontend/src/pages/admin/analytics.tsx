@@ -110,7 +110,7 @@ export default function AdminAnalytics() {
     }
 
     checkAdmin();
-  }, [router]);
+  }, []); // Remove router dependency to prevent loops
 
   // Format currency
   const formatCurrency = (amount: number) => {

@@ -5,6 +5,7 @@ class EasyPostService {
         this.client = null;
         this.isConfigured = false;
         this.testMode = false;
+        this.recentCalls = []; // Track recent API calls for rate limiting detection
         this.init();
     }
 
@@ -121,41 +122,198 @@ class EasyPostService {
             throw new Error('EasyPost client is not configured');
         }
 
-        try {
-            console.log('📦 Creating EasyPost shipment...');
-            const shipment = await this.client.Shipment.create(shipmentData);
-            console.log('✅ EasyPost shipment created:', shipment.id);
-            
-            // Log shipping rate summary for analytics
-            if (shipment.rates && shipment.rates.length > 0) {
-                const carrierCounts = {};
-                shipment.rates.forEach(rate => {
-                    const carrier = rate.carrier.toUpperCase();
-                    carrierCounts[carrier] = (carrierCounts[carrier] || 0) + 1;
-                });
+        const maxRetries = 4; // Increased from 2 to 4
+        let lastError = null;
+
+        // Add a longer random delay to avoid API race conditions
+        await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300));
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`📦 Creating EasyPost shipment (attempt ${attempt}/${maxRetries})...`);
                 
-                console.log(`📊 Rates received by carrier:`, carrierCounts);
-                console.log(`📊 Total rates: ${shipment.rates.length}`);
+                // Check rate limiting before making the call
+                const rateLimitStats = this.getRateLimitingStats();
+                console.log('📊 Rate limiting stats:', rateLimitStats);
                 
-                // Check specifically for UPS
-                const hasUPS = Object.keys(carrierCounts).some(carrier => 
-                    carrier === 'UPS' || carrier === 'UPSDAP'
-                );
-                if (!hasUPS) {
-                    console.log('⚠️ No UPS rates returned from EasyPost');
-                    console.log('📍 From address:', JSON.stringify(shipmentData.from_address, null, 2));
-                    console.log('📍 To address:', JSON.stringify(shipmentData.to_address, null, 2));
-                    console.log('📦 Parcel:', JSON.stringify(shipmentData.parcel, null, 2));
+                if (rateLimitStats.possibleRateLimit) {
+                    console.warn('⚠️ Possible rate limiting detected - high call volume');
+                    console.warn(`   - Calls last minute: ${rateLimitStats.callsLastMinute}`);
+                    console.warn(`   - Calls last 5 minutes: ${rateLimitStats.callsLast5Minutes}`);
                 }
-            } else {
-                console.log('⚠️ No rates returned from EasyPost at all');
+                
+                // Enhanced debugging - log all shipment data
+                console.log('📦 Full shipment data being sent to EasyPost:');
+                console.log(JSON.stringify(shipmentData, null, 2));
+                
+                // Validate package dimensions for carrier requirements
+                const parcel = shipmentData.parcel;
+                console.log('📦 Package validation:');
+                console.log(`  - Length: ${parcel.length}" (Min: 8" for UPS/FedEx)`);
+                console.log(`  - Width: ${parcel.width}" (Min: 6" for UPS/FedEx)`);
+                console.log(`  - Height: ${parcel.height}" (Min: 2" for UPS/FedEx)`);
+                console.log(`  - Weight: ${parcel.weight} lbs (Min: 1 lb for UPS/FedEx)`);
+                
+                // Check if dimensions meet carrier requirements
+                const meetsUPSRequirements = parcel.length >= 8 && parcel.width >= 6 && parcel.height >= 2 && parcel.weight >= 1;
+                const meetsFedExRequirements = parcel.length >= 8 && parcel.width >= 6 && parcel.height >= 2 && parcel.weight >= 1;
+                
+                console.log('📦 Carrier requirements check:');
+                console.log(`  - UPS requirements met: ${meetsUPSRequirements}`);
+                console.log(`  - FedEx requirements met: ${meetsFedExRequirements}`);
+                console.log(`  - USPS requirements met: true (USPS is more flexible)`);
+                
+                // Validate addresses
+                const toAddress = shipmentData.to_address;
+                console.log('📍 Address validation:');
+                console.log(`  - To Address complete: ${!!(toAddress.name && toAddress.street1 && toAddress.city && toAddress.state && toAddress.zip)}`);
+                console.log(`  - From Address type: ${typeof shipmentData.from_address}`);
+                
+                if (!toAddress.name || !toAddress.street1 || !toAddress.city || !toAddress.state || !toAddress.zip) {
+                    console.warn('⚠️ Incomplete destination address may cause carrier rates to be filtered out');
+                }
+                
+                // Add a unique reference to prevent any potential caching issues
+                const uniqueShipmentData = {
+                    ...shipmentData,
+                    reference: `${shipmentData.reference}_${Date.now()}_${attempt}`
+                };
+                
+                console.log(`📦 Creating shipment with unique reference: ${uniqueShipmentData.reference}`);
+                
+                // Track the API call
+                this.trackApiCall('createShipment');
+                
+                const shipment = await this.client.Shipment.create(uniqueShipmentData);
+                console.log('✅ EasyPost shipment created:', shipment.id);
+                
+                // Enhanced rate analysis
+                if (shipment.rates && shipment.rates.length > 0) {
+                    const carrierCounts = {};
+                    const carrierDetails = {};
+                    
+                    shipment.rates.forEach(rate => {
+                        const carrier = rate.carrier.toUpperCase();
+                        carrierCounts[carrier] = (carrierCounts[carrier] || 0) + 1;
+                        
+                        if (!carrierDetails[carrier]) {
+                            carrierDetails[carrier] = [];
+                        }
+                        carrierDetails[carrier].push({
+                            service: rate.service,
+                            rate: rate.rate,
+                            delivery_days: rate.delivery_days
+                        });
+                    });
+                    
+                    console.log(`📊 Detailed rates analysis (attempt ${attempt}):`);
+                    console.log(`📊 Total rates: ${shipment.rates.length}`);
+                    console.log(`📊 Rates by carrier:`, carrierCounts);
+                    
+                    // Log detailed carrier information
+                    Object.keys(carrierDetails).forEach(carrier => {
+                        console.log(`📊 ${carrier} services:`, carrierDetails[carrier]);
+                    });
+                    
+                    // Check for missing major carriers
+                    const hasUPS = Object.keys(carrierCounts).some(carrier => 
+                        carrier === 'UPS' || carrier === 'UPSDAP'
+                    );
+                    const hasFedEx = Object.keys(carrierCounts).some(carrier => 
+                        carrier === 'FEDEX' || carrier === 'FEDEXDEFAULT'
+                    );
+                    const hasUSPS = Object.keys(carrierCounts).some(carrier => 
+                        carrier === 'USPS'
+                    );
+                    
+                    console.log('📊 Major carriers present:');
+                    console.log(`  - UPS: ${hasUPS ? '✅' : '❌'}`);
+                    console.log(`  - FedEx: ${hasFedEx ? '✅' : '❌'}`);
+                    console.log(`  - USPS: ${hasUSPS ? '✅' : '❌'}`);
+                    
+                    // If we got a reasonable response with at least one major carrier, return it
+                    if (hasUSPS || hasUPS || hasFedEx) {
+                        console.log(`✅ Success on attempt ${attempt} - returning shipment with carriers`);
+                        return shipment;
+                    } else if (attempt < maxRetries) {
+                        console.log(`⚠️ No major carriers returned on attempt ${attempt}, retrying...`);
+                        lastError = new Error('No major carriers returned from EasyPost');
+                        // Exponential backoff: wait longer on each retry
+                        const delay = 1000 * Math.pow(2, attempt - 1); // 1s, 2s, 4s, 8s
+                        console.log(`⏱️ Waiting ${delay}ms before retry ${attempt + 1}`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+                    
+                    if (!hasUPS) {
+                        console.log('⚠️ UPS rates missing - possible causes:');
+                        console.log('  - Package too small (min 8"x6"x2", 1lb)');
+                        console.log('  - Address validation failed');
+                        console.log('  - Destination not serviceable by UPS');
+                        console.log('  - Package dimensions exceed UPS limits');
+                        console.log('  - EasyPost API timing/rate limiting issue');
+                    }
+                    
+                    if (!hasFedEx) {
+                        console.log('⚠️ FedEx rates missing - possible causes:');
+                        console.log('  - Package too small (min 8"x6"x2", 1lb)');
+                        console.log('  - Address validation failed');
+                        console.log('  - Destination not serviceable by FedEx');
+                        console.log('  - Package dimensions exceed FedEx limits');
+                        console.log('  - EasyPost API timing/rate limiting issue');
+                    }
+                    
+                    // Check for any EasyPost error messages in the response
+                    if (shipment.messages && shipment.messages.length > 0) {
+                        console.log('⚠️ EasyPost messages/warnings:');
+                        shipment.messages.forEach(msg => {
+                            console.log(`  - ${msg.message}`);
+                        });
+                    }
+                    
+                    return shipment; // Return even if some carriers are missing
+                } else {
+                    console.log('❌ No rates returned from EasyPost at all');
+                    if (attempt < maxRetries) {
+                        console.log(`⚠️ No rates on attempt ${attempt}, retrying...`);
+                        lastError = new Error('No rates returned from EasyPost');
+                        // Exponential backoff for no rates scenario
+                        const delay = 1000 * Math.pow(2, attempt - 1); // 1s, 2s, 4s, 8s
+                        console.log(`⏱️ Waiting ${delay}ms before retry ${attempt + 1}`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+                    console.log('❌ This usually indicates:');
+                    console.log('  - Invalid addresses');
+                    console.log('  - Package dimensions outside carrier limits');
+                    console.log('  - No carriers service this route');
+                    console.log('  - EasyPost API issue');
+                }
+                
+                return shipment;
+            } catch (error) {
+                console.error(`❌ Failed to create EasyPost shipment (attempt ${attempt}):`, error);
+                console.error('❌ Error details:', error.message);
+                if (error.errors) {
+                    console.error('❌ EasyPost validation errors:', error.errors);
+                }
+                
+                lastError = error;
+                
+                if (attempt < maxRetries) {
+                    // Exponential backoff for errors
+                    const delay = 1000 * Math.pow(2, attempt - 1); // 1s, 2s, 4s, 8s
+                    console.log(`🔄 Retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries})`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    console.error('❌ All retry attempts failed');
+                    throw error;
+                }
             }
-            
-            return shipment;
-        } catch (error) {
-            console.error('❌ Failed to create EasyPost shipment:', error);
-            throw error;
         }
+        
+        // If we get here, all retries failed
+        throw lastError || new Error('Failed to create shipment after all retries');
     }
 
     /**
@@ -318,12 +476,60 @@ class EasyPostService {
         let parcel;
         
         if (customDimensions) {
+            // Custom dimensions from frontend (weight is in pounds)
+            // Remove cache-busting timestamp if present
+            const { _timestamp, ...cleanDimensions } = customDimensions;
+            const originalDimensions = { ...cleanDimensions };
+            
             parcel = {
-                length: customDimensions.length,
-                width: customDimensions.width,
-                height: customDimensions.height,
-                weight: customDimensions.weight
+                length: Math.max(cleanDimensions.length, 8),    // Ensure minimum 8" for UPS/FedEx
+                width: Math.max(cleanDimensions.width, 6),      // Ensure minimum 6" for UPS/FedEx
+                height: Math.max(cleanDimensions.height, 2),    // Ensure minimum 2" for UPS/FedEx
+                weight: Math.max(cleanDimensions.weight, 1)     // Ensure minimum 1 lb for UPS/FedEx
             };
+            
+            // Check if any adjustments were made
+            const adjustments = [];
+            if (parcel.length !== originalDimensions.length) {
+                adjustments.push(`Length: ${originalDimensions.length}" → ${parcel.length}"`);
+            }
+            if (parcel.width !== originalDimensions.width) {
+                adjustments.push(`Width: ${originalDimensions.width}" → ${parcel.width}"`);
+            }
+            if (parcel.height !== originalDimensions.height) {
+                adjustments.push(`Height: ${originalDimensions.height}" → ${parcel.height}"`);
+            }
+            if (parcel.weight !== originalDimensions.weight) {
+                adjustments.push(`Weight: ${originalDimensions.weight}lb → ${parcel.weight}lb`);
+            }
+            
+            console.log('📦 Using custom dimensions with auto-enhancement:');
+            console.log(`  - Original: ${originalDimensions.length}×${originalDimensions.width}×${originalDimensions.height}, ${originalDimensions.weight}lb`);
+            console.log(`  - Enhanced: ${parcel.length}×${parcel.width}×${parcel.height}, ${parcel.weight}lb`);
+            if (_timestamp) {
+                console.log(`  - Cache-busting timestamp: ${_timestamp}`);
+            }
+            
+            if (adjustments.length > 0) {
+                console.log('🔧 Auto-adjustments made:');
+                adjustments.forEach(adj => console.log(`     ${adj}`));
+                console.log('🎯 These adjustments ensure UPS/FedEx compatibility');
+            } else {
+                console.log('✅ No adjustments needed - package already meets carrier requirements');
+            }
+            
+            // Validate the final dimensions
+            const meetsUPS = parcel.length >= 8 && parcel.width >= 6 && parcel.height >= 2 && parcel.weight >= 1;
+            const meetsFedEx = parcel.length >= 8 && parcel.width >= 6 && parcel.height >= 2 && parcel.weight >= 1;
+            
+            console.log('🔍 Final validation check:');
+            console.log(`  - UPS requirements (8×6×2, 1lb): ${meetsUPS ? '✅ PASS' : '❌ FAIL'}`);
+            console.log(`  - FedEx requirements (8×6×2, 1lb): ${meetsFedEx ? '✅ PASS' : '❌ FAIL'}`);
+            
+            if (!meetsUPS || !meetsFedEx) {
+                console.error('❌ CRITICAL: Auto-enhancement failed! Package still doesn\'t meet requirements');
+                console.error('❌ This will likely cause UPS/FedEx to not return rates');
+            }
         } else {
             // Calculate total weight and dimensions from order items
             let totalWeight = 0;
@@ -345,35 +551,110 @@ class EasyPostService {
                 });
             }
 
-            // Minimum package dimensions
-            // UPS typically requires minimum 1 lb (16 oz) for most services
+            // Convert ounces to pounds for EasyPost (estimateItemWeight returns ounces)
+            totalWeight = totalWeight / 16;
+
+            // Stricter minimum package dimensions for better carrier compatibility
             parcel = {
-                length: Math.max(maxLength, 8), // Minimum 8 inches for UPS compatibility
-                width: Math.max(maxWidth, 6),   // Minimum 6 inches for UPS compatibility  
-                height: Math.max(totalHeight, 2), // Minimum 2 inches for UPS compatibility
-                weight: Math.max(totalWeight, 16)  // Minimum 16 oz (1 lb) for UPS services
+                length: Math.max(maxLength, 8),   // Minimum 8 inches for UPS/FedEx compatibility
+                width: Math.max(maxWidth, 6),     // Minimum 6 inches for UPS/FedEx compatibility  
+                height: Math.max(totalHeight, 2), // Minimum 2 inches for UPS/FedEx compatibility
+                weight: Math.max(totalWeight, 1)  // Minimum 1 lb for UPS/FedEx services
             };
+            
+            console.log('📦 Calculated dimensions from order items:');
+            console.log(`  - Calculated: ${maxLength}×${maxWidth}×${totalHeight}, ${totalWeight}lb`);
+            console.log(`  - Enhanced: ${parcel.length}×${parcel.width}×${parcel.height}, ${parcel.weight}lb`);
+        }
+
+        // Additional validation for extreme cases
+        if (parcel.weight > 150) {
+            console.warn('⚠️ Package weight exceeds 150 lbs - some carriers may not accept');
+        }
+        
+        if (parcel.length > 108 || parcel.width > 108 || parcel.height > 108) {
+            console.warn('⚠️ Package dimensions exceed 108 inches - some carriers may not accept');
         }
 
         // Format phone number for better carrier compatibility (remove non-numeric characters)
         const formatPhone = (phone) => {
             if (!phone) return null;
-            // Remove all non-numeric characters
-            return phone.replace(/\D/g, '');
+            // Remove all non-numeric characters and ensure it's 10 digits
+            const cleaned = phone.replace(/\D/g, '');
+            if (cleaned.length === 10) {
+                return cleaned;
+            } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
+                return cleaned.substring(1); // Remove country code
+            }
+            return null; // Invalid phone number
         };
 
+        // Enhanced address formatting for better carrier compatibility
         const toAddress = {
             name: `${order.customerFirstName || order.customer_first_name || ''} ${order.customerLastName || order.customer_last_name || ''}`.trim(),
             company: shippingAddr.company || null,
-            street1: shippingAddr.address1 || shippingAddr.line1,
-            street2: shippingAddr.address2 || shippingAddr.line2 || null,
-            city: shippingAddr.city,
-            state: shippingAddr.province || shippingAddr.state,
-            zip: shippingAddr.zip || shippingAddr.postal_code,
-            country: shippingAddr.country || 'US',
+            street1: (shippingAddr.address1 || shippingAddr.line1 || '').trim(),
+            street2: (shippingAddr.address2 || shippingAddr.line2 || '').trim() || null,
+            city: (shippingAddr.city || '').trim(),
+            state: (shippingAddr.province || shippingAddr.state || '').trim(),
+            zip: (shippingAddr.zip || shippingAddr.postal_code || '').trim(),
+            country: (shippingAddr.country || 'US').trim(),
             phone: formatPhone(shippingAddr.phone || order.customerPhone || order.customer_phone),
-            email: order.customerEmail || order.customer_email
+            email: order.customerEmail || order.customer_email,
+            verify: ['delivery'] // Add address verification for better carrier compatibility
         };
+
+        // Validate required address fields
+        if (!toAddress.name || toAddress.name.length < 2) {
+            console.warn('⚠️ Customer name is too short - may cause carrier issues');
+        }
+        
+        if (!toAddress.street1 || toAddress.street1.length < 5) {
+            console.warn('⚠️ Street address is too short - may cause carrier issues');
+        }
+        
+        if (!toAddress.city || toAddress.city.length < 2) {
+            console.warn('⚠️ City name is too short - may cause carrier issues');
+        }
+        
+        if (!toAddress.state || toAddress.state.length < 2) {
+            console.warn('⚠️ State is missing or too short - may cause carrier issues');
+        }
+        
+        if (!toAddress.zip || toAddress.zip.length < 5) {
+            console.warn('⚠️ ZIP code is missing or too short - may cause carrier issues');
+        }
+
+        // Additional address validations for common issues
+        const commonIssues = [];
+        
+        // Check for PO Box (UPS/FedEx may not deliver to PO Boxes)
+        if (toAddress.street1.toUpperCase().includes('PO BOX') || toAddress.street1.toUpperCase().includes('P.O. BOX')) {
+            commonIssues.push('PO Box detected - UPS/FedEx may not deliver to PO Boxes');
+        }
+        
+        // Check for APO/FPO addresses (military addresses)
+        if (toAddress.state.toUpperCase().includes('APO') || toAddress.state.toUpperCase().includes('FPO')) {
+            commonIssues.push('Military address detected - some carriers may have restrictions');
+        }
+        
+        // Check for common state abbreviation issues
+        if (toAddress.state.length > 2 && toAddress.country === 'US') {
+            commonIssues.push('State should be 2-letter abbreviation for US addresses');
+        }
+        
+        // Check ZIP code format for US addresses
+        if (toAddress.country === 'US' && toAddress.zip) {
+            const zipRegex = /^\d{5}(-\d{4})?$/;
+            if (!zipRegex.test(toAddress.zip)) {
+                commonIssues.push('Invalid ZIP code format - should be 12345 or 12345-1234');
+            }
+        }
+        
+        if (commonIssues.length > 0) {
+            console.warn('⚠️ Address validation issues detected:');
+            commonIssues.forEach(issue => console.warn(`  - ${issue}`));
+        }
 
         // Handle fromAddress as either an object or EasyPost address ID
         const fromAddressData = typeof fromAddress === 'string' 
@@ -381,10 +662,10 @@ class EasyPostService {
             : fromAddress; // Use address object
 
         // Log the formatted data for debugging
-        console.log('📦 Formatted shipment data:');
-        console.log('To Address:', JSON.stringify(toAddress, null, 2));
-        console.log('Parcel:', JSON.stringify(parcel, null, 2));
-        console.log('From Address:', JSON.stringify(fromAddressData, null, 2));
+        console.log('📦 Final formatted shipment data:');
+        console.log('📍 To Address:', JSON.stringify(toAddress, null, 2));
+        console.log('📦 Parcel:', JSON.stringify(parcel, null, 2));
+        console.log('📍 From Address:', JSON.stringify(fromAddressData, null, 2));
 
         return {
             to_address: toAddress,
@@ -459,6 +740,124 @@ class EasyPostService {
         // Get the actual API key being used and check if it's a test key
         const apiKey = process.env.EASYPOST_TEST_API_KEY || process.env.EASYPOST_PROD_API_KEY || process.env.EASYPOST_API_KEY;
         return this.detectKeyType(apiKey) === 'test';
+    }
+
+    /**
+     * Test EasyPost API connectivity and account status
+     * @returns {Promise<Object>} - Diagnostic information
+     */
+    async testApiHealth() {
+        if (!this.isReady()) {
+            return {
+                status: 'error',
+                message: 'EasyPost client is not configured',
+                ready: false
+            };
+        }
+
+        try {
+            console.log('🔍 Testing EasyPost API health...');
+            
+            // Test with a simple address verification
+            const testAddress = {
+                street1: '2981 S Harrison St',
+                city: 'Denver',
+                state: 'CO',
+                zip: '80210',
+                country: 'US'
+            };
+
+            this.trackApiCall('healthCheck_address');
+            const address = await this.client.Address.create(testAddress);
+            
+            // Test with a minimal shipment creation
+            const testShipment = {
+                to_address: testAddress,
+                from_address: testAddress,
+                parcel: {
+                    length: 10,
+                    width: 8, 
+                    height: 6,
+                    weight: 2
+                }
+            };
+
+            this.trackApiCall('healthCheck_shipment');
+            const shipment = await this.client.Shipment.create(testShipment);
+            
+            const diagnostics = {
+                status: 'success',
+                ready: true,
+                testMode: this.isTestMode(),
+                apiKeyType: this.detectKeyType(process.env.EASYPOST_API_KEY),
+                addressVerification: {
+                    success: !!address.id,
+                    addressId: address.id
+                },
+                shipmentCreation: {
+                    success: !!shipment.id,
+                    shipmentId: shipment.id,
+                    ratesCount: shipment.rates?.length || 0,
+                    carriers: shipment.rates ? shipment.rates.map(r => r.carrier).join(', ') : 'none'
+                },
+                timestamp: new Date().toISOString()
+            };
+
+            console.log('✅ EasyPost API health test passed:', diagnostics);
+            return diagnostics;
+
+        } catch (error) {
+            console.error('❌ EasyPost API health test failed:', error);
+            
+            const diagnostics = {
+                status: 'error',
+                ready: this.isReady(),
+                testMode: this.isTestMode(),
+                apiKeyType: this.detectKeyType(process.env.EASYPOST_API_KEY),
+                error: error.message,
+                errorCode: error.code,
+                timestamp: new Date().toISOString()
+            };
+
+            return diagnostics;
+        }
+    }
+
+    /**
+     * Track API call for rate limiting detection
+     * @param {string} operation - The type of API operation
+     */
+    trackApiCall(operation) {
+        const now = Date.now();
+        this.recentCalls.push({ operation, timestamp: now });
+        
+        // Keep only last 100 calls or calls from last 5 minutes
+        const fiveMinutesAgo = now - (5 * 60 * 1000);
+        this.recentCalls = this.recentCalls
+            .filter(call => call.timestamp > fiveMinutesAgo)
+            .slice(-100);
+    }
+
+    /**
+     * Get rate limiting statistics
+     * @returns {Object} - Rate limiting info
+     */
+    getRateLimitingStats() {
+        const now = Date.now();
+        const oneMinuteAgo = now - (60 * 1000);
+        const fiveMinutesAgo = now - (5 * 60 * 1000);
+
+        const lastMinuteCalls = this.recentCalls.filter(call => call.timestamp > oneMinuteAgo);
+        const lastFiveMinutesCalls = this.recentCalls.filter(call => call.timestamp > fiveMinutesAgo);
+
+        return {
+            totalRecentCalls: this.recentCalls.length,
+            callsLastMinute: lastMinuteCalls.length,
+            callsLast5Minutes: lastFiveMinutesCalls.length,
+            averageCallsPerMinute: lastFiveMinutesCalls.length / 5,
+            lastCallTimestamp: this.recentCalls.length > 0 ? this.recentCalls[this.recentCalls.length - 1].timestamp : null,
+            possibleRateLimit: lastMinuteCalls.length > 30 || lastFiveMinutesCalls.length > 100 // Conservative estimates
+        };
     }
 }
 

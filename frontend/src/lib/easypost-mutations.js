@@ -1,8 +1,8 @@
 import { gql } from '@apollo/client';
 
 export const CREATE_EASYPOST_SHIPMENT = gql`
-  mutation CreateEasyPostShipment($orderId: ID!) {
-    createEasyPostShipment(orderId: $orderId) {
+  mutation CreateEasyPostShipment($orderId: ID!, $packageDimensions: PackageDimensionsInput!) {
+    createEasyPostShipment(orderId: $orderId, packageDimensions: $packageDimensions) {
       success
       error
       shipment {

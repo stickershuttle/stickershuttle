@@ -156,7 +156,7 @@ export default function AlertsManagement() {
     }
 
     checkAdmin();
-  }, [router]);
+  }, []); // Remove router dependency to prevent loops
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

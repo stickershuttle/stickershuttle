@@ -70,7 +70,7 @@ export default function AdminKlaviyo() {
     }
 
     checkAdmin();
-  }, [router]);
+  }, []); // Remove router dependency to prevent loops
 
   // Get profiles from Klaviyo
   const profiles = klaviyoData?.getAllKlaviyoProfiles?.profiles || [];

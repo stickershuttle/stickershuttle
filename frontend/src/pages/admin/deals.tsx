@@ -99,7 +99,7 @@ export default function AdminDeals() {
     }
 
     checkAdmin();
-  }, [router]);
+  }, []); // Remove router dependency to prevent loops
 
   // Load deals from localStorage (in production, this would be from database)
   const loadDeals = () => {

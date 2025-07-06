@@ -399,6 +399,33 @@ export default function SignUp() {
         console.error('⚠️ Klaviyo sync failed (non-critical):', klaviyoError);
         // Don't block signup if Klaviyo fails
       }
+
+      // Add customer to Resend General audience
+      try {
+        console.log('🔄 Adding customer to Resend audience...');
+        const response = await fetch('/api/add-to-resend-audience', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: userEmail,
+            firstName: userFirstName,
+            lastName: userLastName
+          }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log('✅ Customer added to Resend audience successfully!', result);
+        } else {
+          const errorData = await response.json();
+          console.error('⚠️ Resend audience sync failed (non-critical):', errorData);
+        }
+      } catch (resendError) {
+        console.error('⚠️ Resend audience sync failed (non-critical):', resendError);
+        // Don't block signup if Resend fails
+      }
       
       // Redirect to dashboard after successful verification
       router.push('/account/dashboard');

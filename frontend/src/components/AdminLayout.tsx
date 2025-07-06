@@ -350,7 +350,7 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
                   
                   {/* Orders Submenu - Always visible when on orders pages */}
                   {(router.asPath.startsWith('/admin/orders') || router.asPath.startsWith('/admin/abandoned-checkouts')) && (
-                    <div className="ml-8 mt-1">
+                    <div className="ml-8 mt-3">
                       <a
                         href="/admin/orders"
                         className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${

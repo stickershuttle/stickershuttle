@@ -1508,5 +1508,254 @@ module.exports = {
   sendUserFileUpload,
   sendWholesaleApprovalEmail,
   sendCustomerArtworkUploadNotification,
-  scheduleFirstOrderThankYou
+  scheduleFirstOrderThankYou,
+  addContactToResendAudience,
+  updateContactInResendAudience,
+  bulkSyncUsersToResendAudience
+};
+
+// Add contact to Resend audience
+const addContactToResendAudience = async (email, firstName = '', lastName = '', audienceId = null) => {
+  if (!RESEND_API_KEY) {
+    console.error('❌ RESEND_API_KEY not configured');
+    return { success: false, error: 'Resend API key not configured' };
+  }
+
+  try {
+    // Use default "General" audience if no specific audience ID provided
+    // You can get your audience ID from the Resend dashboard
+    const targetAudienceId = audienceId || process.env.RESEND_GENERAL_AUDIENCE_ID;
+    
+    if (!targetAudienceId) {
+      console.error('❌ No Resend audience ID configured');
+      return { success: false, error: 'Resend audience ID not configured' };
+    }
+
+    console.log('📧 Adding contact to Resend audience:', {
+      email,
+      firstName,
+      lastName,
+      audienceId: targetAudienceId
+    });
+
+    // Create/add contact to Resend audience
+    const response = await fetch('https://api.resend.com/contacts', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: email,
+        first_name: firstName || '',
+        last_name: lastName || '',
+        audience_id: targetAudienceId,
+        unsubscribed: false
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('❌ Resend API error:', errorData);
+      
+      // If contact already exists, try to update instead
+      if (response.status === 409 || (errorData.message && errorData.message.includes('already exists'))) {
+        console.log('📧 Contact already exists, attempting to update...');
+        return await updateContactInResendAudience(email, firstName, lastName, targetAudienceId);
+      }
+      
+      throw new Error(`Resend API error: ${errorData.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('✅ Contact added to Resend audience successfully:', result.id);
+    return { success: true, contactId: result.id };
+    
+  } catch (error) {
+    console.error('❌ Error adding contact to Resend audience:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Update existing contact in Resend audience
+const updateContactInResendAudience = async (email, firstName = '', lastName = '', audienceId) => {
+  try {
+    console.log('📧 Updating existing contact in Resend audience...');
+    
+    // First, get the contact by email to get their ID
+    const searchResponse = await fetch(`https://api.resend.com/contacts?email=${encodeURIComponent(email)}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!searchResponse.ok) {
+      throw new Error(`Failed to find contact: ${searchResponse.statusText}`);
+    }
+
+    const searchResult = await searchResponse.json();
+    if (!searchResult.data || searchResult.data.length === 0) {
+      throw new Error('Contact not found for update');
+    }
+
+    const contactId = searchResult.data[0].id;
+
+    // Update the contact
+    const updateResponse = await fetch(`https://api.resend.com/contacts/${contactId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        first_name: firstName || '',
+        last_name: lastName || '',
+        audience_id: audienceId,
+        unsubscribed: false
+      }),
+    });
+
+    if (!updateResponse.ok) {
+      const errorData = await updateResponse.json();
+      throw new Error(`Resend update error: ${errorData.message || updateResponse.statusText}`);
+    }
+
+    const result = await updateResponse.json();
+    console.log('✅ Contact updated in Resend audience successfully:', contactId);
+    return { success: true, contactId: contactId };
+    
+  } catch (error) {
+    console.error('❌ Error updating contact in Resend audience:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Bulk sync all existing users to Resend audience
+const bulkSyncUsersToResendAudience = async (audienceId = null) => {
+  if (!RESEND_API_KEY) {
+    console.error('❌ RESEND_API_KEY not configured');
+    return { success: false, error: 'Resend API key not configured' };
+  }
+
+  try {
+    // Use default "General" audience if no specific audience ID provided
+    const targetAudienceId = audienceId || process.env.RESEND_GENERAL_AUDIENCE_ID;
+    
+    if (!targetAudienceId) {
+      console.error('❌ No Resend audience ID configured');
+      return { success: false, error: 'Resend audience ID not configured' };
+    }
+
+    console.log('🔄 Starting bulk sync of all users to Resend audience...');
+
+    // Get database client
+    const { getSupabaseServiceClient } = require('./supabase-client');
+    const client = getSupabaseServiceClient();
+
+    // Get all users from auth.users
+    const { data: authUsers, error: authError } = await client.auth.admin.listUsers();
+    
+    if (authError) {
+      console.error('❌ Error fetching auth users:', authError);
+      return { success: false, error: 'Failed to fetch users from auth' };
+    }
+
+    // Get all user profiles to get names
+    const { data: userProfiles, error: profileError } = await client
+      .from('user_profiles')
+      .select('user_id, first_name, last_name');
+
+    if (profileError) {
+      console.error('❌ Error fetching user profiles:', profileError);
+      // Continue without names if profiles fail
+    }
+
+    // Create a map of user profiles for quick lookup
+    const profileMap = {};
+    if (userProfiles) {
+      userProfiles.forEach(profile => {
+        profileMap[profile.user_id] = {
+          firstName: profile.first_name || '',
+          lastName: profile.last_name || ''
+        };
+      });
+    }
+
+    console.log(`📊 Found ${authUsers.users.length} users to sync`);
+
+    let successCount = 0;
+    let errorCount = 0;
+    const errors = [];
+
+    // Process users in batches to avoid rate limiting
+    const batchSize = 10;
+    const delay = 1000; // 1 second delay between batches
+
+    for (let i = 0; i < authUsers.users.length; i += batchSize) {
+      const batch = authUsers.users.slice(i, i + batchSize);
+      
+      console.log(`📦 Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(authUsers.users.length / batchSize)} (${batch.length} users)`);
+
+      // Process batch in parallel
+      const batchPromises = batch.map(async (user) => {
+        try {
+          const profile = profileMap[user.id] || { firstName: '', lastName: '' };
+          
+          // Extract first name from email if not in profile
+          const firstName = profile.firstName || 
+                          user.user_metadata?.first_name || 
+                          user.email.split('@')[0];
+          
+          const lastName = profile.lastName || 
+                          user.user_metadata?.last_name || 
+                          '';
+
+          const result = await addContactToResendAudience(
+            user.email, 
+            firstName, 
+            lastName, 
+            targetAudienceId
+          );
+
+          if (result.success) {
+            successCount++;
+            console.log(`✅ Synced: ${user.email}`);
+          } else {
+            errorCount++;
+            console.warn(`⚠️ Failed to sync ${user.email}: ${result.error}`);
+            errors.push({ email: user.email, error: result.error });
+          }
+        } catch (error) {
+          errorCount++;
+          console.error(`❌ Error syncing ${user.email}:`, error.message);
+          errors.push({ email: user.email, error: error.message });
+        }
+      });
+
+      // Wait for batch to complete
+      await Promise.all(batchPromises);
+
+      // Add delay between batches (except for the last batch)
+      if (i + batchSize < authUsers.users.length) {
+        console.log(`⏳ Waiting ${delay}ms before next batch...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    console.log(`🎉 Bulk sync complete! Success: ${successCount}, Errors: ${errorCount}`);
+
+    return {
+      success: true,
+      totalUsers: authUsers.users.length,
+      successCount,
+      errorCount,
+      errors: errors.slice(0, 10) // Return first 10 errors to avoid huge responses
+    };
+
+  } catch (error) {
+    console.error('❌ Error in bulk sync to Resend audience:', error);
+    return { success: false, error: error.message };
+  }
 }; 

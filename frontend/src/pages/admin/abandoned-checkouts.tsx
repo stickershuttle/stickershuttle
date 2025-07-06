@@ -154,7 +154,7 @@ export default function AbandonedCheckouts() {
     }
 
     checkAdmin();
-  }, [router]);
+  }, []); // Remove router dependency to prevent loops
 
   // Filter for abandoned checkouts (unpaid orders)
   const abandonedCheckouts = React.useMemo(() => {

@@ -152,7 +152,7 @@ export default function DiscountManagement() {
     };
     
     checkAuth();
-  }, [router]);
+  }, []); // Remove router dependency to prevent loops
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

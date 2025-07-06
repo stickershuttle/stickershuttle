@@ -94,7 +94,7 @@ export default function AdminCustomers() {
     }
 
     checkAdmin();
-  }, [router]);
+  }, []); // Remove router dependency to prevent loops
 
   // Filter and sort customers
   const filteredCustomers = React.useMemo(() => {

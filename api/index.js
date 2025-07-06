@@ -511,7 +511,105 @@ app.get('/klaviyo/status', (req, res) => {
   res.json(diagnostics);
 });
 
+// Add Resend audience API endpoint
+app.post('/api/add-to-resend-audience', express.json(), async (req, res) => {
+  try {
+    const { email, firstName, lastName, audienceId } = req.body;
 
+    // Validate required fields
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    console.log('📧 Adding contact to Resend audience:', { email, firstName, lastName, audienceId });
+
+    // Import the email notifications module
+    const emailNotifications = require('./email-notifications');
+
+    // Add contact to Resend audience
+    const result = await emailNotifications.addContactToResendAudience(
+      email,
+      firstName || '',
+      lastName || '',
+      audienceId || null
+    );
+
+    if (result.success) {
+      console.log('✅ Contact added to Resend audience successfully:', result);
+      return res.status(200).json({
+        success: true,
+        message: 'Contact added to Resend audience successfully',
+        data: result
+      });
+    } else {
+      console.error('❌ Failed to add contact to Resend audience:', result);
+      return res.status(400).json({
+        success: false,
+        message: result.message || 'Failed to add contact to Resend audience',
+        error: result.error
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error in add-to-resend-audience endpoint:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Add bulk sync all users to Resend audience endpoint (admin only)
+app.post('/api/bulk-sync-users-to-resend', express.json(), async (req, res) => {
+  try {
+    // This is an admin-only endpoint - in a real app you'd want proper auth
+    const { adminKey, audienceId } = req.body;
+    
+    // Simple admin key check - replace with proper auth in production
+    if (adminKey !== process.env.ADMIN_SECRET_KEY) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    console.log('🔄 Starting bulk sync of all users to Resend audience...');
+
+    // Import the email notifications module
+    const emailNotifications = require('./email-notifications');
+
+    // Bulk sync all users to Resend audience
+    const result = await emailNotifications.bulkSyncUsersToResendAudience(audienceId || null);
+
+    if (result.success) {
+      console.log('✅ Bulk sync completed successfully:', result);
+      return res.status(200).json({
+        success: true,
+        message: 'Bulk sync completed successfully',
+        data: result
+      });
+    } else {
+      console.error('❌ Bulk sync failed:', result);
+      return res.status(400).json({
+        success: false,
+        message: result.message || 'Bulk sync failed',
+        error: result.error
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error in bulk-sync-users-to-resend endpoint:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
 
 // Add Sentry error handler middleware (temporarily commented out)
 // app.use(Sentry.Handlers.errorHandler());
@@ -724,6 +822,9 @@ const typeDefs = gql`
     
     # Mutation to update order item files
     updateOrderItemFiles(orderId: ID!, itemId: ID!, customFiles: [String!]!): CustomerOrder
+    
+    # User management mutations
+    deleteUsers(userIds: [String!]!): DeleteUsersResult!
   }
 
   type Customer {
@@ -984,6 +1085,17 @@ const typeDefs = gql`
   type DeleteResult {
     success: Boolean!
     message: String
+  }
+
+  type DeleteUsersResult {
+    success: Boolean!
+    deletedCount: Int!
+    errors: [UserDeletionError!]!
+  }
+
+  type UserDeletionError {
+    userId: String!
+    error: String!
   }
 
   # Review Types
@@ -8963,6 +9075,91 @@ const resolvers = {
       } catch (error) {
         console.error('Error in updateOrderItemFiles:', error);
         throw error;
+      }
+    },
+
+    // Delete users mutation (admin only)
+    deleteUsers: async (_, { userIds }, context) => {
+      try {
+        console.log('🗑️ Deleting users:', userIds);
+        
+        const { user } = context;
+        if (!user) {
+          throw new AuthenticationError('Authentication required');
+        }
+
+        // Admin authentication required
+        requireAdminAuth(user);
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('User service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        const errors = [];
+        let deletedCount = 0;
+
+        // Process each user deletion
+        for (const userId of userIds) {
+          try {
+            // Get user info first for logging
+            const { data: authUser, error: getUserError } = await client.auth.admin.getUserById(userId);
+            
+            if (getUserError) {
+              console.error(`❌ Error getting user ${userId}:`, getUserError);
+              errors.push({ userId, error: getUserError.message });
+              continue;
+            }
+
+            console.log(`🗑️ Deleting user: ${authUser.user.email} (${userId})`);
+
+            // Delete user profile first (if exists)
+            const { error: profileError } = await client
+              .from('user_profiles')
+              .delete()
+              .eq('user_id', userId);
+
+            if (profileError) {
+              console.warn(`⚠️ Warning: Could not delete profile for user ${userId}:`, profileError);
+            }
+
+            // Delete user credit records
+            const { error: creditError } = await client
+              .from('user_credits')
+              .delete()
+              .eq('user_id', userId);
+
+            if (creditError) {
+              console.warn(`⚠️ Warning: Could not delete credits for user ${userId}:`, creditError);
+            }
+
+            // Delete user from auth (this will cascade to other related data)
+            const { error: deleteError } = await client.auth.admin.deleteUser(userId);
+
+            if (deleteError) {
+              console.error(`❌ Error deleting user ${userId}:`, deleteError);
+              errors.push({ userId, error: deleteError.message });
+            } else {
+              console.log(`✅ Successfully deleted user: ${authUser.user.email} (${userId})`);
+              deletedCount++;
+            }
+          } catch (error) {
+            console.error(`❌ Unexpected error deleting user ${userId}:`, error);
+            errors.push({ userId, error: error.message });
+          }
+        }
+
+        const success = deletedCount > 0;
+        console.log(`🗑️ Deletion complete: ${deletedCount} users deleted, ${errors.length} errors`);
+
+        return {
+          success,
+          deletedCount,
+          errors
+        };
+      } catch (error) {
+        console.error('❌ Error in deleteUsers:', error);
+        throw new Error(error.message);
       }
     }
   }

@@ -8,19 +8,26 @@ import { CREATE_EASYPOST_SHIPMENT, BUY_EASYPOST_LABEL } from '../../../lib/easyp
 
 const ADMIN_EMAILS = ['justin@stickershuttle.com']; // Add all admin emails here
 
-// Preset package dimensions (from your image)
+// Preset package dimensions (comprehensive list with old and new dimensions)
 const PACKAGE_PRESETS = [
-  { id: '10x6x4', name: '10 × 6 × 4', dimensions: '10 × 6 × 4 in, 5 lb', length: 10, width: 6, height: 4, weight: 5, suggested: true },
-  { id: '4x4x4', name: '4 × 4 × 4', dimensions: '4 × 4 × 4 in, 1 lb', length: 4, width: 4, height: 4, weight: 1 },
-  { id: '12x12x4', name: '12 × 12 × 4', dimensions: '12 × 12 × 4 in, 0.25 lb', length: 12, width: 12, height: 4, weight: 0.25 },
-  { id: '14x12x8', name: '14 × 12 × 8', dimensions: '14 × 12 × 8 in, 15 lb', length: 14, width: 12, height: 8, weight: 15 },
-  { id: '4x4x36', name: '4 × 4 × 36', dimensions: '4 × 4 × 36 in, 5 lb', length: 4, width: 4, height: 36, weight: 5 },
-  { id: '5x5x5', name: '5 × 5 × 5', dimensions: '5 × 5 × 5 in, 3 lb', length: 5, width: 5, height: 5, weight: 3 },
-  { id: '6x4x4', name: '6 × 4 × 4', dimensions: '6 × 4 × 4 in, 3 lb', length: 6, width: 4, height: 4, weight: 3 },
-  { id: '6x6x6', name: '6 × 6 × 6', dimensions: '6 × 6 × 6 in, 4 lb', length: 6, width: 6, height: 6, weight: 4 },
-  { id: 'bubble-mailer', name: '7.5" × 10.5" (Bubble Mailer)', dimensions: '9.5 × 6.5 in, 0.5 lb', length: 9.5, width: 6.5, height: 1, weight: 0.5, default: true },
-  { id: '8x6x4', name: '8 × 6 × 4', dimensions: '8 × 6 × 4 in, 5 lb', length: 8, width: 6, height: 4, weight: 5 },
-  { id: '9x9x4', name: '9 × 9 × 4', dimensions: '9 × 9 × 4 in, 10 lb', length: 9, width: 9, height: 4, weight: 10 }
+  // Most Popular Section
+  { id: 'bubble-mailer', name: 'Bubble Mailer', dimensions: '10.5 × 7.5 × 1 in, 1 lb', length: 10.5, width: 7.5, height: 1, weight: 1, mostPopular: true },
+  { id: '4x4x4', name: '4 × 4 × 4', dimensions: '4 × 4 × 4 in, 1 lb', length: 4, width: 4, height: 4, weight: 1, mostPopular: true },
+  { id: '6x4x4', name: '6 × 4 × 4', dimensions: '6 × 4 × 4 in, 1 lb', length: 6, width: 4, height: 4, weight: 1, mostPopular: true },
+  
+  // Standard Packages
+  { id: 'envelope', name: 'Envelope', dimensions: '9.5 × 6.5 × 1 in, 1 lb', length: 9.5, width: 6.5, height: 1, weight: 1 },
+  { id: '4x4x36', name: '4 × 4 × 36', dimensions: '4 × 4 × 36 in, 3 lb', length: 4, width: 4, height: 36, weight: 3 },
+  { id: '6x6x6', name: '6 × 6 × 6', dimensions: '6 × 6 × 6 in, 2 lb', length: 6, width: 6, height: 6, weight: 2 },
+  { id: '8x6x4', name: '8 × 6 × 4', dimensions: '8 × 6 × 4 in, 2 lb', length: 8, width: 6, height: 4, weight: 2 },
+  { id: '8x8x8', name: '8 × 8 × 8', dimensions: '8 × 8 × 8 in, 3 lb', length: 8, width: 8, height: 8, weight: 3 },
+  { id: '10x8x6', name: '10 × 8 × 6', dimensions: '10 × 8 × 6 in, 3 lb', length: 10, width: 8, height: 6, weight: 3 },
+  { id: '10x10x10', name: '10 × 10 × 10', dimensions: '10 × 10 × 10 in, 5 lb', length: 10, width: 10, height: 10, weight: 5 },
+  { id: '12x9x6', name: '12 × 9 × 6', dimensions: '12 × 9 × 6 in, 3 lb', length: 12, width: 9, height: 6, weight: 3 },
+  { id: '14x11x8', name: '14 × 11 × 8', dimensions: '14 × 11 × 8 in, 8 lb', length: 14, width: 11, height: 8, weight: 8 },
+  { id: '16x12x8', name: '16 × 12 × 8', dimensions: '16 × 12 × 8 in, 10 lb', length: 16, width: 12, height: 8, weight: 10 },
+  { id: '18x12x6', name: '18 × 12 × 6', dimensions: '18 × 12 × 6 in, 4 lb', length: 18, width: 12, height: 6, weight: 4 },
+  { id: '20x14x10', name: '20 × 14 × 10', dimensions: '20 × 14 × 10 in, 15 lb', length: 20, width: 14, height: 10, weight: 15 }
 ];
 
 // Carrier logo components
@@ -100,7 +107,7 @@ export default function ShippingLabels() {
   
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [selectedPackage, setSelectedPackage] = useState(PACKAGE_PRESETS.find(p => p.default) || PACKAGE_PRESETS[0]);
+  const [selectedPackage, setSelectedPackage] = useState(PACKAGE_PRESETS.find(p => p.mostPopular) || PACKAGE_PRESETS[0]);
   const [customWeight, setCustomWeight] = useState('');
   const [shippingStep, setShippingStep] = useState<'package' | 'loading' | 'rates' | 'purchasing' | 'complete' | 'error'>('package');
   const [shipmentData, setShipmentData] = useState<any>(null);
@@ -109,7 +116,6 @@ export default function ShippingLabels() {
   const [shippingError, setShippingError] = useState<string>('');
   const [labelData, setLabelData] = useState<any>(null);
   const [packageSearch, setPackageSearch] = useState('');
-  const [showPackageDropdown, setShowPackageDropdown] = useState(false);
   const [selectedCarrier, setSelectedCarrier] = useState('UPS');
   const [showAllRatesForCarrier, setShowAllRatesForCarrier] = useState(false);
   const [isCarrierDropdownOpen, setIsCarrierDropdownOpen] = useState(false);
@@ -177,26 +183,132 @@ export default function ShippingLabels() {
       setShippingStep('loading');
       setShippingError('');
 
-      const { data } = await createShipment({
-        variables: { 
-          orderId: order.id,
-          packageDimensions: {
-            length: selectedPackage.length,
-            width: selectedPackage.width,
-            height: selectedPackage.height,
-            weight: customWeight ? parseFloat(customWeight) : selectedPackage.weight
+      // Validate package dimensions
+      const weight = customWeight ? parseFloat(customWeight) : selectedPackage.weight;
+      if (isNaN(weight) || weight <= 0) {
+        setShippingError('Please enter a valid weight greater than 0');
+        setShippingStep('error');
+        return;
+      }
+
+      const packageDimensions = {
+        length: selectedPackage.length,
+        width: selectedPackage.width,
+        height: selectedPackage.height,
+        weight: weight
+      };
+
+      // Enhanced debugging for tracking the issue
+      console.log('🔍 FRONTEND DEBUG - Package Selection Details:');
+      console.log('  - Selected Package ID:', selectedPackage.id);
+      console.log('  - Selected Package Name:', selectedPackage.name);
+      console.log('  - Original Dimensions:', selectedPackage);
+      console.log('  - Custom Weight:', customWeight);
+      console.log('  - Final Package Dimensions:', packageDimensions);
+      console.log('  - Data Types Check:', {
+        length: typeof packageDimensions.length,
+        width: typeof packageDimensions.width,
+        height: typeof packageDimensions.height,
+        weight: typeof packageDimensions.weight,
+        lengthValue: packageDimensions.length,
+        widthValue: packageDimensions.width,
+        heightValue: packageDimensions.height,
+        weightValue: packageDimensions.weight
+      });
+      
+      // Check if this package needs auto-adjustment
+      const needsAdjustment = packageDimensions.length < 8 || packageDimensions.width < 6 || packageDimensions.height < 2 || packageDimensions.weight < 1;
+      console.log('  - Package needs auto-adjustment:', needsAdjustment);
+      if (needsAdjustment) {
+        console.log('  - Auto-adjustments expected:');
+        if (packageDimensions.length < 8) console.log(`    - Length: ${packageDimensions.length}" → 8"`);
+        if (packageDimensions.width < 6) console.log(`    - Width: ${packageDimensions.width}" → 6"`);
+        if (packageDimensions.height < 2) console.log(`    - Height: ${packageDimensions.height}" → 2"`);
+        if (packageDimensions.weight < 1) console.log(`    - Weight: ${packageDimensions.weight}lb → 1lb`);
+      }
+      
+      console.log('  - Order ID:', order.id);
+      console.log('  - Order Details:', {
+        customerName: `${order.customerFirstName} ${order.customerLastName}`,
+        shippingAddress: order.shippingAddress
+      });
+
+      // Add frontend retry logic for intermittent API issues
+      let data = null;
+      let lastError = null;
+      const maxAttempts = 2;
+      
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          console.log(`🔄 Frontend attempt ${attempt}/${maxAttempts} for createShipment`);
+          
+          const result = await createShipment({
+            variables: { 
+              orderId: order.id,
+              packageDimensions: {
+                ...packageDimensions,
+                // Add cache-busting timestamp
+                _timestamp: Date.now()
+              }
+            },
+            // Disable Apollo cache for this request to prevent stale responses
+            fetchPolicy: 'no-cache'
+          });
+          
+          data = result.data;
+          
+          // Check if we got a good response with carriers
+          if (data?.createEasyPostShipment?.success && data?.createEasyPostShipment?.shipment?.rates?.length > 0) {
+            console.log(`✅ Frontend success on attempt ${attempt}`);
+            break;
+          } else if (attempt < maxAttempts) {
+            console.log(`⚠️ Frontend attempt ${attempt} failed or no rates, retrying...`);
+            lastError = new Error('No rates or failed response');
+            await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+            continue;
+          }
+        } catch (err) {
+          console.error(`❌ Frontend attempt ${attempt} error:`, err);
+          lastError = err;
+          if (attempt < maxAttempts) {
+            console.log(`🔄 Retrying frontend in 2 seconds...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
           }
         }
-      });
+      }
+
+      // Handle case where all attempts failed
+      if (!data || !data.createEasyPostShipment) {
+        throw lastError || new Error('All frontend retry attempts failed');
+      }
+
+      console.log('🔍 FRONTEND DEBUG - GraphQL Response:');
+      console.log('  - Success:', data?.createEasyPostShipment?.success);
+      console.log('  - Error:', data?.createEasyPostShipment?.error);
+      console.log('  - Rates Count:', data?.createEasyPostShipment?.shipment?.rates?.length || 0);
+      
+      if (data?.createEasyPostShipment?.shipment?.rates) {
+        const carrierCounts: { [key: string]: number } = {};
+        data.createEasyPostShipment.shipment.rates.forEach((rate: any) => {
+          const carrier = rate.carrier.toUpperCase();
+          carrierCounts[carrier] = (carrierCounts[carrier] || 0) + 1;
+        });
+        console.log('  - Carriers Returned:', carrierCounts);
+      }
 
       if (data.createEasyPostShipment.success) {
         setShipmentData(data.createEasyPostShipment.shipment);
+        // Auto-select the first rate if available
+        if (data.createEasyPostShipment.shipment.rates && data.createEasyPostShipment.shipment.rates.length > 0) {
+          setSelectedRate(data.createEasyPostShipment.shipment.rates[0]);
+        }
         setShippingStep('rates');
       } else {
-        setShippingError(data.createEasyPostShipment.error || 'Failed to create shipment');
+        setShippingError(data.createEasyPostShipment.error || 'Failed to create shipment after retries');
         setShippingStep('error');
       }
     } catch (err: any) {
+      console.error('🔍 FRONTEND DEBUG - Error:', err);
       console.error('Error creating shipment:', err);
       setShippingError(err.message || 'Failed to create shipment');
       setShippingStep('error');
@@ -255,10 +367,7 @@ export default function ShippingLabels() {
     return 'Standard delivery';
   };
 
-  const filteredPackages = PACKAGE_PRESETS.filter(pkg =>
-    pkg.name.toLowerCase().includes(packageSearch.toLowerCase()) ||
-    pkg.dimensions.toLowerCase().includes(packageSearch.toLowerCase())
-  );
+
 
   // Get rates organized by carrier with "load more" functionality
   const getOrganizedRates = () => {
@@ -447,31 +556,7 @@ export default function ShippingLabels() {
           border-radius: 16px;
         }
         
-        .dropdown-container {
-          background: rgba(3, 1, 64, 0.95);
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          backdrop-filter: blur(20px);
-          border-radius: 12px;
-          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
-        
-        .dropdown-container::-webkit-scrollbar {
-          width: 8px;
-        }
-        
-        .dropdown-container::-webkit-scrollbar-track {
-          background: rgba(255, 255, 255, 0.1);
-          border-radius: 4px;
-        }
-        
-        .dropdown-container::-webkit-scrollbar-thumb {
-          background: rgba(168, 85, 247, 0.6);
-          border-radius: 4px;
-        }
-        
-        .dropdown-container::-webkit-scrollbar-thumb:hover {
-          background: rgba(168, 85, 247, 0.8);
-        }
+
         
         .table-row-hover {
           transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -515,12 +600,25 @@ export default function ShippingLabels() {
           animation: glow-yellow 2s ease-in-out infinite alternate;
         }
 
+        .animate-glow-purple {
+          animation: glow-purple 2s ease-in-out infinite alternate;
+        }
+
         @keyframes glow-yellow {
           from {
             box-shadow: 0 0 5px rgba(234, 179, 8, 0.4), 0 0 10px rgba(234, 179, 8, 0.3), 0 0 15px rgba(234, 179, 8, 0.2);
           }
           to {
             box-shadow: 0 0 10px rgba(234, 179, 8, 0.6), 0 0 20px rgba(234, 179, 8, 0.4), 0 0 30px rgba(234, 179, 8, 0.3);
+          }
+        }
+
+        @keyframes glow-purple {
+          from {
+            box-shadow: 0 0 5px rgba(147, 51, 234, 0.4), 0 0 10px rgba(147, 51, 234, 0.3), 0 0 15px rgba(147, 51, 234, 0.2);
+          }
+          to {
+            box-shadow: 0 0 10px rgba(147, 51, 234, 0.6), 0 0 20px rgba(147, 51, 234, 0.4), 0 0 30px rgba(147, 51, 234, 0.3);
           }
         }
       `}</style>
@@ -555,95 +653,82 @@ export default function ShippingLabels() {
               <div className="lg:col-span-2">
                 {shippingStep === 'package' && (
                   <div className="glass-container p-6">
-                    <h2 className="text-xl font-semibold text-white mb-6">Package and weight</h2>
-                    
-                    {/* Package Dropdown */}
+                    {/* Package Dimensions */}
                     <div className="mb-6">
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Package dimensions
-                      </label>
-                      <div className="relative">
-                        <button
-                          onClick={() => setShowPackageDropdown(!showPackageDropdown)}
-                          className="w-full px-4 py-3 bg-transparent border border-white/20 rounded-xl text-white text-left focus:outline-none focus:border-purple-400 transition-all flex items-center justify-between"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-purple-600 rounded flex items-center justify-center">
-                              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                              </svg>
-                            </div>
-                            <div>
-                              <p className="text-white font-medium">{selectedPackage.name}</p>
-                              <p className="text-sm text-gray-400">{selectedPackage.dimensions}</p>
-                            </div>
-                          </div>
-                          <svg className={`w-5 h-5 text-gray-400 transition-transform ${showPackageDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-
-                        {/* Dropdown Menu */}
-                        {showPackageDropdown && (
-                          <div className="absolute top-full left-0 right-0 mt-2 dropdown-container max-h-80 overflow-y-auto z-10">
-                            {/* Search */}
-                            <div className="p-3 border-b border-white/20">
-                              <div className="relative">
-                                <input
-                                  type="text"
-                                  value={packageSearch}
-                                  onChange={(e) => setPackageSearch(e.target.value)}
-                                  placeholder="Search packages..."
-                                  className="w-full px-3 py-2 pl-9 bg-transparent border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-400 text-sm"
-                                />
-                                <svg className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-                              </div>
-                            </div>
+                      <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
+                        <span className="text-purple-400">📦</span>
+                        Select Package Dimensions
+                      </h2>
+                      
+                      {/* Most Popular Section */}
+                      <div className="mb-6">
+                        <h3 className="text-sm font-medium text-gray-300 mb-3">Most Popular</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {PACKAGE_PRESETS.filter(pkg => pkg.mostPopular).map((pkg) => {
+                            const isSelected = selectedPackage.id === pkg.id;
                             
-                            {/* Package Options */}
-                            <div className="p-2">
-                              {filteredPackages.map((pkg) => (
-                                <button
-                                  key={pkg.id}
-                                  onClick={() => {
-                                    setSelectedPackage(pkg);
-                                    setShowPackageDropdown(false);
-                                    setPackageSearch('');
-                                  }}
-                                  className={`w-full p-3 rounded-lg text-left transition-all hover:bg-white/10 ${
-                                    selectedPackage.id === pkg.id ? 'bg-purple-500/20 border border-purple-500/40' : ''
+                            return (
+                              <button
+                                key={pkg.id}
+                                onClick={() => {
+                                  setSelectedPackage(pkg);
+                                  setPackageSearch('');
+                                }}
+                                className={`button-interactive relative w-full text-left px-4 py-3 rounded-xl flex flex-col gap-2 transition-all border backdrop-blur-md
+                                  ${
+                                    isSelected
+                                      ? "bg-purple-500/20 text-purple-200 font-medium border-purple-400/50 button-selected animate-glow-purple"
+                                      : "hover:bg-white/10 border-white/20 text-white/80"
                                   }`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-8 h-8 bg-purple-600 rounded flex items-center justify-center">
-                                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                                        </svg>
-                                      </div>
-                                      <div>
-                                        <p className="text-white font-medium text-sm">{pkg.name}</p>
-                                        <p className="text-xs text-gray-400">{pkg.dimensions}</p>
-                                      </div>
-                                    </div>
-                                    <div className="flex gap-1">
-                                      {pkg.suggested && (
-                                        <span className="px-2 py-1 bg-blue-600 text-white text-xs rounded">Suggested</span>
-                                      )}
-                                      {pkg.default && (
-                                        <span className="px-2 py-1 bg-gray-600 text-white text-xs rounded">Default</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium">{pkg.name}</span>
+                                  {pkg.name === 'Bubble Mailer' && (
+                                    <span className="text-[10px] text-purple-300 font-medium">Most Popular</span>
+                                  )}
+                                </div>
+                                <span className="text-xs text-gray-400 text-left">{pkg.dimensions}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      
+                      {/* All Packages Section */}
+                      <div className="mb-6">
+                        <h3 className="text-sm font-medium text-gray-300 mb-3">All Packages</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {PACKAGE_PRESETS.filter(pkg => !pkg.mostPopular).map((pkg) => {
+                            const isSelected = selectedPackage.id === pkg.id;
+                            
+                            return (
+                              <button
+                                key={pkg.id}
+                                onClick={() => {
+                                  setSelectedPackage(pkg);
+                                  setPackageSearch('');
+                                }}
+                                className={`button-interactive relative w-full text-left px-4 py-3 rounded-xl flex items-center justify-between transition-all border backdrop-blur-md
+                                  ${
+                                    isSelected
+                                      ? "bg-purple-500/20 text-purple-200 font-medium border-purple-400/50 button-selected animate-glow-purple"
+                                      : "hover:bg-white/10 border-white/20 text-white/80"
+                                  }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <span className="font-medium">{pkg.name}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-gray-400">{pkg.dimensions}</span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
+
+
 
                     {/* Custom Weight Override */}
                     <div className="mb-6">
@@ -731,7 +816,13 @@ export default function ShippingLabels() {
 
                         {/* Carrier Dropdown Menu */}
                         {isCarrierDropdownOpen && (
-                          <div className="absolute top-full right-0 mt-2 dropdown-container min-w-[200px] z-10">
+                          <div className="absolute top-full right-0 mt-2 min-w-[200px] z-50" style={{
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                            backdropFilter: 'blur(12px)',
+                            borderRadius: '16px'
+                          }}>
                             <div className="p-2">
                               {getAvailableCarriers().map((carrier) => (
                                 <button
@@ -885,7 +976,7 @@ export default function ShippingLabels() {
                     <button
                       onClick={handleBuyLabel}
                       disabled={!selectedRate}
-                      className="w-full mt-6 py-3 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-400 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+                      className="w-full mt-6 py-3 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-400 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed cursor-pointer transition-colors"
                     >
                       Purchase Label - {selectedRate ? formatCurrency(selectedRate.rate) : '$0.00'} USD
                     </button>

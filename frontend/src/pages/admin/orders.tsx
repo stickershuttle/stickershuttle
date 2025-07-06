@@ -399,7 +399,7 @@ export default function AdminOrders() {
     }
 
     checkAdmin();
-  }, [router]);
+  }, []); // Remove router dependency to prevent loops
 
   // Filter and sort orders
   const filteredOrders = React.useMemo(() => {
