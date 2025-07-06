@@ -88,11 +88,12 @@ creditHandlers.initializeWithSupabase(supabaseClient);
 const services = {
   supabase: supabaseClient.isReady(),
   stripe: stripeClient.isReady(),
-  easypost: easyPostClient.isReady()
+  easypost: easyPostClient.isReady(),
+  klaviyo: klaviyoClient.isReady()
 };
 const readyCount = Object.values(services).filter(Boolean).length;
-console.log(`📋 Services ready: ${readyCount}/3 (${Object.entries(services).filter(([k,v]) => v).map(([k]) => k).join(', ') || 'none'})`);
-if (readyCount < 3) {
+console.log(`📋 Services ready: ${readyCount}/4 (${Object.entries(services).filter(([k,v]) => v).map(([k]) => k).join(', ') || 'none'})`);
+if (readyCount < 4) {
   console.warn('⚠️ Missing services:', Object.entries(services).filter(([k,v]) => !v).map(([k]) => k).join(', '));
 }
 
@@ -155,7 +156,8 @@ app.get('/test', (req, res) => {
     services: {
       supabase: supabaseClient.isReady() ? 'ready' : 'not configured',
       stripe: stripeClient.isReady() ? 'ready' : 'not configured',
-      easypost: easyPostClient.isReady() ? 'ready' : 'not configured'
+      easypost: easyPostClient.isReady() ? 'ready' : 'not configured',
+      klaviyo: klaviyoClient.isReady() ? 'ready' : 'not configured'
     },
     memory: {
       used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + ' MB',
@@ -265,11 +267,11 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com", "https://checkout.stripe.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com", "https://checkout.stripe.com", "https://va.vercel-scripts.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "https://js.stripe.com", "https://*.stripe.com", "https://js.stripe.com/type-font/"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
-      connectSrc: ["'self'", "https://api.stripe.com", "https://checkout.stripe.com"],
+      connectSrc: ["'self'", "https://api.stripe.com", "https://checkout.stripe.com", "https://vitals.vercel-insights.com"],
       frameSrc: ["'self'", "https://checkout.stripe.com", "https://js.stripe.com"],
     },
   },
@@ -460,6 +462,11 @@ app.get('/easypost/status', (req, res) => {
     timestamp: new Date().toISOString()
   };
 
+  // Add rate limiting stats if client is ready
+  if (easyPostClient.isReady()) {
+    diagnostics.rate_limiting = easyPostClient.getRateLimitingStats();
+  }
+
   // Try to check if we can reinitialize
   if (!easyPostClient.isReady() && process.env.EASYPOST_API_KEY) {
     easyPostClient.init();
@@ -469,6 +476,37 @@ app.get('/easypost/status', (req, res) => {
       console.log('🔄 EasyPost reconnected');
     }
   }
+
+  res.json(diagnostics);
+});
+
+// Add EasyPost health check endpoint
+app.get('/easypost/health', async (req, res) => {
+  try {
+    const healthCheck = await easyPostClient.testApiHealth();
+    res.json(healthCheck);
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Health check failed',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Add Klaviyo diagnostic endpoint
+app.get('/klaviyo/status', (req, res) => {
+  const diagnostics = {
+    klaviyo_configured: klaviyoClient.isReady(),
+    klaviyo_api_key_set: !!process.env.KLAVIYO_PRIVATE_API_KEY,
+    klaviyo_api_key_prefix: process.env.KLAVIYO_PRIVATE_API_KEY ? process.env.KLAVIYO_PRIVATE_API_KEY.substring(0, 8) + '...' : 'NOT SET',
+    klaviyo_public_key_set: !!process.env.KLAVIYO_PUBLIC_API_KEY,
+    klaviyo_default_list_id: process.env.KLAVIYO_DEFAULT_LIST_ID || 'NOT SET',
+    klaviyo_lists_configured: klaviyoClient.getConfiguredLists(),
+    node_env: process.env.NODE_ENV,
+    timestamp: new Date().toISOString()
+  };
 
   res.json(diagnostics);
 });
@@ -1319,6 +1357,7 @@ const typeDefs = gql`
     width: Float!
     height: Float!
     weight: Float!
+    _timestamp: Float  # Optional cache-busting field
   }
 
   # Stripe types
@@ -5794,6 +5833,11 @@ const resolvers = {
     // EasyPost Mutations
     createEasyPostShipment: async (_, { orderId, packageDimensions }) => {
       try {
+        console.log('🔍 DEBUG: createEasyPostShipment called');
+        console.log('🔍 DEBUG: Input parameters:');
+        console.log('  - orderId:', orderId);
+        console.log('  - packageDimensions:', JSON.stringify(packageDimensions, null, 2));
+        
         console.log('🔍 DEBUG: EasyPost client status check...');
         console.log('easyPostClient exists:', !!easyPostClient);
         
@@ -5820,6 +5864,7 @@ const resolvers = {
 
         // Get the order from Supabase
         const client = supabaseClient.getServiceClient();
+        console.log('🔍 DEBUG: Fetching order from Supabase...');
         const { data: order, error: orderError } = await client
           .from('orders_main')
           .select(`
@@ -5830,11 +5875,17 @@ const resolvers = {
           .single();
 
         if (orderError || !order) {
+          console.log('❌ Order fetch failed:', orderError?.message);
           return {
             success: false,
             error: `Order not found: ${orderError?.message || 'Unknown error'}`
           };
         }
+
+        console.log('🔍 DEBUG: Order retrieved successfully:');
+        console.log('  - Order ID:', order.id);
+        console.log('  - Customer:', order.customer_first_name, order.customer_last_name);
+        console.log('  - Shipping Address:', JSON.stringify(order.shipping_address, null, 2));
 
         // Handle from address based on test/production mode
         let fromAddress;
@@ -5861,13 +5912,45 @@ const resolvers = {
           fromAddress = 'adr_31c828354d4a11f08f10ac1f6bc539aa';
         }
 
+        console.log('🔍 DEBUG: From address configured:');
+        console.log('  - Type:', typeof fromAddress);
+        console.log('  - Value:', JSON.stringify(fromAddress, null, 2));
+
         // Format order for EasyPost
+        console.log('🔍 DEBUG: Formatting order for shipment...');
         const shipmentData = easyPostClient.formatOrderForShipment(order, fromAddress, packageDimensions);
+        
+        console.log('🔍 DEBUG: Shipment data formatted. About to call EasyPost...');
         
         // Create shipment with EasyPost
         const shipment = await easyPostClient.createShipment(shipmentData);
 
-        return {
+        console.log('🔍 DEBUG: EasyPost shipment creation completed');
+        console.log('  - Shipment ID:', shipment.id);
+        console.log('  - Total rates returned:', shipment.rates?.length || 0);
+
+        // Enhanced rate debugging for the specific issue
+        if (shipment.rates && shipment.rates.length > 0) {
+          console.log('🔍 DEBUG: Detailed rate breakdown:');
+          const carrierGroups = { UPS: [], FEDEX: [], USPS: [] };
+          
+          shipment.rates.forEach(rate => {
+            const carrier = rate.carrier.toUpperCase();
+            if (carrier === 'UPS' || carrier === 'UPSDAP') {
+              carrierGroups.UPS.push({ service: rate.service, rate: rate.rate });
+            } else if (carrier === 'FEDEX' || carrier === 'FEDEXDEFAULT') {
+              carrierGroups.FEDEX.push({ service: rate.service, rate: rate.rate });
+            } else if (carrier === 'USPS') {
+              carrierGroups.USPS.push({ service: rate.service, rate: rate.rate });
+            }
+          });
+          
+          console.log('  - UPS rates:', carrierGroups.UPS.length, carrierGroups.UPS);
+          console.log('  - FedEx rates:', carrierGroups.FEDEX.length, carrierGroups.FEDEX);
+          console.log('  - USPS rates:', carrierGroups.USPS.length, carrierGroups.USPS);
+        }
+
+        const result = {
           success: true,
           shipment: {
             id: shipment.id,
@@ -5887,8 +5970,12 @@ const resolvers = {
             reference: shipment.reference
           }
         };
+
+        console.log('🔍 DEBUG: Returning success response with', result.shipment.rates.length, 'rates');
+        return result;
       } catch (error) {
-        console.error('Error creating EasyPost shipment:', error);
+        console.error('❌ ERROR in createEasyPostShipment:', error);
+        console.error('❌ Error stack:', error.stack);
         
         // Log more details about the error
         if (error.message && error.message.includes('resource could not be found')) {
@@ -5903,8 +5990,8 @@ const resolvers = {
           success: false,
           error: error.message || 'Failed to create shipment'
         };
-      }
-    },
+              }
+      },
 
     buyEasyPostLabel: async (_, { shipmentId, rateId, orderId, insurance }) => {
       try {

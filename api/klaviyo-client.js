@@ -28,6 +28,22 @@ class KlaviyoClient {
     });
   }
 
+  // Check if Klaviyo client is ready to use
+  isReady() {
+    const ready = !!(this.apiKey && this.defaultListId);
+    
+    if (!ready) {
+      console.log('🔍 Klaviyo isReady() check failed:', {
+        hasApiKey: !!this.apiKey,
+        hasDefaultList: !!this.defaultListId,
+        apiKey: this.apiKey ? 'configured' : 'missing',
+        defaultList: this.defaultListId ? 'configured' : 'missing'
+      });
+    }
+    
+    return ready;
+  }
+
   // Create axios instance with proper headers
   getClient() {
     return axios.create({
