@@ -47,6 +47,37 @@ const nextConfig = {
       ...config.resolve.fallback,
       'date-fns/locale': false,
     };
+
+    // Remove console logs in production builds
+    if (!dev && !isServer) {
+      const TerserPlugin = require('terser-webpack-plugin');
+      
+      // Find existing TerserPlugin and update it, or add a new one
+      const existingTerserPlugin = config.optimization.minimizer.find(
+        plugin => plugin.constructor.name === 'TerserPlugin'
+      );
+      
+      if (existingTerserPlugin) {
+        // Update existing terser options
+        existingTerserPlugin.options.terserOptions.compress = {
+          ...existingTerserPlugin.options.terserOptions.compress,
+          drop_console: true,
+          drop_debugger: true,
+        };
+      } else {
+        // Add new TerserPlugin if none exists
+        config.optimization.minimizer.push(
+          new TerserPlugin({
+            terserOptions: {
+              compress: {
+                drop_console: true,
+                drop_debugger: true,
+              },
+            },
+          })
+        );
+      }
+    }
     
     return config
   },

@@ -395,81 +395,75 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                 >
                   Change Photo
                 </button>
-                {(profile?.profile_photo_url || cachedProfilePhoto) && (
-                  <button
-                    onClick={async () => {
-                      if (!user || !confirm('Are you sure you want to reset your profile photo to a different random avatar?')) return;
+                {/* Always show random avatar button */}
+                <button
+                  onClick={async () => {
+                    if (!user || !confirm('Are you sure you want to reset your profile photo to a different random avatar?')) return;
+                    
+                    setUploadingProfilePhoto(true);
+                    try {
+                      // Get a random default avatar
+                      const { getRandomAvatar } = await import('../../../utils/avatars');
+                      const randomAvatar = getRandomAvatar();
+                      console.log('🎭 Assigning new random avatar:', randomAvatar);
+
+                      const supabase = await getSupabase();
+                      const { error } = await supabase
+                        .from('user_profiles')
+                        .update({
+                          profile_photo_url: randomAvatar,
+                          profile_photo_public_id: null,
+                          updated_at: new Date().toISOString()
+                        })
+                        .eq('user_id', (user as any).id);
+
+                      if (error) throw error;
+
+                      setProfile((prev: any) => ({
+                        ...prev,
+                        profile_photo_url: randomAvatar,
+                        profile_photo_public_id: null
+                      }));
                       
-                      setUploadingProfilePhoto(true);
-                      try {
-                        // Get a random default avatar
-                        const { getRandomAvatar } = await import('../../../utils/avatars');
-                        const randomAvatar = getRandomAvatar();
-                        console.log('🎭 Assigning new random avatar:', randomAvatar);
+                      // Update cached photo
+                      setCachedProfilePhoto(randomAvatar);
+                      localStorage.setItem('userProfilePhoto', randomAvatar);
 
-                        const supabase = await getSupabase();
-                        const { error } = await supabase
-                          .from('user_profiles')
-                          .update({
-                            profile_photo_url: randomAvatar,
-                            profile_photo_public_id: null,
-                            updated_at: new Date().toISOString()
-                          })
-                          .eq('user_id', (user as any).id);
-
-                        if (error) throw error;
-
-                        setProfile((prev: any) => ({
-                          ...prev,
+                      // Broadcast profile update to other components (like UniversalHeader)
+                      window.dispatchEvent(new CustomEvent('profileUpdated', {
+                        detail: {
                           profile_photo_url: randomAvatar,
                           profile_photo_public_id: null
-                        }));
-                        
-                        // Update cached photo
-                        setCachedProfilePhoto(randomAvatar);
-                        localStorage.setItem('userProfilePhoto', randomAvatar);
-
-                        // Broadcast profile update to other components (like UniversalHeader)
-                        window.dispatchEvent(new CustomEvent('profileUpdated', {
-                          detail: {
-                            profile_photo_url: randomAvatar,
-                            profile_photo_public_id: null
-                          }
-                        }));
-                        
-                        console.log('🔄 Profile photo updated in settings:', {
-                          newPhoto: randomAvatar,
-                          cachedPhoto: cachedProfilePhoto,
-                          profilePhoto: profile?.profile_photo_url
-                        });
-                        
-                        setSettingsNotification({
-                          message: 'Profile photo reset to new random avatar',
-                          type: 'success'
-                        });
-                        setTimeout(() => setSettingsNotification(null), 3000);
-                      } catch (error) {
-                        console.error('Error resetting profile photo:', error);
-                        setSettingsNotification({
-                          message: 'Failed to reset profile photo',
-                          type: 'error'
-                        });
-                        setTimeout(() => setSettingsNotification(null), 3000);
-                      } finally {
-                        setUploadingProfilePhoto(false);
-                      }
-                    }}
-                    className="ml-2 px-4 py-2 rounded-lg text-blue-400 text-sm font-medium transition-all duration-200 transform hover:scale-105"
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                      backdropFilter: 'blur(25px) saturate(180%)',
-                      border: '1px solid rgba(59, 130, 246, 0.4)',
-                      boxShadow: 'rgba(59, 130, 246, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                    }}
-                  >
-                    New Random Avatar
-                  </button>
-                )}
+                        }
+                      }));
+                      
+                      setSettingsNotification({
+                        message: 'Profile photo reset to new random avatar',
+                        type: 'success'
+                      });
+                      setTimeout(() => setSettingsNotification(null), 3000);
+                    } catch (error) {
+                      console.error('Error resetting profile photo:', error);
+                      setSettingsNotification({
+                        message: 'Failed to reset profile photo',
+                        type: 'error'
+                      });
+                      setTimeout(() => setSettingsNotification(null), 3000);
+                    } finally {
+                      setUploadingProfilePhoto(false);
+                    }
+                  }}
+                  className="ml-2 px-4 py-2 rounded-lg text-blue-400 text-sm font-medium transition-all duration-200 transform hover:scale-105"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    boxShadow: 'rgba(59, 130, 246, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                  }}
+                  disabled={uploadingProfilePhoto}
+                >
+                  {uploadingProfilePhoto ? 'Updating...' : 'New Random Avatar'}
+                </button>
               </div>
             </div>
           </div>

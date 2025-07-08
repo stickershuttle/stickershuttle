@@ -1,6 +1,47 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// Console suppression for production environment
+const isProduction = Deno.env.get('NODE_ENV') === 'production' || Deno.env.get('DENO_ENV') === 'production'
+
+if (isProduction) {
+  const originalConsole = {
+    log: console.log,
+    warn: console.warn,
+    info: console.info,
+    debug: console.debug,
+    trace: console.trace,
+    table: console.table,
+    dir: console.dir,
+    group: console.group,
+    groupEnd: console.groupEnd,
+    time: console.time,
+    timeEnd: console.timeEnd,
+    count: console.count,
+    clear: console.clear,
+    assert: console.assert
+  }
+
+  // Override console methods with no-op functions in production
+  console.log = () => {}
+  console.warn = () => {}
+  console.info = () => {}
+  console.debug = () => {}
+  console.trace = () => {}
+  console.table = () => {}
+  console.dir = () => {}
+  console.group = () => {}
+  console.groupEnd = () => {}
+  console.time = () => {}
+  console.timeEnd = () => {}
+  console.count = () => {}
+  console.clear = () => {}
+  console.assert = () => {}
+  
+  // Keep console.error for critical error logging
+  // console.error = originalConsole.error
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',

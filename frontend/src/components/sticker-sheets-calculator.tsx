@@ -30,20 +30,18 @@ interface StickerSheetsCalculatorProps {
 }
 
 export default function StickerSheetsCalculator({ initialBasePricing, realPricingData }: StickerSheetsCalculatorProps) {
-  const { addToCart } = useCart();
+  const { addToCart, isRushOrder, updateAllItemsRushOrder } = useCart();
   const router = useRouter();
   const [basePricing, setBasePricing] = useState<BasePricing[]>(initialBasePricing)
-  const [selectedCut, setSelectedCut] = useState("Vertical")
+  const [selectedCut, setSelectedCut] = useState("Custom Shape")
   const [selectedMaterial, setSelectedMaterial] = useState("Matte")
-  const [selectedSize, setSelectedSize] = useState('4" × 6"')
-  const [customWidth, setCustomWidth] = useState("")
-  const [customHeight, setCustomHeight] = useState("")
+  const [selectedSize, setSelectedSize] = useState('8.5" x 11"')
   const [selectedQuantity, setSelectedQuantity] = useState("100")
   const [customQuantity, setCustomQuantity] = useState("")
-  const [selectedKissCutOption, setSelectedKissCutOption] = useState("1-3 cuts")
+  const [selectedWhiteOption, setSelectedWhiteOption] = useState("color-only")
   const [sendProof, setSendProof] = useState(true)
   const [uploadLater, setUploadLater] = useState(false)
-  const [rushOrder, setRushOrder] = useState(false)
+  // Use global rush order state from cart instead of local state
   const [totalPrice, setTotalPrice] = useState("")
   const [costPerSticker, setCostPerSticker] = useState("")
 
@@ -126,6 +124,14 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
     }
   }, [additionalNotes])
 
+  // Sync with global rush order state on component mount and when it changes
+  useEffect(() => {
+    // This effect runs when the global rush order state changes
+    // No need to do anything special here since we're already using isRushOrder directly
+    // The pricing will be automatically recalculated via the updatePricing effect
+    console.log('🚀 Global rush order state changed:', isRushOrder);
+  }, [isRushOrder])
+
   // Pricing data for different sizes
   const getPriceDataForSize = (sizeInches: number) => {
     // Base pricing for 3" stickers
@@ -177,27 +183,24 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
       return;
     }
     
-    const area = calculateArea(selectedSize, customWidth, customHeight)
-    const quantity =
-      selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
+    const quantity = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
 
     console.log(`\n--- Pricing Update ---`)
-    console.log(`Size: ${selectedSize}, Custom Width: ${customWidth}, Custom Height: ${customHeight}`)
-    console.log(`Calculated Area: ${area.toFixed(2)} sq inches`)
+    console.log(`Size: ${selectedSize}`)
     console.log(`Quantity: ${quantity}`)
 
-    if (area > 0 && quantity > 0) {
-      const { total, perSticker } = calculatePrice(quantity, area, rushOrder)
+    if (quantity > 0) {
+      const { total, perSheet } = calculatePrice(quantity, selectedSize, isRushOrder)
       console.log(`Total Price: $${total.toFixed(2)}`)
-      console.log(`Price Per Sticker: $${perSticker.toFixed(2)}`)
+      console.log(`Price Per Sheet: $${perSheet.toFixed(2)}`)
       setTotalPrice(`$${total.toFixed(2)}`)
-      setCostPerSticker(`$${perSticker.toFixed(2)}/ea.`)
+      setCostPerSticker(`$${perSheet.toFixed(2)}/sheet`)
     } else {
-      console.log("Invalid area or quantity, pricing not calculated")
+      console.log("Invalid quantity, pricing not calculated")
       setTotalPrice("")
       setCostPerSticker("")
     }
-  }, [selectedSize, customWidth, customHeight, selectedQuantity, customQuantity, selectedKissCutOption, rushOrder])
+  }, [selectedSize, selectedQuantity, customQuantity, selectedWhiteOption, isRushOrder])
 
   useEffect(() => {
     console.log("Recalculating price due to size or quantity change")
@@ -238,16 +241,15 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                   const customSize = selections.size.value || selections.size.displayValue;
                   if (customSize.includes('x')) {
                     const [width, height] = customSize.split('x').map((s: string) => s.replace(/['"]/g, '').trim());
-                    setCustomWidth(width);
-                    setCustomHeight(height);
+                    setCustomSizeError(width + " x " + height + " is not a valid size. Please enter a valid size.");
                   }
                 }
               }
-              if (selections.kissCut?.displayValue) {
-                setSelectedKissCutOption(selections.kissCut.displayValue);
+              if (selections.whiteOption?.displayValue) {
+                setSelectedWhiteOption(selections.whiteOption.displayValue);
               }
               if (selections.rush?.value === true) {
-                setRushOrder(true);
+                updateAllItemsRushOrder(true);
               }
               if (selections.proof?.value === false) {
                 setSendProof(false);
@@ -343,120 +345,62 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
     return 24 // Default to 4" × 6"
   }
 
-  const calculatePrice = (qty: number, area: number, rushOrder: boolean) => {
+  const calculatePrice = (qty: number, size: string, isRushOrderParam: boolean) => {
     let totalPrice = 0
-    let pricePerSticker = 0
+    let pricePerSheet = 0
 
-    // Get kiss cut pricing modifier
-    const kissCutModifiers = {
-      '1-3 cuts': 1.0,
-      '4-7 cuts': 1.15,
-      '8-15 cuts': 1.3
+    // Get white option pricing modifier
+    const whiteOptionModifiers = {
+      'color-only': 1.0,
+      'partial-white': 1.05,
+      'full-white': 1.1
     };
-    const kissCutMultiplier = kissCutModifiers[selectedKissCutOption as keyof typeof kissCutModifiers] || 1.0;
+    const whiteOptionMultiplier = whiteOptionModifiers[selectedWhiteOption as keyof typeof whiteOptionModifiers] || 1.0;
 
-    // Try to use real pricing data first
-    if (realPricingData && realPricingData.basePricing && realPricingData.quantityDiscounts) {
-      console.log('Using real pricing data for calculation');
-      
-      const realResult = calculateRealPrice(
-        realPricingData.basePricing,
-        realPricingData.quantityDiscounts,
-        area,
-        qty,
-        rushOrder
-      );
-      
-      // Apply kiss cut modifier
-      const adjustedTotal = realResult.totalPrice * kissCutMultiplier;
-      const adjustedPerSticker = realResult.finalPricePerSticker * kissCutMultiplier;
-      
-      console.log(`Real Pricing - Quantity: ${qty}, Area: ${area}, Kiss Cut: ${selectedKissCutOption} (${kissCutMultiplier}x), Total: $${adjustedTotal.toFixed(2)}, Per sticker: $${adjustedPerSticker.toFixed(2)}`);
-      
-      return {
-        total: adjustedTotal,
-        perSticker: adjustedPerSticker
-      };
+    // Base pricing for sheet stickers
+    const basePricing = {
+      50: 12.50,
+      100: 19.00,
+      200: 35.00,
+      300: 51.00,
+      500: 82.50,
+      750: 120.00,
+      1000: 155.00,
+      2500: 375.00,
     }
 
-    // Fallback to legacy pricing calculation
-    console.log('Using legacy pricing calculation');
-    
-    // Use proportional pricing based on area
-    const basePrice = 1.36 // Base price per sticker for 3" (9 sq inches)
-    const baseArea = 9 // 3" x 3" = 9 sq inches
+    // Get base price for quantity
+    const basePrice = basePricing[qty as keyof typeof basePricing] || basePricing[50]
+    pricePerSheet = basePrice * whiteOptionMultiplier
+    totalPrice = pricePerSheet * qty
 
-    // Scale base price by area
-    const scaledBasePrice = basePrice * (area / baseArea)
-
-    // Apply quantity discounts (same discount structure for all sizes)
-    const discountMap: { [key: number]: number } = {
-      50: 1.0, // No discount
-      100: 0.647, // 35.3% discount
-      200: 0.463, // 53.7% discount
-      300: 0.39, // 61% discount
-      500: 0.324, // 67.6% discount
-      750: 0.24, // 76% discount (uses 500 tier from CSV)
-      1000: 0.19, // 81% discount (uses 1000 tier from CSV)
-      2500: 0.213, // 78.7% discount
-    }
-
-    // Find the appropriate quantity tier (use lower tier as per CSV note)
-    // "Any quantities or square inches between these values default to the lowest displayed value"
-    let applicableQuantity = 50; // Default to lowest tier
-    const quantityTiers = [50, 100, 200, 300, 500, 750, 1000, 2500];
-    
-    for (const tier of quantityTiers) {
-      if (qty >= tier) {
-        applicableQuantity = tier;
-      } else {
-        break;
-      }
-    }
-
-    const discountMultiplier = discountMap[applicableQuantity] || 1.0
-    pricePerSticker = scaledBasePrice * discountMultiplier * kissCutMultiplier
-    totalPrice = pricePerSticker * qty
-
-    if (rushOrder) {
+    if (isRushOrderParam) {
       totalPrice *= 1.4 // Add 40% for rush orders
-      pricePerSticker *= 1.4
+      pricePerSheet *= 1.4
     }
 
     console.log(
-      `Legacy Pricing - Quantity: ${qty}, Area: ${area}, Kiss Cut: ${selectedKissCutOption} (${kissCutMultiplier}x), Total price: $${totalPrice.toFixed(2)}, Price per sticker: $${pricePerSticker.toFixed(2)}`,
+      `Sheet Pricing - Quantity: ${qty}, Size: ${size}, White Option: ${selectedWhiteOption} (${whiteOptionMultiplier}x), Total price: $${totalPrice.toFixed(2)}, Price per sheet: $${pricePerSheet.toFixed(2)}`,
     )
 
     return {
       total: totalPrice,
-      perSticker: pricePerSticker,
+      perSheet: pricePerSheet,
     }
   }
 
   const handleSizeChange = (size: string) => {
     setSelectedSize(size)
     if (size !== "Custom size") {
-      setCustomWidth("")
-      setCustomHeight("")
+      setCustomSizeError("")
     }
   }
 
   const handleCustomSizeChange = (dimension: "width" | "height", value: string) => {
     if (dimension === "width") {
-      setCustomWidth(value)
+      setCustomSizeError(value + " is not a valid width. Please enter a valid width.")
     } else {
-      setCustomHeight(value)
-    }
-    
-    // Check minimum area after updating dimensions
-    const w = dimension === "width" ? Number.parseFloat(value) || 0 : Number.parseFloat(customWidth) || 0
-    const h = dimension === "height" ? Number.parseFloat(value) || 0 : Number.parseFloat(customHeight) || 0
-    const area = w * h
-    
-    if (w > 0 && h > 0 && area < 6) {
-      setCustomSizeError("Minimum area must be 6 sq in or above.")
-    } else {
-      setCustomSizeError("")
+      setCustomSizeError(value + " is not a valid height. Please enter a valid height.")
     }
   }
 
@@ -499,25 +443,22 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
     
     try {
       // Prepare metadata from current calculator state
-      const area = calculateArea(selectedSize, customWidth, customHeight)
+      const area = calculateArea(selectedSize, customSizeError, customSizeError)
       const qty = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
       
       const metadata: CalculatorMetadata = {
         selectedCut,
         selectedMaterial,
         selectedSize,
-        customWidth: customWidth || undefined,
-        customHeight: customHeight || undefined,
         selectedQuantity,
         customQuantity: customQuantity || undefined,
         sendProof,
         uploadLater,
-        rushOrder,
+        rushOrder: isRushOrder,
         postToInstagram,
         instagramHandle: instagramHandle || undefined,
         totalPrice: totalPrice || undefined,
         costPerSticker: costPerSticker || undefined,
-        calculatedArea: area > 0 ? area : undefined
       }
       
       const result = await uploadToCloudinary(file, metadata, (progress: UploadProgress) => {
@@ -581,9 +522,8 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
   }
 
   const createCartItem = () => {
-    const area = calculateArea(selectedSize, customWidth, customHeight);
     const quantity = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity);
-    const { total, perSticker } = calculatePrice(quantity, area, rushOrder);
+    const { total, perSheet } = calculatePrice(quantity, selectedSize, isRushOrder);
 
     return {
       id: generateCartItemId(),
@@ -593,8 +533,8 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
         name: "Sticker Sheets",
         category: "sticker-sheets" as const,
         description: "Custom sticker sheets with multiple designs on one sheet",
-        shortDescription: "Sticker sheets with multiple kiss-cut designs",
-        basePrice: perSticker,
+        shortDescription: "Multiple stickers on one convenient sheet",
+        basePrice: perSheet,
         pricingModel: "per-unit" as const,
         images: [],
         defaultImage: "",
@@ -612,13 +552,20 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
           material: { type: "finish" as const, value: selectedMaterial, displayValue: selectedMaterial, priceImpact: 0 },
           size: { 
             type: "size-preset" as const, 
-            value: selectedSize === "Custom size" ? `${customWidth}" × ${customHeight}"` : selectedSize,
-            displayValue: selectedSize === "Custom size" ? `${customWidth}" × ${customHeight}"` : selectedSize,
+            value: selectedSize,
+            displayValue: selectedSize,
             priceImpact: 0 
           },
-          kissCut: { type: "finish" as const, value: selectedKissCutOption, displayValue: selectedKissCutOption, priceImpact: 0 },
+          whiteOption: { 
+            type: "white-base" as const, 
+            value: selectedWhiteOption, 
+            displayValue: selectedWhiteOption === "color-only" ? "Color Only" : 
+                         selectedWhiteOption === "partial-white" ? "Partial White Ink" : 
+                         selectedWhiteOption === "full-white" ? "Full White Ink" : selectedWhiteOption, 
+            priceImpact: 0 
+          },
           proof: { type: "finish" as const, value: sendProof, displayValue: sendProof ? "Send Proof" : "No Proof", priceImpact: 0 },
-          rush: { type: "finish" as const, value: rushOrder, displayValue: rushOrder ? "Rush Order" : "Standard", priceImpact: rushOrder ? total * 0.4 : 0 },
+          rush: { type: "finish" as const, value: isRushOrder, displayValue: isRushOrder ? "Rush Order" : "Standard", priceImpact: isRushOrder ? total * 0.4 : 0 },
           ...(postToInstagram && {
             instagram: { 
               type: "finish" as const, 
@@ -638,7 +585,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
         }
       },
       quantity: quantity,
-      unitPrice: perSticker,
+      unitPrice: perSheet,
       totalPrice: total,
       addedAt: new Date().toISOString()
     };
@@ -865,7 +812,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                       min="2"
                       step="0.1"
                       placeholder="W"
-                      value={customWidth}
+                      value={customSizeError}
                       onChange={(e) => handleCustomSizeChange("width", e.target.value)}
                       className={`w-1/2 px-3 py-2 rounded-lg border bg-white/10 text-white placeholder-white/60 focus:outline-none backdrop-blur-md button-interactive ${
                         customSizeError ? 'border-red-400/50 focus:border-red-400' : 'border-white/20 focus:border-purple-400'
@@ -876,7 +823,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                       min="2"
                       step="0.1"
                       placeholder="H"
-                      value={customHeight}
+                      value={customSizeError}
                       onChange={(e) => handleCustomSizeChange("height", e.target.value)}
                       className={`w-1/2 px-3 py-2 rounded-lg border bg-white/10 text-white placeholder-white/60 focus:outline-none backdrop-blur-md button-interactive ${
                         customSizeError ? 'border-red-400/50 focus:border-red-400' : 'border-white/20 focus:border-purple-400'
@@ -906,15 +853,15 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
               <div className="space-y-2 relative">
                 {["50", "100", "200", "300", "500", "750", "1,000", "2,500", "Custom"].map((amount) => {
                   const numericAmount = Number.parseInt(amount.replace(",", ""))
-                  const area = calculateArea(selectedSize, customWidth, customHeight)
+                  const area = calculateArea(selectedSize, customSizeError, customSizeError)
 
                   // Get pricing for current size
                   let pricePerEach = ""
                   let percentOff = ""
 
                   if (area > 0 && amount !== "Custom") {
-                    const currentPricing = calculatePrice(numericAmount, area, false)
-                    const { perSticker } = currentPricing
+                    const currentPricing = calculatePrice(numericAmount, selectedSize, false)
+                    const { perSheet } = currentPricing
                     
                     // Get the actual discount percentage from CSV data
                     let discount = 0
@@ -951,7 +898,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                       }
                     }
 
-                    pricePerEach = `$${perSticker.toFixed(2)}/ea.`
+                    pricePerEach = `$${perSheet.toFixed(2)}/sheet`
                     if (discount > 0.5) { // Only show if discount is meaningful (>0.5%)
                       percentOff = `${Math.round(discount)}% off`
                     }
@@ -1014,7 +961,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                                   backdropFilter: 'blur(12px)'
                                 }}
                               >
-                                ${calculatePrice(numericAmount, area, false).total.toFixed(2)}
+                                ${calculatePrice(numericAmount, selectedSize, false).total.toFixed(2)}
                               </span>
                             )}
                             {pricePerEach && amount !== "Custom" && (
@@ -1126,7 +1073,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                         {customSizeError ? 'Invalid size' : costPerSticker}
                       </span>
                       {(() => {
-                        const area = calculateArea(selectedSize, customWidth, customHeight)
+                        const area = calculateArea(selectedSize, customSizeError, customSizeError)
                         const qty = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
                         
                         if (area > 0 && qty > 0) {
@@ -1189,7 +1136,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                   )}
                   {/* Reserve space for rush order fee text to prevent layout shift */}
                   <div className="h-4 mb-2">
-                    {rushOrder && (
+                    {isRushOrder && (
                       <div className="text-xs text-red-300 font-medium transition-opacity duration-300">
                         *Rush Order Fee Applied
                       </div>
@@ -1211,10 +1158,10 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* 1-3 Cuts */}
                 <button
-                  onClick={() => setSelectedKissCutOption("1-3 cuts")}
+                  onClick={() => setSelectedWhiteOption("color-only")}
                   className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
                     ${
-                      selectedKissCutOption === "1-3 cuts"
+                      selectedWhiteOption === "color-only"
                         ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
                         : "hover:bg-white/10 border-white/20 text-white/80"
                     }`}
@@ -1222,7 +1169,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                   <div className="flex items-center mb-2">
                     <div className="text-2xl mr-3">✂️</div>
                     <h3 className="font-semibold text-white">
-                      1-3 Cuts
+                      Color Only
                     </h3>
                   </div>
                   <p className="text-gray-300 text-sm mb-2">
@@ -1231,17 +1178,17 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                   <div className="flex items-center text-sm">
                     <span className="text-green-400 font-medium">✅ Standard Pricing</span>
                   </div>
-                  {selectedKissCutOption === "1-3 cuts" && (
+                  {selectedWhiteOption === "color-only" && (
                     <span className="absolute top-1 right-2 text-[10px] text-blue-300 font-medium">Selected</span>
                   )}
                 </button>
 
                 {/* 4-7 Cuts */}
                 <button
-                  onClick={() => setSelectedKissCutOption("4-7 cuts")}
+                  onClick={() => setSelectedWhiteOption("partial-white")}
                   className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
                     ${
-                      selectedKissCutOption === "4-7 cuts"
+                      selectedWhiteOption === "partial-white"
                         ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
                         : "hover:bg-white/10 border-white/20 text-white/80"
                     }`}
@@ -1249,26 +1196,26 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                   <div className="flex items-center mb-2">
                     <div className="text-2xl mr-3">✂️</div>
                     <h3 className="font-semibold text-white">
-                      4-7 Cuts
+                      Partial White Ink
                     </h3>
                   </div>
                   <p className="text-gray-300 text-sm mb-2">
                     Great for medium complexity sheets with multiple sticker designs.
                   </p>
                   <div className="flex items-center text-sm">
-                    <span className="text-yellow-400 font-medium">+15% pricing</span>
+                    <span className="text-yellow-400 font-medium">+5% pricing</span>
                   </div>
-                  {selectedKissCutOption === "4-7 cuts" && (
+                  {selectedWhiteOption === "partial-white" && (
                     <span className="absolute top-1 right-2 text-[10px] text-blue-300 font-medium">Selected</span>
                   )}
                 </button>
 
                 {/* 8-15 Cuts */}
                 <button
-                  onClick={() => setSelectedKissCutOption("8-15 cuts")}
+                  onClick={() => setSelectedWhiteOption("full-white")}
                   className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
                     ${
-                      selectedKissCutOption === "8-15 cuts"
+                      selectedWhiteOption === "full-white"
                         ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
                         : "hover:bg-white/10 border-white/20 text-white/80"
                     }`}
@@ -1276,16 +1223,16 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                   <div className="flex items-center mb-2">
                     <div className="text-2xl mr-3">✂️</div>
                     <h3 className="font-semibold text-white">
-                      8-15 Cuts
+                      Full White Ink
                     </h3>
                   </div>
                   <p className="text-gray-300 text-sm mb-2">
                     Ideal for complex sheets with many individual stickers and detailed layouts.
                   </p>
                   <div className="flex items-center text-sm">
-                    <span className="text-yellow-400 font-medium">+30% pricing</span>
+                    <span className="text-yellow-400 font-medium">+10% pricing</span>
                   </div>
-                  {selectedKissCutOption === "8-15 cuts" && (
+                  {selectedWhiteOption === "full-white" && (
                     <span className="absolute top-1 right-2 text-[10px] text-blue-300 font-medium">Selected</span>
                   )}
                 </button>
@@ -1525,36 +1472,49 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
 
                   {/* Rush Order Toggle */}
                   <div>
-                    <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+                    <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium relative"
                          style={{
-                           background: rushOrder 
+                           background: isRushOrder 
                              ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(239, 68, 68, 0.15) 50%, rgba(239, 68, 68, 0.05) 100%)'
                              : 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.15) 50%, rgba(59, 130, 246, 0.05) 100%)',
-                           border: rushOrder 
+                           border: isRushOrder 
                              ? '1px solid rgba(239, 68, 68, 0.4)'
                              : '1px solid rgba(59, 130, 246, 0.4)',
                            backdropFilter: 'blur(12px)'
                          }}>
                       <button
-                        onClick={() => setRushOrder(!rushOrder)}
-                        title={rushOrder ? "Switch to standard production" : "Enable rush order"}
+                        onClick={() => updateAllItemsRushOrder(!isRushOrder)}
+                        title={isRushOrder ? "Disable rush order for all cart items" : "Enable rush order for all cart items"}
                         className={`w-12 h-6 rounded-full transition-colors ${
-                          rushOrder ? 'bg-red-500' : 'bg-blue-500'
+                          isRushOrder ? 'bg-red-500' : 'bg-blue-500'
                         }`}
                       >
                         <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                          rushOrder ? 'translate-x-7' : 'translate-x-1'
+                          isRushOrder ? 'translate-x-7' : 'translate-x-1'
                         }`} />
                       </button>
-                      <label className={`text-sm font-medium ${rushOrder ? 'text-red-200' : 'text-blue-200'}`}>
-                        {rushOrder ? '🚀 Rush Order (+40%)' : '🕒 Standard Production Time'}
-                      </label>
+                      <div className="flex-1">
+                        <label className={`text-sm font-medium ${isRushOrder ? 'text-red-200' : 'text-blue-200'}`}>
+                          {isRushOrder ? '🚀 Rush Order (+40%)' : '🕒 Standard Production Time'}
+                        </label>
+                        {isRushOrder && (
+                          <div className="text-xs text-orange-200 mt-1 font-medium">
+                            🛒 Applied to entire cart
+                          </div>
+                        )}
+                      </div>
                     </div>
                     
                     {/* Rush Order Disclaimer - right under rush order toggle */}
-                    {rushOrder && (
-                      <div className="mt-3 text-xs text-white/70 leading-relaxed">
-                        *Rush Orders are prioritized in our production queue and completed within 24 hours. Orders under 3,000 stickers are usually completed on time. If you have a tight deadline or specific concerns, feel free to contact us.
+                    {isRushOrder && (
+                      <div className="mt-3 space-y-2">
+                        <div className="text-xs text-orange-300 font-medium flex items-center gap-2">
+                          <span>⚡</span>
+                          <span>Rush order is now active for ALL items in your cart (+40% to each item)</span>
+                        </div>
+                        <div className="text-xs text-white/70 leading-relaxed">
+                          *Rush Orders are prioritized in our production queue and completed within 24 hours. Orders under 3,000 stickers are usually completed on time. If you have a tight deadline or specific concerns, feel free to contact us.
+                        </div>
                       </div>
                     )}
                   </div>

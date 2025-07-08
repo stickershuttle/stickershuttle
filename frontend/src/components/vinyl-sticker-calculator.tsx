@@ -30,7 +30,7 @@ interface StickerCalculatorProps {
 }
 
 export default function StickerCalculator({ initialBasePricing, realPricingData }: StickerCalculatorProps) {
-  const { addToCart } = useCart();
+  const { addToCart, isRushOrder, updateAllItemsRushOrder } = useCart();
   const router = useRouter();
   const [basePricing, setBasePricing] = useState<BasePricing[]>(initialBasePricing)
   const [selectedCut, setSelectedCut] = useState("Custom Shape")
@@ -42,7 +42,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
   const [customQuantity, setCustomQuantity] = useState("")
   const [sendProof, setSendProof] = useState(true)
   const [uploadLater, setUploadLater] = useState(false)
-  const [rushOrder, setRushOrder] = useState(false)
+  // Use global rush order state from cart instead of local state
   const [totalPrice, setTotalPrice] = useState("")
   const [costPerSticker, setCostPerSticker] = useState("")
 
@@ -140,6 +140,14 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     }
   }, [additionalNotes])
 
+  // Sync with global rush order state on component mount and when it changes
+  useEffect(() => {
+    // This effect runs when the global rush order state changes
+    // No need to do anything special here since we're already using isRushOrder directly
+    // The pricing will be automatically recalculated via the updatePricing effect
+    console.log('🚀 Global rush order state changed:', isRushOrder);
+  }, [isRushOrder])
+
   // Reset Instagram options for wholesale users
   useEffect(() => {
     if (isWholesaleApproved() && postToInstagram) {
@@ -222,7 +230,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     console.log(`Quantity: ${quantity}`)
 
     if (area > 0 && quantity > 0) {
-      const { total, perSticker } = calculatePrice(quantity, area, rushOrder)
+      const { total, perSticker } = calculatePrice(quantity, area, isRushOrder)
       console.log(`Total Price: $${total.toFixed(2)}`)
       console.log(`Price Per Sticker: $${perSticker.toFixed(2)}`)
       setTotalPrice(`$${total.toFixed(2)}`)
@@ -232,7 +240,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
       setTotalPrice("")
       setCostPerSticker("")
     }
-  }, [selectedSize, customWidth, customHeight, selectedQuantity, customQuantity, rushOrder])
+  }, [selectedSize, customWidth, customHeight, selectedQuantity, customQuantity, isRushOrder])
 
   useEffect(() => {
     console.log("Recalculating price due to size or quantity change")
@@ -279,7 +287,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
                 }
               }
               if (selections.rush?.value === true) {
-                setRushOrder(true);
+                updateAllItemsRushOrder(true);
               }
               if (selections.proof?.value === false) {
                 setSendProof(false);
@@ -490,15 +498,46 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     }
   }
 
+  // Pre-validate file before upload attempt
+  const preValidateFile = (file: File): { valid: boolean; error?: string } => {
+    // Check file size (25MB limit)
+    const maxSize = 25 * 1024 * 1024; // 25MB
+    if (file.size > maxSize) {
+      return { valid: false, error: 'File size must be less than 25MB' };
+    }
+
+    // Get file extension from filename
+    const fileName = file.name.toLowerCase();
+    const fileExtension = fileName.split('.').pop();
+    
+    // Check file type - allow design files and images
+    const allowedTypes = [
+      'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+      'application/postscript', 'application/illustrator', 'image/vnd.adobe.photoshop',
+      'application/octet-stream', 'application/pdf'
+    ];
+    
+    const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ai', 'eps', 'psd', 'pdf'];
+    
+    const typeAllowed = allowedTypes.includes(file.type);
+    const extensionAllowed = fileExtension && allowedExtensions.includes(fileExtension);
+    
+    if (!typeAllowed && !extensionAllowed) {
+      return { valid: false, error: 'File must be a design file (.ai, .eps, .psd, .svg) or image (.jpg, .png, .gif, .webp) or PDF' };
+    }
+
+    return { valid: true };
+  };
+
   const handleFileUpload = async (file: File) => {
     // Reset previous states
     setUploadError(null)
     setUploadProgress(null)
     
-    // Validate file
-    const validation = validateFile(file)
-    if (!validation.valid) {
-      setUploadError(validation.error || 'Invalid file')
+    // Pre-validate file before attempting upload
+    const preValidation = preValidateFile(file)
+    if (!preValidation.valid) {
+      setUploadError(preValidation.error || 'Invalid file')
       return
     }
 
@@ -519,7 +558,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
         customQuantity: customQuantity || undefined,
         sendProof,
         uploadLater,
-        rushOrder,
+        rushOrder: isRushOrder,
         postToInstagram,
         instagramHandle: instagramHandle || undefined,
         totalPrice: totalPrice || undefined,
@@ -546,6 +585,12 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
+      // Pre-validate before upload
+      const preValidation = preValidateFile(file)
+      if (!preValidation.valid) {
+        setUploadError(preValidation.error || 'Invalid file')
+        return
+      }
       handleFileUpload(file)
     }
   }
@@ -554,6 +599,12 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     event.preventDefault()
     const file = event.dataTransfer.files?.[0]
     if (file) {
+      // Pre-validate before upload
+      const preValidation = preValidateFile(file)
+      if (!preValidation.valid) {
+        setUploadError(preValidation.error || 'Invalid file')
+        return
+      }
       handleFileUpload(file)
     }
   }
@@ -590,7 +641,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
   const createCartItem = () => {
     const area = calculateArea(selectedSize, customWidth, customHeight);
     const quantity = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity);
-    const { total, perSticker } = calculatePrice(quantity, area, rushOrder);
+    const { total, perSticker } = calculatePrice(quantity, area, isRushOrder);
 
     // Apply wholesale discount if applicable
     const { discountAmount, finalPrice } = calculateWholesaleDiscount(total);
@@ -629,7 +680,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
               priceImpact: 0 
             },
             proof: { type: "finish" as const, value: sendProof, displayValue: sendProof ? "Send Proof" : "No Proof", priceImpact: 0 },
-            rush: { type: "finish" as const, value: rushOrder, displayValue: rushOrder ? "Rush Order" : "Standard", priceImpact: rushOrder ? finalTotalPrice * 0.4 : 0 },
+            rush: { type: "finish" as const, value: isRushOrder, displayValue: isRushOrder ? "Rush Order" : "Standard", priceImpact: isRushOrder ? finalTotalPrice * 0.4 : 0 },
             ...(postToInstagram && !isWholesaleApproved() && {
               instagram: { 
                 type: "finish" as const, 
@@ -1282,7 +1333,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
                   )}
                   {/* Reserve space for rush order fee text to prevent layout shift */}
                   <div className="h-4 mb-2">
-                    {rushOrder && (
+                    {isRushOrder && (
                       <div className="text-xs text-red-300 font-medium transition-opacity duration-300">
                         *Rush Order Fee Applied
                       </div>
@@ -1523,36 +1574,49 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
 
                   {/* Rush Order Toggle */}
                   <div>
-                    <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+                    <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium relative"
                          style={{
-                           background: rushOrder 
+                           background: isRushOrder 
                              ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(239, 68, 68, 0.15) 50%, rgba(239, 68, 68, 0.05) 100%)'
                              : 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.15) 50%, rgba(59, 130, 246, 0.05) 100%)',
-                           border: rushOrder 
+                           border: isRushOrder 
                              ? '1px solid rgba(239, 68, 68, 0.4)'
                              : '1px solid rgba(59, 130, 246, 0.4)',
                            backdropFilter: 'blur(12px)'
                          }}>
                       <button
-                        onClick={() => setRushOrder(!rushOrder)}
-                        title={rushOrder ? "Switch to standard production" : "Enable rush order"}
+                        onClick={() => updateAllItemsRushOrder(!isRushOrder)}
+                        title={isRushOrder ? "Disable rush order for all cart items" : "Enable rush order for all cart items"}
                         className={`w-12 h-6 rounded-full transition-colors ${
-                          rushOrder ? 'bg-red-500' : 'bg-blue-500'
+                          isRushOrder ? 'bg-red-500' : 'bg-blue-500'
                         }`}
                       >
                         <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                          rushOrder ? 'translate-x-7' : 'translate-x-1'
+                          isRushOrder ? 'translate-x-7' : 'translate-x-1'
                         }`} />
                       </button>
-                      <label className={`text-sm font-medium ${rushOrder ? 'text-red-200' : 'text-blue-200'}`}>
-                        {rushOrder ? '🚀 Rush Order (+40%)' : '🕒 Standard Production Time'}
-                      </label>
+                      <div className="flex-1">
+                        <label className={`text-sm font-medium ${isRushOrder ? 'text-red-200' : 'text-blue-200'}`}>
+                          {isRushOrder ? '🚀 Rush Order (+40%)' : '🕒 Standard Production Time'}
+                        </label>
+                        {isRushOrder && (
+                          <div className="text-xs text-orange-200 mt-1 font-medium">
+                            🛒 Applied to entire cart
+                          </div>
+                        )}
+                      </div>
                     </div>
                     
                     {/* Rush Order Disclaimer - right under rush order toggle */}
-                    {rushOrder && (
-                      <div className="mt-3 text-xs text-white/70 leading-relaxed">
-                        *Rush Orders are prioritized in our production queue and completed within 24 hours. Orders under 3,000 stickers are usually completed on time. If you have a tight deadline or specific concerns, feel free to contact us.
+                    {isRushOrder && (
+                      <div className="mt-3 space-y-2">
+                        <div className="text-xs text-orange-300 font-medium flex items-center gap-2">
+                          <span>⚡</span>
+                          <span>Rush order is now active for ALL items in your cart (+40% to each item)</span>
+                        </div>
+                        <div className="text-xs text-white/70 leading-relaxed">
+                          *Rush Orders are prioritized in our production queue and completed within 24 hours. Orders under 3,000 stickers are usually completed on time. If you have a tight deadline or specific concerns, feel free to contact us.
+                        </div>
                       </div>
                     )}
                   </div>

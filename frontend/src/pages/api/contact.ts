@@ -15,14 +15,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please enter a valid email address'
+    });
+  }
+
   try {
+    console.log('📧 Processing contact form submission:', {
+      name,
+      email,
+      subject,
+      relatedOrder: relatedOrder || 'none',
+      messageLength: message.length
+    });
+
     // Check if we have Resend API key
     const resendApiKey = process.env.RESEND_API_KEY;
     if (!resendApiKey) {
-      console.error('RESEND_API_KEY not found in environment variables');
+      console.error('❌ RESEND_API_KEY not found in environment variables');
       return res.status(500).json({ 
         success: false, 
-        message: 'Email service not configured' 
+        message: 'Email service is temporarily unavailable. Please try again later or contact us directly.' 
       });
     }
 
@@ -30,10 +47,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const subjectMap: Record<string, string> = {
       'concern': 'Customer Concern',
       'order-issue': 'Order Issue',
+      'proof-concerns': 'Proof Concerns',
+      'shipping-delay': 'Shipping Delay',
+      'quality-issue': 'Quality Issue',
+      'refund-request': 'Refund Request',
       'design-help': 'Design Help Request',
-      'shipping': 'Shipping Question',
-      'billing': 'Billing Question',
-      'technical': 'Technical Support',
+      'billing-question': 'Billing Question',
+      'technical-issue': 'Technical Support',
+      'product-inquiry': 'Product Inquiry',
       'other': 'General Inquiry'
     };
 
@@ -72,6 +93,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       html: emailContent,
     };
 
+    console.log('🚀 Sending email to Resend API...');
+    
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -81,14 +104,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       body: JSON.stringify(emailData),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Resend API error:', errorData);
-      throw new Error(`Email service error: ${errorData.message}`);
+    const responseText = await response.text();
+    let responseData;
+    
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      console.error('❌ Failed to parse Resend API response:', responseText);
+      throw new Error('Invalid response from email service');
     }
 
-    const result = await response.json();
-    console.log('Contact form email sent successfully:', result.id);
+    if (!response.ok) {
+      console.error('❌ Resend API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: responseData
+      });
+      
+      // Handle specific Resend API errors
+      if (response.status === 429) {
+        return res.status(429).json({
+          success: false,
+          message: 'Too many requests. Please wait a moment and try again.'
+        });
+      } else if (response.status === 400) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid request. Please check your information and try again.'
+        });
+      } else if (response.status === 401) {
+        console.error('❌ Resend API authentication failed');
+        return res.status(500).json({
+          success: false,
+          message: 'Email service authentication failed. Please try again later.'
+        });
+      }
+      
+      throw new Error(`Email service error: ${responseData.message || 'Unknown error'}`);
+    }
+
+    console.log('✅ Contact form email sent successfully:', responseData.id);
 
     return res.status(200).json({ 
       success: true, 
@@ -96,10 +151,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
   } catch (error) {
-    console.error('Error sending contact form email:', error);
+    console.error('❌ Error sending contact form email:', error);
+    
+    // Return appropriate error message based on error type
+    if (error instanceof Error) {
+      if (error.message.includes('fetch')) {
+        return res.status(500).json({
+          success: false,
+          message: 'Unable to connect to email service. Please try again later.'
+        });
+      } else if (error.message.includes('timeout')) {
+        return res.status(500).json({
+          success: false,
+          message: 'Request timed out. Please try again.'
+        });
+      }
+    }
+    
     return res.status(500).json({ 
       success: false, 
-      message: 'Failed to send message. Please try again later.' 
+      message: 'Failed to send message. Please try again later or contact us directly.' 
     });
   }
 } 

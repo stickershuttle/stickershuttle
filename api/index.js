@@ -1,3 +1,7 @@
+// Initialize console suppressor for production (must be first)
+const { suppressConsoleInProduction } = require('./console-suppressor');
+suppressConsoleInProduction();
+
 // Startup logging
 console.log('🚀 Sticker Shuttle API starting...');
 if (process.env.NODE_ENV !== 'production') {
@@ -286,7 +290,7 @@ app.use(helmet({
 // Rate limiting configuration
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'development' ? 1000 : 100, // More lenient in development
+  max: process.env.NODE_ENV === 'development' ? 1000 : 500, // Much more generous for customers
   message: {
     error: 'Too many requests from this IP, please try again later.',
     retryAfter: 900
@@ -294,28 +298,42 @@ const generalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
-    // Skip rate limiting for health checks and GraphQL in development
+    // Skip rate limiting for customer-facing requests
     if (process.env.NODE_ENV === 'development') {
-      return req.path === '/health' || req.path === '/graphql' || req.path === '/health/detailed';
+      return true; // Skip all rate limiting in development
     }
-    return false;
+    
+    // Skip for essential customer paths
+    const skipPaths = [
+      '/health',
+      '/graphql',
+      '/health/detailed',
+      '/api/contact', // Allow contact form submissions
+      '/api/auth/verify' // Allow auth verification
+    ];
+    
+    return skipPaths.includes(req.path);
   }
 });
 
 const strictLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // Limit each IP to 10 uploads per hour
+  max: 50, // Increased from 10 to 50 uploads per hour
   message: {
     error: 'Too many upload attempts from this IP, please try again later.',
     retryAfter: 3600
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Skip strict limiting in development
+    return process.env.NODE_ENV === 'development';
+  }
 });
 
 const webhookLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 1000, // Allow up to 1000 webhook requests per hour
+  max: 2000, // Increased from 1000 to 2000 webhook requests per hour
   message: {
     error: 'Webhook rate limit exceeded',
     retryAfter: 3600

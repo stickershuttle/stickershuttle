@@ -3,8 +3,40 @@ import { ShoppingCart, Upload, Instagram, Clock } from 'lucide-react';
 import { uploadToCloudinary, validateFile, CloudinaryUploadResult, UploadProgress, CalculatorMetadata } from '@/utils/cloudinary';
 import AIFileImage from './AIFileImage';
 import { getSupabase } from '@/lib/supabase';
+import { useCart } from '@/components/CartContext';
+import { useRouter } from 'next/navigation';
 
-const VinylBannerCalculator: React.FC = () => {
+interface VinylBannerCalculatorProps {
+  initialBasePricing: {
+    basePrice: number;
+    finishingPrice: number;
+    subtotal: number;
+    quantityDiscount: number;
+    rushFee: number;
+    instagramFee: number;
+    total: number;
+    perUnit: number;
+    sqFt: number;
+  };
+  realPricingData: {
+    basePrice: number;
+    finishingPrice: number;
+    subtotal: number;
+    quantityDiscount: number;
+    rushFee: number;
+    instagramFee: number;
+    total: number;
+    perUnit: number;
+    sqFt: number;
+  };
+}
+
+export default function VinylBannerCalculator({ initialBasePricing, realPricingData }: VinylBannerCalculatorProps) {
+  const { addToCart, isRushOrder, updateAllItemsRushOrder } = useCart();
+  const router = useRouter();
+  // Use global rush order state from cart instead of local state
+  const [totalPrice, setTotalPrice] = useState("")
+
   const [selectedSize, setSelectedSize] = useState<string>('3x5');
   const [customWidth, setCustomWidth] = useState<string>('');
   const [customHeight, setCustomHeight] = useState<string>('');
@@ -743,39 +775,52 @@ const VinylBannerCalculator: React.FC = () => {
           <div className="space-y-4">
             {/* Rush Order Toggle */}
             <div>
-              <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+              <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium relative"
                    style={{
-                     background: rushOrder 
+                     background: isRushOrder 
                        ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(239, 68, 68, 0.15) 50%, rgba(239, 68, 68, 0.05) 100%)'
                        : 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.15) 50%, rgba(59, 130, 246, 0.05) 100%)',
-                     border: rushOrder 
+                     border: isRushOrder 
                        ? '1px solid rgba(239, 68, 68, 0.4)'
                        : '1px solid rgba(59, 130, 246, 0.4)',
                      backdropFilter: 'blur(12px)'
                    }}>
-                <button
-                  onClick={() => setRushOrder(!rushOrder)}
-                  title={rushOrder ? "Switch to standard production" : "Enable rush order"}
-                  className={`w-12 h-6 rounded-full transition-colors ${
-                    rushOrder ? 'bg-red-500' : 'bg-blue-500'
-                  }`}
-                >
-                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                    rushOrder ? 'translate-x-7' : 'translate-x-1'
-                  }`} />
-                </button>
-                <label className={`text-sm font-medium ${rushOrder ? 'text-red-200' : 'text-blue-200'}`}>
-                  {rushOrder ? '🚀 Rush Order (+35%)' : '🕒 Standard Production Time'}
-                </label>
-              </div>
-              
-              {/* Rush Order Disclaimer - right under rush order toggle */}
-              {rushOrder && (
-                <div className="mt-3 text-xs text-white/70 leading-relaxed">
-                  *Rush Orders are prioritized in our production queue and completed within 24 hours. Orders under 10 banners are completed on time. If you have a tight deadline or specific concerns, feel free to contact us.
+                  <button
+                    onClick={() => updateAllItemsRushOrder(!isRushOrder)}
+                    title={isRushOrder ? "Disable rush order for all cart items" : "Enable rush order for all cart items"}
+                    className={`w-12 h-6 rounded-full transition-colors ${
+                      isRushOrder ? 'bg-red-500' : 'bg-blue-500'
+                    }`}
+                  >
+                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                      isRushOrder ? 'translate-x-7' : 'translate-x-1'
+                    }`} />
+                  </button>
+                  <div className="flex-1">
+                    <label className={`text-sm font-medium ${isRushOrder ? 'text-red-200' : 'text-blue-200'}`}>
+                      {isRushOrder ? '🚀 Rush Order (+40%)' : '🕒 Standard Production Time'}
+                    </label>
+                    {isRushOrder && (
+                      <div className="text-xs text-orange-200 mt-1 font-medium">
+                        🛒 Applied to entire cart
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
+                
+                {/* Rush Order Disclaimer - right under rush order toggle */}
+                {isRushOrder && (
+                  <div className="mt-3 space-y-2">
+                    <div className="text-xs text-orange-300 font-medium flex items-center gap-2">
+                      <span>⚡</span>
+                      <span>Rush order is now active for ALL items in your cart (+40% to each item)</span>
+                    </div>
+                    <div className="text-xs text-white/70 leading-relaxed">
+                      *Rush Orders are prioritized in our production queue and completed within 24 hours. Orders under 3,000 stickers are usually completed on time. If you have a tight deadline or specific concerns, feel free to contact us.
+                    </div>
+                  </div>
+                )}
+              </div>
 
             {/* Instagram Post Option */}
             <div>
@@ -955,6 +1000,4 @@ const VinylBannerCalculator: React.FC = () => {
       </div>
     </>
   );
-};
-
-export default VinylBannerCalculator; 
+}; 

@@ -319,7 +319,7 @@ function Dashboard() {
   });
 
   // Fetch user profile to check wholesale status
-  const { data: profileData } = useQuery(GET_USER_PROFILE, {
+  const { data: profileData, refetch: refetchProfile } = useQuery(GET_USER_PROFILE, {
     variables: { userId: (user as any)?.id },
     skip: !(user as any)?.id,
     fetchPolicy: 'cache-first', // Use cache to reduce API calls
@@ -343,6 +343,31 @@ function Dashboard() {
       // Handle rate limiting gracefully
       if (error.message?.includes('429') || error.message?.includes('rate')) {
         console.warn('🚦 Profile query rate limited - using cached data');
+        
+        // Try to use cached profile photo if available
+        const cachedPhoto = localStorage.getItem('userProfilePhoto');
+        if (cachedPhoto) {
+          setCachedProfilePhoto(cachedPhoto);
+          console.log('✅ Using cached profile photo during rate limit');
+        }
+        
+        // Set a basic profile object to maintain functionality
+        if (!profile) {
+          setProfile({
+            profile_photo_url: cachedPhoto,
+            firstName: (user as any)?.user_metadata?.first_name || '',
+            lastName: (user as any)?.user_metadata?.last_name || '',
+            email: (user as any)?.email || ''
+          });
+        }
+      } else {
+        console.error('❌ Profile query failed with non-rate-limit error:', error);
+        
+        // Still try to maintain basic functionality
+        const cachedPhoto = localStorage.getItem('userProfilePhoto');
+        if (cachedPhoto) {
+          setCachedProfilePhoto(cachedPhoto);
+        }
       }
     }
   });
@@ -645,6 +670,157 @@ function Dashboard() {
     }
     setProfilePhotoLoading(false);
   }, []);
+
+  // Enhanced avatar assignment function that works even with rate limiting
+  const handleAssignRandomAvatar = async () => {
+    if (!user || !confirm('Are you sure you want to reset your profile photo to a different random avatar?')) return;
+    
+    setUploadingProfilePhoto(true);
+    try {
+      // Get a random default avatar
+      const { getRandomAvatar } = await import('../../utils/avatars');
+      const randomAvatar = getRandomAvatar();
+      console.log('🎭 Assigning new random avatar:', randomAvatar);
+
+      const supabase = await getSupabase();
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          profile_photo_url: randomAvatar,
+          profile_photo_public_id: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', (user as any).id);
+
+      if (error) {
+        console.error('❌ Database update failed:', error);
+        throw error;
+      }
+
+      // Update local state immediately
+      setProfile((prev: any) => ({
+        ...prev,
+        profile_photo_url: randomAvatar,
+        profile_photo_public_id: null
+      }));
+      
+      // Update cached photo
+      setCachedProfilePhoto(randomAvatar);
+      localStorage.setItem('userProfilePhoto', randomAvatar);
+
+      // Broadcast profile update to other components (like UniversalHeader)
+      window.dispatchEvent(new CustomEvent('profileUpdated', {
+        detail: {
+          profile_photo_url: randomAvatar,
+          profile_photo_public_id: null
+        }
+      }));
+      
+      setSettingsNotification({
+        message: 'Profile photo updated with new random avatar',
+        type: 'success'
+      });
+      setTimeout(() => setSettingsNotification(null), 3000);
+      
+      console.log('✅ Random avatar assigned successfully');
+    } catch (error) {
+      console.error('❌ Error assigning random avatar:', error);
+      setSettingsNotification({
+        message: 'Failed to update profile photo. Please try again.',
+        type: 'error'
+      });
+      setTimeout(() => setSettingsNotification(null), 3000);
+    } finally {
+      setUploadingProfilePhoto(false);
+    }
+  };
+
+  // Enhanced avatar assignment for first-time users
+  const handleAssignInitialAvatar = async () => {
+    if (!user) return;
+    
+    try {
+      // Get a random default avatar
+      const { getRandomAvatar } = await import('../../utils/avatars');
+      const randomAvatar = getRandomAvatar();
+      console.log('🎭 Assigning initial random avatar:', randomAvatar);
+
+      const supabase = await getSupabase();
+      
+      // First ensure user profile exists
+      const { data: existingProfile } = await supabase
+        .from('user_profiles')
+        .select('user_id')
+        .eq('user_id', (user as any).id)
+        .single();
+
+      if (!existingProfile) {
+        // Create profile if it doesn't exist
+        const { error: insertError } = await supabase
+          .from('user_profiles')
+          .insert({
+            user_id: (user as any).id,
+            profile_photo_url: randomAvatar,
+            profile_photo_public_id: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+
+        if (insertError) {
+          console.error('❌ Failed to create profile:', insertError);
+          throw insertError;
+        }
+      } else {
+        // Update existing profile
+        const { error: updateError } = await supabase
+          .from('user_profiles')
+          .update({
+            profile_photo_url: randomAvatar,
+            profile_photo_public_id: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', (user as any).id);
+
+        if (updateError) {
+          console.error('❌ Failed to update profile:', updateError);
+          throw updateError;
+        }
+      }
+
+      // Update local state
+      setProfile((prev: any) => ({
+        ...prev,
+        profile_photo_url: randomAvatar,
+        profile_photo_public_id: null
+      }));
+      
+      // Update cached photo
+      setCachedProfilePhoto(randomAvatar);
+      localStorage.setItem('userProfilePhoto', randomAvatar);
+
+      console.log('✅ Initial avatar assigned successfully');
+    } catch (error) {
+      console.error('❌ Error assigning initial avatar:', error);
+      
+      // Still cache the avatar locally even if database fails
+      const { getRandomAvatar } = await import('../../utils/avatars');
+      const randomAvatar = getRandomAvatar();
+      setCachedProfilePhoto(randomAvatar);
+      localStorage.setItem('userProfilePhoto', randomAvatar);
+    }
+  };
+
+  // Auto-assign avatar if user doesn't have one
+  useEffect(() => {
+    if (user && !profilePhotoLoading && !cachedProfilePhoto && !profile?.profile_photo_url) {
+      // Small delay to avoid rapid calls
+      const timer = setTimeout(() => {
+        handleAssignInitialAvatar();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [user, profilePhotoLoading, cachedProfilePhoto, profile?.profile_photo_url]);
 
   // Check for order completion on mount
   useEffect(() => {
@@ -1192,10 +1368,42 @@ function Dashboard() {
           });
         }, 3000);
       } else {
-        throw new Error('Failed to send message');
+        // Get more specific error information
+        const errorData = await response.json().catch(() => null);
+        const errorMessage = errorData?.message || 'Failed to send message. Please try again.';
+        
+        // Show error notification to user
+        setActionNotification({
+          message: errorMessage,
+          type: 'error'
+        });
+        setTimeout(() => setActionNotification(null), 5000);
+        
+        console.error('Contact form submission failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData
+        });
       }
     } catch (error) {
       console.error('Error submitting contact form:', error);
+      
+      // Show user-friendly error message
+      let errorMessage = 'Network error. Please check your connection and try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('fetch')) {
+          errorMessage = 'Unable to reach our servers. Please check your internet connection.';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'Request timed out. Please try again.';
+        }
+      }
+      
+      setActionNotification({
+        message: errorMessage,
+        type: 'error'
+      });
+      setTimeout(() => setActionNotification(null), 5000);
     } finally {
       setIsSubmittingContact(false);
     }
@@ -2322,10 +2530,28 @@ function Dashboard() {
                     
                     <div className="flex-1 min-w-0">
                       {/* Greeting Section */}
-                      <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-white mb-1"
-                          style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif' }}>
-                        Greetings, {getUserDisplayName()}
-                      </h1>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-white"
+                            style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif' }}>
+                          Greetings, {getUserDisplayName()}
+                        </h1>
+                        {/* Small Random Avatar Button */}
+                        <button
+                          onClick={handleAssignRandomAvatar}
+                          className="ml-2 px-2 py-1 rounded-md text-xs font-medium transition-all duration-200 transform hover:scale-105 pointer-events-auto"
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                            backdropFilter: 'blur(25px) saturate(180%)',
+                            border: '1px solid rgba(59, 130, 246, 0.4)',
+                            boxShadow: 'rgba(59, 130, 246, 0.15) 0px 4px 16px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                            color: 'white'
+                          }}
+                          disabled={uploadingProfilePhoto}
+                          title="Get a new random avatar"
+                        >
+                          {uploadingProfilePhoto ? '...' : '🎲'}
+                        </button>
+                      </div>
                       <div className="flex items-center gap-2 mb-1 md:mb-2">
                         <p className="text-xs md:text-sm text-gray-200">
                           Mission Control Dashboard
