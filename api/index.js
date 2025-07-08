@@ -7104,6 +7104,7 @@ const resolvers = {
           error: error.message,
           profileId: null
         };
+      }
     },
 
     unsubscribeFromKlaviyo: async (_, { email, listId }) => {
