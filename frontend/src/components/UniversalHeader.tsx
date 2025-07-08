@@ -2,14 +2,16 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { getSupabase } from '../lib/supabase';
+import { getSupabase } from '@/lib/supabase';
+import { useQuery } from '@apollo/client';
+import { GET_USER_CREDIT_BALANCE } from '@/lib/credit-mutations';
 import CartIndicator from './CartIndicator';
 
 export default function UniversalHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState<boolean>(false);
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // Start as false to prevent flash
   const [authError, setAuthError] = useState<boolean>(false);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [orderSearch, setOrderSearch] = useState<string>('');
@@ -17,6 +19,7 @@ export default function UniversalHeader() {
   const [showProfileDropdown, setShowProfileDropdown] = useState<boolean>(false);
   const [creditBalance, setCreditBalance] = useState<number>(0);
   const [creditBalanceLoaded, setCreditBalanceLoaded] = useState<boolean>(false);
+  const [initialAuthCheck, setInitialAuthCheck] = useState<boolean>(false); // Track initial auth check
   const router = useRouter();
 
   // Admin emails list - same as in admin dashboard
@@ -33,22 +36,31 @@ export default function UniversalHeader() {
     }
   };
 
+  // GraphQL query for credit balance - replaces the direct database query
+  const { data: creditData, refetch: refetchCreditBalance } = useQuery(GET_USER_CREDIT_BALANCE, {
+    variables: { userId: user?.id },
+    skip: !user?.id,
+    onCompleted: (data) => {
+      if (data?.getUserCreditBalance) {
+        setCreditBalance(data.getUserCreditBalance.balance || 0);
+        setCreditBalanceLoaded(true);
+      }
+    },
+    onError: (error) => {
+      console.warn('Credit balance fetch failed (non-critical):', error);
+      setCreditBalance(0);
+      setCreditBalanceLoaded(true);
+    }
+  });
+
   useEffect(() => {
     let isMounted = true;
     let authSubscription: any = null;
     
     // Listen for profile updates from other components
     const handleProfileUpdate = (event: CustomEvent) => {
-      if (isMounted && event.detail) {
-        console.log('🔄 Universal Header received profile update:', event.detail);
-        setProfile((prev: any) => {
-          const updated = {
-            ...prev,
-            ...event.detail
-          };
-          console.log('📸 Universal Header profile updated:', updated);
-          return updated;
-        });
+      if (isMounted && event.detail && event.detail.profile) {
+        setProfile(event.detail.profile);
       }
     };
 
@@ -63,7 +75,7 @@ export default function UniversalHeader() {
         const supabase = await getSupabase();
         
         // Set up auth state listener first
-        authSubscription = supabase.auth.onAuthStateChange(async (event, session) => {
+        authSubscription = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
           if (!isMounted) return;
           
           // console.log('🔐 Auth state changed:', event, session?.user?.email);
@@ -95,6 +107,7 @@ export default function UniversalHeader() {
           if (isMounted) {
             setAuthError(true);
             setLoading(false);
+            setInitialAuthCheck(true); // Mark initial auth check as complete even on error
           }
           return;
         }
@@ -104,6 +117,7 @@ export default function UniversalHeader() {
           await handleUserSession(session, supabase);
         } else if (isMounted) {
           setLoading(false);
+          setInitialAuthCheck(true); // Mark initial auth check as complete
         }
 
       } catch (error) {
@@ -111,6 +125,7 @@ export default function UniversalHeader() {
         if (isMounted) {
           setAuthError(true);
           setLoading(false);
+          setInitialAuthCheck(true); // Mark initial auth check as complete even on error
         }
       }
     };
@@ -138,10 +153,12 @@ export default function UniversalHeader() {
         console.error('Error handling user session:', error);
         if (isMounted) {
           setAuthError(true);
+          setInitialAuthCheck(true); // Mark initial auth check as complete even on error
         }
       } finally {
         if (isMounted) {
           setLoading(false);
+          setInitialAuthCheck(true); // Mark initial auth check as complete
         }
       }
     };
@@ -163,41 +180,11 @@ export default function UniversalHeader() {
             }
             return profileData;
           });
-          // Fetch credit balance
-          fetchCreditBalance(userId, supabase);
+          // Credit balance will be fetched by GraphQL query automatically
         }
       } catch (profileError) {
         // Profile errors shouldn't affect auth state
         console.warn('Profile fetch failed (non-critical):', profileError);
-      }
-    };
-
-    // Fetch user's credit balance
-    const fetchCreditBalance = async (userId: string, supabase: any) => {
-      try {
-        // Use the user_credit_balance view which aggregates all transactions
-        const { data: creditData, error } = await supabase
-          .from('user_credit_balance')
-          .select('total_credits')
-          .eq('user_id', userId)
-          .single();
-
-        if (isMounted) {
-          if (!error && creditData && creditData.total_credits !== null) {
-            setCreditBalance(Number(creditData.total_credits) || 0);
-          } else {
-            // User doesn't have any credit transactions yet, set to 0
-            setCreditBalance(0);
-          }
-          setCreditBalanceLoaded(true);
-        }
-      } catch (creditError) {
-        // Credit balance errors shouldn't affect auth state
-        console.warn('Credit balance fetch failed (non-critical):', creditError);
-        if (isMounted) {
-          setCreditBalance(0);
-          setCreditBalanceLoaded(true);
-        }
       }
     };
 
@@ -212,6 +199,7 @@ export default function UniversalHeader() {
       setShowProfileDropdown(false);
       setCreditBalance(0);
       setCreditBalanceLoaded(false);
+      setInitialAuthCheck(true); // Keep auth check marked as complete to prevent flash
     };
 
     // Initialize authentication
@@ -228,6 +216,13 @@ export default function UniversalHeader() {
     };
   }, []);
 
+  // Refetch credit balance when user changes
+  useEffect(() => {
+    if (user?.id && refetchCreditBalance) {
+      refetchCreditBalance();
+    }
+  }, [user?.id, refetchCreditBalance]);
+
   const handleSignOut = async () => {
     try {
       const supabase = await getSupabase();
@@ -237,6 +232,7 @@ export default function UniversalHeader() {
       setShowProfileDropdown(false);
       setCreditBalance(0);
       setCreditBalanceLoaded(false);
+      setInitialAuthCheck(true); // Keep auth check marked as complete
       router.push('/');
     } catch (error) {
       console.error('Error signing out:', error);
@@ -275,9 +271,9 @@ export default function UniversalHeader() {
     };
   }, [isAdminPage]);
 
-  // Determine visibility for authentication UI elements
-  const showAccountDashboard = user && !authError && !loading;
-  const showLoginSignupButtons = !showAccountDashboard;
+  // Determine visibility for authentication UI elements with better logic
+  const showAccountDashboard = user && !authError && initialAuthCheck;
+  const showLoginSignupButtons = !showAccountDashboard && initialAuthCheck;
 
   return (
     <>
@@ -674,8 +670,8 @@ export default function UniversalHeader() {
               </Link>
             )}
             
-                        {/* Store Credit Balance - Show for logged in users when loaded */}
-            {!isAdminPage && showAccountDashboard && creditBalanceLoaded && (
+                        {/* Store Credit Balance - Always show container for logged in users */}
+            {!isAdminPage && showAccountDashboard && (
               <Link 
                 href="/account/dashboard?view=financial"
                 className="px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
@@ -683,11 +679,31 @@ export default function UniversalHeader() {
                   background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.15) 50%, rgba(255, 215, 0, 0.05) 100%)',
                   border: '1px solid rgba(255, 215, 0, 0.4)',
                   boxShadow: '0 8px 32px rgba(255, 215, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(12px)'
+                  backdropFilter: 'blur(12px)',
+                  minHeight: '40px' // Ensure consistent height
                 }}
               >
                 <i className="fas fa-coins text-yellow-300"></i>
-                <span className="text-yellow-200">${creditBalance.toFixed(2)}</span>
+                {creditBalanceLoaded ? (
+                  <span className="text-yellow-200 leading-5">${creditBalance.toFixed(2)}</span>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <div 
+                      className="bg-yellow-300/30 rounded animate-pulse leading-5"
+                      style={{ 
+                        width: '12px', 
+                        height: '20px' // Match text height exactly
+                      }}
+                    ></div>
+                    <div 
+                      className="bg-yellow-300/30 rounded animate-pulse leading-5"
+                      style={{ 
+                        width: '28px', 
+                        height: '20px' // Match text height exactly
+                      }}
+                    ></div>
+                  </div>
+                )}
               </Link>
             )}
             
@@ -926,7 +942,7 @@ export default function UniversalHeader() {
           <div className="p-4">
             {/* Profile Header */}
             <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/10">
-              <div className="w-12 h-12 aspect-square rounded-full overflow-hidden">
+              <div className="w-10 h-10 flex-shrink-0 rounded-full overflow-hidden">
                 {profile?.profile_photo_url ? (
                   <img 
                     src={profile.profile_photo_url} 
@@ -934,14 +950,14 @@ export default function UniversalHeader() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full aspect-square bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-lg font-bold rounded-full">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-bold rounded-full">
                     {getUserDisplayName().charAt(0).toUpperCase()}
                   </div>
                 )}
               </div>
-              <div>
-                <h3 className="text-white font-semibold">{getUserDisplayName()}</h3>
-                <p className="text-gray-300 text-sm">{user?.email}</p>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-white font-semibold truncate">{getUserDisplayName()}</h3>
+                <p className="text-gray-300 text-sm truncate">{user?.email}</p>
               </div>
             </div>
 

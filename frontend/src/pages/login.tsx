@@ -55,8 +55,9 @@ export default function Login() {
         return;
       }
 
-      // Success! Redirect to dashboard
-      router.push('/account/dashboard');
+      // Success! Redirect to specified URL or dashboard
+      const redirectUrl = router.query.redirect as string || '/account/dashboard';
+      router.push(redirectUrl);
       
     } catch (err: any) {
       setError(err.message || 'An error occurred during login');
@@ -82,7 +83,7 @@ export default function Login() {
             access_type: 'offline',
             prompt: 'select_account', // Changed from 'consent' to 'select_account' for better UX
           },
-          redirectTo: `${window.location.origin}/account/dashboard`
+          redirectTo: `${window.location.origin}${router.query.redirect as string || '/account/dashboard'}`
         }
       });
 

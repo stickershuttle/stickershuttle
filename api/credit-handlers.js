@@ -204,45 +204,37 @@ const getUserCreditBalance = async (userId) => {
   try {
     const client = supabase.getServiceClient();
     
-    // Get balance directly from the user_credit_balance view
-    const { data: stats, error: statsError } = await client
-      .from('user_credit_balance')
-      .select('total_credits, transaction_count, last_transaction_date')
-      .eq('user_id', userId)
-      .single();
+    console.log(`💳 Calculating credit balance for user ${userId} directly from transactions`);
     
-    if (statsError) {
-      console.error('Error getting credit balance from view:', statsError);
-      // Try alternative approach - sum from credits table
-      const { data: transactions, error: txError } = await client
-        .from('credits')
-        .select('amount')
-        .eq('user_id', userId);
-      
-      if (txError) {
-        throw txError;
-      }
-      
-      // Calculate balance from transactions
-      const balance = transactions?.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0) || 0;
-      
-      return {
-        balance: balance,
-        transactionCount: transactions?.length || 0,
-        lastTransactionDate: null
-      };
+    // Always calculate balance directly from transactions (don't use the view)
+    const { data: transactions, error: txError } = await client
+      .from('credits')
+      .select('amount, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    if (txError) {
+      console.error('❌ Error fetching credit transactions:', txError);
+      throw txError;
     }
     
-    // Parse the balance from the view
-    const balance = parseFloat(stats?.total_credits) || 0;
+    // Calculate balance from transactions
+    const balance = transactions?.reduce((sum, tx) => {
+      const amount = parseFloat(tx.amount) || 0;
+      return sum + amount;
+    }, 0) || 0;
+    
+    const lastTransaction = transactions && transactions.length > 0 ? transactions[0] : null;
+    
+    console.log(`💳 Credit balance calculated: $${balance.toFixed(2)} from ${transactions?.length || 0} transactions`);
     
     return {
       balance: balance,
-      transactionCount: stats?.transaction_count || 0,
-      lastTransactionDate: stats?.last_transaction_date || null
+      transactionCount: transactions?.length || 0,
+      lastTransactionDate: lastTransaction?.created_at || null
     };
   } catch (error) {
-    console.error('Error getting user credit balance:', error);
+    console.error('❌ Error calculating user credit balance:', error);
     // Return safe defaults instead of throwing
     return {
       balance: 0,
@@ -529,22 +521,33 @@ const getUserCreditHistory = async (userId) => {
   }
 };
 
-// Apply credits to order
+// Apply credits to order (using corrected deductCredits function)
 const applyCreditsToOrder = async (orderId, amount, userId) => {
   try {
-    const client = supabase.getServiceClient();
-    const safeAmount = parseFloat(amount) || 0;
+    console.log(`💳 Applying credits to order ${orderId}: $${amount} for user ${userId}`);
     
-    // Deduct credits by adding a negative amount
-    const { data, error } = await client
-      .rpc('add_user_credits_with_order', {
-        p_user_id: userId,
-        p_amount: -safeAmount, // Negative amount to deduct
-        p_reason: `Credits applied to order ${orderId}`,
-        p_order_id: orderId
-      });
+    // Use the corrected deductCredits function instead of the buggy RPC
+    const deductResult = await deductCredits(
+      userId,
+      amount,
+      `Credits applied to order ${orderId}`,
+      'used',
+      orderId
+    );
     
-    if (error) throw error;
+    if (deductResult.alreadyDeducted) {
+      console.log('✅ Credits were already deducted for this order:', deductResult);
+      
+      // Get remaining balance
+      const balance = await getUserCreditBalance(userId);
+      const safeBalance = parseFloat(balance.balance) || 0;
+      
+      return {
+        success: true,
+        remainingBalance: safeBalance,
+        message: 'Credits already applied to this order'
+      };
+    }
     
     // Get remaining balance
     const balance = await getUserCreditBalance(userId);
@@ -555,7 +558,7 @@ const applyCreditsToOrder = async (orderId, amount, userId) => {
       remainingBalance: safeBalance
     };
   } catch (error) {
-    console.error('Error applying credits to order:', error);
+    console.error('❌ Error applying credits to order:', error);
     // Try to get current balance for fallback
     try {
       const fallbackBalance = await getUserCreditBalance(userId);
@@ -574,10 +577,10 @@ const applyCreditsToOrder = async (orderId, amount, userId) => {
   }
 };
 
-// Deduct credits from user (for order processing)
+// Deduct credits from user (using corrected deductCredits function)
 const deductUserCredits = async ({ userId, amount, reason, orderId, transactionType }) => {
   try {
-    const client = supabase.getServiceClient();
+    console.log(`💳 Deducting user credits: $${amount} for user ${userId}, order ${orderId}`);
     
     // Get current balance first
     const currentBalance = await getUserCreditBalance(userId);
@@ -592,16 +595,30 @@ const deductUserCredits = async ({ userId, amount, reason, orderId, transactionT
       };
     }
     
-    // Deduct credits by adding a negative amount
-    const { data, error } = await client
-      .rpc('add_user_credits_with_order', {
-        p_user_id: userId,
-        p_amount: -safeAmount, // Negative amount to deduct
-        p_reason: reason || `Credits deducted for order ${orderId}`,
-        p_order_id: orderId
-      });
+    // Use the corrected deductCredits function instead of the buggy RPC
+    const deductResult = await deductCredits(
+      userId,
+      safeAmount,
+      reason || `Credits deducted for order ${orderId}`,
+      transactionType || 'used',
+      orderId
+    );
     
-    if (error) throw error;
+    if (deductResult.alreadyDeducted) {
+      console.log('✅ Credits were already deducted for this order:', deductResult);
+      
+      // Get updated balance
+      const updatedBalance = await getUserCreditBalance(userId);
+      const safeUpdatedBalance = parseFloat(updatedBalance.balance) || 0;
+      
+      return {
+        success: true,
+        transactionId: deductResult.id,
+        remainingBalance: safeUpdatedBalance,
+        deductedAmount: Math.abs(deductResult.amount),
+        message: 'Credits already deducted for this order'
+      };
+    }
     
     // Get updated balance
     const updatedBalance = await getUserCreditBalance(userId);
@@ -609,12 +626,12 @@ const deductUserCredits = async ({ userId, amount, reason, orderId, transactionT
     
     return {
       success: true,
-      transactionId: data?.id || null,
+      transactionId: deductResult.id,
       remainingBalance: safeUpdatedBalance,
       deductedAmount: safeAmount
     };
   } catch (error) {
-    console.error('Error deducting user credits:', error);
+    console.error('❌ Error deducting user credits:', error);
     // Get current balance for fallback
     try {
       const fallbackBalance = await getUserCreditBalance(userId);
@@ -749,11 +766,6 @@ const earnPointsFromPurchase = async (userId, orderTotal, orderId) => {
     const creditRate = 0.05; // 5% cashback rate
     const creditAmount = orderTotal * creditRate;
     
-    // Get current balance first
-    const currentBalance = await getUserCreditBalance(userId);
-    const safeCurrentBalance = parseFloat(currentBalance.balance) || 0;
-    const newBalance = safeCurrentBalance + creditAmount;
-    
     // Try to insert earned credits with additional safeguards
     try {
       // Double-check right before insert (to catch race conditions)
@@ -774,13 +786,12 @@ const earnPointsFromPurchase = async (userId, orderTotal, orderId) => {
         };
       }
       
-      // Insert earned credits
+      // Insert earned credits WITHOUT balance field (balance calculated dynamically)
       const { data, error } = await client
         .from('credits')
         .insert({
           user_id: userId,
           amount: creditAmount,
-          balance: newBalance,
           reason: `Earned from order (${Math.round(creditRate * 100)}% rate)`,
           transaction_type: 'earned',
           order_id: orderId,
@@ -802,7 +813,7 @@ const earnPointsFromPurchase = async (userId, orderTotal, orderId) => {
         throw error;
       }
       
-      // Get updated balance to confirm
+      // Get updated balance to confirm (calculated dynamically)
       const updatedBalance = await getUserCreditBalance(userId);
       const isWholesale = false; // Fixed rate for all users
       

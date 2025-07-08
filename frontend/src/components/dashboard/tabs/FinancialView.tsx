@@ -83,7 +83,7 @@ const FinancialView: React.FC<FinancialViewProps> = ({
                borderRadius: '16px'
              }}>
           <h3 className="text-yellow-300 text-sm font-medium flex items-center justify-center gap-2">
-            <span>🎉</span>
+            <i className="fas fa-coins"></i>
             <span>Store Credit</span>
           </h3>
           <p className="text-white text-2xl font-bold">${creditBalance.toFixed(2)}</p>

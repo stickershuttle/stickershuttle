@@ -971,7 +971,7 @@ export default function ClearStickerCalculator({ initialBasePricing, realPricing
                       >
                         <div className="flex items-center gap-3">
                           <span className="font-medium">{amount}</span>
-                          {amount === "100" && <span className="text-green-400">⭐</span>}
+                          
                           {isGoldTier && <span className="text-yellow-400">👑</span>}
                         </div>
 

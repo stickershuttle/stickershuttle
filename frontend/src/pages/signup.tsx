@@ -52,12 +52,35 @@ export default function SignUp() {
     }
   }, [router.query.email]);
 
+  // Phone number formatting function
+  const formatPhoneNumber = (value: string) => {
+    // Remove all non-digit characters
+    const phoneNumber = value.replace(/\D/g, '');
+    
+    // Format as XXX-XXX-XXXX
+    if (phoneNumber.length >= 6) {
+      return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6, 10)}`;
+    } else if (phoneNumber.length >= 3) {
+      return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(3)}`;
+    } else {
+      return phoneNumber;
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const checked = 'checked' in e.target ? e.target.checked : false;
+    
+    let processedValue = value;
+    
+    // Apply phone number formatting for phone number fields
+    if (name === 'phoneNumber' && type !== 'checkbox') {
+      processedValue = formatPhoneNumber(value);
+    }
+    
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : processedValue
     }));
   };
 
@@ -144,10 +167,13 @@ export default function SignUp() {
         return;
       }
 
-      // Basic URL validation
-      if (!formData.companyWebsite.startsWith('http://') && !formData.companyWebsite.startsWith('https://')) {
-        console.log('❌ Invalid company website URL');
-        setError('Please enter a valid website URL (starting with http:// or https://)');
+      // Basic URL validation - check for valid domain format
+      const websitePattern = /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.([a-zA-Z]{2,}|[a-zA-Z]{2,}\.[a-zA-Z]{2,})$/;
+      const cleanWebsite = formData.companyWebsite.replace(/^(https?:\/\/)?(www\.)?/, '');
+      
+      if (!websitePattern.test(cleanWebsite)) {
+        console.log('❌ Invalid company website format');
+        setError('Please enter a valid website (e.g., yourcompany.com)');
         setLoading(false);
         return;
       }
@@ -213,7 +239,11 @@ export default function SignUp() {
       // Only add phone number and company website for wholesale accounts
       if (formData.isWholesale) {
         metadataToSend.phone_number = directPhoneNumber;
-        metadataToSend.company_website = directCompanyWebsite;
+        // Ensure website has protocol for storage
+        const formattedWebsite = directCompanyWebsite.startsWith('http') 
+          ? directCompanyWebsite 
+          : `https://${directCompanyWebsite.replace(/^www\./, '')}`;
+        metadataToSend.company_website = formattedWebsite;
       }
       console.log('📦 Metadata being sent:', metadataToSend);
       
@@ -340,6 +370,11 @@ export default function SignUp() {
           
           if (formData.isWholesale) {
             console.log('🏪 Creating wholesale user profile');
+            // Ensure website has protocol for storage
+            const formattedWebsite = formData.companyWebsite.startsWith('http') 
+              ? formData.companyWebsite 
+              : `https://${formData.companyWebsite.replace(/^www\./, '')}`;
+              
             await createWholesaleUserProfile({
               variables: {
                 userId: data.user.id,
@@ -347,7 +382,7 @@ export default function SignUp() {
                   firstName: userFirstName,
                   lastName: userLastName,
                   phoneNumber: formData.phoneNumber,
-                  companyWebsite: formData.companyWebsite,
+                  companyWebsite: formattedWebsite,
                   companyName: formData.companyName,
                   wholesaleMonthlyCustomers: formData.wholesaleMonthlyCustomers,
                   wholesaleOrderingFor: formData.wholesaleOrderingFor,
@@ -425,8 +460,9 @@ export default function SignUp() {
         // Don't block signup if Resend fails
       }
       
-      // Redirect to dashboard after successful verification
-      router.push('/account/dashboard');
+      // Redirect to specified URL or dashboard after successful verification
+      const redirectUrl = router.query.redirect as string || '/account/dashboard';
+      router.push(redirectUrl);
       
     } catch (err: any) {
       setError(err.message || 'An error occurred during verification');
@@ -477,7 +513,7 @@ export default function SignUp() {
             access_type: 'offline',
             prompt: 'select_account', // Changed from 'consent' to 'select_account' for better UX
           },
-          redirectTo: `${window.location.origin}/account/dashboard`
+          redirectTo: `${window.location.origin}${router.query.redirect as string || '/account/dashboard'}`
         }
       });
 
@@ -835,8 +871,9 @@ export default function SignUp() {
                       name="phoneNumber"
                       value={formData.phoneNumber}
                       onChange={handleInputChange}
+                      maxLength={12}
                       className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                      placeholder="(555) 123-4567"
+                      placeholder="555-123-4567"
                       required={formData.isWholesale}
                     />
                   </div>
@@ -853,7 +890,7 @@ export default function SignUp() {
                       value={formData.companyWebsite}
                       onChange={handleInputChange}
                       className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                      placeholder="https://yourcompany.com"
+                      placeholder="yourcompany.com"
                       required={formData.isWholesale}
                     />
                   </div>
@@ -1243,8 +1280,9 @@ export default function SignUp() {
                             name="phoneNumber"
                             value={formData.phoneNumber}
                             onChange={handleInputChange}
+                            maxLength={12}
                             className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                            placeholder="(555) 123-4567"
+                            placeholder="555-123-4567"
                             required={formData.isWholesale}
                           />
                         </div>
@@ -1261,7 +1299,7 @@ export default function SignUp() {
                             value={formData.companyWebsite}
                             onChange={handleInputChange}
                             className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                            placeholder="https://yourcompany.com"
+                            placeholder="yourcompany.com"
                             required={formData.isWholesale}
                           />
                         </div>

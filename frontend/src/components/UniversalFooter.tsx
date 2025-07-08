@@ -222,8 +222,8 @@ export default function UniversalFooter() {
                   alt="Sticker Shuttle Logo" 
                   className="h-10 w-auto object-contain footer-logo-hover cursor-pointer"
                 />
-                <span className="holographic-v3 text-sm px-3 py-1 rounded-full">
-                  v3.0
+                <span className="holographic-v3-container text-sm px-3 py-1 rounded-full">
+                  <span className="holographic-v3-text">v3.0</span>
                 </span>
               </div>
               
@@ -279,7 +279,18 @@ export default function UniversalFooter() {
           100% { transform: scale(1.15) rotate(-3deg); }
         }
 
-        .holographic-v3 {
+        .holographic-v3-container {
+          /* Static pill background styles */
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          backdrop-filter: blur(10px);
+          box-shadow: 0 0 20px rgba(255, 255, 255, 0.3), 
+                      inset 0 0 20px rgba(255, 255, 255, 0.1);
+          font-weight: normal;
+          background: rgba(255, 255, 255, 0.1);
+        }
+
+        .holographic-v3-text {
+          /* Animated text color only */
           background: linear-gradient(45deg, 
             #ff0080, #ff8000, #ffff00, #80ff00, 
             #00ff80, #0080ff, #8000ff, #ff0080);
@@ -288,11 +299,6 @@ export default function UniversalFooter() {
           color: transparent;
           background-clip: text;
           -webkit-background-clip: text;
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          backdrop-filter: blur(10px);
-          box-shadow: 0 0 20px rgba(255, 255, 255, 0.3), 
-                      inset 0 0 20px rgba(255, 255, 255, 0.1);
-          font-weight: normal;
         }
 
         @keyframes holographic-shift {

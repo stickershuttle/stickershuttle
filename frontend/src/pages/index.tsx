@@ -150,25 +150,45 @@ export default function Home() {
         <section className="relative pt-[20px]">
                       <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4 pb-4">
             <div 
-              className="rounded-2xl p-12 relative overflow-hidden min-h-[400px]"
+              className="rounded-2xl pt-12 px-12 pb-8 relative overflow-hidden min-h-[400px] hero-banner"
               style={{
-                backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751382016/StickerShuttle_Banner_Main_nlzoro.png)',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center bottom',
-                backgroundRepeat: 'no-repeat',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
                 boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
                 backdropFilter: 'blur(12px)'
               }}
             >
               <div className="text-center relative z-10">
+                {/* Earn 5% back above H1 - pill container on desktop, text/icon on mobile */}
+                <div className="mb-4">
+                  {/* Desktop pill container */}
+                  <div className="hidden md:flex items-center justify-center">
+                    <div className="px-4 py-2 rounded-full text-xs font-medium flex items-center gap-2"
+                         style={{
+                           background: 'linear-gradient(135deg, rgba(255, 215, 19, 0.3) 0%, rgba(255, 215, 19, 0.15) 50%, rgba(255, 215, 19, 0.05) 100%)',
+                           border: '1px solid rgba(255, 215, 19, 0.4)',
+                           backdropFilter: 'blur(12px)',
+                           color: '#fbbf24'
+                         }}>
+                      <i className="fas fa-coins"></i>
+                      <span>Earn 5% back on every order</span>
+                    </div>
+                  </div>
+                  
+                  {/* Mobile text/icon */}
+                  <div className="md:hidden flex items-center justify-center gap-2 text-xs" style={{ color: '#fbbf24' }}>
+                    <i className="fas fa-coins text-xs"></i>
+                    <span>Earn 5% back on every order</span>
+                  </div>
+                </div>
+
                 <h1 className="text-4xl sm:text-5xl md:text-6xl mb-4 leading-none" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
-                  <span className="block sm:inline">Tired of waiting weeks</span>
-                  <span className="block sm:inline md:block"> to get your stickers?</span>
+                  <span className="block md:inline">Tired of waiting</span>
+                  <span className="block md:inline"> weeks to get</span>
+                  <span className="block md:block"> your stickers?</span>
                 </h1>
                 <p className="text-lg sm:text-xl mb-6 text-purple-100">
-                  <span className="block sm:inline md:block">See why brands like Amazon, Nike Football, and thousands of others</span>
-                  <span className="block sm:inline md:inline"> trust us with their business.</span>
+                  <span className="block sm:inline md:block">See why brands like Amazon, Nike Football,</span>
+                  <span className="block sm:inline md:inline"> and thousands of others trust us with their business.</span>
                 </p>
                 <div className="flex flex-col items-center gap-4 mb-4">
                   <a 
@@ -179,10 +199,11 @@ export default function Home() {
                   </a>
                   <a 
                     href="/products/sample-packs" 
-                    className="text-white hover:text-purple-200 transition"
+                    className="text-white hover:text-purple-200 transition pb-7 md:pb-0"
                   >
                     Order Sample Pack →
                   </a>
+
         </div>
 
               </div>
@@ -744,7 +765,7 @@ export default function Home() {
         </section>
 
         {/* Testimonials Section */}
-        <section className="py-8">
+        <section className="pt-0 pb-8 md:py-8">
           <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
             {/* Header */}
             <div className="text-center mb-6 mt-4">
@@ -1128,7 +1149,7 @@ export default function Home() {
                   Already a customer?
                 </h2>
                 <p className="text-gray-300 text-lg mb-6 max-w-2xl mx-auto">
-                  Quick login to track your orders, reorder favorites, and access exclusive customer perks.
+                  Login to track your orders, reorder favorites, and access exclusive customer perks.
                 </p>
                 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -1392,6 +1413,20 @@ export default function Home() {
           .primaryButton:hover {
             background: linear-gradient(135deg, #ffed4e, #ffd713);
             transform: scale(1.05);
+          }
+
+          /* Responsive Banner Styles */
+          .hero-banner {
+            background-image: url('https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751994147/StickerShuttle_Banner_MainMobile_a93h3q.png');
+            background-size: cover;
+            background-position: center bottom;
+            background-repeat: no-repeat;
+          }
+          
+          @media (min-width: 768px) {
+            .hero-banner {
+              background-image: url('https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751382016/StickerShuttle_Banner_Main_nlzoro.png');
+            }
           }
 
         `}</style>

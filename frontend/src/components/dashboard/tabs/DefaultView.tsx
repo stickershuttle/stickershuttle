@@ -225,7 +225,7 @@ const DefaultView: React.FC<DefaultViewProps> = ({
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">{creditBalance >= 100 ? '🚨' : '🎉'}</span>
+                <span className="text-2xl">{creditBalance >= 100 ? '🚨' : <i className="fas fa-coins text-yellow-400"></i>}</span>
                 <div>
                   <h3 className="text-lg font-bold text-white">
                     ${creditBalance.toFixed(2)} Store Credit

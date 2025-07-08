@@ -685,27 +685,47 @@ function Dashboard() {
     setTerminalOrderText('');
     setTerminalLoadingDots('');
 
-    // Clear any existing intervals/timeouts
-    if ((window as any).launchInterval) {
-      clearInterval((window as any).launchInterval);
-      delete (window as any).launchInterval;
-    }
-    if ((window as any).adjustInterval) {
-      clearInterval((window as any).adjustInterval);
-      delete (window as any).adjustInterval;
-    }
-    if ((window as any).financialTimeout) {
-      clearTimeout((window as any).financialTimeout);
-      delete (window as any).financialTimeout;
-    }
-    if ((window as any).designTimeout) {
-      clearTimeout((window as any).designTimeout);
-      delete (window as any).designTimeout;
-    }
-    if ((window as any).ordersTimeout) {
-      clearTimeout((window as any).ordersTimeout);
-      delete (window as any).ordersTimeout;
-    }
+    // Clear any existing intervals/timeouts more comprehensively
+    const clearAllTimers = () => {
+      if ((window as any).launchInterval) {
+        clearInterval((window as any).launchInterval);
+        delete (window as any).launchInterval;
+      }
+      if ((window as any).adjustInterval) {
+        clearInterval((window as any).adjustInterval);
+        delete (window as any).adjustInterval;
+      }
+      if ((window as any).adjustTimeout) {
+        clearTimeout((window as any).adjustTimeout);
+        delete (window as any).adjustTimeout;
+      }
+      if ((window as any).launchTimeout) {
+        clearTimeout((window as any).launchTimeout);
+        delete (window as any).launchTimeout;
+      }
+      if ((window as any).financialTimeout) {
+        clearTimeout((window as any).financialTimeout);
+        delete (window as any).financialTimeout;
+      }
+      if ((window as any).designTimeout) {
+        clearTimeout((window as any).designTimeout);
+        delete (window as any).designTimeout;
+      }
+      if ((window as any).ordersTimeout) {
+        clearTimeout((window as any).ordersTimeout);
+        delete (window as any).ordersTimeout;
+      }
+      if ((window as any).mainTypeInterval) {
+        clearInterval((window as any).mainTypeInterval);
+        delete (window as any).mainTypeInterval;
+      }
+      if ((window as any).dotsInterval) {
+        clearInterval((window as any).dotsInterval);
+        delete (window as any).dotsInterval;
+      }
+    };
+
+    clearAllTimers();
     
     // Small delay to ensure clean state
     setTimeout(() => {
@@ -717,10 +737,17 @@ function Dashboard() {
       setTerminalLoadingDots(prev => prev.length >= 3 ? '' : prev + '.');
     }, 500);
     
+    // Store the interval for cleanup
+    (window as any).dotsInterval = dotsInterval;
+    
     // After initial delay, start typing effect with specific messages per view
     const typingTimeout = setTimeout(() => {
       setIsTerminalTyping(true);
       clearInterval(dotsInterval);
+      if ((window as any).dotsInterval) {
+        clearInterval((window as any).dotsInterval);
+        delete (window as any).dotsInterval;
+      }
       
       let orderText = '';
       
@@ -740,8 +767,14 @@ function Dashboard() {
             charIndex++;
           } else {
             clearInterval(typeInterval);
+            if ((window as any).mainTypeInterval) {
+              delete (window as any).mainTypeInterval;
+            }
           }
         }, 30);
+        
+        // Store the interval for cleanup
+        (window as any).mainTypeInterval = typeInterval;
         return typeInterval;
       };
       
@@ -848,7 +881,7 @@ function Dashboard() {
             if (hasApprovedProofs) {
               orderText = '> VINNY: ALL SYSTEMS CLEAR, READY TO LAUNCH.\n> COMMAND: LAUNCHING';
               // Add cycling dots for LAUNCHING after typing
-              setTimeout(() => {
+              const launchTimeout = setTimeout(() => {
                 let dots = '';
                 const launchInterval = setInterval(() => {
                   dots = dots.length >= 3 ? '.' : dots + '.';
@@ -857,6 +890,8 @@ function Dashboard() {
                 
                 (window as any).launchInterval = launchInterval;
               }, 3000);
+              
+              (window as any).launchTimeout = launchTimeout;
             } else {
               orderText = '> NO MISSIONS AVAILABLE.';
             }
@@ -870,7 +905,7 @@ function Dashboard() {
         case 'settings':
           orderText = '> ADJUSTING PANELS';
           // Add cycling dots and second message after typing
-          setTimeout(() => {
+          const adjustTimeout = setTimeout(() => {
             let dots = '';
             const adjustInterval = setInterval(() => {
               dots = dots.length >= 3 ? '.' : dots + '.';
@@ -879,6 +914,8 @@ function Dashboard() {
             
             (window as any).adjustInterval = adjustInterval;
           }, 500);
+          
+          (window as any).adjustTimeout = adjustTimeout;
           break;
           
         default:
@@ -896,28 +933,8 @@ function Dashboard() {
     return () => {
       clearInterval(dotsInterval);
       clearTimeout(typingTimeout);
-      // Clear any running intervals
-      if ((window as any).launchInterval) {
-        clearInterval((window as any).launchInterval);
-        delete (window as any).launchInterval;
-      }
-      if ((window as any).adjustInterval) {
-        clearInterval((window as any).adjustInterval);
-        delete (window as any).adjustInterval;
-      }
-      // Clear additional timeouts
-      if ((window as any).financialTimeout) {
-        clearTimeout((window as any).financialTimeout);
-        delete (window as any).financialTimeout;
-      }
-      if ((window as any).designTimeout) {
-        clearTimeout((window as any).designTimeout);
-        delete (window as any).designTimeout;
-      }
-      if ((window as any).ordersTimeout) {
-        clearTimeout((window as any).ordersTimeout);
-        delete (window as any).ordersTimeout;
-      }
+      // Clear all timers comprehensively
+      clearAllTimers();
     };
   }, [currentView, orders, creditBalance]);
 
@@ -1603,11 +1620,21 @@ function Dashboard() {
     }
   };
 
-  const handleDrop = (event: React.DragEvent<HTMLDivElement>, orderId: string, proofId: string) => {
+  const handleDrop = async (event: React.DragEvent<HTMLDivElement>, orderId: string, proofId: string) => {
     event.preventDefault();
-    const file = event.dataTransfer.files[0];
-    if (file) {
-      handleFileSelect(file, orderId, proofId);
+    const files = Array.from(event.dataTransfer.files);
+    
+    if (files.length === 0) return;
+    
+    console.log(`📦 Customer Dashboard: Processing ${files.length} files for proof ${proofId}`);
+    
+    // Process all files, not just the first one
+    for (const file of files) {
+      await handleFileSelect(file, orderId, proofId);
+      // Add a small delay between uploads to prevent overwhelming the server
+      if (files.length > 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
   };
 
@@ -2052,7 +2079,17 @@ function Dashboard() {
             75% { transform: translate(0, 5px) rotate(3deg); }
           }
           
-          .holographic-v3 {
+          .holographic-v3-container {
+            /* Static pill background styles */
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3), 
+                        inset 0 0 20px rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.1);
+            display: inline-block;
+          }
+
+          .holographic-v3-text {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             background-clip: text;
             -webkit-background-clip: text;
@@ -2293,8 +2330,8 @@ function Dashboard() {
                         <p className="text-xs md:text-sm text-gray-200">
                           Mission Control Dashboard
                         </p>
-                        <span className="hidden lg:inline-block holographic-v3 text-sm px-3 py-1 rounded-full">
-                          v3.0
+                        <span className="hidden lg:inline-block holographic-v3-container text-sm px-3 py-1 rounded-full">
+                          <span className="holographic-v3-text">v3.0</span>
                         </span>
                       </div>
                       
@@ -2453,7 +2490,7 @@ function Dashboard() {
                 ) : null;
               })()}
 
-              {profile && (profile.wholesale_status === 'pending' || profile.wholesaleStatus === 'pending') && profile.wholesale_application_date && (
+              {profile && (profile.wholesale_status === 'pending' || profile.wholesaleStatus === 'pending') && (
                 <div 
                   className="rounded-2xl p-4 shadow-xl mb-3 transition-all duration-300"
                   style={{

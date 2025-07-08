@@ -1253,6 +1253,7 @@ const typeDefs = gql`
     wholesaleMonthlyCustomers: String!
     wholesaleOrderingFor: String!
     wholesaleFitExplanation: String!
+    signupCreditAmount: Float
   }
 
   input TaxExemptionInput {

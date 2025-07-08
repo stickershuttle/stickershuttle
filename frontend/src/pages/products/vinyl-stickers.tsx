@@ -124,8 +124,9 @@ export default function VinylStickers() {
               href="/products"
               className="absolute top-4 left-4 z-20 flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 hover:scale-110"
               style={{
-                background: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
                 backdropFilter: 'blur(12px)'
               }}
             >
@@ -244,9 +245,11 @@ export default function VinylStickers() {
                 <span 
                   className="px-3 py-1 text-xs rounded-full font-medium"
                   style={{
-                    background: 'rgba(168, 242, 106, 0.2)',
-                    color: 'white',
-                    border: '1px solid rgba(168, 242, 106, 0.4)'
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)',
+                    color: 'white'
                   }}
                 >
                   💧 Waterproof
@@ -254,9 +257,11 @@ export default function VinylStickers() {
                 <span 
                   className="px-3 py-1 text-xs rounded-full font-medium"
                   style={{
-                    background: 'rgba(168, 242, 106, 0.2)',
-                    color: 'white',
-                    border: '1px solid rgba(168, 242, 106, 0.4)'
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)',
+                    color: 'white'
                   }}
                 >
                   ☀️ UV Resistant
@@ -264,9 +269,11 @@ export default function VinylStickers() {
                 <span 
                   className="px-3 py-1 text-xs rounded-full font-medium"
                   style={{
-                    background: 'rgba(168, 242, 106, 0.2)',
-                    color: 'white',
-                    border: '1px solid rgba(168, 242, 106, 0.4)'
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)',
+                    color: 'white'
                   }}
                 >
                   🏠 Dishwasher Safe
@@ -274,9 +281,11 @@ export default function VinylStickers() {
                 <span 
                   className="px-3 py-1 text-xs rounded-full font-medium"
                   style={{
-                    background: 'rgba(168, 242, 106, 0.2)',
-                    color: 'white',
-                    border: '1px solid rgba(168, 242, 106, 0.4)'
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)',
+                    color: 'white'
                   }}
                 >
                   ⭐ Premium Vinyl

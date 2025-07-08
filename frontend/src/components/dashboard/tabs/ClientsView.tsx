@@ -55,6 +55,25 @@ const ClientsView: React.FC<ClientsViewProps> = ({
   setActionNotification,
   handleViewOrderDetails
 }) => {
+  // Phone number formatting function
+  const formatPhoneNumber = (value: string) => {
+    // Remove all non-digit characters
+    const phoneNumber = value.replace(/\D/g, '');
+    
+    // Format as XXX-XXX-XXXX
+    if (phoneNumber.length >= 6) {
+      return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6, 10)}`;
+    } else if (phoneNumber.length >= 3) {
+      return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(3)}`;
+    } else {
+      return phoneNumber;
+    }
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneNumber(e.target.value);
+    setNewClientData(prev => ({ ...prev, clientPhone: formatted }));
+  };
   const handleCreateClient = async () => {
     if (!newClientData.clientName.trim()) {
       setActionNotification({
@@ -227,9 +246,10 @@ const ClientsView: React.FC<ClientsViewProps> = ({
                 <input
                   type="tel"
                   value={newClientData.clientPhone}
-                  onChange={(e) => setNewClientData(prev => ({ ...prev, clientPhone: e.target.value }))}
+                  onChange={handlePhoneChange}
+                  maxLength={12}
                   className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-400"
-                  placeholder="(555) 123-4567"
+                  placeholder="555-123-4567"
                 />
               </div>
 

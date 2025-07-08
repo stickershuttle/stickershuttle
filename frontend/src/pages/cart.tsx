@@ -929,6 +929,7 @@ export default function CartPage() {
         setUser(data.user);
         setShowLoginModal(false);
         setLoginData({ email: '', password: '' });
+        // User is already on cart page, no need to redirect
       }
     } catch (error: any) {
       console.error('Login error:', error);
@@ -1949,9 +1950,9 @@ export default function CartPage() {
                         <span>$0.00</span>
                       </div>
                     ) : (
-                      <div className="flex justify-between text-green-400 text-sm font-medium mt-3 pt-3 border-t border-white/10">
+                      <div className="flex justify-between text-yellow-400 text-sm font-medium mt-3 pt-3 border-t border-white/10">
                         <span className="flex items-center gap-2">
-                          <span>💰</span>
+                          <i className="fas fa-coins"></i>
                           Store Credit Earned ({creditRate}%{isWholesale && ' Wholesale'})
                         </span>
                         <span>+${(finalTotal * creditRateDecimal).toFixed(2)}</span>
@@ -2496,44 +2497,32 @@ export default function CartPage() {
                     </div>
 
                     {/* Blind Shipment Toggle */}
-                    <div className="p-4 rounded-xl space-y-3 mt-6" style={{
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                      backdropFilter: 'blur(12px)'
-                    }}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-lg">📦</span>
-                          <div>
-                            <h4 className="text-white font-medium">Blind Shipment</h4>
-                            <p className="text-gray-400 text-sm">Hide Sticker Shuttle logos from packaging</p>
-                          </div>
-                        </div>
+                    <div className="mt-6">
+                      <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+                           style={{
+                             background: 'linear-gradient(135deg, rgba(255, 165, 0, 0.3) 0%, rgba(255, 165, 0, 0.15) 50%, rgba(255, 165, 0, 0.05) 100%)',
+                             border: '1px solid rgba(255, 165, 0, 0.4)',
+                             boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                             backdropFilter: 'blur(12px)'
+                           }}>
                         <button
                           onClick={() => setIsBlindShipment(!isBlindShipment)}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
-                            isBlindShipment ? 'bg-blue-600' : 'bg-gray-600'
-                          }`}
-                          style={{
-                            boxShadow: isBlindShipment 
-                              ? 'rgba(59, 130, 246, 0.3) 0px 0px 20px' 
-                              : 'rgba(0, 0, 0, 0.2) 0px 2px 4px'
-                          }}
                           title={isBlindShipment ? 'Disable blind shipment' : 'Enable blind shipment'}
+                          className={`w-12 h-6 rounded-full transition-colors ${
+                            isBlindShipment ? 'bg-orange-500' : 'bg-white/20'
+                          }`}
                         >
-                          <span
-                            className={`${
-                              isBlindShipment ? 'translate-x-6' : 'translate-x-1'
-                            } inline-block h-4 w-4 transform rounded-full bg-white transition duration-200 ease-in-out`}
-                            style={{
-                              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-                            }}
-                          />
+                          <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                            isBlindShipment ? 'translate-x-7' : 'translate-x-1'
+                          }`} />
                         </button>
+                                                  <div>
+                            <span className="text-sm font-medium text-orange-200">Blind Shipment</span>
+                            <p className="text-xs text-orange-200/80">Hide Sticker Shuttle logos from packaging</p>
+                          </div>
                       </div>
                       {isBlindShipment && (
-                        <div className="text-xs text-blue-200 bg-blue-500/10 p-3 rounded-lg border border-blue-500/20">
+                        <div className="mt-3 text-xs text-orange-200 bg-orange-500/10 p-3 rounded-lg border border-orange-500/20">
                           ℹ️ Your order will have generic packaging and shipping labels. The label will still show our return address minus our company name.
                         </div>
                       )}
@@ -2808,15 +2797,12 @@ export default function CartPage() {
             <div className="text-center mt-4">
               <p className="text-xs text-gray-400">
                 Don't have an account?{' '}
-                <button
-                  onClick={() => {
-                    setShowLoginModal(false);
-                    // Guest checkout form is already visible, so just close modal
-                  }}
+                <a
+                  href="/signup?redirect=/cart"
                   className="text-purple-400 hover:text-purple-300 underline"
                 >
                   Create one during checkout
-                </button>
+                </a>
               </p>
             </div>
           </div>

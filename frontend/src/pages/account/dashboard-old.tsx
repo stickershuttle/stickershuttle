@@ -9915,8 +9915,8 @@ function Dashboard() {
                         <p className="text-xs md:text-sm text-gray-200">
                           Mission Control Dashboard
                         </p>
-                        <span className="hidden lg:inline-block holographic-v3 text-sm px-3 py-1 rounded-full">
-                          v3.0
+                        <span className="hidden lg:inline-block holographic-v3-container text-sm px-3 py-1 rounded-full">
+                          <span className="holographic-v3-text">v3.0</span>
                         </span>
                       </div>
                       

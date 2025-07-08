@@ -127,7 +127,7 @@ export default function Products() {
               </div>
             </div>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto relative z-10">
-              Grow your brand, unleash your creativity, or tell the universe your message. Either way, we're here for it. And we're ready to print it for you.
+              Grow your brand, unleash your creativity, and tell the universe your message. We're ready.
             </p>
           </div>
 

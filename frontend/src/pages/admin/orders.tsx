@@ -2806,11 +2806,14 @@ export default function AdminOrders() {
                                           type="file"
                                           id={`proof-upload-${item.id}`}
                                           accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd,.pdf"
+                                          multiple
                                           className="hidden"
                                           aria-label={`Upload proof for Item #${idx + 1}: ${item.productName}`}
                                           onChange={async (e) => {
-                                            const file = e.target.files?.[0];
-                                            if (file) {
+                                            const files = e.target.files ? Array.from(e.target.files) : [];
+                                            if (files.length > 0) {
+                                              console.log(`📦 Admin Orders: Processing ${files.length} files for item ${item.id}`);
+                                              
                                               // Create a temporary ItemSpecificProofUpload component to handle the upload
                                               const uploadComponent = document.createElement('div');
                                               uploadComponent.style.display = 'none';
@@ -2818,15 +2821,23 @@ export default function AdminOrders() {
                                               
                                               // We'll use the existing mutation that's already imported
                                               try {
-                                                console.log('Uploading proof for item:', item.id, 'File:', file.name);
-                                                // For now, just show an alert and refresh
-                                                alert(`Uploading proof for Item #${idx + 1}: ${item.productName}`);
-                                                // The actual upload logic would go here
-                                                // We can implement this properly once the button UI is working
+                                                // Process all files
+                                                for (const file of files) {
+                                                  console.log('Uploading proof for item:', item.id, 'File:', file.name);
+                                                  // For now, just show an alert and refresh
+                                                  alert(`Uploading proof ${file.name} for Item #${idx + 1}: ${item.productName}`);
+                                                  // The actual upload logic would go here
+                                                  // We can implement this properly once the button UI is working
+                                                  
+                                                  // Add a small delay between uploads to prevent overwhelming the UI
+                                                  if (files.length > 1) {
+                                                    await new Promise(resolve => setTimeout(resolve, 500));
+                                                  }
+                                                }
                                                 refetch();
                                               } catch (error) {
                                                 console.error('Upload error:', error);
-                                                alert('Failed to upload proof. Please try again.');
+                                                alert('Failed to upload proofs. Please try again.');
                                               } finally {
                                                 document.body.removeChild(uploadComponent);
                                               }

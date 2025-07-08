@@ -122,9 +122,16 @@ export default function ItemSpecificProofUpload({
       return;
     }
     
-    // Take the first file only
-    const file = files[0];
-    await uploadProofForItem(file);
+    console.log(`📦 ItemSpecificProofUpload: Processing ${files.length} files for item ${orderItem.id}`);
+    
+    // Process all files, not just the first one
+    for (const file of files) {
+      await uploadProofForItem(file);
+      // Add a small delay between uploads to prevent overwhelming the server
+      if (files.length > 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
   }, []);
 
   const uploadProofForItem = async (file: File) => {
