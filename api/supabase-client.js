@@ -1,9 +1,11 @@
 const { createClient } = require('@supabase/supabase-js');
-// Load environment variables from multiple possible locations
-require('dotenv').config({ path: '../.env.local' });  // When running from api/
-require('dotenv').config({ path: './.env.local' });   // When running from root
-require('dotenv').config({ path: './.env' });         // API-specific env
-require('dotenv').config();                           // System env
+// Load environment variables from multiple possible locations (local development only)
+if (process.env.NODE_ENV !== 'production' && !process.env.RAILWAY_ENVIRONMENT) {
+  require('dotenv').config({ path: '../.env.local' });  // When running from api/
+  require('dotenv').config({ path: './.env.local' });   // When running from root
+  require('dotenv').config({ path: './.env' });         // API-specific env
+  require('dotenv').config();                           // System env
+}
 
 class SupabaseClient {
     constructor() {

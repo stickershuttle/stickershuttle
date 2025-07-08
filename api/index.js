@@ -9,8 +9,8 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Load environment variables - Railway provides them directly
-// Always load dotenv for local development, but skip in Railway production
-if (process.env.NODE_ENV !== 'production' || !process.env.RAILWAY_ENVIRONMENT) {
+// Only load dotenv in local development (Railway provides env vars directly)
+if (process.env.NODE_ENV !== 'production' && !process.env.RAILWAY_ENVIRONMENT) {
   require('dotenv').config();
   console.log('📧 Loaded .env file - RESEND_API_KEY configured:', !!process.env.RESEND_API_KEY);
 }

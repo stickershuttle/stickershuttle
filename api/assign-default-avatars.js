@@ -1,7 +1,9 @@
 const { createClient } = require('@supabase/supabase-js');
 
-// Load environment variables
-require('dotenv').config();
+// Load environment variables (local development only)
+if (process.env.NODE_ENV !== 'production' && !process.env.RAILWAY_ENVIRONMENT) {
+  require('dotenv').config();
+}
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

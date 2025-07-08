@@ -17,8 +17,10 @@
 
 const path = require('path');
 
-// Initialize environment and dependencies
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+// Initialize environment and dependencies (local development only)
+if (process.env.NODE_ENV !== 'production' && !process.env.RAILWAY_ENVIRONMENT) {
+  require('dotenv').config({ path: path.join(__dirname, '.env') });
+}
 
 async function runCleanup() {
   try {
