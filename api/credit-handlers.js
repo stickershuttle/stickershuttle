@@ -6,35 +6,235 @@ const initializeWithSupabase = (supabaseClient) => {
   supabase = supabaseClient;
 };
 
+// Validate credit application
+const validateCreditApplication = async (userId, orderSubtotal, requestedCredits) => {
+  try {
+    if (!userId || userId === 'guest') {
+      return {
+        valid: false,
+        message: 'Credit validation is only available for logged-in users',
+        maxApplicable: 0
+      };
+    }
+
+    const safeOrderSubtotal = parseFloat(orderSubtotal) || 0;
+    const safeRequestedCredits = parseFloat(requestedCredits) || 0;
+
+    if (safeRequestedCredits <= 0) {
+      return {
+        valid: false,
+        message: 'Credit amount must be greater than 0',
+        maxApplicable: 0
+      };
+    }
+
+    // Get user's current credit balance
+    const balanceInfo = await getUserCreditBalance(userId);
+    const availableBalance = parseFloat(balanceInfo.balance) || 0;
+
+    if (availableBalance < safeRequestedCredits) {
+      return {
+        valid: false,
+        message: `Insufficient credit balance. You have $${availableBalance.toFixed(2)} available`,
+        maxApplicable: Math.min(availableBalance, safeOrderSubtotal)
+      };
+    }
+
+    if (safeRequestedCredits > safeOrderSubtotal) {
+      return {
+        valid: false,
+        message: `Cannot apply more credits than order subtotal ($${safeOrderSubtotal.toFixed(2)})`,
+        maxApplicable: Math.min(availableBalance, safeOrderSubtotal)
+      };
+    }
+
+    return {
+      valid: true,
+      message: 'Credit application is valid',
+      maxApplicable: Math.min(availableBalance, safeOrderSubtotal)
+    };
+  } catch (error) {
+    console.error('Error validating credit application:', error);
+    return {
+      valid: false,
+      message: 'Error validating credit application',
+      maxApplicable: 0
+    };
+  }
+};
+
+// Deduct credits from user balance
+const deductCredits = async (userId, amount, description, type = 'used', orderId = null) => {
+  try {
+    if (!supabase) {
+      throw new Error('Credit service not initialized');
+    }
+
+    const safeAmount = parseFloat(amount) || 0;
+    if (safeAmount <= 0) {
+      throw new Error('Deduction amount must be greater than 0');
+    }
+
+    if (!userId || userId === 'guest') {
+      throw new Error('Credit deduction is only available for logged-in users');
+    }
+
+    const client = supabase.getServiceClient();
+
+    // Check if credits have already been deducted for this order
+    if (orderId) {
+      console.log(`💳 Checking for existing credit deductions for order ${orderId}...`);
+      
+      const { data: existingDeductions, error: checkError } = await client
+        .from('credits')
+        .select('id, amount')
+        .eq('user_id', userId)
+        .eq('order_id', orderId)
+        .eq('transaction_type', type)
+        .lt('amount', 0); // Negative amounts indicate deductions
+      
+      if (checkError) {
+        console.error('❌ Error checking existing credit deductions:', checkError);
+      } else if (existingDeductions && existingDeductions.length > 0) {
+        console.log(`⚠️ Credits already deducted for order ${orderId}:`, existingDeductions);
+        
+        // Return the existing deduction info
+        const existingDeduction = existingDeductions[0];
+        const balance = await getUserCreditBalance(userId);
+        
+        return {
+          id: existingDeduction.id,
+          userId: userId,
+          amount: existingDeduction.amount,
+          balance: balance.balance,
+          description: description,
+          transactionType: type,
+          orderId: orderId,
+          createdAt: new Date().toISOString(),
+          alreadyDeducted: true
+        };
+      }
+    }
+
+    // Get current balance
+    const balanceInfo = await getUserCreditBalance(userId);
+    const currentBalance = parseFloat(balanceInfo.balance) || 0;
+
+    if (currentBalance < safeAmount) {
+      throw new Error(`Insufficient credits. Available: ${currentBalance}, Requested: ${safeAmount}`);
+    }
+
+    // Calculate new balance
+    const newBalance = currentBalance - safeAmount;
+
+    // Create credit transaction record
+    const { data: transaction, error: transactionError } = await client
+      .from('credits')
+      .insert({
+        user_id: userId,
+        amount: -safeAmount, // Negative amount for deduction
+        balance: newBalance,
+        reason: description || `Credits deducted`,
+        transaction_type: type,
+        order_id: orderId,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (transactionError) {
+      // Check if it's a duplicate key error
+      if (transactionError.code === '23505' || transactionError.message?.includes('duplicate')) {
+        console.log(`⚠️ Duplicate credit deduction prevented for order ${orderId}`);
+        
+        // Try to get the existing deduction
+        const { data: existingDeduction } = await client
+          .from('credits')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('order_id', orderId)
+          .eq('transaction_type', type)
+          .lt('amount', 0)
+          .single();
+        
+        if (existingDeduction) {
+          return {
+            id: existingDeduction.id,
+            userId: existingDeduction.user_id,
+            amount: existingDeduction.amount,
+            balance: existingDeduction.balance,
+            description: existingDeduction.reason,
+            transactionType: existingDeduction.transaction_type,
+            orderId: existingDeduction.order_id,
+            createdAt: existingDeduction.created_at,
+            alreadyDeducted: true
+          };
+        }
+      }
+      
+      console.error('❌ Error creating credit transaction:', transactionError);
+      throw new Error(`Failed to deduct credits: ${transactionError.message}`);
+    }
+
+    console.log('✅ Credits deducted successfully:', {
+      userId,
+      amount: safeAmount,
+      newBalance,
+      transactionId: transaction.id
+    });
+
+    return {
+      id: transaction.id,
+      userId: transaction.user_id,
+      amount: transaction.amount,
+      balance: transaction.balance,
+      description: transaction.reason,
+      transactionType: transaction.transaction_type,
+      orderId: transaction.order_id,
+      createdAt: transaction.created_at
+    };
+  } catch (error) {
+    console.error('❌ Error in deductCredits:', error);
+    throw error;
+  }
+};
+
 // Get user's current credit balance
 const getUserCreditBalance = async (userId) => {
   try {
     const client = supabase.getServiceClient();
-    const { data, error } = await client
-      .rpc('get_user_credit_balance', { p_user_id: userId });
     
-    if (error) throw error;
-    
-    // Ensure balance is always a valid number
-    let balance = 0;
-    if (data !== null && data !== undefined && !isNaN(parseFloat(data))) {
-      balance = parseFloat(data);
-    }
-    
-    // Also get transaction count and last transaction date
+    // Get balance directly from the user_credit_balance view
     const { data: stats, error: statsError } = await client
       .from('user_credit_balance')
       .select('total_credits, transaction_count, last_transaction_date')
       .eq('user_id', userId)
       .single();
     
-    // If the RPC call fails, try to get balance from the view table
-    if (balance === 0 && stats?.total_credits) {
-      const totalCredits = parseFloat(stats.total_credits);
-      if (!isNaN(totalCredits)) {
-        balance = totalCredits;
+    if (statsError) {
+      console.error('Error getting credit balance from view:', statsError);
+      // Try alternative approach - sum from credits table
+      const { data: transactions, error: txError } = await client
+        .from('credits')
+        .select('amount')
+        .eq('user_id', userId);
+      
+      if (txError) {
+        throw txError;
       }
+      
+      // Calculate balance from transactions
+      const balance = transactions?.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0) || 0;
+      
+      return {
+        balance: balance,
+        transactionCount: transactions?.length || 0,
+        lastTransactionDate: null
+      };
     }
+    
+    // Parse the balance from the view
+    const balance = parseFloat(stats?.total_credits) || 0;
     
     return {
       balance: balance,
@@ -91,12 +291,10 @@ const addUserCredits = async (input, adminUserId) => {
     const client = supabase.getServiceClient();
     
     const { data, error } = await client
-      .rpc('add_user_credits', {
+      .rpc('add_user_credits_with_limit', {
         p_user_id: userId,
         p_amount: amount,
-        p_reason: reason || 'Store credit added by admin',
-        p_created_by: adminUserId,
-        p_expires_at: expiresAt || null
+        p_reason: reason || 'Store credit added by admin'
       });
     
     if (error) throw error;
@@ -337,11 +535,13 @@ const applyCreditsToOrder = async (orderId, amount, userId) => {
     const client = supabase.getServiceClient();
     const safeAmount = parseFloat(amount) || 0;
     
+    // Deduct credits by adding a negative amount
     const { data, error } = await client
-      .rpc('use_credits_for_order', {
+      .rpc('add_user_credits_with_order', {
         p_user_id: userId,
-        p_order_id: orderId,
-        p_amount: safeAmount
+        p_amount: -safeAmount, // Negative amount to deduct
+        p_reason: `Credits applied to order ${orderId}`,
+        p_order_id: orderId
       });
     
     if (error) throw error;
@@ -392,11 +592,13 @@ const deductUserCredits = async ({ userId, amount, reason, orderId, transactionT
       };
     }
     
+    // Deduct credits by adding a negative amount
     const { data, error } = await client
-      .rpc('use_credits_for_order', {
+      .rpc('add_user_credits_with_order', {
         p_user_id: userId,
-        p_order_id: orderId,
-        p_amount: safeAmount
+        p_amount: -safeAmount, // Negative amount to deduct
+        p_reason: reason || `Credits deducted for order ${orderId}`,
+        p_order_id: orderId
       });
     
     if (error) throw error;
@@ -523,51 +725,111 @@ const earnPointsFromPurchase = async (userId, orderTotal, orderId) => {
     
     const client = supabase.getServiceClient();
     
-    // Use the new dynamic rate function that handles wholesale vs regular customers
-    const { data, error } = await client
-      .rpc('add_user_credits_with_dynamic_rate', {
-        p_user_id: userId,
-        p_order_total: orderTotal,
-        p_order_id: orderId,
-        p_credit_limit: 100.00
-      });
+    // Check if credits have already been awarded for this order
+    const { data: existingCredits, error: checkError } = await client
+      .from('credits')
+      .select('id, amount')
+      .eq('user_id', userId)
+      .eq('order_id', orderId)
+      .eq('transaction_type', 'earned');
     
-    if (error) throw error;
+    if (checkError) {
+      console.error('❌ Error checking existing credits:', checkError);
+    } else if (existingCredits && existingCredits.length > 0) {
+      console.log(`⚠️ Credits already awarded for order ${orderId}:`, existingCredits);
+      return {
+        success: false,
+        message: 'Credits already awarded for this order',
+        alreadyAwarded: true,
+        existingAmount: existingCredits[0].amount
+      };
+    }
     
-    // Handle different scenarios based on response
-    if (data.success === false) {
-      if (data.message === 'Credit limit reached') {
-        console.log('🚫 Credit limit reached - no additional credits earned:', data);
+    // Use a fixed 5% credit rate for all users
+    const creditRate = 0.05; // 5% cashback rate
+    const creditAmount = orderTotal * creditRate;
+    
+    // Get current balance first
+    const currentBalance = await getUserCreditBalance(userId);
+    const safeCurrentBalance = parseFloat(currentBalance.balance) || 0;
+    const newBalance = safeCurrentBalance + creditAmount;
+    
+    // Try to insert earned credits with additional safeguards
+    try {
+      // Double-check right before insert (to catch race conditions)
+      const { data: finalCheck, error: finalCheckError } = await client
+        .from('credits')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('order_id', orderId)
+        .eq('transaction_type', 'earned')
+        .single();
+      
+      if (finalCheck) {
+        console.log(`⚠️ Race condition detected - credits already exist for order ${orderId}`);
         return {
           success: false,
-          limitReached: true,
-          currentBalance: data.current_balance,
-          creditLimit: data.credit_limit,
-          message: 'Credit limit reached - no additional credits earned'
-        };
-      } else {
-        console.log('⚠️ Credits not earned:', data.message);
-        return {
-          success: false,
-          message: data.message || 'Failed to earn credits'
+          message: 'Credits already awarded for this order (race condition prevented)',
+          alreadyAwarded: true
         };
       }
-    } else {
-      const isWholesale = data.is_wholesale || false;
-      const creditRate = Math.round((data.credit_rate || 0.05) * 100);
       
-      console.log(`✅ Credits earned successfully: ${data.amount} (${creditRate}% ${isWholesale ? 'wholesale' : 'standard'} rate)`);
+      // Insert earned credits
+      const { data, error } = await client
+        .from('credits')
+        .insert({
+          user_id: userId,
+          amount: creditAmount,
+          balance: newBalance,
+          reason: `Earned from order (${Math.round(creditRate * 100)}% rate)`,
+          transaction_type: 'earned',
+          order_id: orderId,
+          created_at: new Date().toISOString()
+        })
+        .select('*')
+        .single();
+      
+      if (error) {
+        // Check if it's a duplicate key error
+        if (error.code === '23505' || error.message?.includes('duplicate')) {
+          console.log(`⚠️ Duplicate credit prevented by database constraint for order ${orderId}`);
+          return {
+            success: false,
+            message: 'Credits already awarded for this order',
+            alreadyAwarded: true
+          };
+        }
+        throw error;
+      }
+      
+      // Get updated balance to confirm
+      const updatedBalance = await getUserCreditBalance(userId);
+      const isWholesale = false; // Fixed rate for all users
+      
+      console.log(`✅ Credits earned successfully: ${creditAmount.toFixed(2)} (${Math.round(creditRate * 100)}% rate)`);
       
       return {
         success: true,
         limitReached: false,
-        pointsEarned: data.amount,
-        totalBalance: data.new_balance,
-        creditRate: data.credit_rate,
+        pointsEarned: creditAmount,
+        totalBalance: updatedBalance.balance,
+        creditRate: creditRate,
         isWholesale: isWholesale,
         orderId: orderId,
-        message: `$${data.amount.toFixed(2)} earned from your recent order (${creditRate}% ${isWholesale ? 'wholesale' : 'standard'} rate)`
+        transactionId: data.id,
+        message: `$${creditAmount.toFixed(2)} earned from your recent order (${Math.round(creditRate * 100)}% rate)`
       };
+    } catch (insertError) {
+      // Handle any database errors including constraint violations
+      if (insertError.code === '23505' || insertError.message?.includes('duplicate')) {
+        console.log(`⚠️ Duplicate credit prevented for order ${orderId}`);
+        return {
+          success: false,
+          message: 'Credits already awarded for this order',
+          alreadyAwarded: true
+        };
+      }
+      throw insertError;
     }
   } catch (error) {
     console.error('Error earning points from purchase:', error);
@@ -756,7 +1018,6 @@ const reserveCreditsForCheckout = async ({ userId, amount, reason, sessionId, tr
         reason: reason || 'Credit reservation for checkout',
         transaction_type: transactionType || 'reservation_pending_payment',
         order_id: null, // Will be updated when order is created
-        session_id: sessionId, // Track the Stripe session
         created_at: new Date().toISOString()
       })
       .select('*')
@@ -813,7 +1074,7 @@ const confirmCreditReservation = async (reservationId, orderId) => {
       .from('credits')
       .update({
         balance: newBalance,
-        transaction_type: 'deduction_confirmed',
+        transaction_type: 'used',
         order_id: orderId,
         reason: `Credit applied to order ${orderId}`,
         updated_at: new Date().toISOString()
@@ -857,6 +1118,75 @@ const cancelCreditReservation = async (reservationId, reason) => {
     };
   } catch (error) {
     console.error('Error cancelling credit reservation:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+// Fix existing credit transactions to have correct transaction_type for earned credits
+const fixExistingEarnedCredits = async () => {
+  try {
+    const client = supabase.getServiceClient();
+    
+    console.log('🔧 Starting to fix existing earned credit transactions...');
+    
+    // Find credit transactions that look like they were earned from orders
+    // but don't have transaction_type = 'earned'
+    const { data: transactionsToFix, error: fetchError } = await client
+      .from('credits')
+      .select('*')
+      .gt('amount', 0) // Positive amounts (earnings)
+      .not('order_id', 'is', null) // Has an associated order
+      .ilike('reason', '%earned from order%') // Reason suggests it was earned
+      .not('transaction_type', 'eq', 'earned'); // But doesn't have 'earned' type
+    
+    if (fetchError) {
+      console.error('❌ Error fetching transactions to fix:', fetchError);
+      return { success: false, error: fetchError.message };
+    }
+    
+    if (!transactionsToFix || transactionsToFix.length === 0) {
+      console.log('✅ No credit transactions need fixing');
+      return { success: true, fixed: 0, message: 'No transactions needed fixing' };
+    }
+    
+    console.log(`🔍 Found ${transactionsToFix.length} credit transactions that need fixing`);
+    
+    // Update all found transactions to have transaction_type = 'earned'
+    const { data: updatedTransactions, error: updateError } = await client
+      .from('credits')
+      .update({ 
+        transaction_type: 'earned',
+        updated_at: new Date().toISOString()
+      })
+      .in('id', transactionsToFix.map(t => t.id))
+      .select('*');
+    
+    if (updateError) {
+      console.error('❌ Error updating transaction types:', updateError);
+      return { success: false, error: updateError.message };
+    }
+    
+    console.log(`✅ Successfully fixed ${updatedTransactions?.length || 0} credit transactions`);
+    
+    // Log some examples of what was fixed
+    if (updatedTransactions && updatedTransactions.length > 0) {
+      console.log('📋 Examples of fixed transactions:');
+      updatedTransactions.slice(0, 3).forEach(t => {
+        console.log(`  - ID: ${t.id}, Amount: $${t.amount}, Order: ${t.order_id}, Reason: ${t.reason}`);
+      });
+    }
+    
+    return {
+      success: true,
+      fixed: updatedTransactions?.length || 0,
+      message: `Fixed ${updatedTransactions?.length || 0} credit transactions`
+    };
+    
+  } catch (error) {
+    console.error('❌ Error fixing existing earned credits:', error);
     return {
       success: false,
       error: error.message
@@ -917,6 +1247,8 @@ const cleanupExpiredReservations = async (maxAgeHours = 24) => {
 
 module.exports = {
   initializeWithSupabase,
+  validateCreditApplication,
+  deductCredits,
   getUserCreditBalance,
   getUnreadCreditNotifications,
   markCreditNotificationsRead,
@@ -935,5 +1267,6 @@ module.exports = {
   reserveCreditsForCheckout,
   confirmCreditReservation,
   cancelCreditReservation,
-  cleanupExpiredReservations
+  cleanupExpiredReservations,
+  fixExistingEarnedCredits
 }; 

@@ -418,6 +418,10 @@ export default function AdminOrders() {
             return !order.proof_status || order.proof_status === 'building' || order.proof_status === 'pending';
           case 'awaiting':
             return order.proof_status === 'awaiting_approval';
+          case 'changes-requested':
+            return order.proof_status === 'changes_requested';
+          case 'printing':
+            return order.orderStatus === 'Printing' || order.proof_status === 'approved';
           case 'approved':
             return order.proof_status === 'approved' || order.orderStatus === 'Printing';
           case 'label-printed':
@@ -1410,6 +1414,26 @@ export default function AdminOrders() {
                       Awaiting
                     </button>
                     <button 
+                      onClick={() => setFilterStatus('changes-requested')}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                        filterStatus === 'changes-requested' 
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                          : 'bg-transparent text-gray-400 border-gray-600'
+                      }`}
+                    >
+                      Changes Requested
+                    </button>
+                    <button 
+                      onClick={() => setFilterStatus('printing')}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                        filterStatus === 'printing' 
+                          ? 'bg-green-500/20 text-green-300 border-green-500/40' 
+                          : 'bg-transparent text-gray-400 border-gray-600'
+                      }`}
+                    >
+                      Printing
+                    </button>
+                    <button 
                       onClick={() => setFilterStatus('approved')}
                       className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                         filterStatus === 'approved' 
@@ -1526,6 +1550,46 @@ export default function AdminOrders() {
                       }}
                     >
                       Awaiting
+                    </button>
+                    <button
+                      onClick={() => setFilterStatus('changes-requested')}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                        filterStatus === 'changes-requested'
+                          ? 'text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      style={{
+                        background: filterStatus === 'changes-requested' 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: `1px solid ${filterStatus === 'changes-requested' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                        boxShadow: filterStatus === 'changes-requested' 
+                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                      }}
+                    >
+                      Changes Requested
+                    </button>
+                    <button
+                      onClick={() => setFilterStatus('printing')}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                        filterStatus === 'printing'
+                          ? 'text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      style={{
+                        background: filterStatus === 'printing' 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: `1px solid ${filterStatus === 'printing' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                        boxShadow: filterStatus === 'printing' 
+                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                      }}
+                    >
+                      Printing
                     </button>
                     <button
                       onClick={() => setFilterStatus('shipped')}

@@ -44,7 +44,7 @@ export const uploadToCloudinary = async (
   onProgress?: (progress: UploadProgress) => void,
   folder?: string
 ): Promise<CloudinaryUploadResult> => {
-  console.log('🚀 Starting Cloudinary upload...');
+  // Starting Cloudinary upload
   
   const formData = new FormData();
   formData.append('file', file);
@@ -119,7 +119,7 @@ export const uploadToCloudinary = async (
       xhr.send(formData);
     });
 
-    console.log('📊 Response status:', response.status);
+          // Response status check
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -128,7 +128,7 @@ export const uploadToCloudinary = async (
     }
 
     const result = await response.json();
-    console.log('✅ Cloudinary upload successful:', result);
+          // Cloudinary upload successful
     
     // Return Cloudinary response in our expected format
     return {

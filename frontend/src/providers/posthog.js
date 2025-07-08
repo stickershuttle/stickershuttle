@@ -11,7 +11,7 @@ if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
     person_profiles: 'identified_only',
     // Enable debug mode in development
     loaded: (posthog) => {
-      if (process.env.NODE_ENV === 'development') console.log('PostHog loaded')
+      // PostHog loaded
     }
   })
 }

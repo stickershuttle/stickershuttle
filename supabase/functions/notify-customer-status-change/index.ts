@@ -46,25 +46,20 @@ serve(async (req) => {
       oldStatus: old_record?.order_status
     })
 
-    // Only process updates where status actually changed
-    if (type === 'UPDATE' && 
-        record.order_status === old_record?.order_status &&
-        record.fulfillment_status === old_record?.fulfillment_status &&
-        record.financial_status === old_record?.financial_status) {
+    // Check if status actually changed
+    if (!record.order_status || !old_record?.order_status || record.order_status === old_record.order_status) {
       console.log('⏭️ No status change detected, skipping notification')
-      return new Response(JSON.stringify({ message: 'No status change' }), {
+      return new Response(JSON.stringify({ success: false, error: 'No status change' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
       })
     }
 
-    // Skip notifications for certain statuses
-    const skipStatuses = ['Awaiting Payment', 'Payment Failed']
-    if (skipStatuses.includes(record.order_status)) {
+    // Only send notifications for specific status changes
+    const notifiableStatuses = ['shipped', 'delivered', 'processing', 'ready_for_pickup']
+    if (!notifiableStatuses.includes(record.order_status)) {
       console.log('⏭️ Skipping notification for status:', record.order_status)
-      return new Response(JSON.stringify({ message: 'Status notification skipped' }), {
-        headers: { 'Content-Type': 'application/json' },
-        status: 200,
+      return new Response(JSON.stringify({ success: false, error: 'Status not notifiable' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 

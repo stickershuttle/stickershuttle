@@ -5,6 +5,7 @@ import { useQuery, useMutation, gql } from '@apollo/client';
 import { getSupabase } from '../lib/supabase';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import AIFileImage from '@/components/AIFileImage';
+import OrderProgressTracker from '@/components/OrderProgressTracker';
 
 // GraphQL query to get user orders with proofs
 const GET_USER_ORDERS_WITH_PROOFS = gql`
@@ -15,6 +16,9 @@ const GET_USER_ORDERS_WITH_PROOFS = gql`
       orderStatus
       totalPrice
       orderCreatedAt
+      status
+      proof_status
+      tracking_number
       proofs {
         id
         proofUrl
@@ -28,8 +32,16 @@ const GET_USER_ORDERS_WITH_PROOFS = gql`
       items {
         id
         productName
+        productId
+        sku
         quantity
+        product {
+          id
+          name
+        }
+        calculatorSelections
       }
+      _fullOrderData
     }
   }
 `;
@@ -45,6 +57,9 @@ const GET_ORDER_BY_ID = gql`
       orderCreatedAt
       customerFirstName
       customerLastName
+      status
+      proof_status
+      tracking_number
       proofs {
         id
         proofUrl
@@ -59,10 +74,17 @@ const GET_ORDER_BY_ID = gql`
       items {
         id
         productName
+        productId
+        sku
         quantity
         totalPrice
         calculatorSelections
+        product {
+          id
+          name
+        }
       }
+      _fullOrderData
     }
   }
 `;
@@ -500,6 +522,11 @@ export default function ProofsPage() {
                 Order {selectedOrder.orderNumber || `#${selectedOrder.id.split('-')[0].toUpperCase()}`}
               </h1>
               <p className="text-gray-400">{formatDate(selectedOrder.orderCreatedAt)}</p>
+            </div>
+
+            {/* Order Progress Tracker */}
+            <div className="mb-6">
+              <OrderProgressTracker order={selectedOrder} />
             </div>
 
             {/* Side-by-Side Proofs Layout */}

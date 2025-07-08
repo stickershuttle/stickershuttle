@@ -19,7 +19,7 @@ interface LayerInfo {
 }
 
 export async function detectCutContourLayers(file: File): Promise<LayerInfo> {
-  console.log(`🔬 Starting PDF layer detection for: ${file.name} (${file.size} bytes)`);
+  // Starting PDF layer detection
   
   try {
     // Dynamically import PDF.js to avoid SSR issues
@@ -33,7 +33,7 @@ export async function detectCutContourLayers(file: File): Promise<LayerInfo> {
 
     // Skip analysis for non-PDF files
     if (!(file.type === 'application/pdf' || file.type === 'application/x-pdf' || file.name.toLowerCase().endsWith('.pdf'))) {
-      console.log('📄 Skipping PDF analysis for non-PDF file:', file.name);
+      // Skipping PDF analysis for non-PDF file
       return {
         hasCutContour: false,
         layerNames: [],
@@ -77,12 +77,12 @@ export async function detectCutContourLayers(file: File): Promise<LayerInfo> {
       const groups = (optionalContentConfig as any).getGroups?.() || [];
       layerInfo.totalLayers = groups.length;
       
-      console.log(`📋 Found ${groups.length} layer groups in PDF`);
+              // Found layer groups in PDF
       
       for (const group of groups) {
         const groupName = group.name || '';
         layerInfo.layerNames.push(groupName);
-        console.log(`🏷️ Layer found: "${groupName}"`);
+                  // Layer found
         
         // Check if this layer contains CutContour (more flexible matching)
         const normalizedName = groupName.toLowerCase().trim();
@@ -92,7 +92,7 @@ export async function detectCutContourLayers(file: File): Promise<LayerInfo> {
             normalizedName === 'cutcontour' ||
             normalizedName.startsWith('cutcontour')) {
           layerInfo.hasCutContour = true;
-          console.log(`✅ CutContour layer detected: "${groupName}"`);
+                      // CutContour layer detected
           
           // Try to get dimensions from the cut contour layer
           try {
@@ -141,12 +141,7 @@ export async function detectCutContourLayers(file: File): Promise<LayerInfo> {
                 }
               };
               
-              console.log(`🔍 CutContour detected in layer "${groupName}"! Dimensions: ${layerInfo.cutContourDimensions.widthInches}" × ${layerInfo.cutContourDimensions.heightInches}"`);
-              console.log(`📊 Detailed cut contour analysis:`);
-              console.log(`   • Layer name: ${groupName}`);
-              console.log(`   • Width: ${widthPoints} points = ${layerInfo.cutContourDimensions.widthInches} inches`);
-              console.log(`   • Height: ${heightPoints} points = ${layerInfo.cutContourDimensions.heightInches} inches`);
-              console.log(`   • Bounding box: (${minX}, ${minY}) to (${maxX}, ${maxY})`);
+              // CutContour detected with dimensions
             }
           } catch (dimensionError) {
             console.warn('Could not extract cut contour dimensions:', dimensionError);
@@ -163,13 +158,13 @@ export async function detectCutContourLayers(file: File): Promise<LayerInfo> {
     const textItems = content.items.map((item: any) => item.str).join(' ');
     if (textItems.toLowerCase().includes('cutcontour')) {
       layerInfo.hasCutContour = true;
-      console.log('🎯 CutContour found in PDF text content/metadata');
+              // CutContour found in PDF text content/metadata
     }
 
     // Check for spot colors that might be named CutContour
     try {
       const operatorList = await page.getOperatorList();
-      console.log(`🔍 Analyzing ${operatorList.fnArray.length} PDF operations for spot colors...`);
+              // Analyzing PDF operations for spot colors
       
       for (let i = 0; i < operatorList.fnArray.length; i++) {
         const fn = operatorList.fnArray[i];
@@ -179,7 +174,7 @@ export async function detectCutContourLayers(file: File): Promise<LayerInfo> {
         if (fn === pdfjsLib.OPS.setFillColorSpace || fn === pdfjsLib.OPS.setStrokeColorSpace) {
           if (args && args.length > 0) {
             const colorSpaceName = args[0];
-            console.log(`🎨 Found color space: "${colorSpaceName}"`);
+            // Found color space
             
             if (typeof colorSpaceName === 'string') {
               const normalizedColorName = colorSpaceName.toLowerCase().trim();
@@ -187,7 +182,7 @@ export async function detectCutContourLayers(file: File): Promise<LayerInfo> {
                   normalizedColorName === 'cutcontour' ||
                   normalizedColorName.startsWith('cutcontour')) {
                 layerInfo.hasCutContour = true;
-                console.log(`✅ CutContour found as spot color: "${colorSpaceName}"`);
+                // CutContour found as spot color
                 break;
               }
             }
@@ -206,8 +201,7 @@ export async function detectCutContourLayers(file: File): Promise<LayerInfo> {
       console.warn('Could not check for spot colors:', spotColorError);
     }
 
-    console.log(`✅ PDF layer detection completed for: ${file.name}`);
-    console.log(`📊 Final results: ${layerInfo.hasCutContour ? 'CutContour1 found' : 'No CutContour1 found'}`);
+    // PDF layer detection completed
     
     return layerInfo;
     

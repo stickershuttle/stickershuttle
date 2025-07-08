@@ -43,13 +43,17 @@ class StripeClient {
       // Calculate discount proportionally across all line items
       const originalTotal = orderData.lineItems.reduce((sum, item) => sum + safeParseFloat(item.totalPrice, 0), 0);
       const discountAmount = safeParseFloat(orderData.cartMetadata?.discountAmount, 0);
-      const discountRatio = discountAmount > 0 && originalTotal > 0 ? discountAmount / originalTotal : 0;
+      const creditsApplied = safeParseFloat(orderData.cartMetadata?.creditsApplied, 0);
+      const totalDiscounts = discountAmount + creditsApplied;
+      const discountRatio = totalDiscounts > 0 && originalTotal > 0 ? totalDiscounts / originalTotal : 0;
 
       console.log('💰 Discount calculation:', {
         originalTotal,
         discountAmount,
+        creditsApplied,
+        totalDiscounts,
         discountRatio,
-        finalTotal: originalTotal - discountAmount
+        finalTotal: originalTotal - totalDiscounts
       });
 
       // Check for tax exemption status
@@ -106,7 +110,7 @@ class StripeClient {
               currency: orderData.currency || 'usd',
               product_data: {
                 name: item.name || item.title,
-                description: item.description || `${item.name} - Custom Stickers (${item.quantity} pieces)${discountAmount > 0 ? ` (${orderData.cartMetadata.discountCode} discount applied)` : ''}`,
+                description: item.description || `${item.name} - Custom Stickers (${item.quantity} pieces)${totalDiscounts > 0 ? ` (${orderData.cartMetadata.discountCode ? orderData.cartMetadata.discountCode + ' discount' : ''}${creditsApplied > 0 ? (orderData.cartMetadata.discountCode ? ' + ' : '') + '$' + creditsApplied.toFixed(2) + ' credits' : ''} applied)` : ''}`,
                 metadata: {
                   productId: item.productId,
                   sku: item.sku,
@@ -141,6 +145,7 @@ class StripeClient {
           originalTotalAmount: orderData.cartMetadata?.subtotalAmount || '0.00',
           discountCode: orderData.cartMetadata?.discountCode || '',
           discountAmount: orderData.cartMetadata?.discountAmount || '0.00',
+          creditsApplied: orderData.cartMetadata?.creditsApplied || '0.00',
           totalAmount: orderData.cartMetadata?.totalAmount || '0.00',
           isTaxExempt: isTaxExempt.toString()
         },
@@ -150,6 +155,10 @@ class StripeClient {
         // Enable automatic tax calculation
         automatic_tax: {
           enabled: true
+        },
+        // Enable customer address updates for automatic tax calculation
+        customer_update: {
+          shipping: 'auto'
         }
       };
 

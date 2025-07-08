@@ -11,18 +11,18 @@ const PRODUCTION_API_URL = 'https://ss-beyond.up.railway.app';
 const getApiUrl = () => {
   // If explicit environment variable is set, use it
   if (process.env.NEXT_PUBLIC_API_URL) {
-    console.log('🔗 Using environment variable API URL:', process.env.NEXT_PUBLIC_API_URL);
+    // Using environment variable API URL
     return process.env.NEXT_PUBLIC_API_URL;
   }
   
   // If in development mode, use localhost
   if (process.env.NODE_ENV === 'development') {
-    console.log('🏠 Development mode: using localhost API');
+    // Development mode: using localhost API
     return 'http://localhost:4000';
   }
   
   // Otherwise use production URL (Railway backend)
-  console.log('🚀 Production mode: using Railway backend:', PRODUCTION_API_URL);
+  // Production mode: using Railway backend
   return PRODUCTION_API_URL;
 };
 
@@ -100,13 +100,12 @@ const client = new ApolloClient({
 });
 
 const finalApiUrl = getApiUrl();
-console.log('🔗 Apollo Client configured with URI:', finalApiUrl);
-console.log('🌍 Environment:', process.env.NODE_ENV);
+// Apollo Client configured
 
 // Clear cache in development to avoid stale error states
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   client.clearStore().catch(console.error);
-  console.log('🧹 Apollo cache cleared for development');
+      // Apollo cache cleared for development
 }
 
 // Clear cache on production if there's a cache version mismatch

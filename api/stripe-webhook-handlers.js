@@ -50,10 +50,14 @@ router.post('/stripe', async (req, res) => {
   // Handle the event
   try {
     console.log(`📦 Stripe webhook received: ${event.type}`);
+    console.log(`📋 Event ID: ${event.id}`);
+    console.log(`📋 Event data object ID: ${event.data?.object?.id}`);
     
     switch (event.type) {
       case 'checkout.session.completed':
+        console.log('💳 Processing checkout.session.completed event');
         await handleCheckoutSessionCompleted(event.data.object);
+        console.log('✅ checkout.session.completed processed successfully');
         break;
         
       case 'payment_intent.succeeded':
@@ -75,7 +79,11 @@ router.post('/stripe', async (req, res) => {
     res.json({ received: true });
   } catch (error) {
     console.error('❌ Error processing webhook:', error);
-    res.status(500).send('Webhook processing error');
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Event type that failed:', event?.type);
+    console.error('❌ Event ID that failed:', event?.id);
+    // Return 200 to prevent Stripe from retrying, but log the error
+    res.json({ received: true, error: error.message });
   }
 });
 
@@ -143,7 +151,15 @@ async function handleCheckoutSessionCompleted(session) {
     
     // Get full session details to access metadata and line items
     const stripe = require('./stripe-client');
+    console.log('📋 Fetching full session details for:', session.id);
     let fullSession = await stripe.getCheckoutSession(session.id);
+    
+    console.log('📋 Full session fetched:', {
+      hasLineItems: !!fullSession.line_items?.data,
+      lineItemCount: fullSession.line_items?.data?.length || 0,
+      hasMetadata: !!fullSession.metadata,
+      hasShippingCost: !!fullSession.shipping_cost
+    });
     
     // If shipping cost is not available, wait a moment and try again
     // Sometimes Stripe needs a moment to populate all session data
@@ -248,18 +264,21 @@ async function handleCheckoutSessionCompleted(session) {
     // Look for existing order by Stripe session ID
     let existingOrderId = null;
     
+    console.log('🔍 Checking Supabase client status:', supabaseClient.isReady());
+    
     if (supabaseClient.isReady()) {
       const client = supabaseClient.getServiceClient();
       
       console.log('🔍 Searching for existing order with session ID:', session.id);
       const { data: existingOrders, error } = await client
         .from('orders_main')
-        .select('id, order_status, user_id, guest_email, created_at')
+        .select('id, order_status, user_id, guest_email, created_at, stripe_session_id')
         .eq('stripe_session_id', session.id)
         .limit(1);
       
       if (error) {
         console.error('❌ Error checking for existing orders:', error);
+        console.error('❌ Error details:', error.message, error.code);
       } else if (existingOrders && existingOrders.length > 0) {
         existingOrderId = existingOrders[0].id;
         console.log('📝 Found existing order:', {
@@ -267,10 +286,12 @@ async function handleCheckoutSessionCompleted(session) {
           currentStatus: existingOrders[0].order_status,
           userId: existingOrders[0].user_id,
           guestEmail: existingOrders[0].guest_email,
-          createdAt: existingOrders[0].created_at
+          createdAt: existingOrders[0].created_at,
+          sessionId: existingOrders[0].stripe_session_id
         });
       } else {
         console.log('⚠️ No existing order found with session ID:', session.id);
+        console.log('🔍 Query returned:', existingOrders);
         console.log('🔍 This might indicate a session ID update failed during checkout');
         
         // Let's also check for orders without session IDs that might match this user/email
@@ -707,33 +728,51 @@ async function handleCheckoutSessionCompleted(session) {
         console.error('⚠️ Failed to send order update admin email (order still processed):', emailError);
       }
       
-      // Credits were already deducted at checkout time - just confirm transaction
-      if (updatedOrder.credits_applied && parseFloat(updatedOrder.credits_applied) > 0 && metadata.userId !== 'guest') {
+      // Handle credit deduction on successful payment
+      const creditsApplied = parseFloat(metadata.creditsApplied || updatedOrder.credits_applied || '0');
+      
+      if (creditsApplied > 0 && metadata.userId !== 'guest') {
         try {
-          const creditsApplied = parseFloat(updatedOrder.credits_applied);
-          console.log('💳 Confirming successful payment for pre-deducted credits:', creditsApplied);
-          console.log('💳 Order ID:', updatedOrder.id);
-          console.log('💳 User ID:', metadata.userId);
+          console.log('💳 Deducting credits for successful payment:', {
+            creditsApplied,
+            orderId: updatedOrder.id,
+            userId: metadata.userId
+          });
           
-          // Mark credit transaction as confirmed (payment successful)
-          if (updatedOrder.credit_transaction_id) {
-            const creditHandlers = require('./credit-handlers');
-            await creditHandlers.confirmTransaction(
-              updatedOrder.credit_transaction_id,
-              updatedOrder.id,
-              'Payment completed successfully'
-            );
-            console.log('✅ Credit transaction confirmed - payment successful');
+          const creditHandlers = require('./credit-handlers');
+          
+          // Deduct credits now that payment is confirmed
+          const creditTransaction = await creditHandlers.deductCredits(
+            metadata.userId,
+            creditsApplied,
+            `Credits applied to order ${updatedOrder.id}`,
+            'used',
+            updatedOrder.id
+          );
+          
+          if (creditTransaction.alreadyDeducted) {
+            console.log('✅ Credits were already deducted for this order:', creditTransaction);
           } else {
-            console.warn('⚠️ No credit transaction ID found for confirmation');
+            console.log('✅ Credits deducted successfully:', creditTransaction);
           }
+          
+          // Update order with credit transaction ID
+          const client = supabaseClient.getServiceClient();
+          await client
+            .from('orders_main')
+            .update({ 
+              credit_transaction_id: creditTransaction.id,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', updatedOrder.id);
+            
         } catch (creditError) {
-          console.error('⚠️ Error confirming credit transaction (payment still successful):', creditError);
-          // Don't fail the order processing for credit confirmation errors
+          console.error('⚠️ Error deducting credits (payment still successful):', creditError);
+          // Don't fail the order processing for credit errors
         }
-      } else {
-        console.log('💳 No pre-deducted credits to confirm:', {
-          creditsApplied: updatedOrder.credits_applied,
+      } else if (creditsApplied > 0) {
+        console.log('💳 No credits to deduct (guest user):', {
+          creditsApplied,
           userId: metadata.userId,
           isGuest: metadata.userId === 'guest'
         });
@@ -1108,28 +1147,46 @@ async function handleCheckoutSessionCompleted(session) {
       
       console.log('✅ New order created:', order?.id);
       
-      // Credits were already handled at checkout time for new orders too
+      // Handle credit deduction for new orders
       if (cartMetadata?.creditsApplied && parseFloat(cartMetadata.creditsApplied) > 0 && metadata.userId !== 'guest' && order?.id) {
         const creditsApplied = parseFloat(cartMetadata.creditsApplied);
-        console.log('💳 Confirming pre-deducted credits for new order:', creditsApplied);
+        console.log('💳 Deducting credits for new order:', creditsApplied);
         console.log('💳 Order ID:', order.id);
         console.log('💳 User ID:', metadata.userId);
         
-        // Credits were already deducted at checkout - just confirm and track
         try {
+          const creditHandlers = require('./credit-handlers');
+          
+          // Deduct credits now that payment is confirmed
+          const creditTransaction = await creditHandlers.deductCredits(
+            metadata.userId,
+            creditsApplied,
+            `Credits applied to order ${order.id}`,
+            'used',
+            order.id
+          );
+          
+          if (creditTransaction.alreadyDeducted) {
+            console.log('✅ Credits were already deducted for this order:', creditTransaction);
+          } else {
+            console.log('✅ Credits deducted successfully for new order:', creditTransaction);
+          }
+          
+          // Update order with credit transaction ID
           const client = supabaseClient.getServiceClient();
           await client
             .from('orders_main')
             .update({
               credits_applied: creditsApplied,
+              credit_transaction_id: creditTransaction.id,
               updated_at: new Date().toISOString()
             })
             .eq('id', order.id);
             
-          console.log('✅ New order updated with pre-deducted credits confirmation');
+          console.log('✅ New order updated with credit deduction');
         } catch (creditError) {
-          console.error('⚠️ Error updating new order with credit confirmation:', creditError);
-          // Don't fail the order processing for tracking errors
+          console.error('⚠️ Error deducting credits for new order:', creditError);
+          // Don't fail the order processing for credit errors
         }
       }
       
@@ -1233,45 +1290,13 @@ async function handlePaymentIntentFailed(paymentIntent) {
       .eq('id', paymentIntent.metadata.customerOrderId)
       .single();
     
-    if (order && order.credits_applied > 0 && order.user_id) {
-      try {
-        console.log('💳 Reversing pre-deducted credits for failed payment:', order.credits_applied);
-        console.log('💳 Transaction ID:', order.credit_transaction_id);
-        
-        const creditHandlers = require('./credit-handlers');
-        
-        // Use proper transaction reversal if we have the transaction ID
-        if (order.credit_transaction_id) {
-          await creditHandlers.reverseTransaction(
-            order.credit_transaction_id,
-            'Payment failed - reversing pre-deducted credits'
-          );
-          console.log('✅ Credits reversed using transaction ID');
-        } else {
-          // Fallback: manually add credits back
-          await creditHandlers.addUserCredits({
-            userId: order.user_id,
-            amount: order.credits_applied,
-            reason: 'Credit reversal due to payment failure (fallback method)'
-          }, null);
-          console.log('✅ Credits reversed using fallback method');
-        }
-        
-        // Clear the credit fields from the order
-        await client
-          .from('orders_main')
-          .update({
-            credits_applied: 0,
-            credit_transaction_id: null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', order.id);
-          
-        console.log('✅ Order updated - credits cleared');
-      } catch (creditError) {
-        console.error('🚨 CRITICAL: Failed to reverse credits for failed payment:', creditError);
-        // This is critical - user paid nothing but lost credits
-      }
+    if (order && order.credits_applied && parseFloat(order.credits_applied) > 0) {
+      // No need to handle credits on payment failure - credits are only deducted after successful payment
+      console.log('💳 Payment failed - no credits were deducted:', {
+        creditsApplied: order.credits_applied,
+        orderId: order.id,
+        userId: order.user_id
+      });
     }
     
     await supabaseClient.updateOrderStatus(paymentIntent.metadata.customerOrderId, {

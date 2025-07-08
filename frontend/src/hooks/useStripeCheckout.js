@@ -15,7 +15,7 @@ export const useStripeCheckout = () => {
     setError(null);
 
     try {
-      console.log('🚀 Processing Stripe checkout...');
+      // Processing Stripe checkout
       
       // Step 1: Get current user context
       let currentUser = null;
@@ -24,16 +24,14 @@ export const useStripeCheckout = () => {
           const supabase = await getSupabase();
           const { data: { session } } = await supabase.auth.getSession();
           currentUser = session?.user || null;
-          console.log('👤 User context:', currentUser ? currentUser.email : 'Guest user');
+          // User context check
         }
       } catch (userError) {
         console.warn('Could not get user context, proceeding as guest:', userError);
       }
 
       // Step 2: Process order through API
-      console.log('📝 Processing order with Stripe...');
-      console.log('🛒 Cart items being processed:', cartItems.length, 'items');
-      console.log('📦 Cart items details:', cartItems);
+          // Processing order with Stripe
 
       // Helper function to safely parse float and handle NaN
       const safeParseFloat = (value, fallback = 0) => {
@@ -94,7 +92,7 @@ export const useStripeCheckout = () => {
       });
 
       const result = orderData.processStripeCartOrder;
-      console.log('📊 Stripe order processing result:', result);
+      // Stripe order processing result
 
       if (!result.success) {
         console.error('❌ Order processing failed with errors:', result.errors);

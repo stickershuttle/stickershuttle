@@ -2,32 +2,41 @@ import { gql } from '@apollo/client';
 
 // Get user's current credit balance
 export const GET_USER_CREDIT_BALANCE = gql`
-  query GetUserCreditBalance($userId: String!) {
+  query GetUserCreditBalance($userId: ID!) {
     getUserCreditBalance(userId: $userId) {
       balance
-      transactionCount
-      lastTransactionDate
+      transactions {
+        id
+        amount
+        balance
+        reason
+        transactionType
+        createdAt
+      }
     }
   }
 `;
 
 // Get unread credit notifications
 export const GET_UNREAD_CREDIT_NOTIFICATIONS = gql`
-  query GetUnreadCreditNotifications($userId: String!) {
+  query GetUnreadCreditNotifications($userId: ID!) {
     getUnreadCreditNotifications(userId: $userId) {
       id
-      amount
-      reason
+      userId
+      creditId
+      type
+      title
+      message
+      read
+      createdAt
     }
   }
 `;
 
 // Mark credit notifications as read
 export const MARK_CREDIT_NOTIFICATIONS_READ = gql`
-  mutation MarkCreditNotificationsRead($userId: String!) {
-    markCreditNotificationsRead(userId: $userId) {
-      success
-    }
+  mutation MarkCreditNotificationAsRead($notificationId: ID!) {
+    markCreditNotificationAsRead(notificationId: $notificationId)
   }
 `;
 
@@ -82,21 +91,19 @@ export const GET_ALL_CREDIT_TRANSACTIONS = gql`
   }
 `;
 
-// Admin: Get user credit history
+// Get user credit history
 export const GET_USER_CREDIT_HISTORY = gql`
-  query GetUserCreditHistory($userId: String!) {
-    getUserCreditHistory(userId: $userId) {
-      transactions {
-        id
-        amount
-        balance
-        reason
-        transactionType
-        orderId
-        createdAt
-        expiresAt
-      }
-      currentBalance
+  query GetUserCreditHistory($userId: ID!, $limit: Int) {
+    getUserCreditHistory(userId: $userId, limit: $limit) {
+      id
+      userId
+      amount
+      balance
+      reason
+      transactionType
+      orderId
+      createdAt
+      expiresAt
     }
   }
 `;
@@ -129,17 +136,14 @@ export const APPLY_CREDITS_TO_ORDER = gql`
 
 // Get earned points/credits per order for the user
 export const GET_USER_EARNED_CREDITS_BY_ORDER = gql`
-  query GetUserEarnedCreditsByOrder($userId: String!) {
+  query GetUserEarnedCreditsByOrder($userId: ID!) {
     getUserCreditHistory(userId: $userId) {
-      transactions {
-        id
-        amount
-        reason
-        transactionType
-        orderId
-        orderNumber
-        createdAt
-      }
+      id
+      amount
+      reason
+      transactionType
+      orderId
+      createdAt
     }
   }
 `;
@@ -164,6 +168,17 @@ export const CLEANUP_ABANDONED_CHECKOUTS = gql`
       success
       totalRestored
       restoredSessions
+      message
+      error
+    }
+  }`;
+
+// Fix existing earned credit transactions
+export const FIX_EXISTING_EARNED_CREDITS = gql`
+  mutation FixExistingEarnedCredits {
+    fixExistingEarnedCredits {
+      success
+      fixed
       message
       error
     }

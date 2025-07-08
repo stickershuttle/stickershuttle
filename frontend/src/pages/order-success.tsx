@@ -16,7 +16,7 @@ export default function OrderSuccess() {
 
   useEffect(() => {
     // Clear cart immediately when order success page loads
-    console.log('🛒 Clearing cart after successful payment');
+    // Clearing cart after successful payment
     clearCart();
     
     // Additional debug: Check if cart was cleared

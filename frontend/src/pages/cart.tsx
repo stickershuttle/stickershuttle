@@ -71,7 +71,7 @@ const calculateAreaFromSize = (sizeString: string, customWidth?: string, customH
       const w = parseFloat(match[1]) || 0;
       const h = parseFloat(match[2]) || 0;
       const area = w * h;
-      console.log(`Cart: Parsed custom size ${sizeString} as ${w}" x ${h}" = ${area} sq inches`);
+      // Parsed custom size
       return area;
     }
   }
@@ -465,7 +465,7 @@ export default function CartPage() {
       if (data.createSharedCart.success) {
         setSharedCartUrl(data.createSharedCart.shareUrl);
         setShowShareModal(true);
-        console.log('✅ Shared cart created successfully:', data.createSharedCart.shareUrl);
+        // Shared cart created successfully
       } else {
         console.error('❌ Error creating shared cart:', data.createSharedCart.error);
       }
@@ -992,7 +992,7 @@ export default function CartPage() {
     if (sharedCartUrl) {
       try {
         await navigator.clipboard.writeText(sharedCartUrl);
-        console.log('✅ Share URL copied to clipboard');
+        // Share URL copied to clipboard
         
         // Show feedback to user
         const button = document.querySelector('[data-copy-button]') as HTMLButtonElement;

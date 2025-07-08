@@ -16,10 +16,10 @@ let Sentry = { captureException: () => {} }; // Mock Sentry
 
 const { ApolloServer } = require('@apollo/server');
 const { expressMiddleware } = require('@apollo/server/express4');
+const GraphQLError = require('graphql').GraphQLError;
 const gql = require('graphql-tag');
 const express = require('express');
 const { json } = require('body-parser');
-const { GraphQLError } = require('graphql');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -75,14 +75,14 @@ const stripeWebhookHandlers = require('./stripe-webhook-handlers');
 const easyPostClient = require('./easypost-client');
 const EasyPostTrackingEnhancer = require('./easypost-tracking-enhancer');
 const { discountManager } = require('./discount-manager');
-const creditHandlers = require('./credit-handlers');
 const KlaviyoClient = require('./klaviyo-client');
 const klaviyoClient = new KlaviyoClient();
+const creditHandlers = require('./credit-handlers');
 
 // Initialize enhanced tracking
 const trackingEnhancer = new EasyPostTrackingEnhancer(easyPostClient);
 
-// Initialize credit handlers with Supabase client
+// Initialize credit handlers with Supabase
 creditHandlers.initializeWithSupabase(supabaseClient);
 
 // Check service status  
@@ -437,12 +437,21 @@ app.get('/webhooks/test', async (req, res) => {
       const client = supabaseClient.getServiceClient();
       const { data: pendingOrders } = await client
         .from('orders_main')
-        .select('id, financial_status, order_status, created_at')
+        .select('id, financial_status, order_status, created_at, stripe_session_id')
         .eq('financial_status', 'pending')
         .order('created_at', { ascending: false })
         .limit(5);
       
       diagnostics.recent_pending_orders = pendingOrders || [];
+      
+      // Also check for orders with the specific session ID
+      const { data: sessionOrder } = await client
+        .from('orders_main')
+        .select('id, financial_status, order_status, stripe_session_id')
+        .eq('stripe_session_id', 'cs_test_a1nPX5t5vTZ4VD01f0mL3dEK3gyfA7yXExQvoVsb3JePgQMfuzscqSehpL')
+        .single();
+      
+      diagnostics.order_with_test_session = sessionOrder || null;
     } catch (error) {
       diagnostics.pending_orders_error = error.message;
     }
@@ -851,11 +860,7 @@ const typeDefs = gql`
     getAllDiscountCodes: [DiscountCode!]!
     getDiscountCodeStats(codeId: ID!): DiscountCodeStats!
     
-    # Credit queries
-    getUserCreditBalance(userId: String!): CreditBalance!
-    getUnreadCreditNotifications(userId: String!): [CreditNotification!]!
-    getAllCreditTransactions(limit: Int, offset: Int): CreditTransactionList!
-    getUserCreditHistory(userId: String!): UserCreditHistory!
+
     
     # User queries
     getAllUsers: [User!]!
@@ -892,6 +897,12 @@ const typeDefs = gql`
     # Shared cart queries
     getSharedCart(shareId: String!): SharedCartResult!
     getAllSharedCarts(offset: Int, limit: Int): AllSharedCartsResult!
+    
+    # Credit queries
+    getUserCreditBalance(userId: ID!): CreditBalance!
+    getUserCreditHistory(userId: ID!, limit: Int): [Credit!]!
+    getUnreadCreditNotifications(userId: ID!): [CreditNotification!]!
+    validateCreditApplication(userId: ID!, orderSubtotal: Float!, requestedCredits: Float!): CreditValidation!
   }
 
   type Mutation {
@@ -948,15 +959,7 @@ const typeDefs = gql`
     applyDiscountToCheckout(code: String!, orderAmount: Float!, hasReorderItems: Boolean): DiscountValidation!
     removeDiscountSession(sessionId: String): MutationResult!
     
-    # Credit mutations
-    markCreditNotificationsRead(userId: String!): MutationResult!
-    addUserCredits(input: AddUserCreditsInput!): AddUserCreditsResult!
-    addCreditsToAllUsers(amount: Float!, reason: String!): AddCreditsToAllUsersResult!
-    applyCreditsToOrder(orderId: ID!, amount: Float!): ApplyCreditsResult!
-    
-    # Credit restoration for abandoned checkouts
-    restoreCreditsForAbandonedCheckout(sessionId: String!, reason: String): RestoreCreditsResult!
-    cleanupAbandonedCheckouts(maxAgeHours: Int): CleanupResult!
+
 
     # Shared cart mutations
     createSharedCart(input: CreateSharedCartInput!): SharedCartResult!
@@ -969,7 +972,7 @@ const typeDefs = gql`
     updateUserProfileBanner(userId: ID!, bannerUrl: String, bannerPublicId: String, bannerTemplate: String, bannerTemplateId: Int): UserProfileResult!
     updateUserProfileCompany(userId: ID!, companyName: String!): UserProfileResult!
     updateUserProfileComprehensive(userId: ID!, input: UserProfileInput!): UserProfileResult!
-    updateWholesaleStatus(userId: ID!, isWholesaleCustomer: Boolean!, wholesaleCreditRate: Float): UserProfileResult!
+    updateWholesaleStatus(userId: ID!, isWholesaleCustomer: Boolean!): UserProfileResult!
     
     # Admin wholesale mutations
     approveWholesaleApplication(userId: ID!, approvedBy: ID!): WholesaleApprovalResult!
@@ -1017,6 +1020,13 @@ const typeDefs = gql`
     
     # User management mutations
     deleteUsers(userIds: [String!]!): DeleteUsersResult!
+    
+    # Credit mutations
+    addCredits(userId: ID!, amount: Float!, reason: String!, expiresAt: String): CreditTransactionResult!
+    applyCreditsToOrder(userId: ID!, orderId: ID!, amount: Float!): CreditTransactionResult!
+    reverseCredits(transactionId: ID!, reason: String!): CreditTransactionResult!
+    markCreditNotificationAsRead(notificationId: ID!): Boolean!
+    fixExistingEarnedCredits: CreditFixResult!
   }
 
   type Customer {
@@ -1104,13 +1114,13 @@ const typeDefs = gql`
     bannerTemplateId: Int
     companyName: String
     isWholesaleCustomer: Boolean
-    wholesaleCreditRate: Float
     wholesaleMonthlyCustomers: String
     wholesaleOrderingFor: String
     wholesaleFitExplanation: String
     wholesaleStatus: String
     wholesaleApprovedAt: String
     wholesaleApprovedBy: String
+    wholesaleCreditRate: Float
     isTaxExempt: Boolean
     taxExemptId: String
     taxExemptReason: String
@@ -1142,13 +1152,6 @@ const typeDefs = gql`
     monthlyRevenue: Float!
     monthlyOrders: Int!
     growthRate: Float!
-    creditRateDistribution: [CreditRateDistribution!]!
-  }
-
-  type CreditRateDistribution {
-    creditRate: Float!
-    customerCount: Int!
-    percentage: Float!
   }
 
   type WholesalePerformer {
@@ -1160,7 +1163,7 @@ const typeDefs = gql`
     totalOrders: Int!
     totalRevenue: Float!
     averageOrderValue: Float!
-    creditRate: Float!
+
     lastOrderDate: String
     monthlyRevenue: Float!
   }
@@ -1169,10 +1172,10 @@ const typeDefs = gql`
     firstName: String
     lastName: String
     companyName: String
-    wholesaleCreditRate: Float
     wholesaleMonthlyCustomers: String
     wholesaleOrderingFor: String
     wholesaleFitExplanation: String
+    wholesaleCreditRate: Float
   }
 
   # Wholesale Client Types
@@ -1239,7 +1242,6 @@ const typeDefs = gql`
     bannerImagePublicId: String
     bio: String
     isWholesaleCustomer: Boolean
-    wholesaleCreditRate: Float
   }
 
   input WholesaleUserProfileInput {
@@ -1251,7 +1253,6 @@ const typeDefs = gql`
     wholesaleMonthlyCustomers: String!
     wholesaleOrderingFor: String!
     wholesaleFitExplanation: String!
-    signupCreditAmount: Float
   }
 
   input TaxExemptionInput {
@@ -1550,6 +1551,61 @@ const typeDefs = gql`
     customer: Customer
   }
 
+  # Credit System Types
+  type Credit {
+    id: ID!
+    userId: ID!
+    amount: Float!
+    balance: Float!
+    reason: String
+    transactionType: String
+    orderId: ID
+    createdAt: String
+    createdBy: ID
+    expiresAt: String
+    metadata: JSON
+    reversedAt: String
+    reversalReason: String
+  }
+
+  type CreditBalance {
+    balance: Float!
+    transactionCount: Int
+    lastTransactionDate: String
+    transactions: [Credit!]
+  }
+
+  type CreditNotification {
+    id: ID!
+    userId: ID!
+    creditId: ID
+    type: String!
+    title: String!
+    message: String!
+    read: Boolean!
+    createdAt: String!
+  }
+
+  type CreditValidation {
+    valid: Boolean!
+    message: String!
+    maxApplicable: Float!
+  }
+
+  type CreditTransactionResult {
+    success: Boolean!
+    message: String
+    credit: Credit
+    newBalance: Float
+  }
+
+  type CreditFixResult {
+    success: Boolean!
+    fixed: Int!
+    message: String
+    error: String
+  }
+
   input KlaviyoCustomerInput {
     email: String!
     firstName: String
@@ -1632,7 +1688,7 @@ const typeDefs = gql`
     sku: String
     quantity: Int!
     unitPrice: Float!
-    totalPrice: Float!
+    totalPrice: Float
     calculatorSelections: JSON!
     customFiles: [String]
     customerNotes: String
@@ -1939,92 +1995,8 @@ const typeDefs = gql`
     active: Boolean
   }
   
-  # Credit Types
-  type CreditBalance {
-    balance: Float!
-    transactionCount: Int!
-    lastTransactionDate: String
-  }
-  
-  type CreditNotification {
-    id: String!
-    creditId: String!
-    amount: Float!
-    reason: String
-    createdAt: String!
-  }
-  
-  type CreditTransaction {
-    id: String!
-    userId: String!
-    userEmail: String!
-    userName: String!
-    amount: Float!
-    balance: Float!
-    reason: String
-    transactionType: String!
-    orderId: String
-    orderNumber: String
-    createdAt: String!
-    createdBy: String
-    expiresAt: String
-  }
-  
-  type CreditTransactionList {
-    transactions: [CreditTransaction!]!
-    totalCount: Int!
-  }
-  
-  type UserCreditHistory {
-    transactions: [CreditTransaction!]!
-    currentBalance: Float!
-  }
-  
   type MutationResult {
     success: Boolean!
-  }
-  
-  type AddUserCreditsResult {
-    success: Boolean!
-    credit: CreditTransaction
-    error: String
-  }
-  
-  type AddCreditsToAllUsersResult {
-    success: Boolean!
-    usersUpdated: Int
-    error: String
-  }
-  
-  type ApplyCreditsResult {
-    success: Boolean!
-    remainingBalance: Float
-    error: String
-  }
-
-  type RestoreCreditsResult {
-    success: Boolean!
-    restoredCredits: Float
-    restoredOrders: [String!]
-    message: String
-    error: String
-  }
-
-  type CleanupResult {
-    success: Boolean!
-    totalRestored: Float
-    restoredSessions: Int
-    message: String
-    error: String
-  }
-
-
-  
-  input AddUserCreditsInput {
-    userId: String!
-    amount: Float!
-    reason: String
-    expiresAt: String
   }
   
   # Blog Types
@@ -2299,6 +2271,15 @@ const resolvers = {
         const rpcData = await supabaseClient.getUserOrders(userId);
         console.log('📊 RPC data received:', rpcData.length, 'total orders');
         
+        // IMPORTANT: The RPC function must return order_id field, not just id
+        // Run the SQL fix in DASHBOARD_ORDERS_FIX.md to update the RPC function
+        
+        // Log what we're getting from RPC to debug field names
+        if (rpcData.length > 0) {
+          console.log('🔍 RPC data structure check - first order fields:', Object.keys(rpcData[0]));
+          console.log('🔍 Looking for order_id field:', rpcData[0].order_id ? '✅ Found' : '❌ Missing - RPC needs update!');
+        }
+        
         // Filter to only show paid orders in dashboard (hide draft orders with financial_status = 'pending')
         const paidOrders = rpcData.filter(order => order.financial_status === 'paid');
         console.log('💰 Filtered to paid orders:', paidOrders.length, 'of', rpcData.length, 'total');
@@ -2392,27 +2373,11 @@ const resolvers = {
             orderNoteLength: orderExtras.order_note ? orderExtras.order_note.length : 0,
             hasCustomerInfo: !!(orderExtras.customer_first_name || orderExtras.customer_email)
           });
-          console.log(`🎯 Order ${order.order_id} Shopify data:`, {
-            shopify_order_id: order.shopify_order_id,
-            shopify_order_number: order.shopify_order_number,
-            hasShopifyData: !!(order.shopify_order_id || order.shopify_order_number)
-          });
-          
           console.log(`🔍 RAW ORDER OBJECT:`, {
             keys: Object.keys(order),
             order_id: order.order_id,
-            shopify_order_id: order.shopify_order_id,
-            shopify_order_number: order.shopify_order_number,
             order_status: order.order_status,
-            total_price: order.total_price,
-            fullOrder: order
-          });
-          
-          console.log(`🎯 RESOLVER MAPPING:`, {
-            'order.shopify_order_id': order.shopify_order_id,
-            'order.shopify_order_number': order.shopify_order_number,
-            'mapped shopifyOrderId': order.shopify_order_id || null,
-            'mapped shopifyOrderNumber': order.shopify_order_number || null
+            total_price: order.total_price
           });
           
           // 🔍 Debug log for white option fix verification
@@ -3327,43 +3292,7 @@ const resolvers = {
         throw new Error('Failed to fetch discount statistics');
       }
     },
-    
-    // Credit queries
-    getUserCreditBalance: async (_, { userId }) => {
-      try {
-        return await creditHandlers.getUserCreditBalance(userId);
-      } catch (error) {
-        console.error('❌ Error fetching user credit balance:', error);
-        throw new Error('Failed to fetch credit balance');
-      }
-    },
-    
-    getUnreadCreditNotifications: async (_, { userId }) => {
-      try {
-        return await creditHandlers.getUnreadCreditNotifications(userId);
-      } catch (error) {
-        console.error('❌ Error fetching credit notifications:', error);
-        throw new Error('Failed to fetch credit notifications');
-      }
-    },
-    
-    getAllCreditTransactions: async (_, { limit, offset }) => {
-      try {
-        return await creditHandlers.getAllCreditTransactions(limit, offset);
-      } catch (error) {
-        console.error('❌ Error fetching credit transactions:', error);
-        throw new Error('Failed to fetch credit transactions');
-      }
-    },
-    
-    getUserCreditHistory: async (_, { userId }) => {
-      try {
-        return await creditHandlers.getUserCreditHistory(userId);
-      } catch (error) {
-        console.error('❌ Error fetching user credit history:', error);
-        throw new Error('Failed to fetch credit history');
-      }
-    },
+
 
     getAllUsers: async (_, args, context) => {
       try {
@@ -3467,7 +3396,6 @@ const resolvers = {
           bannerImagePublicId: profile.banner_image_public_id,
           companyName: profile.company_name,
           isWholesaleCustomer: profile.is_wholesale_customer || false,
-          wholesaleCreditRate: profile.wholesale_credit_rate || 0.05,
           wholesaleMonthlyCustomers: profile.wholesale_monthly_customers,
           wholesaleOrderingFor: profile.wholesale_ordering_for,
           wholesaleFitExplanation: profile.wholesale_fit_explanation,
@@ -4372,97 +4300,6 @@ const resolvers = {
       }
     },
 
-    getAllKlaviyoProfiles: async (_, { limit }, context) => {
-      const { user } = context;
-      if (!user) {
-        throw new AuthenticationError('Authentication required');
-      }
-
-      try {
-        const result = await klaviyoClient.getAllKlaviyoProfiles(limit);
-        return {
-          success: result.success,
-          profiles: result.allProfiles.map(profile => ({
-            id: profile.id,
-            email: profile.attributes?.email || '',
-            firstName: profile.attributes?.first_name || '',
-            lastName: profile.attributes?.last_name || '',
-            phone: profile.attributes?.phone_number || '',
-            city: profile.attributes?.location?.city || '',
-            state: profile.attributes?.location?.region || '',
-            country: profile.attributes?.location?.country || '',
-            totalOrders: profile.attributes?.properties?.total_orders || 0,
-            totalSpent: profile.attributes?.properties?.total_spent || 0,
-            averageOrderValue: profile.attributes?.properties?.average_order_value || 0,
-            firstOrderDate: profile.attributes?.properties?.first_order_date || null,
-            lastOrderDate: profile.attributes?.properties?.last_order_date || null,
-            createdAt: profile.attributes?.created || null,
-            updatedAt: profile.attributes?.updated || null,
-            sources: profile.sources || []
-          })),
-          totalProfiles: result.totalProfiles,
-          uniqueProfiles: result.uniqueProfiles,
-          profilesBySource: Object.entries(result.profilesBySource).map(([sourceName, data]) => ({
-            sourceName,
-            sourceId: data.id,
-            sourceType: data.type,
-            count: data.count
-          })),
-          errors: result.errors || []
-        };
-      } catch (error) {
-        console.error('Error getting all Klaviyo profiles:', error);
-        return {
-          success: false,
-          profiles: [],
-          totalProfiles: 0,
-          uniqueProfiles: 0,
-          profilesBySource: [],
-          errors: [{ error: error.message }]
-        };
-      }
-    },
-
-    // Sitewide Alert queries
-    getActiveSitewideAlerts: async () => {
-      try {
-        if (!supabaseClient.isReady()) {
-          throw new Error('Alert service is currently unavailable');
-        }
-        
-        const client = supabaseClient.getServiceClient();
-        const { data: alerts, error } = await client
-          .from('sitewide_alerts')
-          .select('*')
-          .eq('is_active', true)
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          console.error('❌ Error fetching active alerts:', error);
-          throw new Error('Failed to fetch active alerts');
-        }
-
-        return (alerts || []).map(alert => ({
-          id: String(alert.id),
-          title: alert.title,
-          message: alert.message,
-          backgroundColor: alert.background_color,
-          textColor: alert.text_color,
-          linkUrl: alert.link_url,
-          linkText: alert.link_text,
-          isActive: alert.is_active,
-          startDate: alert.start_date,
-          endDate: alert.end_date,
-          createdAt: alert.created_at,
-          updatedAt: alert.updated_at,
-          createdBy: alert.created_by
-        }));
-      } catch (error) {
-        console.error('Error fetching active sitewide alerts:', error);
-        throw new Error(error.message);
-      }
-    },
-
     getAllSitewideAlerts: async (_, args, context) => {
       const { user } = context;
       if (!user) {
@@ -4613,6 +4450,59 @@ const resolvers = {
       } catch (error) {
         console.error('❌ Error in getAllSharedCarts:', error);
         return { success: false, sharedCarts: [], totalCount: 0, error: error.message };
+      }
+    },
+
+    // Credit queries
+    getUserCreditBalance: async (_, { userId }) => {
+      try {
+        const balance = await creditHandlers.getUserCreditBalance(userId);
+        // Get recent transactions to include with balance
+        const history = await creditHandlers.getUserCreditHistory(userId);
+        const transactions = history?.transactions || [];
+        
+        return {
+          ...balance,
+          transactions: transactions.slice(0, 10) // Include last 10 transactions
+        };
+      } catch (error) {
+        console.error('❌ Error getting credit balance:', error);
+        return { balance: 0, transactionCount: 0, lastTransactionDate: null, transactions: [] };
+      }
+    },
+
+    getUserCreditHistory: async (_, { userId, limit = 10 }) => {
+      try {
+        const history = await creditHandlers.getUserCreditHistory(userId);
+        // Return just the transactions array, limited by the limit parameter
+        return (history?.transactions || []).slice(0, limit);
+      } catch (error) {
+        console.error('❌ Error getting credit history:', error);
+        return [];
+      }
+    },
+
+    getUnreadCreditNotifications: async (_, { userId }) => {
+      try {
+        const notifications = await creditHandlers.getUnreadCreditNotifications(userId);
+        return notifications;
+      } catch (error) {
+        console.error('❌ Error getting credit notifications:', error);
+        return [];
+      }
+    },
+
+    validateCreditApplication: async (_, { userId, orderSubtotal, requestedCredits }) => {
+      try {
+        const validation = await creditHandlers.validateCreditApplication(userId, orderSubtotal, requestedCredits);
+        return validation;
+      } catch (error) {
+        console.error('❌ Error validating credit application:', error);
+        return {
+          valid: false,
+          message: 'Error validating credits',
+          maxApplicable: 0
+        };
       }
     }
   },
@@ -5648,8 +5538,7 @@ const resolvers = {
         let checkoutSession = null;
         let customerOrder = null;
         let actualCreditsApplied = 0;
-        let remainingCredits = 0; // Initialize to 0
-        let creditDeductionId = null; // Track the credit transaction for potential reversal
+        let remainingCredits = 0;
         
         // Helper function to safely parse numbers and handle NaN
         const safeParseFloat = (value, fallback = 0) => {
@@ -5657,112 +5546,80 @@ const resolvers = {
           return isNaN(parsed) ? fallback : parsed;
         };
 
-        // Step 1: Calculate credits before creating order
+        // Step 1: Calculate totals before creating order
         const cartSubtotal = input.cartItems.reduce((sum, item) => {
           const itemTotal = safeParseFloat(item.totalPrice, 0);
           return sum + itemTotal;
         }, 0);
         const discountAmount = safeParseFloat(input.discountAmount, 0);
-        const creditsToApply = safeParseFloat(input.creditsToApply, 0);
-        const blindShipmentFee = input.isBlindShipment ? 5.00 : 0;
-        
-        // IMMEDIATELY deduct credits if provided (before payment processing)
-        if (creditsToApply > 0 && input.userId && input.userId !== 'guest') {
-          try {
-            console.log('💳 Processing credit application for user:', input.userId);
-            
-            const creditHandlers = require('./credit-handlers');
-            const userCreditData = await creditHandlers.getUserCreditBalance(input.userId);
-            const currentBalance = safeParseFloat(userCreditData?.balance, 0);
-            
-            // Calculate how much credit can be applied - ensure all values are safe
-            const safeCartSubtotal = safeParseFloat(cartSubtotal, 0);
-            const safeDiscountAmount = safeParseFloat(discountAmount, 0);
-            const afterDiscountTotal = safeCartSubtotal - safeDiscountAmount;
-            // Credits should only apply to product total, not fees like blind shipment
-            const maxCreditsToApply = Math.min(safeParseFloat(creditsToApply, 0), currentBalance, afterDiscountTotal);
-            
-            if (maxCreditsToApply > 0) {
-              console.log('💳 Deducting credits immediately before payment...');
-              
-              // ACTUALLY deduct credits now (not in webhook)
-              const creditResult = await creditHandlers.deductUserCredits({
-                userId: input.userId,
-                amount: maxCreditsToApply,
-                reason: 'Applied to order (pre-payment)',
-                orderId: null, // Will be updated when order is created
-                transactionType: 'deduction_pending_payment'
-              });
-              
-              if (creditResult.success) {
-                actualCreditsApplied = maxCreditsToApply;
-                remainingCredits = safeParseFloat(creditResult.remainingBalance, 0);
-                creditDeductionId = creditResult.transactionId;
-                
-                console.log('✅ Credits deducted successfully at checkout time');
-                console.log('💳 Applied:', actualCreditsApplied);
-                console.log('💳 Remaining balance:', remainingCredits);
-                console.log('💳 Transaction ID:', creditDeductionId);
-              } else {
-                console.error('❌ Failed to deduct credits:', creditResult.error);
-                errors.push(`Credit deduction failed: ${creditResult.error}`);
-                actualCreditsApplied = 0;
-                remainingCredits = safeParseFloat(currentBalance, 0);
-              }
-            } else {
-              remainingCredits = safeParseFloat(currentBalance, 0);
-              console.log('⚠️ No credits to apply (insufficient balance or amount)');
-            }
-            
-            console.log('💳 Credit processing summary:', {
-              requested: creditsToApply,
-              available: currentBalance,
-              applied: actualCreditsApplied,
-              afterDiscountTotal,
-              transactionId: creditDeductionId
+        const creditsRequested = safeParseFloat(input.creditsToApply, 0);
+        // Safely handle isBlindShipment with debug logging
+        const safeIsBlindShipment = (() => {
+          const safeBool = Boolean(input.isBlindShipment);
+          
+          // Debug logging for non-boolean values
+          if (typeof input.isBlindShipment !== 'boolean' && input.isBlindShipment !== undefined && input.isBlindShipment !== null) {
+            console.warn('⚠️ Backend: Non-boolean isBlindShipment value detected:', {
+              original: input.isBlindShipment,
+              type: typeof input.isBlindShipment,
+              converted: safeBool
             });
-          } catch (creditError) {
-            console.error('❌ Critical error processing credits:', creditError);
-            errors.push(`Credit system error: ${creditError.message}`);
-            actualCreditsApplied = 0;
-            
-            // Try to get current balance as fallback
-            try {
-              const creditHandlers = require('./credit-handlers');
-              const userCreditData = await creditHandlers.getUserCreditBalance(input.userId);
-              remainingCredits = safeParseFloat(userCreditData?.balance, 0);
-            } catch (fallbackError) {
-              console.error('⚠️ Failed to get fallback balance:', fallbackError);
-              remainingCredits = 0;
-            }
           }
-        } else {
-          // No credits being applied, but get current balance for logged in users
-          if (input.userId && input.userId !== 'guest') {
-            try {
-              const creditHandlers = require('./credit-handlers');
-              const userCreditData = await creditHandlers.getUserCreditBalance(input.userId);
-              remainingCredits = safeParseFloat(userCreditData?.balance, 0);
-              console.log('💳 User current balance (no credits applied):', remainingCredits);
-            } catch (balanceError) {
-              console.error('⚠️ Error getting user balance:', balanceError);
+          
+          return safeBool;
+        })();
+        
+        const blindShipmentFee = safeIsBlindShipment ? 0.00 : 0;
+        
+        // Step 1a: Handle credit application
+        let creditTransactionId = null;
+        if (creditsRequested > 0 && input.userId && input.userId !== 'guest') {
+          try {
+            console.log('💳 Attempting to validate credits:', creditsRequested);
+            
+            // Validate credit application
+            const validation = await creditHandlers.validateCreditApplication(
+              input.userId,
+              cartSubtotal - discountAmount,
+              creditsRequested
+            );
+            
+            if (validation.valid) {
+              // Don't deduct credits yet - just validate and pass to Stripe metadata
+              actualCreditsApplied = creditsRequested;
+              
+              // Get current balance for display
+              const { balance } = await creditHandlers.getUserCreditBalance(input.userId);
+              remainingCredits = safeParseFloat(balance, 0);
+              
+              console.log('✅ Credits validated successfully:', {
+                toApply: actualCreditsApplied,
+                currentBalance: remainingCredits
+              });
+            } else {
+              console.warn('⚠️ Credit application invalid:', validation.message);
+              errors.push(`Credit application failed: ${validation.message}`);
+              actualCreditsApplied = 0;
               remainingCredits = 0;
             }
-          } else {
-            // Guest user or no user - no credits available
+          } catch (creditError) {
+            console.error('❌ Error validating credits:', creditError);
+            errors.push(`Credit validation failed: ${creditError.message}`);
+            // Continue without credits - don't fail the whole order
+            actualCreditsApplied = 0;
             remainingCredits = 0;
           }
         }
-
-        // Step 2: Prepare order in Supabase (as pending payment) with correct credits
+        
+        // Step 2: Prepare order in Supabase (as pending payment)
         console.log('🔍 Checking Supabase client status...');
         console.log('Supabase ready?', supabaseClient.isReady());
 
         if (supabaseClient.isReady()) {
           try {
             const customerOrderData = {
-              user_id: input.userId || null,
-              guest_email: input.guestEmail || input.customerInfo.email,
+              user_id: (input.userId && input.userId !== 'guest') ? input.userId : null,
+              guest_email: (input.userId === 'guest') ? input.customerInfo.email : (input.guestEmail || null),
               order_status: 'Awaiting Payment',
               fulfillment_status: 'unfulfilled',
               financial_status: 'pending',
@@ -5771,7 +5628,8 @@ const resolvers = {
               total_price: cartSubtotal - discountAmount - actualCreditsApplied + blindShipmentFee,
               discount_code: input.discountCode || null,
               discount_amount: discountAmount || 0,
-              credits_applied: actualCreditsApplied, // Set the actual credits that will be applied
+              credits_applied: actualCreditsApplied || 0,
+              credit_transaction_id: creditTransactionId || null,
               currency: 'USD',
               customer_first_name: input.customerInfo.firstName,
               customer_last_name: input.customerInfo.lastName,
@@ -5781,7 +5639,7 @@ const resolvers = {
               billing_address: input.billingAddress || input.shippingAddress,
               order_tags: generateOrderTags(input.cartItems).split(','),
               order_note: generateOrderNote(input.cartItems),
-              is_blind_shipment: input.isBlindShipment || false,
+              is_blind_shipment: safeIsBlindShipment,
               order_created_at: new Date().toISOString(),
               order_updated_at: new Date().toISOString()
             };
@@ -5814,66 +5672,6 @@ const resolvers = {
 
               await supabaseClient.createOrderItems(orderItems);
               console.log('✅ Order items created');
-
-              // Store credit confirmation - credits already deducted
-              if (actualCreditsApplied > 0 && input.userId && creditDeductionId) {
-                console.log('💳 Storing credit confirmation in order:', actualCreditsApplied);
-                console.log('💳 Order ID:', customerOrder.id);
-                console.log('💳 Transaction ID:', creditDeductionId);
-                
-                try {
-                  const client = supabaseClient.getServiceClient();
-                  const { error: creditUpdateError } = await client
-                    .from('orders_main')
-                    .update({
-                      credits_applied: actualCreditsApplied, // Actual applied (already deducted)
-                      credit_transaction_id: creditDeductionId, // For potential reversal
-                      updated_at: new Date().toISOString()
-                    })
-                    .eq('id', customerOrder.id);
-                  
-                  if (creditUpdateError) {
-                    console.error('⚠️ Failed to store credit confirmation in order:', creditUpdateError);
-                    errors.push(`Credit tracking failed: ${creditUpdateError.message}`);
-                    
-                    // Critical: If we can't track the deduction, reverse it to prevent credit loss
-                    try {
-                      const creditHandlers = require('./credit-handlers');
-                      await creditHandlers.reverseTransaction(creditDeductionId, 'Order creation failed - tracking error');
-                      console.log('🔄 Credits reversed due to tracking failure');
-                      actualCreditsApplied = 0; // Reset since we reversed
-                    } catch (reverseError) {
-                      console.error('🚨 CRITICAL: Failed to reverse credits:', reverseError);
-                      errors.push('CRITICAL: Credit reversal failed - manual intervention required');
-                    }
-                  } else {
-                    console.log('✅ Credit confirmation stored in order');
-                    
-                    // Update the credit transaction with the order ID
-                    try {
-                      const creditHandlers = require('./credit-handlers');
-                      await creditHandlers.updateTransactionOrderId(creditDeductionId, customerOrder.id);
-                    } catch (updateError) {
-                      console.warn('⚠️ Failed to update credit transaction with order ID:', updateError);
-                    }
-                  }
-                } catch (creditStoreError) {
-                  console.error('⚠️ Critical error storing credit confirmation:', creditStoreError);
-                  errors.push(`Credit system error: ${creditStoreError.message}`);
-                  
-                  // Attempt to reverse the transaction since we can't track it properly
-                  if (creditDeductionId) {
-                    try {
-                      const creditHandlers = require('./credit-handlers');
-                      await creditHandlers.reverseTransaction(creditDeductionId, 'Order creation failed - critical error');
-                      console.log('🔄 Credits reversed due to critical error');
-                      actualCreditsApplied = 0;
-                    } catch (reverseError) {
-                      console.error('🚨 CRITICAL: Failed to reverse credits after critical error:', reverseError);
-                    }
-                  }
-                }
-              }
             }
           } catch (supabaseError) {
             console.error('❌ Supabase order creation failed:', supabaseError);
@@ -5884,13 +5682,13 @@ const resolvers = {
           errors.push('Order tracking service is not available');
         }
 
-        // Step 3: Check tax exemption status
+        // Step 3: Check tax exemption status and existing Stripe customer
         let customerTaxExempt = false;
         let existingCustomerId = null;
         
         if (input.userId && input.userId !== 'guest' && supabaseClient.isReady()) {
           try {
-            console.log('🏛️ Checking tax exemption status for user:', input.userId);
+            console.log('🏛️ Checking tax exemption status and Stripe customer for user:', input.userId);
             
             const client = supabaseClient.getServiceClient();
             const { data: userProfile, error: profileError } = await client
@@ -5902,6 +5700,10 @@ const resolvers = {
             if (profileError) {
               console.warn('⚠️ Could not fetch user profile for tax exemption check:', profileError);
             } else if (userProfile) {
+              // Note: Stripe customer ID is not stored in database - will create new customer each time
+              existingCustomerId = null;
+              console.log('💳 No existing Stripe customer ID stored - will create new customer');
+              
               customerTaxExempt = userProfile.is_tax_exempt || false;
               
               // Check if tax exemption has expired
@@ -5917,7 +5719,8 @@ const resolvers = {
               console.log('🏛️ Tax exemption status determined:', { 
                 userId: input.userId, 
                 isTaxExempt: customerTaxExempt,
-                expiresAt: userProfile.tax_exempt_expires_at 
+                expiresAt: userProfile.tax_exempt_expires_at,
+                hasStripeCustomer: !!existingCustomerId
               });
             }
           } catch (taxExemptError) {
@@ -5958,7 +5761,7 @@ const resolvers = {
             
             console.log('🌐 Using frontend URL for Stripe redirects:', baseUrl);
             
-            // Calculate final cart total (credits already calculated in Step 1)
+            // Calculate final cart total
             const cartTotal = cartSubtotal - discountAmount - actualCreditsApplied + blindShipmentFee;
             
             const checkoutData = {
@@ -5988,16 +5791,21 @@ const resolvers = {
               successUrl: `${baseUrl}/order-success`,
               cancelUrl: `${baseUrl}/cart`,
               customerEmail: input.customerInfo.email,
+              customerFirstName: input.customerInfo.firstName,
+              customerLastName: input.customerInfo.lastName,
+              shippingAddress: input.shippingAddress, // Pass shipping address for customer creation
               userId: input.userId,
               customerOrderId: customerOrder?.id,
               customerTaxExempt: customerTaxExempt, // Pass tax exemption status
               existingCustomerId: existingCustomerId, // Pass existing customer ID if available
+              creditsToApply: actualCreditsApplied, // Pass actual credits applied
+              creditTransactionId: creditTransactionId, // Pass credit transaction ID for tracking
               // Generate detailed order note with all selections including white options
               orderNote: generateOrderNote(input.cartItems),
               cartMetadata: {
                 itemCount: input.cartItems.length,
                 subtotalAmount: cartSubtotal.toFixed(2),
-                discountAmount: (discountAmount + actualCreditsApplied).toFixed(2), // Include credits in total discount
+                discountAmount: discountAmount.toFixed(2),
                 creditsApplied: actualCreditsApplied.toFixed(2),
                 totalAmount: cartTotal.toFixed(2),
                 customerEmail: input.customerInfo.email,
@@ -6022,21 +5830,36 @@ const resolvers = {
               if (customerOrder && supabaseClient.isReady()) {
                 try {
                   const client = supabaseClient.getServiceClient();
-                  const { error: updateError } = await client
-                    .from('orders_main')
-                    .update({ 
-                      stripe_session_id: sessionResult.sessionId,
-                      updated_at: new Date().toISOString()
-                    })
-                    .eq('id', customerOrder.id);
                   
-                  if (updateError) {
-                    console.error('❌ Failed to update order with Stripe session ID:', updateError);
-                    console.error('Order ID:', customerOrder.id);
-                    console.error('Session ID:', sessionResult.sessionId);
-                    errors.push('Failed to link payment session with order');
+                  // First try the RPC function
+                  const { data: rpcResult, error: rpcError } = await client
+                    .rpc('update_order_stripe_session', {
+                      p_order_id: customerOrder.id,
+                      p_session_id: sessionResult.sessionId
+                    });
+                  
+                  if (rpcError) {
+                    console.error('❌ RPC function failed, trying direct update:', rpcError);
+                    
+                    // Fallback to direct update
+                    const { error: updateError } = await client
+                      .from('orders_main')
+                      .update({ 
+                        stripe_session_id: sessionResult.sessionId,
+                        updated_at: new Date().toISOString()
+                      })
+                      .eq('id', customerOrder.id);
+                    
+                    if (updateError) {
+                      console.error('❌ Failed to update order with Stripe session ID:', updateError);
+                      console.error('Order ID:', customerOrder.id);
+                      console.error('Session ID:', sessionResult.sessionId);
+                      errors.push('Failed to link payment session with order');
+                    } else {
+                      console.log('✅ Order updated with Stripe session ID via direct update:', sessionResult.sessionId);
+                    }
                   } else {
-                    console.log('✅ Order updated with Stripe session ID:', sessionResult.sessionId);
+                    console.log('✅ Order updated with Stripe session ID via RPC:', sessionResult.sessionId);
                   }
                 } catch (sessionUpdateError) {
                   console.error('❌ Critical error updating order with session ID:', sessionUpdateError);
@@ -6069,8 +5892,8 @@ const resolvers = {
             ? 'Checkout session created successfully'
             : 'Order created with some issues',
           errors: errors.length > 0 ? errors : null,
-          creditsApplied: safeParseFloat(actualCreditsApplied, 0),
-          remainingCredits: safeParseFloat(remainingCredits, 0)
+          creditsApplied: actualCreditsApplied,
+          remainingCredits: remainingCredits
         };
       } catch (error) {
         console.error('❌ Stripe cart order processing failed:', error);
@@ -6294,8 +6117,8 @@ const resolvers = {
           success: false,
           error: error.message || 'Failed to create shipment'
         };
-              }
-      },
+      }
+    },
 
     buyEasyPostLabel: async (_, { shipmentId, rateId, orderId, insurance }) => {
       try {
@@ -7237,83 +7060,7 @@ const resolvers = {
       }
     },
     
-    // Credit mutations
-    markCreditNotificationsRead: async (_, { userId }) => {
-      try {
-        return await creditHandlers.markCreditNotificationsRead(userId);
-      } catch (error) {
-        console.error('❌ Error marking credit notifications as read:', error);
-        throw new Error('Failed to mark notifications as read');
-      }
-    },
-    
-    addUserCredits: async (_, { input }, context) => {
-      try {
-        // Admin authentication required
-        requireAdminAuth(context.user);
-        const adminUserId = context.user.id;
-        return await creditHandlers.addUserCredits(input, adminUserId);
-      } catch (error) {
-        console.error('❌ Error adding user credits:', error);
-        throw new Error('Failed to add credits');
-      }
-    },
-    
-    addCreditsToAllUsers: async (_, { amount, reason }, context) => {
-      try {
-        // Admin authentication required
-        requireAdminAuth(context.user);
-        const adminUserId = context.user.id;
-        return await creditHandlers.addCreditsToAllUsers(amount, reason, adminUserId);
-      } catch (error) {
-        console.error('❌ Error adding credits to all users:', error);
-        throw new Error('Failed to add credits to all users');
-      }
-    },
-    
-    applyCreditsToOrder: async (_, { orderId, amount }, context) => {
-      try {
-        const userId = context.user?.id;
-        if (!userId) {
-          throw new Error('Authentication required');
-        }
-        return await creditHandlers.applyCreditsToOrder(orderId, amount, userId);
-      } catch (error) {
-        console.error('❌ Error applying credits to order:', error);
-        throw new Error('Failed to apply credits');
-      }
-    },
 
-    // Credit restoration resolvers
-    restoreCreditsForAbandonedCheckout: async (_, { sessionId, reason }, context) => {
-      try {
-        // Admin authentication required
-        requireAdminAuth(context.user);
-        
-        return await creditHandlers.restoreCreditsForAbandonedCheckout(sessionId, reason);
-      } catch (error) {
-        console.error('❌ Error restoring credits for abandoned checkout:', error);
-        return {
-          success: false,
-          error: error.message
-        };
-      }
-    },
-
-    cleanupAbandonedCheckouts: async (_, { maxAgeHours = 24 }, context) => {
-      try {
-        // Admin authentication required
-        requireAdminAuth(context.user);
-        
-        return await creditHandlers.cleanupAbandonedCheckouts(maxAgeHours);
-      } catch (error) {
-        console.error('❌ Error cleaning up abandoned checkouts:', error);
-        return {
-          success: false,
-          error: error.message
-        };
-      }
-    },
 
     // Klaviyo mutations
     subscribeToKlaviyo: async (_, { email, listId }) => {
@@ -7624,8 +7371,6 @@ const resolvers = {
         return { success: false, error: error.message };
       }
     },
-
-
 
     // User Profile mutations
     updateUserProfileNames: async (_, { userId, firstName, lastName }) => {
@@ -8094,7 +7839,7 @@ const resolvers = {
             const { data: creditResult, error: creditError } = await client
               .rpc('grant_wholesale_signup_credits', {
                 p_user_id: userId,
-                p_signup_credit_amount: input.signupCreditAmount
+                p_signup_credits_amount: input.signupCreditAmount
               });
 
             if (creditError) {
@@ -8353,12 +8098,6 @@ const resolvers = {
             companyName: profile.company_name,
             isWholesaleCustomer: profile.is_wholesale_customer,
             wholesaleCreditRate: profile.wholesale_credit_rate,
-            wholesaleMonthlyCustomers: profile.wholesale_monthly_customers,
-            wholesaleOrderingFor: profile.wholesale_ordering_for,
-            wholesaleFitExplanation: profile.wholesale_fit_explanation,
-            wholesaleStatus: profile.wholesale_status,
-            wholesaleApprovedAt: profile.wholesale_approved_at,
-            wholesaleApprovedBy: profile.wholesale_approved_by,
             createdAt: profile.created_at,
             updatedAt: profile.updated_at
           }
@@ -8542,18 +8281,6 @@ const resolvers = {
             companyName: updatedProfile.company_name,
             isWholesaleCustomer: updatedProfile.is_wholesale_customer,
             wholesaleCreditRate: updatedProfile.wholesale_credit_rate,
-            wholesaleMonthlyCustomers: updatedProfile.wholesale_monthly_customers,
-            wholesaleOrderingFor: updatedProfile.wholesale_ordering_for,
-            wholesaleFitExplanation: updatedProfile.wholesale_fit_explanation,
-            wholesaleStatus: updatedProfile.wholesale_status,
-            wholesaleApprovedAt: updatedProfile.wholesale_approved_at,
-            wholesaleApprovedBy: updatedProfile.wholesale_approved_by,
-            isTaxExempt: updatedProfile.is_tax_exempt || false,
-            taxExemptId: updatedProfile.tax_exempt_id,
-            taxExemptReason: updatedProfile.tax_exempt_reason,
-            taxExemptExpiresAt: updatedProfile.tax_exempt_expires_at,
-            taxExemptUpdatedAt: updatedProfile.tax_exempt_updated_at,
-            taxExemptUpdatedBy: updatedProfile.tax_exempt_updated_by,
             createdAt: updatedProfile.created_at,
             updatedAt: updatedProfile.updated_at
           }
@@ -9172,37 +8899,6 @@ const resolvers = {
         throw error;
       }
     },
-    
-    // Credit restoration resolvers
-    restoreCreditsForAbandonedCheckout: async (_, { sessionId, reason }, context) => {
-      try {
-        // Admin authentication required
-        requireAdminAuth(context.user);
-        
-        return await creditHandlers.restoreCreditsForAbandonedCheckout(sessionId, reason);
-      } catch (error) {
-        console.error('❌ Error restoring credits for abandoned checkout:', error);
-        return {
-          success: false,
-          error: error.message
-        };
-      }
-    },
-
-    cleanupAbandonedCheckouts: async (_, { maxAgeHours = 24 }, context) => {
-      try {
-        // Admin authentication required
-        requireAdminAuth(context.user);
-        
-        return await creditHandlers.cleanupAbandonedCheckouts(maxAgeHours);
-      } catch (error) {
-        console.error('❌ Error cleaning up abandoned checkouts:', error);
-        return {
-          success: false,
-          error: error.message
-        };
-      }
-    },
 
     // Mutation to update order item files
     updateOrderItemFiles: async (_, { orderId, itemId, customFiles }, context) => {
@@ -9354,6 +9050,141 @@ const resolvers = {
       } catch (error) {
         console.error('❌ Error in deleteUsers:', error);
         throw new Error(error.message);
+      }
+    },
+
+    // Credit mutations
+    addCredits: async (_, { userId, amount, reason, expiresAt }, context) => {
+      try {
+        // Admin authentication required
+        const { user } = context;
+        if (!user) {
+          throw new AuthenticationError('Authentication required');
+        }
+        requireAdminAuth(user);
+
+        const creditTransaction = await creditHandlers.addCredits(
+          userId,
+          amount,
+          reason,
+          'manual',
+          null,
+          user.id,
+          expiresAt
+        );
+
+        return {
+          success: true,
+          message: `Successfully added ${amount} credits`,
+          credit: creditTransaction,
+          newBalance: creditTransaction.balance
+        };
+      } catch (error) {
+        console.error('❌ Error adding credits:', error);
+        return {
+          success: false,
+          message: error.message,
+          credit: null,
+          newBalance: 0
+        };
+      }
+    },
+
+    applyCreditsToOrder: async (_, { userId, orderId, amount }) => {
+      try {
+        const creditTransaction = await creditHandlers.deductCredits(
+          userId,
+          amount,
+          `Credits applied to order ${orderId}`,
+          'used',
+          orderId
+        );
+
+        return {
+          success: true,
+          message: `Successfully applied ${amount} credits to order`,
+          credit: creditTransaction,
+          newBalance: creditTransaction.balance
+        };
+      } catch (error) {
+        console.error('❌ Error applying credits:', error);
+        return {
+          success: false,
+          message: error.message,
+          credit: null,
+          newBalance: 0
+        };
+      }
+    },
+
+    reverseCredits: async (_, { transactionId, reason }, context) => {
+      try {
+        // Admin authentication required
+        const { user } = context;
+        if (!user) {
+          throw new AuthenticationError('Authentication required');
+        }
+        requireAdminAuth(user);
+
+        const reversalTransaction = await creditHandlers.reverseCredits(
+          transactionId,
+          reason
+        );
+
+        return {
+          success: true,
+          message: 'Credits reversed successfully',
+          credit: reversalTransaction,
+          newBalance: reversalTransaction.balance
+        };
+      } catch (error) {
+        console.error('❌ Error reversing credits:', error);
+        return {
+          success: false,
+          message: error.message,
+          credit: null,
+          newBalance: 0
+        };
+      }
+    },
+
+    markCreditNotificationAsRead: async (_, { notificationId }) => {
+      try {
+        await creditHandlers.markNotificationAsRead(notificationId);
+        return true;
+      } catch (error) {
+        console.error('❌ Error marking notification as read:', error);
+        return false;
+      }
+    },
+
+    // Fix existing earned credit transactions that have wrong transaction_type
+    fixExistingEarnedCredits: async (_, {}, context) => {
+      try {
+        // Admin authentication required
+        const { user } = context;
+        if (!user) {
+          throw new AuthenticationError('Authentication required');
+        }
+        requireAdminAuth(user);
+
+        console.log('🔧 Admin user triggering fix for existing earned credits:', user.email);
+        const result = await creditHandlers.fixExistingEarnedCredits();
+        
+        return {
+          success: result.success,
+          fixed: result.fixed || 0,
+          message: result.message || 'Fix completed',
+          error: result.error || null
+        };
+      } catch (error) {
+        console.error('❌ Error fixing existing earned credits:', error);
+        return {
+          success: false,
+          fixed: 0,
+          message: 'Failed to fix existing earned credits',
+          error: error.message
+        };
       }
     }
   }

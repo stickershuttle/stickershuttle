@@ -66,13 +66,11 @@ export default function SignUp() {
     
     // Prevent multiple submissions
     if (loading) {
-      console.log('⚠️ Already processing signup, ignoring duplicate submission...');
-      return;
-    }
-    
-    console.log('🔄 Form submitted, starting signup process...');
-    console.log('📋 Raw form data:', formData);
-    console.log('🖥️ Form that submitted:', (e.target as HTMLFormElement)?.className || 'Unknown form');
+          // Already processing signup, ignoring duplicate submission
+    return;
+  }
+
+  // Form submitted, starting signup process
     setLoading(true);
     setError(null);
 
