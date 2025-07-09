@@ -529,31 +529,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
-          {/* Email Address - Display Only */}
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-              Email Address
-            </label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={settingsData.email}
-              readOnly
-              className="w-full px-4 py-3 rounded-lg text-gray-300 bg-gray-600/30 cursor-not-allowed"
-              style={{
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid rgba(255, 255, 255, 0.05)',
-                boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.05) 0px 1px 0px inset',
-                backdropFilter: 'blur(12px)'
-              }}
-              title="Email cannot be changed from this form"
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              Email address is managed through your account authentication
-            </p>
-          </div>
-
           {/* Company Name */}
           <div>
             <label htmlFor="companyName" className="block text-sm font-medium text-gray-300 mb-2">

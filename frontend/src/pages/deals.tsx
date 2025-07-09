@@ -416,7 +416,7 @@ export default function Deals() {
                               </div>
                               <p className="text-white font-medium text-base mb-2 hidden md:block">Drag or click to upload your file</p>
                               <p className="text-white font-medium text-base mb-2 md:hidden">Tap to add file</p>
-                              <p className="text-white/80 text-sm">All formats supported. Max file size: 25MB | 1 file per order</p>
+                              <p className="text-white/80 text-sm">All formats supported. Max file size: 25MB <span className="hidden sm:inline">|</span> 1 file per order</p>
                             </div>
                           )}
                         </div>

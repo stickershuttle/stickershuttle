@@ -6,6 +6,8 @@ import { getSupabase } from '@/lib/supabase';
 import { useQuery } from '@apollo/client';
 import { GET_USER_CREDIT_BALANCE } from '@/lib/credit-mutations';
 import CartIndicator from './CartIndicator';
+import { useMutation } from '@apollo/client';
+import { CREATE_USER_PROFILE } from '@/lib/profile-mutations';
 
 export default function UniversalHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -52,6 +54,8 @@ export default function UniversalHeader() {
       setCreditBalanceLoaded(true);
     }
   });
+
+  const [createUserProfile] = useMutation(CREATE_USER_PROFILE);
 
   useEffect(() => {
     let isMounted = true;
@@ -157,7 +161,7 @@ export default function UniversalHeader() {
         }
 
         // Fetch profile data asynchronously
-        fetchUserProfile(session.user.id, supabase);
+        await fetchUserProfile(session.user.id, supabase, session.user);
 
       } catch (error) {
         console.error('Error handling user session:', error);
@@ -174,7 +178,7 @@ export default function UniversalHeader() {
     };
 
     // Separate profile fetching to avoid blocking main auth flow
-    const fetchUserProfile = async (userId: string, supabase: any) => {
+    const fetchUserProfile = async (userId: string, supabase: any, user: any) => {
       try {
         const { data: profileData, error } = await supabase
           .from('user_profiles')
@@ -191,6 +195,58 @@ export default function UniversalHeader() {
             return profileData;
           });
           // Credit balance will be fetched by GraphQL query automatically
+        } else if (error && error.code === 'PGRST116') {
+          // No profile found - check if this is an OAuth user and create profile
+          console.log('🔍 No profile found for user, checking if OAuth user needs profile creation');
+          
+          // Check if user has OAuth metadata with first/last name
+          const firstName = user.user_metadata?.first_name || user.user_metadata?.given_name || '';
+          const lastName = user.user_metadata?.last_name || user.user_metadata?.family_name || '';
+          const fullName = user.user_metadata?.full_name || user.user_metadata?.name || '';
+          
+          // If we have name data from OAuth, create a profile
+          if (firstName || lastName || fullName) {
+            console.log('🆕 Creating profile for OAuth user:', { firstName, lastName, fullName });
+            
+            // Extract first/last name from full name if individual names not available
+            let finalFirstName = firstName;
+            let finalLastName = lastName;
+            
+            if (!firstName && !lastName && fullName) {
+              const nameParts = fullName.split(' ');
+              finalFirstName = nameParts[0] || '';
+              finalLastName = nameParts.slice(1).join(' ') || '';
+            }
+            
+            try {
+              // Create profile using GraphQL mutation
+              const { data: createResult } = await createUserProfile({
+                variables: {
+                  userId: userId,
+                  firstName: finalFirstName,
+                  lastName: finalLastName,
+                  phoneNumber: null,
+                  companyWebsite: null
+                }
+              });
+              
+              if (createResult?.createUserProfile?.success) {
+                console.log('✅ OAuth user profile created successfully');
+                // Fetch the newly created profile
+                const { data: newProfileData } = await supabase
+                  .from('user_profiles')
+                  .select('*')
+                  .eq('user_id', userId)
+                  .single();
+                
+                if (newProfileData && isMounted) {
+                  setProfile(newProfileData);
+                }
+              }
+            } catch (profileCreateError) {
+              console.warn('⚠️ Failed to create OAuth user profile:', profileCreateError);
+            }
+          }
         }
       } catch (profileError) {
         // Profile errors shouldn't affect auth state
@@ -812,6 +868,20 @@ export default function UniversalHeader() {
                           <span>Orders</span>
                         </Link>
 
+                        {/* Wholesale Clients Tab - Only show for wholesale users */}
+                        {profile?.isWholesaleCustomer && (
+                          <Link 
+                            href="/account/dashboard?view=clients"
+                            className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                            onClick={() => setShowProfileDropdown(false)}
+                          >
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#06b6d4' }}>
+                              <path d="M16 4c0-1.11.89-2 2-2s2 .89 2 2-.89 2-2 2-2-.89-2-2zm4 18v-6h2.5l-2.54-7.63A1.5 1.5 0 0 0 18.54 8H17c-.8 0-1.5.7-1.5 1.5v6c0 .8.7 1.5 1.5 1.5h1v1.5c0 .8.7 1.5 1.5 1.5s1.5-.7 1.5-1.5zM12.5 11.5c0-.83-.67-1.5-1.5-1.5h-2V8.5c0-.83-.67-1.5-1.5-1.5S6 7.67 6 8.5V10H4c-.83 0-1.5.67-1.5 1.5v8c0 .83.67 1.5 1.5 1.5h8c.83 0 1.5-.67 1.5-1.5v-8z"/>
+                            </svg>
+                            <span>Clients</span>
+                          </Link>
+                        )}
+
                         <Link 
                           href="/account/dashboard?view=financial"
                           className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
@@ -867,6 +937,19 @@ export default function UniversalHeader() {
                             <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
                           </svg>
                           <span>Settings</span>
+                        </Link>
+
+                        <hr className="border-white/10 my-2" />
+
+                        <Link 
+                          href="/deals"
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                          onClick={() => setShowProfileDropdown(false)}
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#fbbf24' }}>
+                            <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinejoin="round" strokeLinecap="round" />
+                          </svg>
+                          <span>Deals</span>
                         </Link>
 
                         <hr className="border-white/10 my-2" />
@@ -998,6 +1081,20 @@ export default function UniversalHeader() {
                 <span>Orders</span>
               </Link>
 
+              {/* Wholesale Clients Tab - Only show for wholesale users */}
+              {profile?.isWholesaleCustomer && (
+                <Link 
+                  href="/account/dashboard?view=clients"
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#06b6d4' }}>
+                    <path d="M16 4c0-1.11.89-2 2-2s2 .89 2 2-.89 2-2 2-2-.89-2-2zm4 18v-6h2.5l-2.54-7.63A1.5 1.5 0 0 0 18.54 8H17c-.8 0-1.5.7-1.5 1.5v6c0 .8.7 1.5 1.5 1.5h1v1.5c0 .8.7 1.5 1.5 1.5s1.5-.7 1.5-1.5zM12.5 11.5c0-.83-.67-1.5-1.5-1.5h-2V8.5c0-.83-.67-1.5-1.5-1.5S6 7.67 6 8.5V10H4c-.83 0-1.5.67-1.5 1.5v8c0 .83.67 1.5 1.5 1.5h8c.83 0 1.5-.67 1.5-1.5v-8z"/>
+                  </svg>
+                  <span>Clients</span>
+                </Link>
+              )}
+
               <Link 
                 href="/account/dashboard?view=financial"
                 className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
@@ -1054,6 +1151,8 @@ export default function UniversalHeader() {
                 </svg>
                 <span>Settings</span>
               </Link>
+
+              <hr className="border-white/10 my-2" />
 
               {!isAdminPage && (
                 <Link 

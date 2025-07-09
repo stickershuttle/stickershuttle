@@ -205,11 +205,16 @@ const OrderProgressTracker: React.FC<OrderProgressTrackerProps> = ({ order }) =>
               <div 
                 className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
                   isCurrent 
-                    ? 'bg-orange-500 text-white border-2 border-orange-400 ring-2 ring-orange-400 ring-offset-2 ring-offset-transparent subtle-pulse' 
+                    ? 'bg-orange-500 text-white border-2 border-orange-400 subtle-pulse' 
                     : isActive 
                       ? 'bg-orange-500 text-white border-2 border-orange-400' 
                       : 'bg-gray-700 text-gray-400 border-2 border-gray-600'
                 }`}
+                style={{
+                  boxShadow: isCurrent 
+                    ? '0 0 0 2px rgba(251, 146, 60, 0.5), 0 0 0 4px rgba(251, 146, 60, 0.3)' 
+                    : undefined
+                }}
                 title={step.label}
               >
                 {step.icon}

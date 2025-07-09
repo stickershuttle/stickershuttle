@@ -66,6 +66,9 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
   // User and profile states
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
+  
+  // Info tooltip state
+  const [showInfoTooltip, setShowInfoTooltip] = useState(false)
 
   // Check for mobile on component mount and resize
   useEffect(() => {
@@ -78,6 +81,18 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
     
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  // Close tooltip when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showInfoTooltip && !(event.target as Element).closest('.info-tooltip-container')) {
+        setShowInfoTooltip(false)
+      }
+    }
+
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [showInfoTooltip])
 
   // Fetch user and profile data
   useEffect(() => {
@@ -1579,7 +1594,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                           </div>
                           <p className="text-white font-medium text-base mb-2 hidden md:block">Drag or click to upload your file</p>
                           <p className="text-white font-medium text-base mb-2 md:hidden">Tap to add file</p>
-                          <p className="text-white/80 text-sm">All formats supported. Max file size: 25MB | 1 file per order</p>
+                          <p className="text-white/80 text-sm">All formats supported. Max file size: 25MB <span className="hidden sm:inline">|</span> 1 file per order</p>
                         </div>
                       )}
                     </div>

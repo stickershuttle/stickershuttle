@@ -348,7 +348,7 @@ const DefaultView: React.FC<DefaultViewProps> = ({
           
           {/* Mobile: Horizontal Scroll */}
           <div className="lg:hidden">
-            <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
+            <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 max-w-full">
               {/* Deal 1 - Reorder Discount */}
               <button 
                 onClick={() => setCurrentView('all-orders')}
@@ -1061,8 +1061,8 @@ const DefaultView: React.FC<DefaultViewProps> = ({
         </div>
 
         {/* Mobile Scrollable */}
-        <div className="md:hidden overflow-x-auto pb-2 -mx-4 px-6 md:px-4">
-          <div className="flex space-x-3">
+        <div className="md:hidden overflow-x-auto pb-2 -mx-4 px-6 md:px-4 max-w-full">
+          <div className="flex space-x-3 w-max">
             {/* Vinyl Mobile */}
             <Link href="/products/vinyl-stickers">
               <div className="flex-shrink-0 w-32 text-center rounded-2xl p-3" style={{ 

@@ -155,6 +155,18 @@ h1 {
   .w-\[95\%\] {
     width: 98% !important;
   }
+  
+  /* Prevent horizontal overflow on mobile */
+  body {
+    overflow-x: hidden;
+  }
+  
+  /* Specifically handle dashboard horizontal scrolling sections */
+  .lg\\:hidden .overflow-x-auto,
+  .md\\:hidden .overflow-x-auto {
+    contain: layout style;
+    scroll-behavior: smooth;
+  }
 }
 
 /* Mobile Safari status bar styling */

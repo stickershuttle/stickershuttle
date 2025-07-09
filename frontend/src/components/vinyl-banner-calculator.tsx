@@ -58,6 +58,9 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
   // User and profile states
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
+  
+  // Info tooltip state
+  const [showInfoTooltip, setShowInfoTooltip] = useState(false);
 
   const bannerSizes = [
     { value: '2x4', label: '2\' × 4\'', sqFt: 8, popular: false },
@@ -98,6 +101,18 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
 
     fetchUserData();
   }, [])
+
+  // Close tooltip when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showInfoTooltip && !(event.target as Element).closest('.info-tooltip-container')) {
+        setShowInfoTooltip(false)
+      }
+    }
+
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [showInfoTooltip])
 
   // Calculate dynamic credit rate based on wholesale status
   const getCreditRate = () => {
@@ -687,7 +702,7 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
                     </div>
                     <p className="text-white font-medium text-base mb-2 hidden md:block">Drag or click to upload your file</p>
                     <p className="text-white font-medium text-base mb-2 md:hidden">Tap to add file</p>
-                    <p className="text-white/80 text-sm">All formats supported. Max file size: 25MB | 1 file per order</p>
+                    <p className="text-white/80 text-sm">All formats supported. Max file size: 25MB <span className="hidden sm:inline">|</span> 1 file per order</p>
                   </div>
                 )}
               </div>
@@ -893,19 +908,26 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
                 <label className="text-sm font-medium text-purple-200">
                   Post this order to Instagram
                 </label>
-                <div className="relative group">
-                  <span className="text-purple-300 cursor-help text-sm font-medium select-none">ⓘ</span>
-                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block z-50 w-64">
-                    <div className="text-white text-xs rounded-lg px-3 py-2 whitespace-normal" style={{
-                      background: 'rgba(30, 41, 59, 0.95)',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                      backdropFilter: 'blur(12px)'
-                    }}>
-                      We may still post your order on Instagram even if not selected, put in the notes below if you explicitly don't want us to post your order.
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-700"></div>
-                    </div>
-                  </div>
+                <div className="relative info-tooltip-container">
+                  <span 
+                    className="text-purple-300 cursor-pointer text-sm font-medium select-none hover:text-purple-200 transition-colors"
+                    onClick={() => setShowInfoTooltip(!showInfoTooltip)}
+                  >
+                    ⓘ
+                  </span>
+                                     {showInfoTooltip && (
+                     <div className="absolute right-0 sm:left-1/2 sm:-translate-x-1/2 bottom-full mb-2 z-50 w-72 sm:w-64">
+                       <div className="text-white text-xs rounded-lg px-3 py-2 whitespace-normal" style={{
+                         background: 'rgba(30, 41, 59, 0.95)',
+                         border: '1px solid rgba(255, 255, 255, 0.2)',
+                         boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                         backdropFilter: 'blur(12px)'
+                       }}>
+                         We may still post your order on Instagram even if not selected, put in the notes below if you explicitly don't want us to post your order.
+                         <div className="absolute top-full right-4 sm:left-1/2 sm:-translate-x-1/2 border-4 border-transparent border-t-slate-700"></div>
+                       </div>
+                     </div>
+                   )}
                 </div>
               </div>
               
