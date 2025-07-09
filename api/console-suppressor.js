@@ -35,6 +35,9 @@ const originalConsole = {
  */
 function suppressConsoleInProduction() {
   if (process.env.NODE_ENV === 'production') {
+    // Log suppression message before overriding console.log
+    originalConsole.log('🔕 Console logs suppressed in production environment');
+    
     // Override console methods with no-op functions
     console.log = () => {};
     console.warn = () => {};
@@ -57,8 +60,6 @@ function suppressConsoleInProduction() {
     
     // Keep console.error for critical error logging
     // console.error = originalConsole.error;
-    
-    console.log('🔕 Console logs suppressed in production environment');
   }
 }
 

@@ -793,6 +793,25 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                             </svg>
                             Reorder
                           </button>
+                          {isOrderShippedWithTracking(order) && (
+                            <button
+                              onClick={() => handleTrackOrder(order)}
+                              className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
+                              style={{
+                                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                                backdropFilter: 'blur(25px) saturate(180%)',
+                                border: '1px solid rgba(34, 197, 94, 0.4)',
+                                boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                                color: 'white'
+                              }}
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                              </svg>
+                              Track Order
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -866,6 +885,25 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                           >
                             Reorder
                           </button>
+                          {isOrderShippedWithTracking(order) && (
+                            <button
+                              onClick={() => handleTrackOrder(order)}
+                              className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
+                              style={{
+                                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                                backdropFilter: 'blur(25px) saturate(180%)',
+                                border: '1px solid rgba(34, 197, 94, 0.4)',
+                                boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                                color: 'white'
+                              }}
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                              </svg>
+                              Track Order
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1332,6 +1370,25 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                             </svg>
                             Reorder
                           </button>
+                          {isOrderShippedWithTracking(order) && (
+                            <button
+                              onClick={() => handleTrackOrder(order)}
+                              className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
+                              style={{
+                                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                                backdropFilter: 'blur(25px) saturate(180%)',
+                                border: '1px solid rgba(34, 197, 94, 0.4)',
+                                boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                                color: 'white'
+                              }}
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                              </svg>
+                              Track Order
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1405,10 +1462,32 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                           >
                             Reorder
                           </button>
+                          {isOrderShippedWithTracking(order) && (
+                            <button
+                              onClick={() => handleTrackOrder(order)}
+                              className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
+                              style={{
+                                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                                backdropFilter: 'blur(25px) saturate(180%)',
+                                border: '1px solid rgba(34, 197, 94, 0.4)',
+                                boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                                color: 'white'
+                              }}
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                              </svg>
+                              Track Order
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
                   </div>
+
+                  {/* Progress Tracker Subrow */}
+                  {renderOrderProgressTracker(order)}
                 </div>
               ))}
             </div>

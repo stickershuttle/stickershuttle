@@ -7,6 +7,10 @@ import client from '@/lib/apollo-client';
 import { PostHogProvider } from '@/providers/posthog';
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
+// Initialize console suppression for production (must be first)
+import { initializeConsoleSuppressionForProduction } from '@/utils/console-suppressor';
+initializeConsoleSuppressionForProduction();
+
 // Initialize Sentry error monitoring
 import * as Sentry from "@sentry/react";
 

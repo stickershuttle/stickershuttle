@@ -43,6 +43,86 @@ export default function Document() {
         {/* Safari specific meta tags for color matching */}
         <meta name="msapplication-navbutton-color" content="#030140" />
         <meta name="apple-touch-fullscreen" content="yes" />
+        
+        {/* Console suppression script - runs immediately in production */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                // Only suppress in production
+                if (typeof window !== 'undefined' && '${process.env.NODE_ENV}' === 'production') {
+                  // Store original console methods
+                  const originalConsole = {
+                    log: console.log,
+                    warn: console.warn,
+                    error: console.error,
+                    info: console.info,
+                    debug: console.debug,
+                    trace: console.trace,
+                    table: console.table,
+                    dir: console.dir,
+                    dirxml: console.dirxml,
+                    group: console.group,
+                    groupCollapsed: console.groupCollapsed,
+                    groupEnd: console.groupEnd,
+                    time: console.time,
+                    timeEnd: console.timeEnd,
+                    timeLog: console.timeLog,
+                    count: console.count,
+                    countReset: console.countReset,
+                    clear: console.clear,
+                    assert: console.assert
+                  };
+                  
+                  // Show suppression message before overriding
+                  originalConsole.log('🔕 Console logs suppressed in production environment');
+                  
+                  // Override console methods with no-op functions
+                  console.log = function() {};
+                  console.warn = function() {};
+                  console.info = function() {};
+                  console.debug = function() {};
+                  console.trace = function() {};
+                  console.table = function() {};
+                  console.dir = function() {};
+                  console.dirxml = function() {};
+                  console.group = function() {};
+                  console.groupCollapsed = function() {};
+                  console.groupEnd = function() {};
+                  console.time = function() {};
+                  console.timeEnd = function() {};
+                  console.timeLog = function() {};
+                  console.count = function() {};
+                  console.countReset = function() {};
+                  console.clear = function() {};
+                  console.assert = function() {};
+                  
+                  // Also override window.console to be safe
+                  if (window.console) {
+                    window.console.log = function() {};
+                    window.console.warn = function() {};
+                    window.console.info = function() {};
+                    window.console.debug = function() {};
+                    window.console.trace = function() {};
+                    window.console.table = function() {};
+                    window.console.dir = function() {};
+                    window.console.dirxml = function() {};
+                    window.console.group = function() {};
+                    window.console.groupCollapsed = function() {};
+                    window.console.groupEnd = function() {};
+                    window.console.time = function() {};
+                    window.console.timeEnd = function() {};
+                    window.console.timeLog = function() {};
+                    window.console.count = function() {};
+                    window.console.countReset = function() {};
+                    window.console.clear = function() {};
+                    window.console.assert = function() {};
+                  }
+                }
+              })();
+            `,
+          }}
+        />
       </Head>
       <body>
         <Main />

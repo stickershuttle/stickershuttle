@@ -1467,9 +1467,87 @@ function Dashboard() {
     updateCurrentView('order-details');
   };
 
+  // Helper function to guess carrier from tracking number format
+  const guessCarrierFromTrackingNumber = (trackingNumber: string) => {
+    const cleanTracking = trackingNumber.replace(/\s/g, '').toUpperCase();
+    
+    // UPS tracking patterns
+    if (/^1Z[0-9A-Z]{16}$/.test(cleanTracking) || 
+        /^[0-9]{18}$/.test(cleanTracking) ||
+        /^T[0-9A-Z]{10}$/.test(cleanTracking)) {
+      return 'UPS';
+    }
+    
+    // FedEx tracking patterns
+    if (/^[0-9]{12}$/.test(cleanTracking) ||
+        /^[0-9]{14}$/.test(cleanTracking) ||
+        /^[0-9]{15}$/.test(cleanTracking) ||
+        /^[0-9]{20}$/.test(cleanTracking)) {
+      return 'FEDEX';
+    }
+    
+    // USPS tracking patterns
+    if (/^[0-9]{20}$/.test(cleanTracking) ||
+        /^[0-9]{13}$/.test(cleanTracking) ||
+        /^[A-Z]{2}[0-9]{9}[A-Z]{2}$/.test(cleanTracking) ||
+        /^[0-9A-Z]{13}$/.test(cleanTracking)) {
+      return 'USPS';
+    }
+    
+    return null;
+  };
+
+  // Create tracking URL based on carrier
+  const getTrackingUrl = (trackingNumber: string, carrier?: string) => {
+    const carrierGuess = carrier || guessCarrierFromTrackingNumber(trackingNumber);
+    
+    switch (carrierGuess?.toUpperCase()) {
+      case 'UPS':
+      case 'UPSDAP':
+        return `https://www.ups.com/track?tracknum=${trackingNumber}`;
+      case 'FEDEX':
+      case 'FEDEXDEFAULT':
+        return `https://www.fedex.com/fedextrack/?trknbr=${trackingNumber}`;
+      case 'USPS':
+        return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${trackingNumber}`;
+      default:
+        return `https://www.ups.com/track?tracknum=${trackingNumber}`;
+    }
+  };
+
   const handleTrackOrder = (order: any) => {
-    if (order.trackingUrl) {
-      window.open(order.trackingUrl, '_blank');
+    // Try multiple tracking number fields
+    const trackingNumber = order.trackingNumber || 
+                          order._fullOrderData?.tracking_number || 
+                          order._fullOrderData?.tracking_code;
+    
+    if (!trackingNumber) {
+      console.log('⚠️ No tracking number found in any field');
+      return;
+    }
+    
+    console.log('🚚 Found tracking number:', trackingNumber);
+    
+    // Check if this is a test tracking number (EasyPost test numbers often start with EZ)
+    if (trackingNumber.startsWith('EZ') || trackingNumber.includes('test')) {
+      console.log('🧪 Test tracking number detected, opening UPS demo for testing');
+      // For test tracking numbers, open UPS demo
+      window.open('https://www.ups.com/track?tracknum=1Z12345E0291980793', '_blank', 'noopener,noreferrer');
+      return;
+    }
+    
+    // Get the tracking URL from order data or generate it
+    let trackingUrl = order.trackingUrl || order._fullOrderData?.tracking_url;
+    
+    if (!trackingUrl) {
+      // Try to get carrier info from full order data
+      const carrier = order._fullOrderData?.carrier || order._fullOrderData?.selected_rate?.carrier;
+      trackingUrl = getTrackingUrl(trackingNumber, carrier);
+    }
+    
+    if (trackingUrl) {
+      // Open tracking page in new tab
+      window.open(trackingUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -1683,7 +1761,32 @@ function Dashboard() {
   };
 
   const isOrderShippedWithTracking = (order: any) => {
-    return order.status === 'Shipped' && order.trackingNumber && order.trackingUrl;
+    // Check if order has a tracking number from any source
+    const trackingNumber = order.trackingNumber || 
+                          order._fullOrderData?.tracking_number || 
+                          order._fullOrderData?.tracking_code;
+    
+    // Check if order is shipped (various ways to determine this)
+    const isShipped = order.status === 'Shipped' || 
+                     order.orderStatus === 'Shipped' ||
+                     order._fullOrderData?.orderStatus === 'Shipped' ||
+                     order._fullOrderData?.order_status === 'Shipped' ||
+                     order._fullOrderData?.proof_status === 'shipped' ||
+                     order._fullOrderData?.proof_status === 'label_printed' ||
+                     (order._fullOrderData?.fulfillmentStatus === 'partial' && trackingNumber);
+    
+    console.log(`🚚 isOrderShippedWithTracking debug for order ${order.id}:`, {
+      trackingNumber,
+      isShipped,
+      status: order.status,
+      orderStatus: order.orderStatus,
+      fullOrderStatus: order._fullOrderData?.orderStatus,
+      proofStatus: order._fullOrderData?.proof_status,
+      fulfillmentStatus: order._fullOrderData?.fulfillmentStatus,
+      result: isShipped && trackingNumber
+    });
+    
+    return isShipped && trackingNumber;
   };
 
   const renderOrderProgressTracker = (order: any) => {

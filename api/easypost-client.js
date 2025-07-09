@@ -661,16 +661,24 @@ class EasyPostService {
             ? { id: fromAddress }  // Wrap address ID in object for EasyPost
             : fromAddress; // Use address object
 
+        // Configure label options for 4x6" thermal printer compatibility
+        const options = {
+            label_format: 'PDF',
+            label_size: '4x6'
+        };
+
         // Log the formatted data for debugging
         console.log('📦 Final formatted shipment data:');
         console.log('📍 To Address:', JSON.stringify(toAddress, null, 2));
         console.log('📦 Parcel:', JSON.stringify(parcel, null, 2));
         console.log('📍 From Address:', JSON.stringify(fromAddressData, null, 2));
+        console.log('🏷️ Label Options:', JSON.stringify(options, null, 2));
 
         return {
             to_address: toAddress,
             from_address: fromAddressData,
             parcel: parcel,
+            options: options,
             reference: order.orderNumber || order.order_number || order.id
         };
     }
