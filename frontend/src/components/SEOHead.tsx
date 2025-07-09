@@ -20,12 +20,12 @@ interface SEOHeadProps {
 }
 
 export default function SEOHead({
-  title = "Sticker Shuttle - Custom Stickers & Vinyl Signs | High Quality Printing",
+  title = "Sticker Shuttle - Premium Custom Stickers & Vinyl Banners",
   description = "Custom stickers, vinyl banners, and decals with fast shipping. Professional quality printing for business, personal, and promotional use. Order now!",
   canonical,
   ogTitle,
   ogDescription,
-  ogImage = "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png",
+  ogImage = "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png",
   ogType = "website",
   ogUrl,
   twitterCard = "summary_large_image",

@@ -126,11 +126,11 @@ export default function Home() {
   return (
     <>
       <SEOHead
-        title="Sticker Shuttle - Custom Stickers & Vinyl Signs | Fast 24hr Printing"
-        description="Professional custom stickers, vinyl banners, and decals with fast 24-hour printing. Trusted by Amazon, Nike, and thousands of businesses. Free shipping, high quality materials."
+        title="Sticker Shuttle - Premium Custom Stickers & Vinyl Banners"
+        description="Professional custom stickers, vinyl banners, and decals with fast printing. Trusted by Amazon, Nike, Harry Potter and thousands of businesses. Free shipping, high quality materials."
         keywords="custom stickers, vinyl stickers, holographic stickers, clear stickers, chrome stickers, glitter stickers, custom decals, vinyl banners, business stickers, promotional stickers, logo stickers"
         canonical="https://stickershuttle.com"
-        ogImage="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751382016/StickerShuttle_Banner_Main_nlzoro.png"
+        ogImage="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png"
         structuredData={structuredData}
         preconnect={[
           "https://res.cloudinary.com",

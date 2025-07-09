@@ -12,7 +12,7 @@ interface LayoutProps {
 
 export default function Layout({ 
   children, 
-  title = "Sticker Shuttle - Custom Stickers & Vinyl Signs", 
+  title = "Sticker Shuttle - Premium Custom Stickers & Vinyl Banners", 
   description,
   ogImage 
 }: LayoutProps) {
