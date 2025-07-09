@@ -6,6 +6,7 @@ import { ApolloProvider } from '@apollo/client';
 import client from '@/lib/apollo-client';
 import { PostHogProvider } from '@/providers/posthog';
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 
 // Initialize console suppression for production (must be first)
 import { initializeConsoleSuppressionForProduction } from '@/utils/console-suppressor';
@@ -86,6 +87,7 @@ export default function App({ Component, pageProps }: AppProps) {
           </CartProvider>
         </ApolloProvider>
         <SpeedInsights />
+        <Analytics />
       </PostHogProvider>
     </Sentry.ErrorBoundary>
     </>

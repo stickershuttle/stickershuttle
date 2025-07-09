@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@apollo/client';
 import AdminLayout from '@/components/AdminLayout';
 import { GET_ALL_SHARED_CARTS } from '@/lib/admin-mutations';
+import { getCanonicalUrl } from '@/utils/url';
 
 interface SharedCart {
   id: string;
@@ -271,7 +272,7 @@ export default function SharedCartsAdmin() {
                             </svg>
                           </a>
                           <button
-                            onClick={() => navigator.clipboard.writeText(`${window.location.origin}/shared-cart/${cart.shareId}`)}
+                            onClick={() => navigator.clipboard.writeText(getCanonicalUrl(`/shared-cart/${cart.shareId}`))}
                             className="text-gray-400 hover:text-white transition-colors"
                             title="Copy share URL"
                           >

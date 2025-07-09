@@ -6,6 +6,7 @@ import { getSupabase } from '../lib/supabase';
 import { useMutation } from '@apollo/client';
 import { SYNC_CUSTOMER_TO_KLAVIYO } from '../lib/klaviyo-mutations';
 import { CREATE_USER_PROFILE, CREATE_WHOLESALE_USER_PROFILE } from '../lib/profile-mutations';
+import { getCanonicalUrl } from '../utils/url';
 
 export default function SignUp() {
   const router = useRouter();
@@ -550,7 +551,7 @@ export default function SignUp() {
             access_type: 'offline',
             prompt: 'select_account', // Changed from 'consent' to 'select_account' for better UX
           },
-          redirectTo: `${window.location.origin}${router.query.redirect as string || '/account/dashboard'}`
+          redirectTo: getCanonicalUrl(router.query.redirect as string || '/account/dashboard')
         }
       });
 

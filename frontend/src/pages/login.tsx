@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import { getSupabase } from '../lib/supabase';
+import { getCanonicalUrl } from '../utils/url';
 
 export default function Login() {
   const router = useRouter();
@@ -123,7 +124,7 @@ export default function Login() {
             access_type: 'offline',
             prompt: 'select_account',
           },
-          redirectTo: `${window.location.origin}${router.query.redirect as string || '/account/dashboard'}`
+          redirectTo: getCanonicalUrl(router.query.redirect as string || '/account/dashboard')
         }
       });
 

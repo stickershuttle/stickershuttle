@@ -4956,7 +4956,7 @@ const resolvers = {
        }
        
        // Generate proof approval link
-       const baseUrl = process.env.FRONTEND_URL || 'https://stickershuttle.com';
+       const baseUrl = 'https://stickershuttle.com';
        const proofLink = `${baseUrl}/proofs?orderId=${orderId}`;
        
        // Update order with sent proofs and status
@@ -5833,28 +5833,13 @@ const resolvers = {
           try {
             console.log('🔍 Stripe client is ready, creating checkout session...');
             
-            // Dynamically determine the frontend URL based on environment
-            let baseUrl = process.env.FRONTEND_URL;
-            
-            // If FRONTEND_URL is not set, try to detect from request headers or use Railway URL
-            if (!baseUrl) {
-              // Check if we have a request with headers (for dynamic environment detection)
-              // Fall back to Railway URL if available, or localhost for development
-              if (process.env.RAILWAY_STATIC_URL) {
-                baseUrl = `https://${process.env.RAILWAY_STATIC_URL}`;
-              } else if (process.env.NODE_ENV === 'development') {
-                baseUrl = 'http://localhost:3000';
-              } else {
-                // For deployed environments, try to detect from common deployment URLs
-                // Vercel deployments typically have predictable URLs
-                const deploymentUrl = process.env.VERCEL_URL || process.env.DEPLOYMENT_URL;
-                if (deploymentUrl) {
-                  baseUrl = `https://${deploymentUrl}`;
-                } else {
-                  // Last resort fallback to production
-                  baseUrl = 'https://stickershuttle.com';
-                }
-              }
+            // Use canonical domain for all Stripe redirects
+            let baseUrl;
+            if (process.env.NODE_ENV === 'development') {
+              baseUrl = 'http://localhost:3000';
+            } else {
+              // Always use canonical domain in production
+              baseUrl = 'https://stickershuttle.com';
             }
             
             console.log('🌐 Using frontend URL for Stripe redirects:', baseUrl);
@@ -7446,7 +7431,7 @@ const resolvers = {
           throw new Error(`Failed to create shared cart: ${error.message}`);
         }
 
-        const shareUrl = `${process.env.FRONTEND_URL || 'https://stickershuttle.com'}/shared-cart/${shareId}`;
+        const shareUrl = `https://stickershuttle.com/shared-cart/${shareId}`;
         
         console.log('✅ Successfully created shared cart:', shareId);
         

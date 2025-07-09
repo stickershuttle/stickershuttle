@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase'
+import { getCanonicalUrl } from '../utils/url'
 
 export async function getUser() {
   const supabase = getSupabase()
@@ -20,7 +21,7 @@ export async function onAuthStateChange(callback: (event: string, session: any) 
 export async function resetPassword(email: string) {
   const supabase = getSupabase()
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/reset-password`
+    redirectTo: getCanonicalUrl('/reset-password')
   })
   return { error }
 }

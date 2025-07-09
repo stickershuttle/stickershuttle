@@ -2,7 +2,7 @@
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FROM_EMAIL = 'Sticker Shuttle <orbit@stickershuttle.com>';
 const REPLY_TO_EMAIL = 'orbit@stickershuttle.com';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://stickershuttle.com';
+const FRONTEND_URL = 'https://stickershuttle.com';
 
 // Rate limiting for email sends (Resend allows 2 requests per second)
 let lastEmailSent = 0;
