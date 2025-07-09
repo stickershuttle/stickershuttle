@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Layout from "../components/Layout";
 import SEOHead from "../components/SEOHead";
-import SitewideAlert from "../components/SitewideAlert";
+
 import { useRouter } from "next/router";
 import { getSupabase } from "../lib/supabase";
 
@@ -144,7 +144,7 @@ export default function Home() {
       ogImage="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751382016/StickerShuttle_Banner_Main_nlzoro.png"
     >
         {/* Sitewide Alert Banner */}
-        <SitewideAlert />
+  
         
         {/* Hero Section with Banner Background */}
         <section className="relative pt-[20px]">

@@ -914,7 +914,6 @@ const typeDefs = gql`
     getAllKlaviyoProfiles(limit: Int): KlaviyoAllProfilesResult!
     
     # Sitewide Alert queries
-    getActiveSitewideAlerts: [SitewideAlert!]!
     getAllSitewideAlerts: [SitewideAlert!]!
     
     # Shared cart queries
