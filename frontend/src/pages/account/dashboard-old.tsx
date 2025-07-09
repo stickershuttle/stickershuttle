@@ -4976,37 +4976,6 @@ function Dashboard() {
 
     return (
       <div className="space-y-4">
-        {/* Proof Approval Alert Banner */}
-        {orders.filter(order => order.status === 'Proof Review Needed' || order.status === 'Reviewing Changes').length > 0 && (
-                  <div 
-          className="rounded-xl p-4 shadow-xl mb-6 transition-all duration-300 cursor-pointer"
-          style={{
-            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
-            backdropFilter: 'blur(25px) saturate(180%)',
-            border: '1px solid rgba(239, 68, 68, 0.4)',
-            boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-          }}
-          onClick={() => setCurrentView('proofs')}
-        >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                    <div>
-                  <h3 className="text-red-300 font-semibold text-sm">
-                    ⚠️ Alert! You have {orders.filter(order => order.status === 'Proof Review Needed').length} proof(s) to approve
-                  </h3>
-                  <p className="text-red-200 text-xs">
-                    Click here to approve or request changes
-                  </p>
-                </div>
-              </div>
-              <div className="text-red-300 text-xl">
-                →
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Proof Status Summary - Only show for multiple proofs */}
         {hasMultipleProofs && (
           <div className="container-style p-4 mb-4">
@@ -9852,28 +9821,28 @@ function Dashboard() {
                     {/* Proof Alert Banner */}
       {orders.filter(order => order.status === 'Proof Review Needed' || order.status === 'Reviewing Changes').length > 0 && (
         <div 
-          className="rounded-xl p-4 shadow-xl mb-6 transition-all duration-300 cursor-pointer"
+          className="rounded-xl p-4 shadow-xl mb-6 cursor-pointer transition-all duration-300 hover:scale-[1.02]"
           style={{
-            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
-            backdropFilter: 'blur(25px) saturate(180%)',
-            border: '1px solid rgba(239, 68, 68, 0.4)',
-            boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+            backgroundColor: 'rgba(249, 115, 22, 0.1)',
+            backdropFilter: 'blur(20px)',
+            border: '2px solid rgba(249, 115, 22, 0.3)',
+            boxShadow: '0 0 12px rgba(249, 115, 22, 0.1)'
           }}
           onClick={() => setCurrentView('proofs')}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+              <div className="w-3 h-3 bg-orange-500 rounded-full animate-pulse"></div>
                   <div>
-                <h3 className="text-red-300 font-semibold text-sm">
+                <h3 className="text-orange-300 font-semibold text-sm">
                   ⚠️ Alert! You have {orders.filter(order => order.status === 'Proof Review Needed').length} proof(s) to approve
                 </h3>
-                <p className="text-red-200 text-xs">
+                <p className="text-orange-200 text-xs">
                   Click here to approve or request changes
                 </p>
               </div>
             </div>
-            <div className="text-red-300 text-xl">
+            <div className="text-orange-300 text-xl">
               →
             </div>
           </div>

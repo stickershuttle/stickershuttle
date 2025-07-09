@@ -69,7 +69,7 @@ export default function AdminBlogs() {
   // Fetch current user
   useEffect(() => {
     const fetchUser = async () => {
-      const supabase = await getSupabase();
+      const supabase = getSupabase();
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
     };

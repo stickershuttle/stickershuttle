@@ -21,7 +21,7 @@ export const useStripeCheckout = () => {
       let currentUser = null;
       try {
         if (typeof window !== 'undefined') {
-          const supabase = await getSupabase();
+          const supabase = getSupabase();
           const { data: { session } } = await supabase.auth.getSession();
           currentUser = session?.user || null;
           // User context check

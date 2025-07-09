@@ -34,32 +34,26 @@ const ProofsView: React.FC<ProofsViewProps> = ({
     const hasProofs = (order.proofs && order.proofs.length > 0) || order.proofUrl;
     if (!hasProofs) return false;
     
+    // Check if order is already shipped/delivered
+    const hasShipped = order.status === 'Shipped' || order.orderStatus === 'Shipped' || order.fulfillmentStatus === 'shipped';
+    const hasDelivered = order.status === 'Delivered' || order.orderStatus === 'Delivered' || order.fulfillmentStatus === 'fulfilled';
+    if (hasShipped || hasDelivered) return false;
+    
     // Check individual proof statuses within the proofs array
     if (order.proofs && order.proofs.length > 0) {
-      // Only exclude order if there are NO proofs that need review (pending/sent)
+      // Include order if there are ANY proofs that need review (pending/sent)
       const hasPendingProofs = order.proofs.some((proof: any) => 
-        proof.status === 'pending' || proof.status === 'sent'
+        proof.status === 'pending' || proof.status === 'sent' || proof.status === 'pending_customer_approval'
       );
-      // If no proofs need review, exclude this order
-      if (!hasPendingProofs) {
-        return false;
-      }
+      return hasPendingProofs;
     }
     
-    // Exclude orders that are already approved or have changes requested at order level
-    if (order.proof_status === 'approved' || order.proof_status === 'changes_requested') {
-      return false;
+    // For legacy single proof orders
+    if (order.proofUrl) {
+      return order.proof_status === 'pending' || order.proof_status === 'sent' || order.proof_status === 'pending_customer_approval' || !order.proof_status;
     }
     
-    // Include orders with these statuses or proof statuses (more inclusive)
-    return (
-      order.status === 'Printing' ||
-      order.proof_status === 'approved' ||
-      order.proof_status === 'sent' ||
-      (hasProofs && order.proof_sent_at && order.proof_status !== 'approved') ||
-      // Include orders with pending proofs that need customer action
-      (hasProofs && (order.proof_status === 'pending' || !order.proof_status))
-    );
+    return false;
   });
   
   const printingOrders = orders.filter(order => {
@@ -156,11 +150,12 @@ const ProofsView: React.FC<ProofsViewProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {printingOrders.map((order) => (
                 <div key={order.id} 
-                     className="rounded-xl p-4 shadow-xl border border-blue-400/30"
+                     className="rounded-2xl p-4"
                      style={{
-                       backgroundColor: 'rgba(59, 130, 246, 0.08)',
-                       backdropFilter: 'blur(20px)',
-                       boxShadow: '0 0 8px rgba(59, 130, 246, 0.1)'
+                       background: 'rgba(255, 255, 255, 0.05)',
+                       border: '1px solid rgba(255, 255, 255, 0.1)',
+                       boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                       backdropFilter: 'blur(12px)'
                      }}>
                   
                   <div className="flex items-center justify-between mb-3">
@@ -279,11 +274,12 @@ const ProofsView: React.FC<ProofsViewProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {shippedOrders.map((order) => (
                 <div key={order.id} 
-                     className="rounded-xl p-4 shadow-xl border border-green-400/30"
+                     className="rounded-2xl p-4"
                      style={{
-                       backgroundColor: 'rgba(34, 197, 94, 0.08)',
-                       backdropFilter: 'blur(20px)',
-                       boxShadow: '0 0 8px rgba(34, 197, 94, 0.1)'
+                       background: 'rgba(255, 255, 255, 0.05)',
+                       border: '1px solid rgba(255, 255, 255, 0.1)',
+                       boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                       backdropFilter: 'blur(12px)'
                      }}>
                   
                   <div className="flex items-center justify-between mb-3">
@@ -407,11 +403,12 @@ const ProofsView: React.FC<ProofsViewProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {deliveredOrders.map((order) => (
                 <div key={order.id} 
-                     className="rounded-xl p-4 shadow-xl border border-purple-400/30"
+                     className="rounded-2xl p-4"
                      style={{
-                       backgroundColor: 'rgba(168, 85, 247, 0.08)',
-                       backdropFilter: 'blur(20px)',
-                       boxShadow: '0 0 8px rgba(168, 85, 247, 0.1)'
+                       background: 'rgba(255, 255, 255, 0.05)',
+                       border: '1px solid rgba(255, 255, 255, 0.1)',
+                       boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                       backdropFilter: 'blur(12px)'
                      }}>
                   
                   <div className="flex items-center justify-between mb-3">
@@ -532,11 +529,12 @@ const ProofsView: React.FC<ProofsViewProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {requestChanges.map((order) => (
                 <div key={order.id} 
-                     className="rounded-xl p-4 shadow-xl border border-amber-400/30"
+                     className="rounded-2xl p-4"
                      style={{
-                       backgroundColor: 'rgba(245, 158, 11, 0.08)',
-                       backdropFilter: 'blur(20px)',
-                       boxShadow: '0 0 8px rgba(245, 158, 11, 0.1)'
+                       background: 'rgba(255, 255, 255, 0.05)',
+                       border: '1px solid rgba(255, 255, 255, 0.1)',
+                       boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                       backdropFilter: 'blur(12px)'
                      }}>
                   
                   <div className="flex items-center justify-between mb-3">

@@ -74,7 +74,7 @@ export default function AdminDeals() {
   useEffect(() => {
     async function checkAdmin() {
       try {
-        const supabase = await getSupabase();
+        const supabase = getSupabase();
         const { data: { session } } = await supabase.auth.getSession();
 
         if (!session?.user) {

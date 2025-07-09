@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import AIFileImage from '../../AIFileImage';
-import OrderItemFileUpload from '../../OrderItemFileUpload';
+// import OrderItemFileUpload from '../../OrderItemFileUpload';
 
 interface AllOrdersViewProps {
   orders: any[];
@@ -168,16 +168,13 @@ const AllOrdersView: React.FC<AllOrdersViewProps> = ({
                                   )}
                                 </div>
                               ) : (
-                                <OrderItemFileUpload 
-                                  orderId={String(order.id)}
-                                  itemId={String(item.id)}
-                                  onUploadComplete={(fileUrl) => {
-                                    console.log('File uploaded:', fileUrl);
-                                    // Refresh orders to show the new file
-                                    refreshOrders();
-                                  }}
-                                  className="w-12 h-12"
-                                />
+                                <div className="w-12 h-12 rounded-lg bg-white/10 border border-white/20 overflow-hidden">
+                                  <img 
+                                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752082666/No-File-Uploaded_vedqkk.png"
+                                    alt="No file uploaded"
+                                    className="w-full h-full object-cover rounded-lg"
+                                  />
+                                </div>
                               )}
                             </div>
                           );
@@ -405,16 +402,13 @@ const AllOrdersView: React.FC<AllOrdersViewProps> = ({
                                   showFileType={false}
                                 />
                               ) : (
-                                <OrderItemFileUpload 
-                                  orderId={String(order.id)}
-                                  itemId={String(item.id)}
-                                  onUploadComplete={(fileUrl) => {
-                                    console.log('File uploaded:', fileUrl);
-                                    // Refresh orders to show the new file
-                                    refreshOrders();
-                                  }}
-                                  className="w-full h-full"
-                                />
+                                <div className="w-full h-full rounded-lg overflow-hidden">
+                                  <img 
+                                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752082666/No-File-Uploaded_vedqkk.png"
+                                    alt="No file uploaded"
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
                               )}
                             </div>
                           );

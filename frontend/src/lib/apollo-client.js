@@ -33,7 +33,7 @@ const httpLink = createHttpLink({
 // Auth link to add authorization header
 const authLink = setContext(async (_, { headers }) => {
   try {
-    const supabase = await getSupabase();
+    const supabase = getSupabase();
     const { data: { session } } = await supabase.auth.getSession();
     
     return {

@@ -28,7 +28,7 @@ export default function OrderSuccess() {
     // Check user authentication
     const checkUserAndGuestInfo = async () => {
       try {
-        const supabase = await getSupabase();
+        const supabase = getSupabase();
         const { data: { session } } = await supabase.auth.getSession();
         console.log('🔍 Order success session check:', {
           hasSession: !!session,

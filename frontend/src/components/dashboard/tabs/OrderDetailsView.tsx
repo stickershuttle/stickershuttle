@@ -1,6 +1,6 @@
 import React from 'react';
 import AIFileImage from '../../AIFileImage';
-import OrderItemFileUpload from '../../OrderItemFileUpload';
+// import OrderItemFileUpload from '../../OrderItemFileUpload';
 import OrderProgressTracker from '../../OrderProgressTracker';
 import useInvoiceGenerator, { InvoiceData } from '../../InvoiceGenerator';
 
@@ -209,22 +209,27 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
                         />
                       </div>
                     ) : (
-                      <OrderItemFileUpload 
-                        orderId={String(selectedOrderForInvoice.id)}
-                        itemId={String(item.id)}
-                        onUploadComplete={(fileUrl) => {
-                          console.log('File uploaded:', fileUrl);
-                          // Refresh orders to show the new file
-                          refreshOrders();
-                          // Re-select the order to show updated data
-                          setTimeout(() => {
-                            const updatedOrder = orders.find(o => o.id === selectedOrderForInvoice.id);
-                            if (updatedOrder) {
-                              setSelectedOrderForInvoice(updatedOrder);
-                            }
-                          }, 500);
-                        }}
-                      />
+                      <div className="flex flex-col items-center gap-3 mx-auto sm:mx-0">
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg bg-white/10 border border-white/20 overflow-hidden">
+                          <img 
+                            src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752082666/No-File-Uploaded_vedqkk.png"
+                            alt="No file uploaded"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <button 
+                          onClick={() => window.open('mailto:orbit@stickershuttle.com?subject=Design Upload for Order #' + (selectedOrderForInvoice.orderNumber || selectedOrderForInvoice.id) + '&body=I selected Upload File Later on my order and wanted to send you my file! Here it is!')}
+                          className="px-4 py-2 text-xs font-medium rounded-lg transition-all duration-200 hover:scale-105 text-white"
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                            backdropFilter: 'blur(25px) saturate(180%)',
+                            border: '1px solid rgba(59, 130, 246, 0.4)',
+                            boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          }}
+                        >
+                          Send Design
+                        </button>
+                      </div>
                     )}
                     {customFiles && customFiles.length > 1 && (
                       <p className="text-xs text-gray-400 mt-1 text-center">

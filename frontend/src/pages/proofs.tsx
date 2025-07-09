@@ -172,7 +172,7 @@ export default function ProofsPage() {
     async function checkAuth() {
       console.log('🔐 Checking authentication...');
       try {
-        const supabase = await getSupabase();
+        const supabase = getSupabase();
         const { data: { session } } = await supabase.auth.getSession();
         
         console.log('👤 Session:', session);

@@ -1596,28 +1596,42 @@ function Dashboard() {
   };
 
   const getProductImage = (item: any, itemData?: any) => {
-    if (item.image) return item.image;
+    // Debug logging
+    console.log('getProductImage called:', {
+      itemId: item.id,
+      itemName: item.name || item.productName,
+      customFiles: itemData?.customFiles || item.customFiles,
+      itemImage: item.image,
+      hasUploadFileLater: !item.customFiles && !itemData?.customFiles
+    });
     
+    // Check for actual uploaded custom files first
     const customFiles = itemData?.customFiles || item.customFiles;
     if (customFiles && customFiles.length > 0) {
       const imageFile = customFiles.find((file: string) => 
         /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file)
       );
+      console.log('Returning custom file:', imageFile || customFiles[0]);
       return imageFile || customFiles[0];
     }
     
-    const productImages: { [key: string]: string } = {
-      'vinyl-stickers': '/product-images/vinyl-stickers.jpg',
-      'holographic-stickers': '/product-images/holographic-stickers.jpg',
-      'glitter-stickers': '/product-images/glitter-stickers.jpg',
-      'chrome-stickers': '/product-images/chrome-stickers.jpg',
-      'clear-stickers': '/product-images/clear-stickers.jpg',
-      'sticker-sheets': '/product-images/sticker-sheets.jpg',
-      'vinyl-banners': '/product-images/vinyl-banners.jpg'
-    };
+    // Check for item image (actual uploaded image)
+    if (item.image && !item.image.includes('/product-images/')) {
+      console.log('Returning item image:', item.image);
+      return item.image;
+    }
     
-    const productType = item.product || itemData?.product || itemData?.productType;
-    return productImages[productType] || '/product-images/default.jpg';
+    // For sample packs, return the sample pack image
+    if (item.productName?.toLowerCase().includes('sample pack') || 
+        item.name?.toLowerCase().includes('sample pack') ||
+        item.sku === 'SP-001') {
+      console.log('Returning sample pack image');
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750890354/Sample-Pack_jsy2yf.png';
+    }
+    
+    // Return null if no actual uploaded image - this will show "No File Uploaded"
+    console.log('Returning null - should show No File Uploaded image');
+    return null;
   };
 
   const getOrderDisplayNumber = (order: any) => {
@@ -2565,31 +2579,49 @@ function Dashboard() {
                 order.proof_status !== 'changes_requested'
               ).length > 0 && (
                 <div 
-                  className="rounded-2xl p-4 shadow-xl mb-3 cursor-pointer transition-all duration-300"
+                  className="rounded-2xl overflow-hidden mb-3 cursor-pointer transition-all duration-300 hover:scale-[1.02]"
                   style={{
-                    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
-                    backdropFilter: 'blur(25px) saturate(180%)',
-                    border: '1px solid rgba(239, 68, 68, 0.4)',
-                    boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.6) 0%, rgba(248, 113, 113, 0.4) 25%, rgba(254, 202, 202, 0.25) 50%, rgba(239, 68, 68, 0.15) 75%, rgba(254, 202, 202, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(200%)',
+                    border: '1px solid rgba(239, 68, 68, 0.5)',
+                    boxShadow: 'rgba(239, 68, 68, 0.25) 0px 4px 20px, rgba(255, 255, 255, 0.3) 0px 1px 0px inset'
                   }}
                   onClick={() => updateCurrentView('proofs')}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                      <div>
-                        <h3 className="text-red-300 font-semibold text-sm">
-                          ⚠️ Alert! You have {orders.filter(order => 
-                            (order.status === 'Proof Review Needed' || order.status === 'Reviewing Changes') && 
-                            order.proof_status !== 'changes_requested'
-                          ).length} proof(s) to approve
-                        </h3>
-                        <p className="text-red-200 text-xs">
-                          Click here to approve or request changes
-                        </p>
+                  <div className="px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
+                          <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-white">
+                            Alert! You have {orders.filter(order => 
+                              (order.status === 'Proof Review Needed' || order.status === 'Reviewing Changes') && 
+                              order.proof_status !== 'changes_requested'
+                            ).length} proof(s) to approve
+                          </h3>
+                          <p className="text-red-300 text-sm">Click here to approve or request changes</p>
+                        </div>
                       </div>
+                      
+                      <button
+                        className="px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
+                          backdropFilter: 'blur(25px) saturate(180%)',
+                          border: '1px solid rgba(239, 68, 68, 0.4)',
+                          boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                        }}
+                      >
+                        <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                        </svg>
+                        Review Proofs
+                      </button>
                     </div>
-                    <div className="text-red-300 text-xl">→</div>
                   </div>
                 </div>
               )}

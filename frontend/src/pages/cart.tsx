@@ -488,7 +488,7 @@ export default function CartPage() {
     const checkUser = async () => {
       try {
         if (typeof window !== 'undefined') {
-          const supabase = await getSupabase();
+          const supabase = getSupabase();
           const { data: { session } } = await supabase.auth.getSession();
           setUser(session?.user || null);
         // Hide account required message if user is logged in
@@ -917,7 +917,7 @@ export default function CartPage() {
 
     setIsLoggingIn(true);
     try {
-      const supabase = await getSupabase();
+      const supabase = getSupabase();
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email: loginData.email,
@@ -1445,11 +1445,12 @@ export default function CartPage() {
                               />
                             </div>
                           ) : (
-                            <div className="aspect-square rounded-xl bg-gray-800/50 flex items-center justify-center text-white/50">
-                              <div className="text-center">
-                                <div className="text-3xl mb-2">📁</div>
-                                <span className="text-sm font-medium">No image uploaded</span>
-                              </div>
+                            <div className="aspect-square rounded-xl bg-gray-800/50 overflow-hidden">
+                              <img 
+                                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752082666/No-File-Uploaded_vedqkk.png"
+                                alt="No file uploaded"
+                                className="w-full h-full object-cover"
+                              />
                             </div>
                           )}
                           {/* Reorder Badge - Now outside and on top */}
@@ -2252,7 +2253,7 @@ export default function CartPage() {
                             // Send OTP via Supabase (use same flow as signup page)
                             setIsSendingOtp(true);
                             try {
-                              const supabase = await getSupabase();
+                              const supabase = getSupabase();
                               
                               // Sign up with Supabase to trigger OTP (same as signup page)
                               const { data, error: authError } = await supabase.auth.signUp({
@@ -2293,7 +2294,7 @@ export default function CartPage() {
                             // Verify OTP with Supabase (use same flow as signup page)
                             setIsVerifyingOtp(true);
                             try {
-                              const supabase = await getSupabase();
+                              const supabase = getSupabase();
                               
                               // Verify the OTP (same as signup page, using 'signup' type)
                               const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({

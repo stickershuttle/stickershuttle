@@ -230,7 +230,7 @@ export default function SignUp() {
     try {
       console.log('🔄 Getting Supabase client...');
       // Get Supabase client from CDN (latest version)
-      const supabase = await getSupabase();
+      const supabase = getSupabase();
       console.log('✅ Supabase client loaded:', !!supabase);
       
       console.log('🔄 Calling signUp...');
@@ -295,7 +295,7 @@ export default function SignUp() {
     setError(null);
 
     try {
-      const supabase = await getSupabase();
+      const supabase = getSupabase();
       
       // Debug Supabase client configuration
       console.log('🔧 Supabase client created:', {
@@ -471,7 +471,7 @@ export default function SignUp() {
       // Fetch and broadcast profile data to ensure avatar sync
       try {
         console.log('🔄 Fetching fresh profile data for sync...');
-        const supabase = await getSupabase();
+        const supabase = getSupabase();
         
         if (data.user?.id) {
           const { data: profileData, error: profileError } = await supabase
@@ -512,7 +512,7 @@ export default function SignUp() {
     setError(null);
 
     try {
-      const supabase = await getSupabase();
+      const supabase = getSupabase();
       
       const { error } = await supabase.auth.resend({
         type: 'signup',
@@ -540,7 +540,7 @@ export default function SignUp() {
 
     try {
       setLoading(true);
-      const supabase = await getSupabase();
+      const supabase = getSupabase();
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',

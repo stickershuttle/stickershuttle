@@ -20,7 +20,7 @@ export const useOrderCompletion = () => {
   const initializeUser = useCallback(async () => {
     try {
       if (typeof window !== 'undefined') {
-        const supabase = await getSupabase();
+        const supabase = getSupabase();
         const { data: { session } } = await supabase.auth.getSession();
         currentUser.current = session?.user || null;
         

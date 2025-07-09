@@ -1548,7 +1548,7 @@ Please try re-uploading or contact support.`);
               >
                 <div className="flex items-start gap-4">
                   {/* Original and Replacement Preview Column */}
-                  <div className="flex flex-col items-center gap-2">
+                  <div className="flex flex-col items-center gap-2 flex-shrink-0">
                     {/* Original File Preview */}
                     {originalProof && (
                       <>
@@ -1574,7 +1574,7 @@ Please try re-uploading or contact support.`);
 
                     {/* Replacement File Preview */}
                     <div className="text-center">
-                      <p className="text-xs text-orange-300 mb-1 font-medium">Customer's New File:</p>
+                      <p className="text-xs text-orange-300 mb-1 font-medium">New File:</p>
                       {proof.proofUrl && (
                         <FilePreview 
                           fileUrl={proof.proofUrl} 

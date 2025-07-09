@@ -40,26 +40,62 @@ export default function Login() {
     setError(null);
 
     try {
-      // Get Supabase client from CDN
-      const supabase = await getSupabase();
+      console.log('🔄 Starting login process...');
+      console.log('📧 Email:', formData.email);
+      console.log('🔑 Password length:', formData.password.length);
       
-      // Sign in with modern Supabase API
+      const supabase = getSupabase();
+      console.log('✅ Supabase client loaded');
+      console.log('🔍 Supabase auth object:', !!supabase.auth);
+      
+      // Log before auth call
+      console.log('📡 About to call signInWithPassword...');
+      console.time('authCall');
+      
+      // Simple authentication call
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       });
+      
+      console.timeEnd('authCall');
+      console.log('📊 Auth call completed');
+
+      console.log('📊 Login result:', { 
+        success: !!data?.user, 
+        error: authError?.message,
+        userId: data?.user?.id,
+        session: !!data?.session,
+        sessionUser: data?.session?.user?.email
+      });
 
       if (authError) {
+        console.error('❌ Login error:', authError.message);
         setError(authError.message);
         setLoading(false);
         return;
       }
 
+      // Log session details
+      if (data?.session) {
+        console.log('🎫 Session created:', {
+          accessToken: data.session.access_token?.substring(0, 20) + '...',
+          refreshToken: data.session.refresh_token?.substring(0, 20) + '...',
+          expiresAt: data.session.expires_at
+        });
+      }
+
       // Success! Redirect to specified URL or dashboard
+      console.log('✅ Login successful, redirecting...');
       const redirectUrl = router.query.redirect as string || '/account/dashboard';
-      router.push(redirectUrl);
+      console.log('🎯 Redirect URL:', redirectUrl);
+      
+      // Force a full page refresh to ensure all components get the new session
+      window.location.href = redirectUrl;
       
     } catch (err: any) {
+      console.error('❌ Login catch error:', err);
+      console.error('❌ Error stack:', err.stack);
       setError(err.message || 'An error occurred during login');
       setLoading(false);
     }
@@ -72,8 +108,12 @@ export default function Login() {
     }
 
     try {
+      console.log('🔄 Starting OAuth login...');
       setLoading(true);
-      const supabase = await getSupabase();
+      setError(null);
+      
+      const supabase = getSupabase();
+      console.log('✅ Supabase client loaded for OAuth');
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -81,20 +121,24 @@ export default function Login() {
           scopes: 'openid email profile',
           queryParams: {
             access_type: 'offline',
-            prompt: 'select_account', // Changed from 'consent' to 'select_account' for better UX
+            prompt: 'select_account',
           },
           redirectTo: `${window.location.origin}${router.query.redirect as string || '/account/dashboard'}`
         }
       });
 
+      console.log('📊 OAuth result:', { success: !!data, error: error?.message });
+
       if (error) {
-        console.error('OAuth error:', error);
+        console.error('❌ OAuth error:', error);
         setError(error.message);
         setLoading(false);
+      } else {
+        console.log('✅ OAuth initiated successfully');
+        // If successful, user will be redirected by Supabase
       }
-      // If successful, user will be redirected by Supabase
     } catch (err: any) {
-      console.error('OAuth error:', err);
+      console.error('❌ OAuth catch error:', err);
       setError(err.message || 'An error occurred during OAuth login');
       setLoading(false);
     }

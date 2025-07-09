@@ -135,7 +135,7 @@ export default function DiscountManagement() {
     const checkAuth = async () => {
       try {
         if (typeof window !== 'undefined') {
-          const supabase = await getSupabase();
+          const supabase = getSupabase();
           const { data: { session } } = await supabase.auth.getSession();
           
           if (session?.user && ADMIN_EMAILS.includes(session.user.email || '')) {

@@ -50,7 +50,7 @@ export default function GlitterStickers() {
   const checkUser = async () => {
     try {
       if (typeof window !== 'undefined') {
-        const supabase = await getSupabase();
+        const supabase = getSupabase();
         const { data: { session } } = await supabase.auth.getSession();
         setUser(session?.user || null);
       }

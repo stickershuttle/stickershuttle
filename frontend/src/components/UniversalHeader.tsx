@@ -6,8 +6,7 @@ import { getSupabase } from '@/lib/supabase';
 import { useQuery } from '@apollo/client';
 import { GET_USER_CREDIT_BALANCE } from '@/lib/credit-mutations';
 import CartIndicator from './CartIndicator';
-import { useMutation } from '@apollo/client';
-import { CREATE_USER_PROFILE } from '@/lib/profile-mutations';
+
 
 export default function UniversalHeader() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -55,7 +54,7 @@ export default function UniversalHeader() {
     }
   });
 
-  const [createUserProfile] = useMutation(CREATE_USER_PROFILE);
+
 
   useEffect(() => {
     let isMounted = true;
@@ -86,34 +85,47 @@ export default function UniversalHeader() {
       if (typeof window === 'undefined') return;
       
       try {
-        const supabase = await getSupabase();
+        const supabase = getSupabase();
         
-        // Set up auth state listener first
+        // Set up auth state listener with minimal processing
         authSubscription = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
           if (!isMounted) return;
           
-          // console.log('🔐 Auth state changed:', event, session?.user?.email);
+          console.log('🔐 Auth state changed:', event, session?.user?.email);
           
-          // Handle different auth events
-          switch (event) {
-            case 'SIGNED_IN':
-            case 'TOKEN_REFRESHED':
-              await handleUserSession(session, supabase);
-              break;
-            case 'SIGNED_OUT':
-              handleSignOut();
-              break;
-            default:
-              // For initial session or other events
-              if (session) {
-                await handleUserSession(session, supabase);
-              } else {
-                handleSignOut();
-              }
+          // Only handle critical auth events to prevent loops
+          if (event === 'SIGNED_OUT') {
+            handleSignOut();
+            return;
+          }
+          
+          // For sign in events, only update user state, don't fetch additional data
+          if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+            setUser(session.user);
+            setAuthError(false);
+            
+            // Check admin status
+            const userEmail = session.user.email;
+            if (userEmail && ADMIN_EMAILS.includes(userEmail)) {
+              setIsAdmin(true);
+            } else {
+              setIsAdmin(false);
+            }
+            
+            setLoading(false);
+            setInitialAuthCheck(true);
+            
+            // Load cached profile photo from localStorage
+            const cachedPhoto = localStorage.getItem('userProfilePhoto');
+            if (cachedPhoto) {
+              setProfile({ profile_photo_url: cachedPhoto });
+            }
+            
+            return;
           }
         });
 
-        // Get initial session
+        // Get initial session with minimal processing
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -121,17 +133,34 @@ export default function UniversalHeader() {
           if (isMounted) {
             setAuthError(true);
             setLoading(false);
-            setInitialAuthCheck(true); // Mark initial auth check as complete even on error
+            setInitialAuthCheck(true);
           }
           return;
         }
 
-        // Handle initial session if it exists
-        if (session && isMounted) {
-          await handleUserSession(session, supabase);
-        } else if (isMounted) {
+        // Handle initial session with minimal processing
+        if (session?.user && isMounted) {
+          setUser(session.user);
+          setAuthError(false);
+          
+          // Check admin status
+          const userEmail = session.user.email;
+          if (userEmail && ADMIN_EMAILS.includes(userEmail)) {
+            setIsAdmin(true);
+          } else {
+            setIsAdmin(false);
+          }
+          
+          // Load cached profile photo from localStorage
+          const cachedPhoto = localStorage.getItem('userProfilePhoto');
+          if (cachedPhoto) {
+            setProfile({ profile_photo_url: cachedPhoto });
+          }
+        }
+        
+        if (isMounted) {
           setLoading(false);
-          setInitialAuthCheck(true); // Mark initial auth check as complete
+          setInitialAuthCheck(true);
         }
 
       } catch (error) {
@@ -144,115 +173,8 @@ export default function UniversalHeader() {
       }
     };
 
-    // Handle user session data
-    const handleUserSession = async (session: any, supabase: any) => {
-      if (!isMounted || !session?.user) return;
-
-      try {
-        setUser(session.user);
-        setAuthError(false);
-
-        // Check admin status with safe email access
-        const userEmail = session.user.email;
-        if (userEmail && ADMIN_EMAILS.includes(userEmail)) {
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
-        }
-
-        // Fetch profile data asynchronously
-        await fetchUserProfile(session.user.id, supabase, session.user);
-
-      } catch (error) {
-        console.error('Error handling user session:', error);
-        if (isMounted) {
-          setAuthError(true);
-          setInitialAuthCheck(true); // Mark initial auth check as complete even on error
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-          setInitialAuthCheck(true); // Mark initial auth check as complete
-        }
-      }
-    };
-
-    // Separate profile fetching to avoid blocking main auth flow
-    const fetchUserProfile = async (userId: string, supabase: any, user: any) => {
-      try {
-        const { data: profileData, error } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .single();
-
-        if (isMounted && !error && profileData) {
-          setProfile((prevProfile: any) => {
-            // If we already have profile data, merge instead of replacing to avoid overwriting updates
-            if (prevProfile) {
-              return { ...prevProfile, ...profileData };
-            }
-            return profileData;
-          });
-          // Credit balance will be fetched by GraphQL query automatically
-        } else if (error && error.code === 'PGRST116') {
-          // No profile found - check if this is an OAuth user and create profile
-          console.log('🔍 No profile found for user, checking if OAuth user needs profile creation');
-          
-          // Check if user has OAuth metadata with first/last name
-          const firstName = user.user_metadata?.first_name || user.user_metadata?.given_name || '';
-          const lastName = user.user_metadata?.last_name || user.user_metadata?.family_name || '';
-          const fullName = user.user_metadata?.full_name || user.user_metadata?.name || '';
-          
-          // If we have name data from OAuth, create a profile
-          if (firstName || lastName || fullName) {
-            console.log('🆕 Creating profile for OAuth user:', { firstName, lastName, fullName });
-            
-            // Extract first/last name from full name if individual names not available
-            let finalFirstName = firstName;
-            let finalLastName = lastName;
-            
-            if (!firstName && !lastName && fullName) {
-              const nameParts = fullName.split(' ');
-              finalFirstName = nameParts[0] || '';
-              finalLastName = nameParts.slice(1).join(' ') || '';
-            }
-            
-            try {
-              // Create profile using GraphQL mutation
-              const { data: createResult } = await createUserProfile({
-                variables: {
-                  userId: userId,
-                  firstName: finalFirstName,
-                  lastName: finalLastName,
-                  phoneNumber: null,
-                  companyWebsite: null
-                }
-              });
-              
-              if (createResult?.createUserProfile?.success) {
-                console.log('✅ OAuth user profile created successfully');
-                // Fetch the newly created profile
-                const { data: newProfileData } = await supabase
-                  .from('user_profiles')
-                  .select('*')
-                  .eq('user_id', userId)
-                  .single();
-                
-                if (newProfileData && isMounted) {
-                  setProfile(newProfileData);
-                }
-              }
-            } catch (profileCreateError) {
-              console.warn('⚠️ Failed to create OAuth user profile:', profileCreateError);
-            }
-          }
-        }
-      } catch (profileError) {
-        // Profile errors shouldn't affect auth state
-        console.warn('Profile fetch failed (non-critical):', profileError);
-      }
-    };
+    // Note: Profile fetching moved to dashboard to prevent auth loops
+    // The header now only handles basic auth state for UI display
 
     // Handle sign out state
     const handleSignOut = () => {
@@ -291,7 +213,7 @@ export default function UniversalHeader() {
 
   const handleSignOut = async () => {
     try {
-      const supabase = await getSupabase();
+      const supabase = getSupabase();
       await supabase.auth.signOut();
       setUser(null);
       setProfile(null);

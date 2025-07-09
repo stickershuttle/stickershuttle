@@ -1,7 +1,7 @@
 import React, { ReactNode, useState, useEffect } from 'react';
 import { useQuery } from '@apollo/client';
 import { GET_USER_CREDIT_HISTORY } from '../../../lib/credit-mutations';
-import OrderItemFileUpload from '../../OrderItemFileUpload';
+// import OrderItemFileUpload from '../../OrderItemFileUpload';
 
 interface FinancialViewProps {
   orders: any[];
@@ -296,16 +296,13 @@ const FinancialView: React.FC<FinancialViewProps> = ({
                               />
                             </div>
                           ) : (
-                            <OrderItemFileUpload 
-                              orderId={String(recentOrder.id)}
-                              itemId={String(recentOrder.items[0]?.id)}
-                              onUploadComplete={(fileUrl) => {
-                                console.log('File uploaded:', fileUrl);
-                                // Refresh orders to show the new file
-                                refreshOrders();
-                              }}
-                              className="w-20 h-20"
-                            />
+                            <div className="w-20 h-20 rounded-lg bg-white/10 border border-white/20 overflow-hidden">
+                              <img 
+                                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752082666/No-File-Uploaded_vedqkk.png"
+                                alt="No file uploaded"
+                                className="w-full h-full object-cover rounded-lg"
+                              />
+                            </div>
                           )}
                         </div>
                         

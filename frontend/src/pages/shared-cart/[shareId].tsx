@@ -1569,11 +1569,12 @@ export default function SharedCartPage() {
                               />
                             </div>
                           ) : (
-                            <div className="aspect-square rounded-xl bg-gray-800/50 flex items-center justify-center text-white/50">
-                              <div className="text-center">
-                                <div className="text-3xl mb-2">📁</div>
-                                <span className="text-sm font-medium">No image uploaded</span>
-                              </div>
+                            <div className="aspect-square rounded-xl bg-gray-800/50 overflow-hidden">
+                              <img 
+                                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752082666/No-File-Uploaded_vedqkk.png"
+                                alt="No file uploaded"
+                                className="w-full h-full object-cover"
+                              />
                             </div>
                           )}
                           {/* Reorder Badge - Now outside and on top */}

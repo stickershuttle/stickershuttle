@@ -54,6 +54,27 @@ const ProofReviewInterface: React.FC<ProofReviewInterfaceProps> = ({
   isOrderShippedWithTracking,
   handleTrackOrder
 }) => {
+  const [showValidationMessage, setShowValidationMessage] = React.useState<{[key: string]: boolean}>({});
+  
+  const handleRequestChangesClick = (orderId: string, proofId: string) => {
+    const hasComments = proofComments.trim().length > 0;
+    const hasUploadedFile = stagedFile && stagedFile.orderId === orderId && stagedFile.proofId === proofId;
+    
+    // If there's a file uploaded, send the replacement instead
+    if (hasUploadedFile) {
+      handleSendReplacement();
+      return;
+    }
+    
+    if (!hasComments && !hasUploadedFile) {
+      setShowValidationMessage({...showValidationMessage, [`${orderId}-${proofId}`]: true});
+      return;
+    }
+    
+    setShowValidationMessage({...showValidationMessage, [`${orderId}-${proofId}`]: false});
+    handleProofAction('request_changes', orderId, proofId);
+  };
+  
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -125,15 +146,15 @@ const ProofReviewInterface: React.FC<ProofReviewInterfaceProps> = ({
     <div className="space-y-4">
       {/* Proof Status Summary - Only show for multiple proofs */}
       {hasMultipleProofs && (
-        <div 
-          className="p-4 mb-4"
-          style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(12px)'
-          }}
-        >
+                  <div 
+            className="rounded-2xl p-4 mb-4"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(12px)'
+            }}
+          >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className={`w-3 h-3 rounded-full ${allProofsApproved ? 'bg-green-500' : 'bg-orange-500 animate-pulse'}`}></div>
@@ -176,7 +197,7 @@ const ProofReviewInterface: React.FC<ProofReviewInterfaceProps> = ({
           return (
             <div 
               key={proof.id} 
-              className="p-8 text-center"
+              className="rounded-2xl p-8 text-center"
               style={{
                 background: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -204,7 +225,7 @@ const ProofReviewInterface: React.FC<ProofReviewInterfaceProps> = ({
         return (
           <div 
             key={proof.id} 
-            className="p-6"
+            className="rounded-2xl p-6"
             style={{
               background: 'rgba(255, 255, 255, 0.05)',
               border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -233,7 +254,7 @@ const ProofReviewInterface: React.FC<ProofReviewInterfaceProps> = ({
               {/* Left - Proof Image */}
               <div className="lg:col-span-1">
                 <div 
-                  className="rounded-lg overflow-hidden cursor-pointer hover:scale-[1.02] transition-all duration-200 hover:shadow-lg relative bg-white"
+                  className="rounded-2xl overflow-hidden cursor-pointer hover:scale-[1.02] transition-all duration-200 hover:shadow-lg relative bg-white"
                   style={{
                     border: '1px solid rgba(255, 255, 255, 0.08)',
                     aspectRatio: '1'
@@ -280,7 +301,7 @@ const ProofReviewInterface: React.FC<ProofReviewInterfaceProps> = ({
               <div className="lg:col-span-2 space-y-4">
                 {/* Order Summary Container */}
                 <div 
-                  className="p-4"
+                  className="rounded-2xl p-4"
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -333,7 +354,7 @@ const ProofReviewInterface: React.FC<ProofReviewInterfaceProps> = ({
 
                 {/* Actions Container */}
                 <div 
-                  className="p-4"
+                  className="rounded-2xl p-4"
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -346,7 +367,7 @@ const ProofReviewInterface: React.FC<ProofReviewInterfaceProps> = ({
                       {/* Action Buttons */}
                       <div className="space-y-3">
                         <button
-                          className="w-full py-3 px-6 md:px-4 rounded-lg border transition-all duration-200 hover:scale-[1.02] text-sm font-medium backdrop-blur-md"
+                          className="w-full py-3 px-6 md:px-4 rounded-2xl border transition-all duration-200 hover:scale-[1.02] text-sm font-medium backdrop-blur-md"
                           style={{
                             background: 'rgba(34, 197, 94, 0.1)',
                             borderColor: 'rgba(34, 197, 94, 0.3)',
@@ -359,17 +380,40 @@ const ProofReviewInterface: React.FC<ProofReviewInterfaceProps> = ({
                         </button>
 
                         <button
-                          className="w-full py-3 px-6 md:px-4 rounded-lg border transition-all duration-200 hover:scale-[1.02] text-sm font-medium backdrop-blur-md"
+                          className="w-full py-3 px-6 md:px-4 rounded-2xl border transition-all duration-200 hover:scale-[1.02] text-sm font-medium backdrop-blur-md"
                           style={{
-                            background: 'rgba(251, 146, 60, 0.1)',
-                            borderColor: 'rgba(251, 146, 60, 0.3)',
-                            color: '#fb923c',
-                            boxShadow: '0 4px 16px rgba(251, 146, 60, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+                            background: (stagedFile && stagedFile.orderId === order.id && stagedFile.proofId === proof.id) 
+                              ? 'rgba(34, 197, 94, 0.1)' 
+                              : 'rgba(251, 146, 60, 0.1)',
+                            borderColor: (stagedFile && stagedFile.orderId === order.id && stagedFile.proofId === proof.id) 
+                              ? 'rgba(34, 197, 94, 0.3)' 
+                              : 'rgba(251, 146, 60, 0.3)',
+                            color: (stagedFile && stagedFile.orderId === order.id && stagedFile.proofId === proof.id) 
+                              ? '#22c55e' 
+                              : '#fb923c',
+                            boxShadow: (stagedFile && stagedFile.orderId === order.id && stagedFile.proofId === proof.id) 
+                              ? '0 4px 16px rgba(34, 197, 94, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)' 
+                              : '0 4px 16px rgba(251, 146, 60, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
                           }}
-                          onClick={() => handleProofAction('request_changes', order.id, proof.id)}
+                          onClick={() => handleRequestChangesClick(order.id, proof.id)}
                         >
-                          ✏️ Request Changes
+                          {(stagedFile && stagedFile.orderId === order.id && stagedFile.proofId === proof.id) 
+                            ? '📁 Send Replacement' 
+                            : '✏️ Request Changes'
+                          }
                         </button>
+                        
+                        {/* Validation message */}
+                        {showValidationMessage[`${order.id}-${proof.id}`] && (
+                          <div className="mt-2 p-3 rounded-xl border border-red-400/50 bg-red-500/10 backdrop-blur-md">
+                            <div className="flex items-center gap-2 text-red-300 text-sm">
+                              <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span>Please either add comments describing the changes needed or upload a revised file before requesting changes.</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Divider */}
@@ -387,15 +431,28 @@ const ProofReviewInterface: React.FC<ProofReviewInterfaceProps> = ({
                               type="file" 
                               className="hidden" 
                               accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd"
+                              aria-label="Upload proof file"
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
-                                if (file) handleFileSelect(file, order.id, proof.id);
+                                if (file) {
+                                  handleFileSelect(file, order.id, proof.id);
+                                  // Clear validation message when file is uploaded
+                                  if (showValidationMessage[`${order.id}-${proof.id}`]) {
+                                    setShowValidationMessage({...showValidationMessage, [`${order.id}-${proof.id}`]: false});
+                                  }
+                                }
                               }}
                             />
 
                             <div 
                               className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative mb-3"
-                              onDrop={(e) => handleDrop(e, order.id, proof.id)}
+                              onDrop={(e) => {
+                                handleDrop(e, order.id, proof.id);
+                                // Clear validation message when file is dropped
+                                if (showValidationMessage[`${order.id}-${proof.id}`]) {
+                                  setShowValidationMessage({...showValidationMessage, [`${order.id}-${proof.id}`]: false});
+                                }
+                              }}
                               onDragOver={handleDragOver}
                               onClick={() => document.getElementById(`proof-file-input-${proof.id}`)?.click()}
                             >
@@ -414,45 +471,81 @@ const ProofReviewInterface: React.FC<ProofReviewInterfaceProps> = ({
                           </div>
                         ) : (
                           <div className="border border-green-400/50 rounded-xl p-4 bg-green-500/10 backdrop-blur-md mb-3">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-3">
-                                <div className="text-green-400 text-xl">📎</div>
-                                <div>
-                                  <p className="text-green-200 font-medium">{stagedFile.file.name}</p>
-                                  <p className="text-xs text-green-300/60">
-                                    {(stagedFile.file.size / 1024 / 1024).toFixed(2)} MB
-                                  </p>
+                            {/* Responsive Layout: Vertical on mobile, Horizontal on desktop */}
+                            <div className="flex flex-col md:flex-row gap-4 items-start">
+                              {/* Image Preview - Full width on mobile, fixed size on desktop */}
+                              <div className="w-full h-48 md:w-32 md:h-32 lg:w-40 lg:h-40 rounded-xl overflow-hidden border border-green-400/30 bg-white/5 backdrop-blur-md p-3 flex items-center justify-center flex-shrink-0">
+                                <AIFileImage
+                                  src={URL.createObjectURL(stagedFile.file)}
+                                  filename={stagedFile.file.name}
+                                  alt={stagedFile.file.name}
+                                  className="w-full h-full object-contain"
+                                  size="preview"
+                                  showFileType={false}
+                                />
+                              </div>
+
+                              {/* File Info - Below image on mobile, right side on desktop */}
+                              <div className="flex-1 min-w-0 w-full">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="text-green-400 text-xl">📎</div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-green-200 font-medium break-words text-lg">{stagedFile.file.name}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    <button
+                                      onClick={() => document.getElementById(`proof-file-input-${proof.id}`)?.click()}
+                                      className="text-blue-300 hover:text-blue-200 p-2 hover:bg-blue-500/20 rounded-lg transition-colors cursor-pointer"
+                                      title="Replace file"
+                                    >
+                                      🔄
+                                    </button>
+                                    <button
+                                      onClick={removeUploadedFile}
+                                      className="text-red-300 hover:text-red-200 p-2 hover:bg-red-500/20 rounded-lg transition-colors cursor-pointer"
+                                      title="Remove file"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* File Details */}
+                                <div className="space-y-2 mb-3">
+                                  <div className="flex flex-wrap items-center gap-3 text-green-300/80 text-sm">
+                                    <span className="flex items-center gap-1">
+                                      <span className="text-green-400">📏</span>
+                                      {(stagedFile.file.size / 1024 / 1024).toFixed(2)} MB
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <span className="text-green-400">🎨</span>
+                                      {stagedFile.file.name.split('.').pop()?.toUpperCase() || 'FILE'}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* File Type Icon */}
+                                  {getFileTypeIcon(stagedFile.file.name.split('.').pop() || '') && (
+                                    <div className="flex items-center gap-2">
+                                      <img 
+                                        src={getFileTypeIcon(stagedFile.file.name.split('.').pop() || '')!} 
+                                        alt={`${stagedFile.file.name.split('.').pop()?.toUpperCase()} file`}
+                                        className="w-6 h-6 object-contain opacity-80"
+                                      />
+                                      <span className="text-xs text-green-300/60">
+                                        Professional design file detected
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Upload Success Message */}
+                                <div className="flex items-center gap-2 text-green-300 text-sm">
+                                  <span className="text-green-400">✅</span>
+                                  <span>File uploaded successfully!</span>
                                 </div>
                               </div>
-                              <button
-                                onClick={removeUploadedFile}
-                                className="text-red-300 hover:text-red-200 p-2"
-                                title="Remove file"
-                              >
-                                🗑️
-                              </button>
-                            </div>
-                            
-                            <div className="flex gap-2">
-                              <button
-                                onClick={handleSendReplacement}
-                                className="flex-1 py-3 px-4 rounded-lg text-white font-semibold transition-all"
-                                style={{
-                                  background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
-                                  backdropFilter: 'blur(25px) saturate(180%)',
-                                  border: '1px solid rgba(34, 197, 94, 0.4)',
-                                  boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                                }}
-                              >
-                                Send Replacement
-                              </button>
-                              <button
-                                onClick={handleCancelReplacement}
-                                className="px-4 py-3 rounded-lg text-gray-300 hover:text-white transition-colors"
-                                style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
-                              >
-                                Cancel
-                              </button>
                             </div>
                           </div>
                         )}
@@ -464,9 +557,15 @@ const ProofReviewInterface: React.FC<ProofReviewInterfaceProps> = ({
                           </label>
                           <textarea
                             value={proofComments}
-                            onChange={(e) => setProofComments(e.target.value)}
+                            onChange={(e) => {
+                              setProofComments(e.target.value);
+                              // Clear validation message when user starts typing
+                              if (showValidationMessage[`${order.id}-${proof.id}`]) {
+                                setShowValidationMessage({...showValidationMessage, [`${order.id}-${proof.id}`]: false});
+                              }
+                            }}
                             placeholder="Share any feedback about this proof..."
-                            className="w-full h-20 p-3 rounded-lg text-white placeholder-gray-400 text-sm resize-none bg-white/5 border border-white/10 focus:border-white/20 focus:outline-none transition-colors"
+                            className="w-full h-20 p-3 rounded-2xl text-white placeholder-gray-400 text-sm resize-none bg-white/5 border border-white/10 focus:border-white/20 focus:outline-none transition-colors"
                           />
                           <p className="text-xs text-gray-400 mt-1">
                             <span className="text-yellow-400">*</span> When requesting changes, you must provide either written feedback or upload a revised file

@@ -8,7 +8,7 @@ export default function UniversalFooter() {
   useEffect(() => {
     const checkUser = async () => {
       try {
-        const supabase = await getSupabase();
+        const supabase = getSupabase();
         const { data: { session } } = await supabase.auth.getSession();
         setUser(session?.user || null);
       } catch (error) {
@@ -21,7 +21,7 @@ export default function UniversalFooter() {
 
   const handleSignOut = async () => {
     try {
-      const supabase = await getSupabase();
+      const supabase = getSupabase();
       await supabase.auth.signOut();
       setUser(null);
       window.location.href = '/';

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import AnimatedCreditCounter from '../../AnimatedCreditCounter';
 import AIFileImage from '../../AIFileImage';
-import OrderItemFileUpload from '../../OrderItemFileUpload';
+// import OrderItemFileUpload from '../../OrderItemFileUpload';
 
 // Define the props interface
 interface DefaultViewProps {
@@ -113,38 +113,44 @@ const DefaultView: React.FC<DefaultViewProps> = ({
       {/* Proof Ready Alert */}
       {orders.some((order: any) => order.proof_status === 'pending_customer_approval' && order.proofs?.some((proof: any) => proof.status === 'pending_customer_approval')) && (
         <div 
-          className="mb-6 p-4 rounded-xl animate-pulse"
+          className="mb-6 rounded-2xl overflow-hidden animate-pulse"
           style={{
-            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.5) 0%, rgba(248, 113, 113, 0.35) 50%, rgba(254, 202, 202, 0.2) 100%)',
-            backdropFilter: 'blur(25px) saturate(180%)',
+            background: 'rgba(255, 255, 255, 0.05)',
             border: '1px solid rgba(239, 68, 68, 0.4)',
-            boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+            boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+            backdropFilter: 'blur(12px)'
           }}
         >
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+          <div className="px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">📋 Proof Ready for Review!</h3>
+                  <p className="text-red-300 text-sm">Your proof is ready for approval. Please review and approve to start production.</p>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => setCurrentView('proofs')}
+                className="px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(180%)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                }}
+              >
+                <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+                Review Proof
+              </button>
             </div>
-            <div className="flex-1">
-              <h3 className="text-red-200 font-bold text-lg">📋 Proof Ready for Review!</h3>
-              <p className="text-red-100 text-sm">
-                Your proof is ready for approval. Please review and approve to start production.
-              </p>
-            </div>
-            <button
-              onClick={() => setCurrentView('proofs')}
-              className="px-4 py-2 rounded-lg text-white font-semibold transition-all duration-200 hover:scale-105"
-              style={{
-                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
-                backdropFilter: 'blur(25px) saturate(180%)',
-                border: '1px solid rgba(239, 68, 68, 0.4)',
-                boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-              }}
-            >
-              Review Proof
-            </button>
           </div>
         </div>
       )}
@@ -688,15 +694,13 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                                     />
                                   </div>
                                 ) : (
-                                  <OrderItemFileUpload 
-                                    orderId={String(order.id)}
-                                    itemId={String(item.id)}
-                                    onUploadComplete={(fileUrl) => {
-                                      console.log('File uploaded:', fileUrl);
-                                      refreshOrders();
-                                    }}
-                                    className="w-12 h-12"
-                                  />
+                                  <div className="w-12 h-12 rounded-lg bg-white/10 border border-white/20 overflow-hidden">
+                                    <img 
+                                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752082666/No-File-Uploaded_vedqkk.png"
+                                      alt="No file uploaded"
+                                      className="w-full h-full object-cover rounded-lg"
+                                    />
+                                  </div>
                                 )}
                               </div>
                             );
@@ -822,15 +826,13 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                                     showFileType={false}
                                   />
                                 ) : (
-                                  <OrderItemFileUpload 
-                                    orderId={String(order.id)}
-                                    itemId={String(item.id)}
-                                    onUploadComplete={(fileUrl) => {
-                                      console.log('File uploaded:', fileUrl);
-                                      refreshOrders();
-                                    }}
-                                    className="w-full h-full"
-                                  />
+                                  <div className="w-full h-full rounded-lg overflow-hidden">
+                                    <img 
+                                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752082666/No-File-Uploaded_vedqkk.png"
+                                      alt="No file uploaded"
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
                                 )}
                               </div>
                             );
@@ -1232,15 +1234,13 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                                     />
                                   </div>
                                 ) : (
-                                  <OrderItemFileUpload 
-                                    orderId={String(order.id)}
-                                    itemId={String(item.id)}
-                                    onUploadComplete={(fileUrl) => {
-                                      console.log('File uploaded:', fileUrl);
-                                      refreshOrders();
-                                    }}
-                                    className="w-12 h-12"
-                                  />
+                                  <div className="w-12 h-12 rounded-lg bg-white/10 border border-white/20 overflow-hidden">
+                                    <img 
+                                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752082666/No-File-Uploaded_vedqkk.png"
+                                      alt="No file uploaded"
+                                      className="w-full h-full object-cover rounded-lg"
+                                    />
+                                  </div>
                                 )}
                               </div>
                             );
@@ -1365,15 +1365,13 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                                     showFileType={false}
                                   />
                                 ) : (
-                                  <OrderItemFileUpload 
-                                    orderId={String(order.id)}
-                                    itemId={String(item.id)}
-                                    onUploadComplete={(fileUrl) => {
-                                      console.log('File uploaded:', fileUrl);
-                                      refreshOrders();
-                                    }}
-                                    className="w-full h-full"
-                                  />
+                                  <div className="w-full h-full rounded-lg overflow-hidden">
+                                    <img 
+                                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752082666/No-File-Uploaded_vedqkk.png"
+                                      alt="No file uploaded"
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
                                 )}
                               </div>
                             );
