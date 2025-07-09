@@ -1,6 +1,18 @@
 // Real Pricing System for Sticker Shuttle
 // Uses actual CSV data: base-price.csv and qty-sq.csv
 
+// Suppress console errors for expected CSV loading failures
+const originalConsoleError = console.error;
+let errorSuppressionEnabled = false;
+
+export function enableErrorSuppression() {
+  errorSuppressionEnabled = true;
+}
+
+export function disableErrorSuppression() {
+  errorSuppressionEnabled = false;
+}
+
 export interface BasePriceRow {
   sqInches: number;
   basePrice: number;
@@ -101,60 +113,115 @@ export function parseQuantityDiscounts(csvText: string): QuantityDiscountRow[] {
   return data.sort((a, b) => a.quantity - b.quantity);
 }
 
-// Load pricing data from CSV files
+// Load pricing data from CSV files with retry mechanism
 export async function loadRealPricingData(): Promise<{
   basePricing: BasePriceRow[];
   quantityDiscounts: QuantityDiscountRow[];
 }> {
-  try {
-    console.log('Attempting to load CSV files from:', {
-      basePriceUrl: '/orbit/base-price.csv',
-      qtyUrl: '/orbit/qty-sq.csv'
-    });
-    
-    const [basePriceResponse, qtyDiscountResponse] = await Promise.all([
-      fetch('/orbit/base-price.csv'),
-      fetch('/orbit/qty-sq.csv')
-    ]);
-    
-    console.log('CSV fetch responses:', {
-      basePriceOk: basePriceResponse.ok,
-      basePriceStatus: basePriceResponse.status,
-      qtyDiscountOk: qtyDiscountResponse.ok,
-      qtyDiscountStatus: qtyDiscountResponse.status
-    });
-    
-    if (!basePriceResponse.ok || !qtyDiscountResponse.ok) {
-      throw new Error(`Failed to load pricing CSV files: base-price (${basePriceResponse.status}), qty-sq (${qtyDiscountResponse.status})`);
+  const maxRetries = 3;
+  const timeoutMs = 10000; // 10 second timeout
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Loading CSV files (attempt ${attempt}/${maxRetries})...`);
+      
+      // Create timeout promise
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('CSV loading timeout')), timeoutMs)
+      );
+      
+      // Create fetch promises with timeout
+      const fetchPromises = Promise.all([
+        fetch('/orbit/base-price.csv'),
+        fetch('/orbit/qty-sq.csv')
+      ]);
+      
+      // Race between fetch and timeout
+      const [basePriceResponse, qtyDiscountResponse] = await Promise.race([
+        fetchPromises,
+        timeoutPromise
+      ]) as [Response, Response];
+      
+      console.log('CSV fetch responses:', {
+        basePriceOk: basePriceResponse.ok,
+        basePriceStatus: basePriceResponse.status,
+        qtyDiscountOk: qtyDiscountResponse.ok,
+        qtyDiscountStatus: qtyDiscountResponse.status
+      });
+      
+      if (!basePriceResponse.ok || !qtyDiscountResponse.ok) {
+        throw new Error(`Failed to load pricing CSV files: base-price (${basePriceResponse.status}), qty-sq (${qtyDiscountResponse.status})`);
+      }
+      
+      // Parse response text with timeout
+      const textPromises = Promise.all([
+        basePriceResponse.text(),
+        qtyDiscountResponse.text()
+      ]);
+      
+      const [basePriceText, qtyDiscountText] = await Promise.race([
+        textPromises,
+        timeoutPromise
+      ]) as [string, string];
+      
+      console.log('CSV file sizes:', {
+        basePriceLength: basePriceText.length,
+        qtyDiscountLength: qtyDiscountText.length
+      });
+      
+      // Validate CSV content
+      if (!basePriceText.trim() || !qtyDiscountText.trim()) {
+        throw new Error('CSV files are empty or invalid');
+      }
+      
+      if (!basePriceText.includes('Sq. Inches') || !qtyDiscountText.includes('Quantity')) {
+        throw new Error('CSV files do not contain expected headers');
+      }
+      
+      const basePricing = parseBasePricing(basePriceText);
+      const quantityDiscounts = parseQuantityDiscounts(qtyDiscountText);
+      
+      // Validate parsed data
+      if (basePricing.length === 0 || quantityDiscounts.length === 0) {
+        throw new Error('Failed to parse CSV data - no valid entries found');
+      }
+      
+      console.log('Successfully loaded pricing data:', {
+        basePricing: basePricing.length,
+        quantityDiscounts: quantityDiscounts.length
+      });
+      
+      return { basePricing, quantityDiscounts };
+      
+    } catch (error) {
+      const errorMessage = `CSV loading attempt ${attempt} failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      
+      // Only log detailed errors on first attempt or final failure
+      if (attempt === 1 || attempt === maxRetries) {
+        console.error(errorMessage);
+      } else if (!errorSuppressionEnabled) {
+        console.warn(`Retry ${attempt}/${maxRetries} failed, retrying...`);
+      }
+      
+      if (attempt === maxRetries) {
+        console.error('All CSV loading attempts failed, throwing error');
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          throw new Error('Network error: CSV files may not be accessible. Please check your internet connection and try again.');
+        }
+        throw error;
+      }
+      
+      // Wait before retrying (exponential backoff)
+      const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+      if (!errorSuppressionEnabled) {
+        console.log(`Waiting ${waitTime}ms before retry...`);
+      }
+      await new Promise(resolve => setTimeout(resolve, waitTime));
     }
-    
-    const [basePriceText, qtyDiscountText] = await Promise.all([
-      basePriceResponse.text(),
-      qtyDiscountResponse.text()
-    ]);
-    
-    console.log('CSV file sizes:', {
-      basePriceLength: basePriceText.length,
-      qtyDiscountLength: qtyDiscountText.length
-    });
-    
-    const basePricing = parseBasePricing(basePriceText);
-    const quantityDiscounts = parseQuantityDiscounts(qtyDiscountText);
-    
-    console.log('Successfully loaded pricing data:', {
-      basePricing: basePricing.length,
-      quantityDiscounts: quantityDiscounts.length
-    });
-    
-    return { basePricing, quantityDiscounts };
-    
-  } catch (error) {
-    console.error('Error loading real pricing data:', error);
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      console.error('This appears to be a network error. CSV files may not be accessible.');
-    }
-    throw error;
   }
+  
+  // This should never be reached due to the throw in the loop
+  throw new Error('Unexpected error in CSV loading');
 }
 
 // Get base price for specific square inches

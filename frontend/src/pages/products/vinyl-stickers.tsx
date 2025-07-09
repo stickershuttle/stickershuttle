@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { loadRealPricingData, BasePriceRow, QuantityDiscountRow } from "@/utils/real-pricing";
 import Link from "next/link";
 import { getSupabase } from "@/lib/supabase";
+import Head from "next/head";
 
 export default function VinylStickers() {
   const [realPricingData, setRealPricingData] = useState<{
@@ -14,32 +15,55 @@ export default function VinylStickers() {
   const [pricingError, setPricingError] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [pricingLoading, setPricingLoading] = useState(true);
 
   // Load real CSV pricing data on component mount
   useEffect(() => {
     const loadPricing = async () => {
       try {
+        setPricingLoading(true);
+        console.log('🔄 Starting CSV pricing data load...');
         const data = await loadRealPricingData();
         setRealPricingData(data);
-        console.log('Loaded real pricing data:', data);
+        setPricingError(null); // Clear any previous errors
+        console.log('✅ Successfully loaded real pricing data:', data);
       } catch (error) {
-        console.error('Failed to load real pricing data:', error);
-        setPricingError('Failed to load real pricing data from CSV files');
+        console.error('❌ Failed to load real pricing data:', error);
+        setPricingError(error instanceof Error ? error.message : 'Failed to load real pricing data from CSV files');
         
-        // Fallback to basic mock data if CSV fails
+        // Enhanced fallback data that matches CSV structure more closely
         const mockData = {
           basePricing: [
-            { sqInches: 4, basePrice: 1.17 },
-            { sqInches: 9, basePrice: 1.35 },
-            { sqInches: 16, basePrice: 1.62 },
-            { sqInches: 25, basePrice: 1.91 }
+            // Small sizes
+            { sqInches: 1, basePrice: 1.17 },
+            { sqInches: 2, basePrice: 1.20 },
+            { sqInches: 3, basePrice: 1.25 },
+            { sqInches: 4, basePrice: 1.30 }, // Small (2" x 2")
+            { sqInches: 6, basePrice: 1.32 },
+            { sqInches: 9, basePrice: 1.35 }, // Medium (3" x 3")
+            { sqInches: 12, basePrice: 1.45 },
+            { sqInches: 16, basePrice: 1.62 }, // Large (4" x 4")
+            { sqInches: 20, basePrice: 1.75 },
+            { sqInches: 25, basePrice: 1.91 }, // X-Large (5" x 5")
+            { sqInches: 30, basePrice: 2.10 },
+            { sqInches: 36, basePrice: 2.25 },
+            { sqInches: 49, basePrice: 2.50 }
           ],
           quantityDiscounts: [
-            { quantity: 100, discounts: { 1: 0.35, 9: 0.35, 16: 0.25, 25: 0.25 } },
-            { quantity: 500, discounts: { 1: 0.68, 9: 0.68, 16: 0.53, 25: 0.53 } }
+            { quantity: 50, discounts: { 1: 0.00, 4: 0.00, 9: 0.00, 16: 0.00, 25: 0.00, 36: 0.00, 49: 0.00 } },
+            { quantity: 100, discounts: { 1: 0.35, 4: 0.35, 9: 0.35, 16: 0.25, 25: 0.25, 36: 0.20, 49: 0.20 } },
+            { quantity: 200, discounts: { 1: 0.53, 4: 0.53, 9: 0.53, 16: 0.40, 25: 0.40, 36: 0.35, 49: 0.35 } },
+            { quantity: 300, discounts: { 1: 0.61, 4: 0.61, 9: 0.61, 16: 0.50, 25: 0.50, 36: 0.45, 49: 0.45 } },
+            { quantity: 500, discounts: { 1: 0.68, 4: 0.68, 9: 0.68, 16: 0.58, 25: 0.58, 36: 0.53, 49: 0.53 } },
+            { quantity: 750, discounts: { 1: 0.76, 4: 0.76, 9: 0.76, 16: 0.65, 25: 0.65, 36: 0.60, 49: 0.60 } },
+            { quantity: 1000, discounts: { 1: 0.81, 4: 0.81, 9: 0.81, 16: 0.70, 25: 0.70, 36: 0.65, 49: 0.65 } },
+            { quantity: 2500, discounts: { 1: 0.79, 4: 0.79, 9: 0.79, 16: 0.68, 25: 0.68, 36: 0.63, 49: 0.63 } }
           ]
         };
         setRealPricingData(mockData);
+        console.log('🔄 Using enhanced fallback pricing data');
+      } finally {
+        setPricingLoading(false);
       }
     };
 
@@ -75,6 +99,10 @@ export default function VinylStickers() {
       description="Premium vinyl stickers perfect for laptops, water bottles, and outdoor use - waterproof, scratch-resistant, and dishwasher safe."
       ogImage="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749652894/StickerShuttle_Banner_PurpleCustomStickers_zxst8r.webp"
     >
+      <Head>
+        <link rel="preload" href="/orbit/base-price.csv" as="fetch" crossOrigin="anonymous" />
+        <link rel="preload" href="/orbit/qty-sq.csv" as="fetch" crossOrigin="anonymous" />
+      </Head>
       <style jsx>{`
         .container-style {
           background: rgba(255, 255, 255, 0.05);
@@ -306,15 +334,23 @@ export default function VinylStickers() {
               ⚠️ {pricingError} - Using fallback pricing data
             </div>
           )}
-          {/* Only render calculator after pricing data is loaded to prevent SSR issues */}
-          {realPricingData ? (
+          {/* Show loading state while pricing data is being loaded */}
+          {pricingLoading ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400 mb-4"></div>
+              <p className="text-gray-300 text-sm">Loading pricing data...</p>
+            </div>
+          ) : realPricingData ? (
             <StickerCalculator 
               initialBasePricing={basePricing} 
               realPricingData={realPricingData}
             />
           ) : (
-            <div className="flex items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400"></div>
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="text-red-400 text-center">
+                <p className="text-lg mb-2">⚠️ Unable to load pricing data</p>
+                <p className="text-sm text-gray-300">Please refresh the page to try again</p>
+              </div>
             </div>
           )}
         </div>
