@@ -9105,10 +9105,33 @@ const resolvers = {
 
     // Mutation to update order item files
     updateOrderItemFiles: async (_, { orderId, itemId, customFiles }, context) => {
+      console.log('🚨🚨🚨 BACKEND RESOLVER CALLED - updateOrderItemFiles:', { orderId, itemId, customFiles });
+      console.log('🚨🚨🚨 THIS LOG SHOULD APPEAR IF RESOLVER IS CALLED');
       try {
-        console.log('📤 Updating order item files:', { orderId, itemId, customFiles });
+        console.log('📤 Updating order item files:', { 
+          orderId, 
+          itemId, 
+          customFiles,
+          orderIdType: typeof orderId,
+          itemIdType: typeof itemId 
+        });
+        
+        // Get supabase client from context
+        const supabase = context.supabase?.getServiceClient();
+        if (!supabase) {
+          throw new Error('Database service not available');
+        }
+        
+        // IDs are UUIDs (strings), use them directly
+        console.log('🔍 Using UUID IDs:', { 
+          orderId, 
+          itemId,
+          orderIdType: typeof orderId,
+          itemIdType: typeof itemId
+        });
         
         // Get the order first to verify it exists
+        console.log('🔍 Querying order with ID:', orderId);
         const { data: order, error: orderError } = await supabase
           .from('customer_orders')
           .select('*, items:customer_order_items(*)')
@@ -9116,14 +9139,19 @@ const resolvers = {
           .single();
           
         if (orderError || !order) {
+          console.error('Order lookup error:', orderError);
           throw new Error('Order not found');
         }
         
         // Find the specific item
+        console.log('🔍 Available items:', order.items.map(item => ({ id: item.id, name: item.product_name })));
         const item = order.items.find(item => item.id === itemId);
         if (!item) {
+          console.error('❌ Item not found. Looking for ID:', itemId, 'Available IDs:', order.items.map(i => i.id));
           throw new Error('Order item not found');
         }
+        
+        console.log('✅ Found item:', { id: item.id, name: item.product_name });
         
         // Update the item with new custom files
         const { error: updateError } = await supabase
@@ -9159,6 +9187,7 @@ const resolvers = {
           .single();
           
         if (fetchError) {
+          console.error('Updated order fetch error:', fetchError);
           throw new Error('Failed to fetch updated order');
         }
         
