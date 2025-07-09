@@ -60,13 +60,18 @@ const ClientsView: React.FC<ClientsViewProps> = ({
     // Remove all non-digit characters
     const phoneNumber = value.replace(/\D/g, '');
     
-    // Format as XXX-XXX-XXXX
-    if (phoneNumber.length >= 6) {
-      return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6, 10)}`;
-    } else if (phoneNumber.length >= 3) {
-      return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(3)}`;
+    // Limit to 10 digits
+    const limitedNumber = phoneNumber.slice(0, 10);
+    
+    // Apply formatting based on length
+    if (limitedNumber.length === 0) {
+      return '';
+    } else if (limitedNumber.length <= 3) {
+      return limitedNumber;
+    } else if (limitedNumber.length <= 6) {
+      return `${limitedNumber.slice(0, 3)}-${limitedNumber.slice(3)}`;
     } else {
-      return phoneNumber;
+      return `${limitedNumber.slice(0, 3)}-${limitedNumber.slice(3, 6)}-${limitedNumber.slice(6)}`;
     }
   };
 
@@ -457,11 +462,17 @@ const ClientsView: React.FC<ClientsViewProps> = ({
       <div className="mobile-container mobile-full-width">
         {clientsLoading ? (
           <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
             <div className="text-gray-400 text-lg mb-2">Loading clients...</div>
           </div>
         ) : wholesaleClients.length === 0 ? (
           <div className="text-center py-12">
-            <div className="text-gray-400 text-lg mb-2">No clients yet</div>
+            <div className="flex items-center justify-center mb-4">
+              <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+            <div className="text-gray-400 text-lg mb-2">There are no clients added currently</div>
             <p className="text-gray-500 text-sm">Add your first client to get started with order management.</p>
           </div>
         ) : (

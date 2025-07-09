@@ -458,27 +458,7 @@ function Dashboard() {
       }
     },
 
-    // Stellar Void - Second Option
-    {
-      id: 2,
-      name: 'Stellar Void',
-      category: 'cosmic',
-      isDefault: false,
-      style: {
-        background: 'linear-gradient(135deg, #0a0a2e 0%, #1a1a4a 25%, #2d1b6b 50%, #4c1d95 75%, #7c3aed 100%)',
-        backgroundImage: `
-          radial-gradient(ellipse at 25% 30%, rgba(139, 92, 246, 0.5) 0%, transparent 60%),
-          radial-gradient(ellipse at 75% 70%, rgba(124, 58, 237, 0.4) 0%, transparent 50%),
-          radial-gradient(ellipse at 50% 20%, rgba(147, 51, 234, 0.3) 0%, transparent 40%),
-          radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15) 1px, transparent 1px),
-          radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.12) 1px, transparent 1px),
-          radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.18) 1px, transparent 1px)
-        `,
-        backgroundSize: '200% 200%, 200% 200%, 200% 200%, 100px 100px, 150px 150px, 80px 80px',
-        animation: 'stellar-drift 8s ease-in-out infinite',
-        backgroundPosition: '0% 0%, 20% 20%, 40% 60%, 60% 40%, 80% 80%, 10% 30%'
-      }
-    },
+
 
     // Space/NASA Templates
     {
@@ -740,10 +720,9 @@ function Dashboard() {
     if (!user) return;
     
     try {
-      // Get a random default avatar
-      const { getRandomAvatar } = await import('../../utils/avatars');
-      const randomAvatar = getRandomAvatar();
-      console.log('🎭 Assigning initial random avatar:', randomAvatar);
+      // Use specific default avatar for all new signups
+      const defaultAvatar = 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751390215/StickerShuttle_Avatar1_dmnkat.png';
+      console.log('🎭 Assigning default avatar:', defaultAvatar);
 
       const supabase = await getSupabase();
       
@@ -760,7 +739,7 @@ function Dashboard() {
           .from('user_profiles')
           .insert({
             user_id: (user as any).id,
-            profile_photo_url: randomAvatar,
+            profile_photo_url: defaultAvatar,
             profile_photo_public_id: null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -775,7 +754,7 @@ function Dashboard() {
         const { error: updateError } = await supabase
           .from('user_profiles')
           .update({
-            profile_photo_url: randomAvatar,
+            profile_photo_url: defaultAvatar,
             profile_photo_public_id: null,
             updated_at: new Date().toISOString()
           })
@@ -790,23 +769,30 @@ function Dashboard() {
       // Update local state
       setProfile((prev: any) => ({
         ...prev,
-        profile_photo_url: randomAvatar,
+        profile_photo_url: defaultAvatar,
         profile_photo_public_id: null
       }));
       
       // Update cached photo
-      setCachedProfilePhoto(randomAvatar);
-      localStorage.setItem('userProfilePhoto', randomAvatar);
+      setCachedProfilePhoto(defaultAvatar);
+      localStorage.setItem('userProfilePhoto', defaultAvatar);
+
+      // Broadcast profile update to other components (like UniversalHeader)
+      window.dispatchEvent(new CustomEvent('profileUpdated', {
+        detail: {
+          profile_photo_url: defaultAvatar,
+          profile_photo_public_id: null
+        }
+      }));
 
       console.log('✅ Initial avatar assigned successfully');
     } catch (error) {
       console.error('❌ Error assigning initial avatar:', error);
       
       // Still cache the avatar locally even if database fails
-      const { getRandomAvatar } = await import('../../utils/avatars');
-      const randomAvatar = getRandomAvatar();
-      setCachedProfilePhoto(randomAvatar);
-      localStorage.setItem('userProfilePhoto', randomAvatar);
+      const defaultAvatar = 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751390215/StickerShuttle_Avatar1_dmnkat.png';
+      setCachedProfilePhoto(defaultAvatar);
+      localStorage.setItem('userProfilePhoto', defaultAvatar);
     }
   };
 
@@ -1735,10 +1721,12 @@ function Dashboard() {
       setProofComments('');
       setShowApprovalConfirm(false);
       
-      // Show success message
-      const message = action === 'approve' ? 'Proof approved! Order is now in production.' : 'Change request submitted! Our design team will review your feedback.';
-      setActionNotification({ message, type: 'success' });
-      setTimeout(() => setActionNotification(null), 4000);
+      // Show success message only for change requests, not approvals
+      if (action === 'request_changes') {
+        const message = 'Change request submitted! Our design team will review your feedback.';
+        setActionNotification({ message, type: 'success' });
+        setTimeout(() => setActionNotification(null), 4000);
+      }
       
       console.log(`✅ Proof action ${action} completed successfully`);
       
@@ -2043,6 +2031,7 @@ function Dashboard() {
             handleReorder={handleReorder}
             getOrderDisplayNumber={getOrderDisplayNumber}
             refreshOrders={refreshOrders}
+            handleViewOrderDetails={handleViewOrderDetails}
           />
         );
       case 'items-analysis':
@@ -2383,9 +2372,7 @@ function Dashboard() {
             <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-2 md:px-4">
               {/* Banner with Profile */}
               <div 
-                className={`relative rounded-2xl p-4 md:p-6 shadow-xl mb-3 overflow-hidden cursor-pointer group ${
-                  (profile?.banner_template_id === 2 || !profile?.banner_template) ? 'banner-gradient stellar-void-animation' : ''
-                }`}
+                className="relative rounded-2xl p-4 md:p-6 shadow-xl mb-3 overflow-hidden cursor-pointer group"
                 style={{
                   aspectRatio: '5.2/1',
                   minHeight: '207px',
@@ -2395,10 +2382,7 @@ function Dashboard() {
                   ...(profile?.banner_template
                       ? {
                           ...JSON.parse(profile.banner_template),
-                          border: '1px solid rgba(255, 255, 255, 0.15)',
-                          animation: profile?.banner_template_id === 2 
-                            ? 'stellar-drift 8s ease-in-out infinite'
-                            : 'none'
+                          border: '1px solid rgba(255, 255, 255, 0.15)'
                         }
                       : {
                           backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750883615/261355a9-3a2b-48d8-ad79-08ce1407d61b.png)',
@@ -2415,27 +2399,7 @@ function Dashboard() {
                 }}
                 title="Click to choose banner template"
               >
-                {/* Grain texture overlay for Stellar Void template */}
-                {profile?.banner_template_id === 2 && (
-                  <div 
-                    className="absolute inset-0 opacity-40"
-                    style={{
-                      backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='7' cy='7' r='1'/%3E%3Ccircle cx='27' cy='7' r='1'/%3E%3Ccircle cx='47' cy='7' r='1'/%3E%3Ccircle cx='17' cy='17' r='1'/%3E%3Ccircle cx='37' cy='17' r='1'/%3E%3Ccircle cx='7' cy='27' r='1'/%3E%3Ccircle cx='27' cy='27' r='1'/%3E%3Ccircle cx='47' cy='27' r='1'/%3E%3Ccircle cx='17' cy='37' r='1'/%3E%3Ccircle cx='37' cy='37' r='1'/%3E%3Ccircle cx='7' cy='47' r='1'/%3E%3Ccircle cx='27' cy='47' r='1'/%3E%3Ccircle cx='47' cy='47' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-                      backgroundSize: '60px 60px'
-                    }}
-                  />
-                )}
-                
-                {/* Additional animated stars for Stellar Void */}
-                {profile?.banner_template_id === 2 && (
-                  <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute w-1 h-1 bg-white rounded-full opacity-50" style={{ left: '10%', top: '20%', animation: 'star-twinkle 9s ease-in-out infinite' }} />
-                    <div className="absolute w-1 h-1 bg-white rounded-full opacity-40" style={{ left: '30%', top: '60%', animation: 'star-twinkle 9s ease-in-out infinite', animationDelay: '3s' }} />
-                    <div className="absolute w-1.5 h-1.5 bg-purple-300 rounded-full opacity-60" style={{ left: '70%', top: '30%', animation: 'star-twinkle 9s ease-in-out infinite', animationDelay: '6s' }} />
-                    <div className="absolute w-1 h-1 bg-white rounded-full opacity-50" style={{ left: '85%', top: '70%', animation: 'star-twinkle 9s ease-in-out infinite', animationDelay: '1.5s' }} />
-                    <div className="absolute w-1 h-1 bg-purple-200 rounded-full opacity-40" style={{ left: '50%', top: '80%', animation: 'star-twinkle 9s ease-in-out infinite', animationDelay: '4.5s' }} />
-                  </div>
-                )}
+
                 
                 {/* Dark overlay for text readability */}
                 <div className="absolute inset-0 bg-black/30 z-0"></div>
@@ -2526,6 +2490,22 @@ function Dashboard() {
                       ) : (
                         <div className="w-full h-full aspect-square bg-gradient-to-br from-gray-600 to-gray-700 animate-pulse rounded-full"></div>
                       )}
+                      
+                      {/* Wholesale Indicator */}
+                      {profile?.isWholesaleCustomer && (
+                        <div 
+                          className="absolute -top-1 -right-1 w-5 h-5 md:w-6 md:h-6 rounded-full flex items-center justify-center text-xs font-bold text-white z-10"
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.9) 0%, rgba(16, 185, 129, 0.9) 100%)',
+                            border: '2px solid rgba(255, 255, 255, 0.8)',
+                            boxShadow: '0 2px 8px rgba(34, 197, 94, 0.4)',
+                            backdropFilter: 'blur(4px)'
+                          }}
+                          title="Wholesale Customer"
+                        >
+                          <span className="text-[8px] md:text-[10px]">WS</span>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="flex-1 min-w-0">
@@ -2536,21 +2516,7 @@ function Dashboard() {
                           Greetings, {getUserDisplayName()}
                         </h1>
                         {/* Small Random Avatar Button */}
-                        <button
-                          onClick={handleAssignRandomAvatar}
-                          className="ml-2 px-2 py-1 rounded-md text-xs font-medium transition-all duration-200 transform hover:scale-105 pointer-events-auto"
-                          style={{
-                            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                            backdropFilter: 'blur(25px) saturate(180%)',
-                            border: '1px solid rgba(59, 130, 246, 0.4)',
-                            boxShadow: 'rgba(59, 130, 246, 0.15) 0px 4px 16px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
-                            color: 'white'
-                          }}
-                          disabled={uploadingProfilePhoto}
-                          title="Get a new random avatar"
-                        >
-                          {uploadingProfilePhoto ? '...' : '🎲'}
-                        </button>
+
                       </div>
                       <div className="flex items-center gap-2 mb-1 md:mb-2">
                         <p className="text-xs md:text-sm text-gray-200">
@@ -2896,7 +2862,7 @@ function Dashboard() {
                       </div>
                       <div className="min-w-0">
                         <h4 className="font-semibold text-white text-xs lg:text-sm truncate">Finances</h4>
-                        <p className="text-xs text-gray-300">$0.00 invested</p>
+                        <p className="text-xs text-gray-300">Manage finances</p>
                       </div>
                     </div>
                   </button>
@@ -3159,7 +3125,7 @@ function Dashboard() {
                           ...template.style,
                           aspectRatio: '5.2/1', // Match the actual banner ratio
                           minHeight: '60px', // Minimum height for readability
-                          animation: template.id === 2 ? 'stellar-drift 8s ease-in-out infinite' : 'none'
+                          animation: 'none'
                         }}
                       >
                         {template.isDefault && (

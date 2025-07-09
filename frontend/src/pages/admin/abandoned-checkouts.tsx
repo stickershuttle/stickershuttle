@@ -668,10 +668,8 @@ export default function AbandonedCheckouts() {
                   <thead
                     className="border-b border-gray-700 sticky top-0 z-20"
                     style={{
-                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
-                      backdropFilter: 'blur(25px) saturate(180%)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      boxShadow: 'rgba(255, 255, 255, 0.1) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                      background: 'rgba(3, 1, 64, 0.95)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
                     }}
                   >
                     <tr>

@@ -57,13 +57,18 @@ export default function SignUp() {
     // Remove all non-digit characters
     const phoneNumber = value.replace(/\D/g, '');
     
-    // Format as XXX-XXX-XXXX
-    if (phoneNumber.length >= 6) {
-      return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6, 10)}`;
-    } else if (phoneNumber.length >= 3) {
-      return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(3)}`;
+    // Limit to 10 digits
+    const limitedNumber = phoneNumber.slice(0, 10);
+    
+    // Apply formatting based on length
+    if (limitedNumber.length === 0) {
+      return '';
+    } else if (limitedNumber.length <= 3) {
+      return limitedNumber;
+    } else if (limitedNumber.length <= 6) {
+      return `${limitedNumber.slice(0, 3)}-${limitedNumber.slice(3)}`;
     } else {
-      return phoneNumber;
+      return `${limitedNumber.slice(0, 3)}-${limitedNumber.slice(3, 6)}-${limitedNumber.slice(6)}`;
     }
   };
 
@@ -274,6 +279,9 @@ export default function SignUp() {
       setShowOtpVerification(true);
       setLoading(false);
       
+      // Scroll to top when OTP form is shown
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
     } catch (err: any) {
       console.log('❌ Catch error:', err);
       setError(err.message || 'An error occurred during signup');
@@ -460,6 +468,35 @@ export default function SignUp() {
         // Don't block signup if Resend fails
       }
       
+      // Fetch and broadcast profile data to ensure avatar sync
+      try {
+        console.log('🔄 Fetching fresh profile data for sync...');
+        const supabase = await getSupabase();
+        
+        if (data.user?.id) {
+          const { data: profileData, error: profileError } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('user_id', data.user.id)
+            .single();
+
+          if (!profileError && profileData) {
+            console.log('✅ Profile data fetched:', profileData);
+            // Broadcast profile update to ensure all components are synced
+            window.dispatchEvent(new CustomEvent('profileUpdated', {
+              detail: {
+                profile_photo_url: profileData.profile_photo_url,
+                profile_photo_public_id: profileData.profile_photo_public_id
+              }
+            }));
+            console.log('📡 Profile update broadcasted for avatar sync');
+          }
+        }
+      } catch (profileSyncError) {
+        console.error('⚠️ Profile sync failed (non-critical):', profileSyncError);
+        // Don't block signup if profile sync fails
+      }
+      
       // Redirect to specified URL or dashboard after successful verification
       const redirectUrl = router.query.redirect as string || '/account/dashboard';
       router.push(redirectUrl);
@@ -559,6 +596,14 @@ export default function SignUp() {
             <source src="https://images-assets.nasa.gov/video/KSC-19890502-MH-NAS01-0001-Apollo_11_The_Twentieth_Year_1969_to_1989-B_0514/KSC-19890502-MH-NAS01-0001-Apollo_11_The_Twentieth_Year_1969_to_1989-B_0514~large.mp4" type="video/mp4" />
           </video>
           <div className="absolute inset-0 bg-black/60"></div>
+          {/* Seamless header fade */}
+          <div 
+            className="absolute top-0 left-0 right-0 z-10"
+            style={{
+              height: '25vh',
+              background: 'linear-gradient(180deg, #030140 0%, #030140 15%, rgba(3, 1, 64, 0.9) 35%, rgba(3, 1, 64, 0.7) 55%, rgba(3, 1, 64, 0.4) 75%, rgba(3, 1, 64, 0.2) 90%, transparent 100%)'
+            }}
+          ></div>
         </div>
         
         <div className="min-h-screen py-4 px-4 relative z-10 flex items-center justify-center">
@@ -884,7 +929,7 @@ export default function SignUp() {
                       Company Website *
                     </label>
                     <input
-                      type="url"
+                      type="text"
                       id="companyWebsite"
                       name="companyWebsite"
                       value={formData.companyWebsite}
@@ -1040,18 +1085,20 @@ export default function SignUp() {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || (formData.isWholesale && formData.wholesaleOrderingFor === 'myself')}
                 onClick={() => console.log('🔴 Button clicked!')}
-                className="w-full py-3 px-6 md:px-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 px-6 md:px-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 style={{
-                  background: loading ? '#666' : 'linear-gradient(135deg, #ffd713, #ffed4e)',
+                  background: (loading || (formData.isWholesale && formData.wholesaleOrderingFor === 'myself')) ? '#666' : 'linear-gradient(135deg, #ffd713, #ffed4e)',
                   color: '#030140',
                   fontWeight: 'bold',
                   border: 'none',
-                  cursor: 'pointer'
+                  cursor: (loading || (formData.isWholesale && formData.wholesaleOrderingFor === 'myself')) ? 'not-allowed' : 'pointer'
                 }}
               >
-                {loading ? 'Creating Account...' : 'Create Account'}
+                {loading ? 'Creating Account...' : 
+                 (formData.isWholesale && formData.wholesaleOrderingFor === 'myself') ? 'Wholesale Only for Clients' : 
+                 'Create Account'}
               </button>
             </form>
 
@@ -1293,7 +1340,7 @@ export default function SignUp() {
                             Company Website *
                           </label>
                           <input
-                            type="url"
+                            type="text"
                             id="companyWebsite-desktop"
                             name="companyWebsite"
                             value={formData.companyWebsite}
@@ -1449,18 +1496,20 @@ export default function SignUp() {
                     {/* Submit Button */}
                     <button
                       type="submit"
-                      disabled={loading}
+                      disabled={loading || (formData.isWholesale && formData.wholesaleOrderingFor === 'myself')}
                       onClick={() => console.log('🔴 Desktop Button clicked!')}
-                      className="w-full py-3 px-6 md:px-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                              className="w-full py-3 px-6 md:px-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                       style={{
-                        background: loading ? '#666' : 'linear-gradient(135deg, #ffd713, #ffed4e)',
+                        background: (loading || (formData.isWholesale && formData.wholesaleOrderingFor === 'myself')) ? '#666' : 'linear-gradient(135deg, #ffd713, #ffed4e)',
                         color: '#030140',
                         fontWeight: 'bold',
                         border: 'none',
-                        cursor: 'pointer'
+                        cursor: (loading || (formData.isWholesale && formData.wholesaleOrderingFor === 'myself')) ? 'not-allowed' : 'pointer'
                       }}
                     >
-                      {loading ? 'Creating Account...' : 'Create Account'}
+                      {loading ? 'Creating Account...' : 
+                       (formData.isWholesale && formData.wholesaleOrderingFor === 'myself') ? 'Wholesale Only for Clients' : 
+                       'Create Account'}
                     </button>
                   </form>
 

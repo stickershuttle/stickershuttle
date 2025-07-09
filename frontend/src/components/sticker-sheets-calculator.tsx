@@ -33,12 +33,14 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
   const { addToCart, isRushOrder, updateAllItemsRushOrder } = useCart();
   const router = useRouter();
   const [basePricing, setBasePricing] = useState<BasePricing[]>(initialBasePricing)
-  const [selectedCut, setSelectedCut] = useState("Custom Shape")
+  const [selectedCut, setSelectedCut] = useState("Vertical")
   const [selectedMaterial, setSelectedMaterial] = useState("Matte")
-  const [selectedSize, setSelectedSize] = useState('8.5" x 11"')
+  const [selectedSize, setSelectedSize] = useState('4" × 6"')
+  const [customWidth, setCustomWidth] = useState("")
+  const [customHeight, setCustomHeight] = useState("")
   const [selectedQuantity, setSelectedQuantity] = useState("100")
   const [customQuantity, setCustomQuantity] = useState("")
-  const [selectedWhiteOption, setSelectedWhiteOption] = useState("color-only")
+  const [selectedKissOption, setSelectedKissOption] = useState("1-4")
   const [sendProof, setSendProof] = useState(true)
   const [uploadLater, setUploadLater] = useState(false)
   // Use global rush order state from cart instead of local state
@@ -51,7 +53,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
   const [hoveredGoldTier, setHoveredGoldTier] = useState<number | null>(null)
   const [showCustomGoldMessage, setShowCustomGoldMessage] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
-  const [customSizeError, setCustomSizeError] = useState("")
+  const [showSizeWarning, setShowSizeWarning] = useState(false)
   
   // File upload states
   const [uploadedFile, setUploadedFile] = useState<CloudinaryUploadResult | null>(null)
@@ -105,15 +107,31 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
 
   // Calculate dynamic credit rate based on wholesale status
   const getCreditRate = () => {
-    if (!profile) return 0.05; // Default 5% for non-logged in users
+    if (!profile) return 0.05; // Default 5% for non-users
     
-    // Check if user is wholesale and approved
+    // Check if user is wholesale approved
     if (profile.is_wholesale_customer && profile.wholesale_status === 'approved') {
-      return profile.wholesale_credit_rate || 0.10; // Use profile rate or default 10%
+      return 0.025; // 2.5% for approved wholesale customers
     }
     
-    return 0.05; // Default 5% for regular users
-  }
+    return 0.05; // 5% for regular customers
+  };
+
+  // Check if user is wholesale approved
+  const isWholesaleApproved = () => {
+    if (!profile) return false;
+    return profile.is_wholesale_customer && profile.wholesale_status === 'approved';
+  };
+
+  // Calculate wholesale discount (15% off)
+  const calculateWholesaleDiscount = (originalPrice: number) => {
+    if (!isWholesaleApproved()) return { discountAmount: 0, finalPrice: originalPrice };
+    
+    const discountAmount = originalPrice * 0.15;
+    const finalPrice = originalPrice - discountAmount;
+    
+    return { discountAmount, finalPrice };
+  };
 
   // Auto-expand textarea when additionalNotes changes
   useEffect(() => {
@@ -168,7 +186,8 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
   const getSizeDimensions = (sizeString: string) => {
     if (sizeString === "Custom size") return { width: 0, height: 0 }
     
-    // Handle new rectangular format: "4" × 6""
+    // Handle new rectangular format: "2" × 4""
+    if (sizeString === '2" × 4"') return { width: 2, height: 4 }
     if (sizeString === '4" × 6"') return { width: 4, height: 6 }
     if (sizeString === '5" × 7"') return { width: 5, height: 7 }
     if (sizeString === '8.5" × 11"') return { width: 8.5, height: 11 }
@@ -183,24 +202,26 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
       return;
     }
     
+    const area = calculateArea(selectedSize, customWidth, customHeight)
     const quantity = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
 
     console.log(`\n--- Pricing Update ---`)
-    console.log(`Size: ${selectedSize}`)
+    console.log(`Size: ${selectedSize}, Custom Width: ${customWidth}, Custom Height: ${customHeight}`)
+    console.log(`Calculated Area: ${area.toFixed(2)} sq inches`)
     console.log(`Quantity: ${quantity}`)
 
-    if (quantity > 0) {
-      const { total, perSheet } = calculatePrice(quantity, selectedSize, isRushOrder)
+    if (area > 0 && quantity > 0) {
+      const { total, perSheet } = calculatePrice(quantity, area, isRushOrder)
       console.log(`Total Price: $${total.toFixed(2)}`)
       console.log(`Price Per Sheet: $${perSheet.toFixed(2)}`)
       setTotalPrice(`$${total.toFixed(2)}`)
       setCostPerSticker(`$${perSheet.toFixed(2)}/sheet`)
     } else {
-      console.log("Invalid quantity, pricing not calculated")
+      console.log("Invalid area or quantity, pricing not calculated")
       setTotalPrice("")
       setCostPerSticker("")
     }
-  }, [selectedSize, selectedQuantity, customQuantity, selectedWhiteOption, isRushOrder])
+  }, [selectedSize, customWidth, customHeight, selectedQuantity, customQuantity, selectedKissOption, isRushOrder])
 
   useEffect(() => {
     console.log("Recalculating price due to size or quantity change")
@@ -241,12 +262,13 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                   const customSize = selections.size.value || selections.size.displayValue;
                   if (customSize.includes('x')) {
                     const [width, height] = customSize.split('x').map((s: string) => s.replace(/['"]/g, '').trim());
-                    setCustomSizeError(width + " x " + height + " is not a valid size. Please enter a valid size.");
+                    setCustomWidth(width);
+                    setCustomHeight(height);
                   }
                 }
               }
               if (selections.whiteOption?.displayValue) {
-                setSelectedWhiteOption(selections.whiteOption.displayValue);
+                setSelectedKissOption(selections.whiteOption.displayValue);
               }
               if (selections.rush?.value === true) {
                 updateAllItemsRushOrder(true);
@@ -325,17 +347,13 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
     if (size === "Custom size") {
       const w = Number.parseFloat(customW) || 0
       const h = Number.parseFloat(customH) || 0
-      // Minimum area check for custom sizes
-      const area = w * h
-      if (area > 0 && area < 6) {
-        console.log(`Custom size: ${w}" x ${h}", Area: ${area.toFixed(2)} sq inches (below minimum of 6)`)
-        return 6 // Minimum 6 square inches
-      }
+      const area = calculateSquareInches(w, h)
       console.log(`Custom size: ${w}" x ${h}", Area: ${area.toFixed(2)} sq inches`)
       return area
     }
     
-    // Handle new rectangular sizes
+    // Handle preset sheet sizes
+    if (size === '2" × 4"') return 8 // 2 × 4 = 8 sq in
     if (size === '4" × 6"') return 24 // 4 × 6 = 24 sq in
     if (size === '5" × 7"') return 35 // 5 × 7 = 35 sq in  
     if (size === '8.5" × 11"') return 93.5 // 8.5 × 11 = 93.5 sq in
@@ -345,62 +363,130 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
     return 24 // Default to 4" × 6"
   }
 
-  const calculatePrice = (qty: number, size: string, isRushOrderParam: boolean) => {
+  const calculatePrice = (qty: number, area: number, isRushOrderParam: boolean) => {
     let totalPrice = 0
-    let pricePerSheet = 0
+    let pricePerSticker = 0
 
-    // Get white option pricing modifier
-    const whiteOptionModifiers = {
-      'color-only': 1.0,
-      'partial-white': 1.05,
-      'full-white': 1.1
+    // Get kiss option pricing modifier
+    const kissOptionModifiers = {
+      '1-4': 1.0,
+      '5-8': 1.05,
+      '9-12': 1.1
     };
-    const whiteOptionMultiplier = whiteOptionModifiers[selectedWhiteOption as keyof typeof whiteOptionModifiers] || 1.0;
+    const kissOptionMultiplier = kissOptionModifiers[selectedKissOption as keyof typeof kissOptionModifiers] || 1.0;
 
-    // Base pricing for sheet stickers
-    const basePricing = {
-      50: 12.50,
-      100: 19.00,
-      200: 35.00,
-      300: 51.00,
-      500: 82.50,
-      750: 120.00,
-      1000: 155.00,
-      2500: 375.00,
+    // Try to use real pricing data first (same as vinyl stickers)
+    if (realPricingData && realPricingData.basePricing && realPricingData.quantityDiscounts) {
+      console.log('Using real pricing data for sticker sheets calculation');
+      
+      const realResult = calculateRealPrice(
+        realPricingData.basePricing,
+        realPricingData.quantityDiscounts,
+        area,
+        qty,
+        isRushOrderParam
+      );
+      
+      // Apply kiss option multiplier to the real pricing
+      const finalTotalPrice = realResult.totalPrice * kissOptionMultiplier;
+      const finalPricePerSticker = realResult.finalPricePerSticker * kissOptionMultiplier;
+      
+      console.log(`Real Pricing (Sheets) - Quantity: ${qty}, Area: ${area}, Kiss Option: ${selectedKissOption} (${kissOptionMultiplier}x), Total: $${finalTotalPrice.toFixed(2)}, Per sheet: $${finalPricePerSticker.toFixed(2)}`);
+      
+      return {
+        total: finalTotalPrice,
+        perSheet: finalPricePerSticker
+      };
     }
 
-    // Get base price for quantity
-    const basePrice = basePricing[qty as keyof typeof basePricing] || basePricing[50]
-    pricePerSheet = basePrice * whiteOptionMultiplier
-    totalPrice = pricePerSheet * qty
+    // Fallback to legacy pricing calculation (similar to vinyl stickers but for sheets)
+    console.log('Using legacy pricing calculation for sticker sheets');
+    
+    // Use proportional pricing based on area (same base as vinyl stickers)
+    const basePrice = 1.36 // Base price per sticker for 3" (9 sq inches) from vinyl pricing
+    const baseArea = 9 // 3" x 3" = 9 sq inches
+
+    // Scale base price by area
+    const scaledBasePrice = basePrice * (area / baseArea)
+
+    // Apply quantity discounts (same discount structure as vinyl stickers)
+    const discountMap: { [key: number]: number } = {
+      50: 1.0, // No discount
+      100: 0.647, // 35.3% discount
+      200: 0.463, // 53.7% discount
+      300: 0.39, // 61% discount
+      500: 0.324, // 67.6% discount
+      750: 0.24, // 76% discount
+      1000: 0.19, // 81% discount
+      2500: 0.213, // 78.7% discount
+    }
+
+    // Find the appropriate quantity tier
+    let applicableQuantity = 50;
+    const quantityTiers = [50, 100, 200, 300, 500, 750, 1000, 2500];
+    
+    for (const tier of quantityTiers) {
+      if (qty >= tier) {
+        applicableQuantity = tier;
+      } else {
+        break;
+      }
+    }
+
+    const discountMultiplier = discountMap[applicableQuantity] || 1.0
+    pricePerSticker = scaledBasePrice * discountMultiplier * kissOptionMultiplier
+    totalPrice = pricePerSticker * qty
 
     if (isRushOrderParam) {
       totalPrice *= 1.4 // Add 40% for rush orders
-      pricePerSheet *= 1.4
+      pricePerSticker *= 1.4
     }
 
     console.log(
-      `Sheet Pricing - Quantity: ${qty}, Size: ${size}, White Option: ${selectedWhiteOption} (${whiteOptionMultiplier}x), Total price: $${totalPrice.toFixed(2)}, Price per sheet: $${pricePerSheet.toFixed(2)}`,
+      `Legacy Pricing (Sheets) - Quantity: ${qty}, Area: ${area}, Kiss Option: ${selectedKissOption} (${kissOptionMultiplier}x), Total price: $${totalPrice.toFixed(2)}, Price per sheet: $${pricePerSticker.toFixed(2)}`,
     )
 
     return {
       total: totalPrice,
-      perSheet: pricePerSheet,
+      perSheet: pricePerSticker,
     }
   }
 
   const handleSizeChange = (size: string) => {
     setSelectedSize(size)
     if (size !== "Custom size") {
-      setCustomSizeError("")
+      setCustomWidth("")
+      setCustomHeight("")
+      setShowSizeWarning(false) // Reset warning when leaving custom size
     }
   }
 
   const handleCustomSizeChange = (dimension: "width" | "height", value: string) => {
+    // Validate input - only allow numbers and decimal points
+    const numericValue = value.replace(/[^0-9.]/g, '')
+    
+    // Check if value is below minimum or above maximum
+    const numValue = parseFloat(numericValue)
+    if (numValue < 3 && numericValue !== "") {
+      // Show warning message for minimum size
+      setShowSizeWarning(true)
+      return
+    }
+    if (numValue > 14) {
+      // Show warning message for maximum size
+      setShowSizeWarning(true)
+      return
+    }
+    
+    // Reset warning if entering valid value
+    if (showSizeWarning && numValue >= 3 && numValue <= 14) {
+      setShowSizeWarning(false)
+    }
+    
     if (dimension === "width") {
-      setCustomSizeError(value + " is not a valid width. Please enter a valid width.")
+      setCustomWidth(numericValue)
     } else {
-      setCustomSizeError(value + " is not a valid height. Please enter a valid height.")
+      setCustomHeight(numericValue)
     }
   }
 
@@ -443,7 +529,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
     
     try {
       // Prepare metadata from current calculator state
-      const area = calculateArea(selectedSize, customSizeError, customSizeError)
+      const area = calculateArea(selectedSize, customWidth, customHeight)
       const qty = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
       
       const metadata: CalculatorMetadata = {
@@ -522,8 +608,9 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
   }
 
   const createCartItem = () => {
+    const area = calculateArea(selectedSize, customWidth, customHeight);
     const quantity = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity);
-    const { total, perSheet } = calculatePrice(quantity, selectedSize, isRushOrder);
+    const { total, perSheet } = calculatePrice(quantity, area, isRushOrder);
 
     return {
       id: generateCartItemId(),
@@ -556,13 +643,13 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
             displayValue: selectedSize,
             priceImpact: 0 
           },
-          whiteOption: { 
-            type: "white-base" as const, 
-            value: selectedWhiteOption, 
-            displayValue: selectedWhiteOption === "color-only" ? "Color Only" : 
-                         selectedWhiteOption === "partial-white" ? "Partial White Ink" : 
-                         selectedWhiteOption === "full-white" ? "Full White Ink" : selectedWhiteOption, 
-            priceImpact: 0 
+          kissOption: {
+            type: "finish" as const,
+            value: selectedKissOption,
+            displayValue: selectedKissOption === "1-4" ? "1-4 Cuts" :
+                          selectedKissOption === "5-8" ? "5-8 Cuts" :
+                          selectedKissOption === "9-12" ? "9-12 Cuts" : selectedKissOption,
+            priceImpact: 0
           },
           proof: { type: "finish" as const, value: sendProof, displayValue: sendProof ? "Send Proof" : "No Proof", priceImpact: 0 },
           rush: { type: "finish" as const, value: isRushOrder, displayValue: isRushOrder ? "Rush Order" : "Standard", priceImpact: isRushOrder ? total * 0.4 : 0 },
@@ -784,7 +871,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                 Select a size
               </h2>
               <div className="space-y-3">
-                {['4" × 6"', '5" × 7"', '8.5" × 11"', "Custom size"].map((size) => (
+                {['2" × 4"', '4" × 6"', '5" × 7"', '8.5" × 11"', "Custom size"].map((size) => (
                   <button
                     key={size}
                     onClick={() => handleSizeChange(size)}
@@ -805,41 +892,125 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                 ))}
               </div>
               {selectedSize === "Custom size" && (
-                <div className="mt-3">
+                <div className="mt-3 space-y-2">
                   <div className="flex gap-3">
                     <input
                       type="number"
-                      min="2"
-                      step="0.1"
                       placeholder="W"
-                      value={customSizeError}
+                      value={customWidth}
                       onChange={(e) => handleCustomSizeChange("width", e.target.value)}
-                      className={`w-1/2 px-3 py-2 rounded-lg border bg-white/10 text-white placeholder-white/60 focus:outline-none backdrop-blur-md button-interactive ${
-                        customSizeError ? 'border-red-400/50 focus:border-red-400' : 'border-white/20 focus:border-purple-400'
-                      }`}
+                      max="14"
+                      step="0.1"
+                      className="w-1/2 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                     <input
                       type="number"
-                      min="2"
-                      step="0.1"
                       placeholder="H"
-                      value={customSizeError}
+                      value={customHeight}
                       onChange={(e) => handleCustomSizeChange("height", e.target.value)}
-                      className={`w-1/2 px-3 py-2 rounded-lg border bg-white/10 text-white placeholder-white/60 focus:outline-none backdrop-blur-md button-interactive ${
-                        customSizeError ? 'border-red-400/50 focus:border-red-400' : 'border-white/20 focus:border-purple-400'
-                      }`}
+                      max="14"
+                      step="0.1"
+                      className="w-1/2 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
-                  {customSizeError && (
-                    <div className="mt-2 p-2 bg-red-500/20 border border-red-400/50 rounded-lg">
-                      <p className="text-red-200 text-sm flex items-center gap-2">
-                        <span>⚠️</span>
-                        {customSizeError}
-                      </p>
+                  {showSizeWarning && (
+                    <div className="text-xs text-orange-300 font-medium">
+                      📏 Size must be between 0.5" and 14". Please enter a valid size.
                     </div>
                   )}
                 </div>
               )}
+            </div>
+
+            {/* Kiss Cut Options Section - Mobile Only */}
+            <div className="md:hidden md:col-span-3 lg:col-span-6 container-style p-4 lg:p-6 transition-colors duration-200 mb-1">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
+                <span className="text-blue-400">✂️</span>
+                Kiss Cut Total
+              </h2>
+              
+              <div className="grid grid-cols-1 gap-4">
+                {/* 1-4 Cuts */}
+                <button
+                  onClick={() => setSelectedKissOption("1-4")}
+                  className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
+                    ${
+                      selectedKissOption === "1-4"
+                        ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
+                        : "hover:bg-white/10 border-white/20 text-white/80"
+                    }`}
+                >
+                  <div className="flex items-center mb-2">
+                    <div className="text-2xl mr-3">✂️</div>
+                    <h3 className="font-semibold text-white">
+                      1-4 Cuts
+                    </h3>
+                  </div>
+                  <p className="text-gray-300 text-sm mb-2">
+                    Perfect for simple designs with just a few individual stickers per sheet.
+                  </p>
+                  <div className="flex items-center text-sm">
+                    <span className="text-green-400 font-medium">✅ Standard Pricing</span>
+                  </div>
+                  {selectedKissOption === "1-4" && (
+                    <span className="absolute top-1 right-2 text-[10px] text-blue-300 font-medium">Selected</span>
+                  )}
+                </button>
+
+                {/* 5-8 Cuts */}
+                <button
+                  onClick={() => setSelectedKissOption("5-8")}
+                  className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
+                    ${
+                      selectedKissOption === "5-8"
+                        ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
+                        : "hover:bg-white/10 border-white/20 text-white/80"
+                    }`}
+                >
+                  <div className="flex items-center mb-2">
+                    <div className="text-2xl mr-3">✂️</div>
+                    <h3 className="font-semibold text-white">
+                      5-8 Cuts
+                    </h3>
+                  </div>
+                  <p className="text-gray-300 text-sm mb-2">
+                    Great for medium complexity sheets with multiple sticker designs.
+                  </p>
+                  <div className="flex items-center text-sm">
+                    <span className="text-yellow-400 font-medium">+5% pricing</span>
+                  </div>
+                  {selectedKissOption === "5-8" && (
+                    <span className="absolute top-1 right-2 text-[10px] text-blue-300 font-medium">Selected</span>
+                  )}
+                </button>
+
+                {/* 9-12 Cuts */}
+                <button
+                  onClick={() => setSelectedKissOption("9-12")}
+                  className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
+                    ${
+                      selectedKissOption === "9-12"
+                        ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
+                        : "hover:bg-white/10 border-white/20 text-white/80"
+                    }`}
+                >
+                  <div className="flex items-center mb-2">
+                    <div className="text-2xl mr-3">✂️</div>
+                    <h3 className="font-semibold text-white">
+                      9-12 Cuts
+                    </h3>
+                  </div>
+                  <p className="text-gray-300 text-sm mb-2">
+                    Ideal for complex sheets with many individual stickers and detailed layouts.
+                  </p>
+                  <div className="flex items-center text-sm">
+                    <span className="text-yellow-400 font-medium">+10% pricing</span>
+                  </div>
+                  {selectedKissOption === "9-12" && (
+                    <span className="absolute top-1 right-2 text-[10px] text-blue-300 font-medium">Selected</span>
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Quantity Selection */}
@@ -851,16 +1022,16 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                 </span>
               </h2>
               <div className="space-y-2 relative">
-                {["50", "100", "200", "300", "500", "750", "1,000", "2,500", "Custom"].map((amount) => {
+                {["50", "100", "200", "300", "500", "1,000", "2,500", "Custom"].map((amount) => {
                   const numericAmount = Number.parseInt(amount.replace(",", ""))
-                  const area = calculateArea(selectedSize, customSizeError, customSizeError)
+                  const area = calculateArea(selectedSize, customWidth, customHeight)
 
                   // Get pricing for current size
                   let pricePerEach = ""
                   let percentOff = ""
 
                   if (area > 0 && amount !== "Custom") {
-                    const currentPricing = calculatePrice(numericAmount, selectedSize, false)
+                    const currentPricing = calculatePrice(numericAmount, area, false)
                     const { perSheet } = currentPricing
                     
                     // Get the actual discount percentage from CSV data
@@ -961,7 +1132,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                                   backdropFilter: 'blur(12px)'
                                 }}
                               >
-                                ${calculatePrice(numericAmount, selectedSize, false).total.toFixed(2)}
+                                ${calculatePrice(numericAmount, area, false).total.toFixed(2)}
                               </span>
                             )}
                             {pricePerEach && amount !== "Custom" && (
@@ -1041,87 +1212,194 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                 </div>
               )}
               {totalPrice && (
-                <div className={`mt-3 space-y-1 ${customSizeError ? 'opacity-40' : ''}`}>
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-semibold text-white/80">Total:</span>
-                      <span className={`text-lg font-medium ${
-                        customSizeError 
-                          ? 'text-blue-200' 
-                          : 'text-green-200'
-                      }`}>
-                        {customSizeError ? 'Min 6 sq in required' : totalPrice}
-                      </span>
+                <div className={`mt-3 space-y-1 ${showSizeWarning ? 'opacity-40' : ''}`}>
+                  {/* Wholesale pricing display */}
+                  {isWholesaleApproved() && totalPrice && !showSizeWarning && (
+                    <div className="mb-3 p-3 rounded-lg text-sm"
+                         style={{
+                           background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(34, 197, 94, 0.15) 50%, rgba(34, 197, 94, 0.05) 100%)',
+                           border: '1px solid rgba(34, 197, 94, 0.4)',
+                           backdropFilter: 'blur(12px)'
+                         }}>
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center text-white/80">
+                          <span>Competitive Price:</span>
+                          <span>{totalPrice}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-orange-300 font-medium">
+                          <span>Aggressive Price:</span>
+                          <span>${(parseFloat(totalPrice.replace('$', '')) * 1.3).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-red-300 font-medium">
+                          <span>Homerun Price:</span>
+                          <span>${(parseFloat(totalPrice.replace('$', '')) * 1.5).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-green-300 font-medium">
+                          <span>Your Price:</span>
+                          <span>${calculateWholesaleDiscount(parseFloat(totalPrice.replace('$', ''))).finalPrice.toFixed(2)}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`px-2 py-1 text-xs font-medium rounded-lg border relative ${
-                          customSizeError
-                            ? 'text-blue-200'
-                            : 'text-purple-200'
-                        }`}
-                        style={{
-                          background: customSizeError 
-                            ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.15) 50%, rgba(59, 130, 246, 0.05) 100%)'
-                            : 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
-                          border: customSizeError
-                            ? '1px solid rgba(59, 130, 246, 0.4)'
-                            : '1px solid rgba(147, 51, 234, 0.4)',
-                          backdropFilter: 'blur(12px)'
-                        }}
-                      >
-                        {customSizeError ? 'Invalid size' : costPerSticker}
-                      </span>
-                      {(() => {
-                        const area = calculateArea(selectedSize, customSizeError, customSizeError)
-                        const qty = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
-                        
-                        if (area > 0 && qty > 0) {
-                          let discount = 0
-                          if (realPricingData && realPricingData.quantityDiscounts && qty > 50) {
-                            let applicableQuantity = 50;
-                            for (const row of realPricingData.quantityDiscounts) {
-                              if (qty >= row.quantity) {
-                                applicableQuantity = row.quantity;
-                              } else {
-                                break;
-                              }
-                            }
+                  )}
+                  
+                  <div className="flex justify-between items-center">
+                    {/* For wholesale accounts, flip the layout */}
+                    {isWholesaleApproved() && !showSizeWarning ? (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="px-2 py-1 text-xs font-medium rounded-lg border text-purple-200 relative"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                              border: '1px solid rgba(147, 51, 234, 0.4)',
+                              backdropFilter: 'blur(12px)'
+                            }}
+                          >
+                            {(() => {
+                              const originalPrice = parseFloat(totalPrice.replace('$', ''));
+                              const finalPrice = calculateWholesaleDiscount(originalPrice).finalPrice;
+                              const quantity = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity);
+                              return `$${(finalPrice / quantity).toFixed(2)}/ea.`;
+                            })()}
+                          </span>
+                          {(() => {
+                            const area = calculateArea(selectedSize, customWidth, customHeight)
+                            const qty = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
                             
-                            const quantityRow = realPricingData.quantityDiscounts.find(row => row.quantity === applicableQuantity);
-                            if (quantityRow) {
-                              const availableSqInches = Object.keys(quantityRow.discounts)
-                                .map(k => parseInt(k))
-                                .sort((a, b) => a - b);
-                              
-                              let applicableSqInches = availableSqInches[0];
-                              for (const sqIn of availableSqInches) {
-                                if (area >= sqIn) {
-                                  applicableSqInches = sqIn;
-                                } else {
-                                  break;
+                            if (area > 0 && qty > 0) {
+                              let discount = 0
+                              if (realPricingData && realPricingData.quantityDiscounts && qty > 50) {
+                                let applicableQuantity = 50;
+                                for (const row of realPricingData.quantityDiscounts) {
+                                  if (qty >= row.quantity) {
+                                    applicableQuantity = row.quantity;
+                                  } else {
+                                    break;
+                                  }
+                                }
+                                
+                                const quantityRow = realPricingData.quantityDiscounts.find(row => row.quantity === applicableQuantity);
+                                if (quantityRow) {
+                                  const availableSqInches = Object.keys(quantityRow.discounts)
+                                    .map(k => parseInt(k))
+                                    .sort((a, b) => a - b);
+                                  
+                                  let applicableSqInches = availableSqInches[0];
+                                  for (const sqIn of availableSqInches) {
+                                    if (area >= sqIn) {
+                                      applicableSqInches = sqIn;
+                                    } else {
+                                      break;
+                                    }
+                                  }
+                                  
+                                  const discountDecimal = quantityRow.discounts[applicableSqInches] || 0;
+                                  discount = discountDecimal * 100;
                                 }
                               }
                               
-                              const discountDecimal = quantityRow.discounts[applicableSqInches] || 0;
-                              discount = discountDecimal * 100;
+                              if (discount > 0.5) {
+                                return (
+                                  <span className="text-sm font-medium text-green-300">
+                                    {Math.round(discount)}% off
+                                  </span>
+                                )
+                              }
                             }
-                          }
-                          
-                          if (discount > 0.5) {
-                            return (
-                              <span className="text-sm font-medium text-green-300">
-                                {Math.round(discount)}% off
-                              </span>
-                            )
-                          }
-                        }
-                        return null
-                      })()}
-                    </div>
+                            return null
+                          })()}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-semibold text-white/80">Total:</span>
+                          <span className="text-lg font-medium text-green-200">
+                            ${calculateWholesaleDiscount(parseFloat(totalPrice.replace('$', ''))).finalPrice.toFixed(2)}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      /* Regular customer layout */
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-semibold text-white/80">Total:</span>
+                          <span className={`text-lg font-medium ${
+                            showSizeWarning 
+                              ? 'text-blue-200' 
+                              : 'text-green-200'
+                          }`}>
+                            {showSizeWarning ? 'Invalid custom size' : totalPrice}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`px-2 py-1 text-xs font-medium rounded-lg border relative ${
+                              showSizeWarning
+                                ? 'text-blue-200'
+                                : 'text-purple-200'
+                            }`}
+                            style={{
+                              background: showSizeWarning 
+                                ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.15) 50%, rgba(59, 130, 246, 0.05) 100%)'
+                                : 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                              border: showSizeWarning
+                                ? '1px solid rgba(59, 130, 246, 0.4)'
+                                : '1px solid rgba(147, 51, 234, 0.4)',
+                              backdropFilter: 'blur(12px)'
+                            }}
+                          >
+                            {showSizeWarning ? 'Invalid size' : costPerSticker}
+                          </span>
+                          {(() => {
+                            const area = calculateArea(selectedSize, customWidth, customHeight)
+                            const qty = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
+                            
+                            if (area > 0 && qty > 0) {
+                              let discount = 0
+                              if (realPricingData && realPricingData.quantityDiscounts && qty > 50) {
+                                let applicableQuantity = 50;
+                                for (const row of realPricingData.quantityDiscounts) {
+                                  if (qty >= row.quantity) {
+                                    applicableQuantity = row.quantity;
+                                  } else {
+                                    break;
+                                  }
+                                }
+                                
+                                const quantityRow = realPricingData.quantityDiscounts.find(row => row.quantity === applicableQuantity);
+                                if (quantityRow) {
+                                  const availableSqInches = Object.keys(quantityRow.discounts)
+                                    .map(k => parseInt(k))
+                                    .sort((a, b) => a - b);
+                                  
+                                  let applicableSqInches = availableSqInches[0];
+                                  for (const sqIn of availableSqInches) {
+                                    if (area >= sqIn) {
+                                      applicableSqInches = sqIn;
+                                    } else {
+                                      break;
+                                    }
+                                  }
+                                  
+                                  const discountDecimal = quantityRow.discounts[applicableSqInches] || 0;
+                                  discount = discountDecimal * 100;
+                                }
+                              }
+                              
+                              if (discount > 0.5) {
+                                return (
+                                  <span className="text-sm font-medium text-green-300">
+                                    {Math.round(discount)}% off
+                                  </span>
+                                )
+                              }
+                            }
+                            return null
+                          })()}
+                        </div>
+                      </>
+                    )}
                   </div>
                   {/* Store Credit Notification */}
-                  {totalPrice && !customSizeError && (
+                  {totalPrice && !showSizeWarning && (
                     <div className="mt-2 mb-2 px-3 py-1.5 rounded-lg text-xs font-medium text-left"
                          style={{
                            background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.15) 50%, rgba(255, 215, 0, 0.05) 100%)',
@@ -1130,7 +1408,13 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                          }}>
                       <span className="flex items-center justify-start gap-1.5 text-yellow-200">
                         <i className="fas fa-coins text-yellow-300"></i>
-                        You'll earn ${(parseFloat(totalPrice.replace('$', '')) * getCreditRate()).toFixed(2)} in store credit on this order!
+                        You'll earn ${(() => {
+                          const originalPrice = parseFloat(totalPrice.replace('$', ''));
+                          const finalPrice = isWholesaleApproved() 
+                            ? calculateWholesaleDiscount(originalPrice).finalPrice 
+                            : originalPrice;
+                          return (finalPrice * getCreditRate()).toFixed(2);
+                        })()} in store credit on this order!
                       </span>
                     </div>
                   )}
@@ -1148,7 +1432,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
           </div>
 
           {/* Kiss Cut Options Section */}
-          <div className="mb-6">
+          <div className="mb-6 hidden md:block">
             <div className="container-style p-6 transition-colors duration-200">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
                 <span className="text-blue-400">✂️</span>
@@ -1156,12 +1440,12 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
               </h2>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* 1-3 Cuts */}
+                {/* 1-4 Cuts */}
                 <button
-                  onClick={() => setSelectedWhiteOption("color-only")}
+                  onClick={() => setSelectedKissOption("1-4")}
                   className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
                     ${
-                      selectedWhiteOption === "color-only"
+                      selectedKissOption === "1-4"
                         ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
                         : "hover:bg-white/10 border-white/20 text-white/80"
                     }`}
@@ -1169,7 +1453,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                   <div className="flex items-center mb-2">
                     <div className="text-2xl mr-3">✂️</div>
                     <h3 className="font-semibold text-white">
-                      Color Only
+                      1-4 Cuts
                     </h3>
                   </div>
                   <p className="text-gray-300 text-sm mb-2">
@@ -1178,17 +1462,17 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                   <div className="flex items-center text-sm">
                     <span className="text-green-400 font-medium">✅ Standard Pricing</span>
                   </div>
-                  {selectedWhiteOption === "color-only" && (
+                  {selectedKissOption === "1-4" && (
                     <span className="absolute top-1 right-2 text-[10px] text-blue-300 font-medium">Selected</span>
                   )}
                 </button>
 
-                {/* 4-7 Cuts */}
+                {/* 5-8 Cuts */}
                 <button
-                  onClick={() => setSelectedWhiteOption("partial-white")}
+                  onClick={() => setSelectedKissOption("5-8")}
                   className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
                     ${
-                      selectedWhiteOption === "partial-white"
+                      selectedKissOption === "5-8"
                         ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
                         : "hover:bg-white/10 border-white/20 text-white/80"
                     }`}
@@ -1196,7 +1480,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                   <div className="flex items-center mb-2">
                     <div className="text-2xl mr-3">✂️</div>
                     <h3 className="font-semibold text-white">
-                      Partial White Ink
+                      5-8 Cuts
                     </h3>
                   </div>
                   <p className="text-gray-300 text-sm mb-2">
@@ -1205,17 +1489,17 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                   <div className="flex items-center text-sm">
                     <span className="text-yellow-400 font-medium">+5% pricing</span>
                   </div>
-                  {selectedWhiteOption === "partial-white" && (
+                  {selectedKissOption === "5-8" && (
                     <span className="absolute top-1 right-2 text-[10px] text-blue-300 font-medium">Selected</span>
                   )}
                 </button>
 
-                {/* 8-15 Cuts */}
+                {/* 9-12 Cuts */}
                 <button
-                  onClick={() => setSelectedWhiteOption("full-white")}
+                  onClick={() => setSelectedKissOption("9-12")}
                   className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
                     ${
-                      selectedWhiteOption === "full-white"
+                      selectedKissOption === "9-12"
                         ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
                         : "hover:bg-white/10 border-white/20 text-white/80"
                     }`}
@@ -1223,7 +1507,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                   <div className="flex items-center mb-2">
                     <div className="text-2xl mr-3">✂️</div>
                     <h3 className="font-semibold text-white">
-                      Full White Ink
+                      9-12 Cuts
                     </h3>
                   </div>
                   <p className="text-gray-300 text-sm mb-2">
@@ -1232,7 +1516,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                   <div className="flex items-center text-sm">
                     <span className="text-yellow-400 font-medium">+10% pricing</span>
                   </div>
-                  {selectedWhiteOption === "full-white" && (
+                  {selectedKissOption === "9-12" && (
                     <span className="absolute top-1 right-2 text-[10px] text-blue-300 font-medium">Selected</span>
                   )}
                 </button>
@@ -1255,7 +1539,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                   <input
                     id="file-input"
                     type="file"
-                    accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd"
+                    accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd,.zip"
                     onChange={handleFileSelect}
                     className="hidden"
                     aria-label="Upload artwork file"
@@ -1542,6 +1826,20 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                       <label className="text-sm font-medium text-purple-200">
                         Post this order to Instagram
                       </label>
+                      <div className="relative group">
+                        <span className="text-purple-300 cursor-help text-sm font-medium select-none">ⓘ</span>
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block z-50 w-64">
+                          <div className="text-white text-xs rounded-lg px-3 py-2 whitespace-normal" style={{
+                            background: 'rgba(30, 41, 59, 0.95)',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                            backdropFilter: 'blur(12px)'
+                          }}>
+                            We may still post your order on Instagram even if not selected, put in the notes below if you explicitly don't want us to post your order.
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-700"></div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                     
                     {/* Instagram handle input - right under Instagram toggle */}

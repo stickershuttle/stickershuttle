@@ -1,5 +1,60 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 
+// Helper function to format order number for display (matches frontend logic)
+async function formatOrderNumberForDisplay(relatedOrder: string): Promise<string> {
+  if (!relatedOrder) return 'none';
+  
+  // If it's already in SS-XXXX format, return as is
+  if (relatedOrder.startsWith('SS-')) {
+    return relatedOrder;
+  }
+  
+  // If it looks like a UUID (contains hyphens), look up the actual order number
+  if (relatedOrder.includes('-')) {
+    try {
+      // Import Supabase client
+      const { createClient } = await import('@supabase/supabase-js');
+      
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      
+      if (!supabaseUrl || !supabaseServiceKey) {
+        console.error('❌ Supabase credentials not found');
+        return relatedOrder.slice(-6).toUpperCase(); // Fallback to last 6 chars
+      }
+      
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      
+      // Query the database for the order number
+      const { data: order, error } = await supabase
+        .from('orders_main')
+        .select('order_number')
+        .eq('id', relatedOrder)
+        .single();
+      
+      if (error) {
+        console.error('❌ Error looking up order number:', error);
+        return relatedOrder.slice(-6).toUpperCase(); // Fallback to last 6 chars
+      }
+      
+      if (order?.order_number) {
+        console.log('✅ Found order number:', order.order_number, 'for ID:', relatedOrder);
+        return order.order_number;
+      } else {
+        console.warn('⚠️ No order number found for ID:', relatedOrder);
+        return relatedOrder.slice(-6).toUpperCase(); // Fallback to last 6 chars
+      }
+      
+    } catch (error) {
+      console.error('❌ Error in order lookup:', error);
+      return relatedOrder.slice(-6).toUpperCase(); // Fallback to last 6 chars
+    }
+  }
+  
+  // Otherwise, assume it's already properly formatted
+  return relatedOrder;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, message: 'Method not allowed' });
@@ -25,11 +80,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    // Format the order number for display (async lookup if needed)
+    const formattedOrderNumber = await formatOrderNumberForDisplay(relatedOrder);
+    
     console.log('📧 Processing contact form submission:', {
       name,
       email,
       subject,
-      relatedOrder: relatedOrder || 'none',
+      relatedOrder: formattedOrderNumber,
       messageLength: message.length
     });
 
@@ -69,7 +127,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           <p><strong>Name:</strong> ${name}</p>
           <p><strong>Email:</strong> ${email}</p>
           <p><strong>Subject:</strong> ${subjectMap[subject] || subject}</p>
-          ${relatedOrder ? `<p><strong>Related Order:</strong> ${relatedOrder}</p>` : ''}
+          ${relatedOrder && formattedOrderNumber !== 'none' ? `<p><strong>Related Order:</strong> ${formattedOrderNumber}</p>` : ''}
         </div>
         
         <div style="background: #ffffff; padding: 20px; border: 1px solid #e9ecef; border-radius: 8px;">

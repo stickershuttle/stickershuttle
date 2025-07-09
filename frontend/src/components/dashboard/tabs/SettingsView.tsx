@@ -381,6 +381,22 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                     {getUserDisplayName().charAt(0).toUpperCase()}
                   </div>
                 )}
+                
+                {/* Wholesale Indicator */}
+                {profile?.isWholesaleCustomer && (
+                  <div 
+                    className="absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white z-10"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.9) 0%, rgba(16, 185, 129, 0.9) 100%)',
+                      border: '2px solid rgba(255, 255, 255, 0.8)',
+                      boxShadow: '0 2px 8px rgba(34, 197, 94, 0.4)',
+                      backdropFilter: 'blur(4px)'
+                    }}
+                    title="Wholesale Customer"
+                  >
+                    <span className="text-[10px]">WS</span>
+                  </div>
+                )}
               </div>
               <div>
                 <button

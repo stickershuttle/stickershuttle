@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import AnimatedCreditCounter from '../../AnimatedCreditCounter';
 import AIFileImage from '../../AIFileImage';
@@ -71,6 +71,17 @@ const DefaultView: React.FC<DefaultViewProps> = ({
   handleViewOrderDetails,
   handleTrackOrder,
 }) => {
+  // Pagination state for Recent Orders
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 5;
+
+  // Calculate pagination values
+  const totalOrders = orders.length;
+  const totalPages = Math.ceil(totalOrders / ordersPerPage);
+  const startIndex = (currentPage - 1) * ordersPerPage;
+  const endIndex = startIndex + ordersPerPage;
+  const currentOrders = orders.slice(startIndex, endIndex);
+
   // Default view content is rendered here
   return (
     <>
@@ -99,19 +110,66 @@ const DefaultView: React.FC<DefaultViewProps> = ({
         </div>
       )}
 
+      {/* Proof Ready Alert */}
+      {orders.some((order: any) => order.proof_status === 'pending_customer_approval' && order.proofs?.some((proof: any) => proof.status === 'pending_customer_approval')) && (
+        <div 
+          className="mb-6 p-4 rounded-xl animate-pulse"
+          style={{
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.5) 0%, rgba(248, 113, 113, 0.35) 50%, rgba(254, 202, 202, 0.2) 100%)',
+            backdropFilter: 'blur(25px) saturate(180%)',
+            border: '1px solid rgba(239, 68, 68, 0.4)',
+            boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-red-200 font-bold text-lg">📋 Proof Ready for Review!</h3>
+              <p className="text-red-100 text-sm">
+                Your proof is ready for approval. Please review and approve to start production.
+              </p>
+            </div>
+            <button
+              onClick={() => setCurrentView('proofs')}
+              className="px-4 py-2 rounded-lg text-white font-semibold transition-all duration-200 hover:scale-105"
+              style={{
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
+                backdropFilter: 'blur(25px) saturate(180%)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+              }}
+            >
+              Review Proof
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Wholesale Approval Message */}
       {profile?.wholesale_status === 'approved' && (
-        <div className="mb-6 p-4 rounded-xl bg-blue-500/20 border-2 border-blue-400/50 animate-pulse">
+        <div 
+          className="mb-6 p-4 rounded-xl animate-pulse"
+          style={{
+            background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.5) 0%, rgba(251, 146, 60, 0.35) 50%, rgba(254, 215, 170, 0.2) 100%)',
+            backdropFilter: 'blur(25px) saturate(180%)',
+            border: '1px solid rgba(249, 115, 22, 0.4)',
+            boxShadow: 'rgba(249, 115, 22, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+          }}
+        >
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center">
               <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="text-blue-300 font-bold text-lg">🎉 Wholesale Account Approved!</h3>
-              <p className="text-blue-200 text-sm">
-                Congratulations! Your wholesale account has been approved. You now earn 10% store credit on all orders.
+              <h3 className="text-orange-200 font-bold text-lg">🎉 Wholesale Account Approved!</h3>
+              <p className="text-orange-100 text-sm">
+                Congratulations! Your wholesale account has been approved. You now earn 2.5% store credit on all orders.
               </p>
             </div>
             <button
@@ -119,7 +177,7 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                 // Update user profile to mark they've seen the message
                 setProfile((prev: any) => ({ ...prev, wholesale_status: 'approved_seen' }));
               }}
-              className="text-blue-300 hover:text-blue-100 transition-colors"
+              className="text-orange-200 hover:text-orange-100 transition-colors"
               title="Close notification"
               aria-label="Close wholesale approval notification"
             >
@@ -656,11 +714,26 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                       {/* Items Column */}
                       <div className="col-span-4">
                         <div className="space-y-1">
-                                                   {order.items.map((item: any) => (
-                           <div key={item.id} className="text-sm text-white">
-                             {item.quantity} {item.name}
-                           </div>
-                         ))}
+                          {(() => {
+                            // Group items by product name
+                            const groupedItems = order.items.reduce((acc: any, item: any) => {
+                              const productName = item.name || item.productName;
+                              if (!acc[productName]) {
+                                acc[productName] = {
+                                  name: productName,
+                                  totalQuantity: 0
+                                };
+                              }
+                              acc[productName].totalQuantity += item.quantity;
+                              return acc;
+                            }, {});
+
+                            return Object.values(groupedItems).map((groupedItem: any, index: number) => (
+                              <div key={index} className="text-sm text-white">
+                                {groupedItem.totalQuantity} {groupedItem.name}
+                              </div>
+                            ));
+                          })()}
                         </div>
                       </div>
 
@@ -1087,6 +1160,328 @@ const DefaultView: React.FC<DefaultViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Recent Orders Section with Pagination */}
+      {orders.length > 0 && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-white">📦 Recent Orders</h2>
+            <button 
+              onClick={() => setCurrentView('all-orders')}
+              className="text-purple-400 hover:text-purple-300 font-medium transition-colors duration-200 text-sm"
+            >
+              View All ({totalOrders}) →
+            </button>
+          </div>
+          
+          {/* Orders List */}
+          <div 
+            className="rounded-2xl overflow-hidden"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(12px)'
+            }}
+          >
+            {/* Table Header - Desktop Only */}
+            <div className="hidden md:block px-6 py-3 border-b border-white/10 bg-white/5">
+              <div className="grid grid-cols-16 gap-4 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                <div className="col-span-3">Preview</div>
+                <div className="col-span-2">ORDER #</div>
+                <div className="col-span-4">Items</div>
+                <div className="col-span-2">Date</div>
+                <div className="col-span-2">Total</div>
+                <div className="col-span-3">Actions</div>
+              </div>
+            </div>
+            
+            {/* Table Body */}
+            <div className="divide-y divide-white/5">
+              {currentOrders.map((order) => (
+                <div key={order.id}>
+                  <div className="px-6 py-4 hover:bg-white/5 transition-colors duration-200">
+                    {/* Desktop Row Layout */}
+                    <div className="hidden md:grid grid-cols-16 gap-4 items-center">
+                      
+                      {/* Preview Column */}
+                      <div className="col-span-3">
+                        <div className="flex gap-2 flex-wrap">
+                          {order.items.map((item: any, index: number) => {
+                            const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+                            const productImage = getProductImage(item, itemData);
+                            
+                            return (
+                              <div key={`preview-${item.id}-${index}`} className="flex-shrink-0">
+                                {productImage && productImage.trim() !== '' ? (
+                                  <div 
+                                    className="w-12 h-12 rounded-lg bg-white/10 border border-white/20 p-1 flex items-center justify-center cursor-pointer hover:border-blue-400/60 transition-all duration-200 hover:scale-105 relative"
+                                    onClick={() => {
+                                      setSelectedDesignImage(productImage);
+                                      setCurrentView('design-vault');
+                                    }}
+                                    title={`Click to view ${item.name} in Design Vault`}
+                                  >
+                                    <AIFileImage
+                                      src={productImage}
+                                      filename={productImage.split('/').pop()?.split('?')[0] || 'design.jpg'}
+                                      alt={item.name}
+                                      className="max-w-full max-h-full object-contain rounded"
+                                      size="thumbnail"
+                                      showFileType={false}
+                                    />
+                                  </div>
+                                ) : (
+                                  <OrderItemFileUpload 
+                                    orderId={String(order.id)}
+                                    itemId={String(item.id)}
+                                    onUploadComplete={(fileUrl) => {
+                                      console.log('File uploaded:', fileUrl);
+                                      refreshOrders();
+                                    }}
+                                    className="w-12 h-12"
+                                  />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      
+                      {/* Order Column */}
+                      <div className="col-span-2">
+                        <div className="font-semibold text-white text-sm">
+                          {getOrderDisplayNumber(order)}
+                        </div>
+                      </div>
+
+                      {/* Items Column */}
+                      <div className="col-span-4">
+                        <div className="space-y-1">
+                          {(() => {
+                            const groupedItems = order.items.reduce((acc: any, item: any) => {
+                              const productName = item.name || item.productName;
+                              if (!acc[productName]) {
+                                acc[productName] = {
+                                  name: productName,
+                                  totalQuantity: 0
+                                };
+                              }
+                              acc[productName].totalQuantity += item.quantity;
+                              return acc;
+                            }, {});
+
+                            return Object.values(groupedItems).map((groupedItem: any, index: number) => (
+                              <div key={index} className="text-sm text-white">
+                                {groupedItem.totalQuantity} {groupedItem.name}
+                              </div>
+                            ));
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* Date Column */}
+                      <div className="col-span-2">
+                        <div className="text-xs text-gray-400">
+                          {new Date(order.date).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric'
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Total Column */}
+                      <div className="col-span-2">
+                        <div className="text-sm font-semibold text-white">
+                          ${typeof order.total === 'number' ? order.total.toFixed(2) : parseFloat(order.total || 0).toFixed(2)}
+                        </div>
+                      </div>
+
+                      {/* Actions Column */}
+                      <div className="col-span-3">
+                        <div className="flex flex-col gap-2">
+                          <button
+                            onClick={() => handleViewOrderDetails(order)}
+                            className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(59, 130, 246, 0.4)',
+                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                              color: 'white'
+                            }}
+                          >
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                            </svg>
+                            View Details
+                          </button>
+                          <button
+                            onClick={() => handleReorder(order.id)}
+                            className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(245, 158, 11, 0.4)',
+                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                              color: 'white'
+                            }}
+                          >
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                            </svg>
+                            Reorder
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Mobile Card Layout */}
+                    <div className="md:hidden">
+                      <div className="bg-white/5 rounded-lg p-4 border border-white/10 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="font-semibold text-white text-base">
+                            {getOrderDisplayNumber(order)}
+                          </div>
+                          <div className="text-sm font-semibold text-white">
+                            ${typeof order.total === 'number' ? order.total.toFixed(2) : parseFloat(order.total || 0).toFixed(2)}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 flex-wrap">
+                          {order.items.map((item: any, index: number) => {
+                            const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
+                            const productImage = getProductImage(item, itemData);
+
+                            return (
+                              <div key={index} className="w-16 h-16 rounded-lg overflow-hidden border border-white/10 bg-black/20">
+                                {productImage && productImage.trim() !== '' ? (
+                                  <AIFileImage
+                                    src={productImage}
+                                    filename={productImage.split('/').pop()?.split('?')[0] || 'design.jpg'}
+                                    alt={item.name}
+                                    className="w-full h-full object-cover"
+                                    size="thumbnail"
+                                    showFileType={false}
+                                  />
+                                ) : (
+                                  <OrderItemFileUpload 
+                                    orderId={String(order.id)}
+                                    itemId={String(item.id)}
+                                    onUploadComplete={(fileUrl) => {
+                                      console.log('File uploaded:', fileUrl);
+                                      refreshOrders();
+                                    }}
+                                    className="w-full h-full"
+                                  />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleViewOrderDetails(order)}
+                            className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(59, 130, 246, 0.4)',
+                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                              color: 'white'
+                            }}
+                          >
+                            View Details
+                          </button>
+                          <button
+                            onClick={() => handleReorder(order.id)}
+                            className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(245, 158, 11, 0.4)',
+                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                              color: 'white'
+                            }}
+                          >
+                            Reorder
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="px-6 py-4 border-t border-white/10 bg-white/5">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-400">
+                    Showing {startIndex + 1}-{Math.min(endIndex, totalOrders)} of {totalOrders} orders
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{
+                        background: currentPage === 1 ? 'rgba(255, 255, 255, 0.05)' : 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: '1px solid rgba(59, 130, 246, 0.4)',
+                        boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                        color: 'white'
+                      }}
+                    >
+                      Previous
+                    </button>
+                    
+                    {/* Page numbers */}
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 ${
+                            currentPage === page ? 'text-white' : 'text-gray-400'
+                          }`}
+                          style={{
+                            background: currentPage === page 
+                              ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                              : 'rgba(255, 255, 255, 0.05)',
+                            backdropFilter: 'blur(25px) saturate(180%)',
+                            border: '1px solid rgba(59, 130, 246, 0.4)',
+                            boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          }}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                    </div>
+                    
+                    <button
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{
+                        background: currentPage === totalPages ? 'rgba(255, 255, 255, 0.05)' : 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: '1px solid rgba(59, 130, 246, 0.4)',
+                        boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                        color: 'white'
+                      }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 };

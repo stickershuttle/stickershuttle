@@ -62,8 +62,8 @@ const CookiePolicy: NextPage = () => {
                     <h3 className="text-xl font-medium text-white mb-3">Analytics Cookies</h3>
                     <p className="mb-2">These cookies help us understand how visitors interact with our website.</p>
                     <ul className="list-disc list-inside ml-4 space-y-1">
-                      <li><strong>PostHog:</strong> User behavior analytics and feature usage</li>
-                      <li><strong>Vercel Analytics:</strong> Website performance monitoring</li>
+                      <li>User behavior analytics and feature usage</li>
+                      <li>Website performance monitoring</li>
                       <li>Page view tracking</li>
                       <li>User journey analysis</li>
                     </ul>
@@ -84,7 +84,7 @@ const CookiePolicy: NextPage = () => {
                     <h3 className="text-xl font-medium text-white mb-3">Marketing Cookies</h3>
                     <p className="mb-2">These cookies are used to deliver relevant advertisements and track campaign effectiveness.</p>
                     <ul className="list-disc list-inside ml-4 space-y-1">
-                      <li><strong>Klaviyo:</strong> Email marketing and customer segmentation</li>
+                      <li>Email marketing and customer segmentation</li>
                       <li>Abandoned cart tracking</li>
                       <li>Marketing campaign attribution</li>
                       <li>Customer journey tracking</li>
@@ -101,22 +101,22 @@ const CookiePolicy: NextPage = () => {
                   <div>
                     <h3 className="text-lg font-medium text-white">Payment Processing</h3>
                     <ul className="list-disc list-inside ml-4 space-y-1">
-                      <li><strong>Stripe:</strong> Secure payment processing and fraud prevention</li>
+                      <li>Secure payment processing and fraud prevention</li>
                     </ul>
                   </div>
 
                   <div>
                     <h3 className="text-lg font-medium text-white">Authentication</h3>
                     <ul className="list-disc list-inside ml-4 space-y-1">
-                      <li><strong>Supabase:</strong> User authentication and session management</li>
+                      <li>User authentication and session management</li>
                     </ul>
                   </div>
 
                   <div>
                     <h3 className="text-lg font-medium text-white">Content Delivery</h3>
                     <ul className="list-disc list-inside ml-4 space-y-1">
-                      <li><strong>Cloudinary:</strong> Image optimization and delivery</li>
-                      <li><strong>Vercel:</strong> Website hosting and performance optimization</li>
+                      <li>Image optimization and delivery</li>
+                      <li>Website hosting and performance optimization</li>
                     </ul>
                   </div>
                 </div>
@@ -191,8 +191,8 @@ const CookiePolicy: NextPage = () => {
                 <h2 className="text-2xl font-semibold text-white mb-4">Contact Us</h2>
                 <p>If you have any questions about our use of cookies, please contact us:</p>
                 <div className="mt-4 space-y-2">
-                  <p><strong>Email:</strong> privacy@stickershuttle.com</p>
-                  <p><strong>Support:</strong> support@stickershuttle.com</p>
+                  <p><strong>Email:</strong> orbit@stickershuttle.com</p>
+                  <p><strong>Support:</strong> orbit@stickershuttle.com</p>
                 </div>
               </section>
             </div>

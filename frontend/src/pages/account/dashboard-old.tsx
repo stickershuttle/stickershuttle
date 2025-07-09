@@ -6541,30 +6541,7 @@ function Dashboard() {
                         let selections = calculatorSelections || {};
                         const orderNote = selectedOrderForInvoice.orderNote || '';
                         
-                        // Add fallback data from order note if missing in calculator selections (only for specialty stickers)
-                        if (!selections.whiteOption && orderNote) {
-                          // Only show white option fallback for products that actually support white options
-                          const itemName = itemData.name || item.name || '';
-                          const supportsWhiteOption = itemName.toLowerCase().includes('holographic') || 
-                                                    itemName.toLowerCase().includes('chrome') ||
-                                                    itemName.toLowerCase().includes('glitter') || 
-                                                    itemName.toLowerCase().includes('clear');
-                          
-                          if (supportsWhiteOption) {
-                            const whiteOptionMatch = orderNote.match(/⚪ White Option: (.+?)(?:\n|$)/);
-                            if (whiteOptionMatch) {
-                              selections = {
-                                ...selections,
-                                whiteOption: {
-                                  type: 'white-base',
-                                  value: whiteOptionMatch[1].trim(),
-                                  displayValue: whiteOptionMatch[1].trim(),
-                                  priceImpact: 0
-                                }
-                              };
-                            }
-                          }
-                        }
+                        // White options are stored per item in calculatorSelections - no fallback needed
                         
                         return Object.keys(selections).length > 0 && (
                           <div className="bg-black/20 rounded-lg p-4 border border-white/5 mb-4">
@@ -7143,65 +7120,7 @@ function Dashboard() {
               // Comprehensive approach to find white option data from all possible sources
               let selections = calculatorSelections;
               
-              // First check if white option exists in calculator selections
-              if (!selections.whiteOption) {
-                // Check all possible order note sources
-                const allOrderNotes = [
-                  orderNote,
-                  selectedOrderForPopup.orderNote,
-                  selectedOrderForPopup._fullOrderData?.orderNote,
-                  selectedOrderForPopup._fullOrderData?.order_note,
-                  itemData.orderNote,
-                  itemData.order_note
-                ].filter(Boolean);
-                
-                console.log('🔍 All order note sources:', allOrderNotes);
-                
-                for (const noteSource of allOrderNotes) {
-                  if (noteSource && typeof noteSource === 'string') {
-                    const whiteOptionMatch = noteSource.match(/⚪ White Option: (.+?)(?:\n|$)/);
-                    if (whiteOptionMatch) {
-                      console.log('🎯 Found white option in order note:', whiteOptionMatch[1]);
-                      selections = {
-                        ...selections,
-                        whiteOption: {
-                          type: 'white-base',
-                          value: whiteOptionMatch[1].trim(),
-                          displayValue: whiteOptionMatch[1].trim(),
-                          priceImpact: 0
-                        }
-                      };
-                      break;
-                    }
-                  }
-                }
-              }
-              
-              // Also check if white option is stored directly in item data under different keys
-              if (!selections.whiteOption) {
-                const possibleWhiteOptions = [
-                  itemData.whiteOption,
-                  itemData.white_option,
-                  itemData.whiteInk,
-                  itemData.white_ink,
-                  item.whiteOption,
-                  item.white_option
-                ].filter(Boolean);
-                
-                if (possibleWhiteOptions.length > 0) {
-                  console.log('🎯 Found white option in item data:', possibleWhiteOptions[0]);
-                  const whiteOptionData = possibleWhiteOptions[0];
-                  selections = {
-                    ...selections,
-                    whiteOption: {
-                      type: 'white-base',
-                      value: whiteOptionData.value || whiteOptionData,
-                      displayValue: whiteOptionData.displayValue || whiteOptionData.value || whiteOptionData,
-                      priceImpact: 0
-                    }
-                  };
-                }
-              }
+                              // White options are stored per item in calculatorSelections - no comprehensive fallback needed
               
               console.log('📊 Final selections object:', selections);
 
@@ -7434,67 +7353,9 @@ function Dashboard() {
                     // Use EXACT same logic as viewport display for building selections
                     let selections = itemData.calculatorSelections || itemData.calculator_selections || {};
                     
-                    // Enhanced fallback logic for white option - only for specialty stickers
-                    const orderNotePattern = /⚪ White Option: (.+?)(?:\n|$)/;
-                    const whiteOptionMatch = orderNote.match(orderNotePattern);
+                    // White options are stored per item in calculatorSelections - no fallback needed
                     
-                    if (whiteOptionMatch) {
-                      // Only show white option fallback for products that actually support white options
-                      const itemName = itemData.name || item.name || '';
-                      const supportsWhiteOption = itemName.toLowerCase().includes('holographic') || 
-                                                itemName.toLowerCase().includes('chrome') ||
-                                                itemName.toLowerCase().includes('glitter') || 
-                                                itemName.toLowerCase().includes('clear');
-                      
-                      if (supportsWhiteOption) {
-                        console.log('🎯 Found white option in order note for specialty sticker:', whiteOptionMatch[1]);
-                        const whiteValue = whiteOptionMatch[1].trim();
-                        selections = {
-                          ...selections,
-                          whiteOption: {
-                            type: 'white-base',
-                            value: whiteValue,
-                            displayValue: whiteValue,
-                            priceImpact: 0
-                          }
-                        };
-                      }
-                    }
-                    
-                    // Also check if white option is stored directly in item data under different keys - only for specialty stickers
-                    if (!selections.whiteOption) {
-                      // Only check for white option data if product supports white options
-                      const itemName = itemData.name || item.name || '';
-                      const supportsWhiteOption = itemName.toLowerCase().includes('holographic') || 
-                                                itemName.toLowerCase().includes('chrome') ||
-                                                itemName.toLowerCase().includes('glitter') || 
-                                                itemName.toLowerCase().includes('clear');
-                      
-                      if (supportsWhiteOption) {
-                        const possibleWhiteOptions = [
-                          itemData.whiteOption,
-                          itemData.white_option,
-                          itemData.whiteInk,
-                          itemData.white_ink,
-                          item.whiteOption,
-                          item.white_option
-                        ].filter(Boolean);
-                        
-                        if (possibleWhiteOptions.length > 0) {
-                          console.log('🎯 Found white option in item data for specialty sticker:', possibleWhiteOptions[0]);
-                          const whiteOptionData = possibleWhiteOptions[0];
-                          selections = {
-                            ...selections,
-                            whiteOption: {
-                              type: 'white-base',
-                              value: whiteOptionData.value || whiteOptionData,
-                              displayValue: whiteOptionData.displayValue || whiteOptionData.value || whiteOptionData,
-                              priceImpact: 0
-                            }
-                          };
-                        }
-                      }
-                    }
+                    // White options are stored per item in calculatorSelections - no additional fallback needed
                     
                     return {
                       id: item.id,

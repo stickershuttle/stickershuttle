@@ -59,8 +59,18 @@ export default function UniversalHeader() {
     
     // Listen for profile updates from other components
     const handleProfileUpdate = (event: CustomEvent) => {
-      if (isMounted && event.detail && event.detail.profile) {
-        setProfile(event.detail.profile);
+      if (isMounted && event.detail) {
+        // Handle both full profile updates and partial photo updates
+        if (event.detail.profile) {
+          setProfile(event.detail.profile);
+        } else if (event.detail.profile_photo_url !== undefined) {
+          // Handle profile photo updates from dashboard
+          setProfile((prevProfile: any) => ({
+            ...prevProfile,
+            profile_photo_url: event.detail.profile_photo_url,
+            profile_photo_public_id: event.detail.profile_photo_public_id
+          }));
+        }
       }
     };
 

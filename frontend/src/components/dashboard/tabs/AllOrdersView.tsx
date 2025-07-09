@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import AIFileImage from '../../AIFileImage';
 import OrderItemFileUpload from '../../OrderItemFileUpload';
 
@@ -33,6 +33,17 @@ const AllOrdersView: React.FC<AllOrdersViewProps> = ({
   getProductImage,
   isOrderShippedWithTracking,
 }) => {
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 5;
+
+  // Calculate pagination values
+  const totalOrders = orders.length;
+  const totalPages = Math.ceil(totalOrders / ordersPerPage);
+  const startIndex = (currentPage - 1) * ordersPerPage;
+  const endIndex = startIndex + ordersPerPage;
+  const currentOrders = orders.slice(startIndex, endIndex);
+
   return (
     <div className="space-y-6 mobile-content">
       <div className="flex items-center justify-between mobile-container">
@@ -55,7 +66,7 @@ const AllOrdersView: React.FC<AllOrdersViewProps> = ({
         <div className="container-style p-6">
           <div className="text-center">
             <div className="text-3xl font-bold text-blue-400 mb-2">
-              {orders.length}
+              {totalOrders}
             </div>
             <div className="text-sm text-gray-300">Total Orders</div>
           </div>
@@ -104,7 +115,7 @@ const AllOrdersView: React.FC<AllOrdersViewProps> = ({
         
         {/* Table Body */}
         <div className="divide-y divide-white/5">
-          {orders.map((order) => {
+          {currentOrders.map((order) => {
             // Calculate total stickers
             const totalStickers = order.items.reduce((sum, item) => {
               const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
@@ -420,6 +431,71 @@ const AllOrdersView: React.FC<AllOrdersViewProps> = ({
             );
           })}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-white/10 bg-white/5">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-400">
+                Showing {startIndex + 1}-{Math.min(endIndex, totalOrders)} of {totalOrders} orders
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    background: currentPage === 1 ? 'rgba(255, 255, 255, 0.05)' : 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                    color: 'white'
+                  }}
+                >
+                  Previous
+                </button>
+                
+                {/* Page numbers */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 ${
+                        currentPage === page ? 'text-white' : 'text-gray-400'
+                      }`}
+                      style={{
+                        background: currentPage === page 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: '1px solid rgba(59, 130, 246, 0.4)',
+                        boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                      }}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                
+                <button
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    background: currentPage === totalPages ? 'rgba(255, 255, 255, 0.05)' : 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                    color: 'white'
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

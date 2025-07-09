@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Here is your link! - Sticker Shuttle</title>
+</head>
+<body style="margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8f9fa; color: #333333; line-height: 1.6;">
+  
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+    
+    <!-- Header -->
+    <div style="text-align: center; margin-bottom: 30px;">
+      <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751567428/LogoDarktGreyStickerShuttle_lpvvnc.png" alt="Sticker Shuttle" style="height: 25px; width: auto;" />
+    </div>
+    
+    <!-- Main Content -->
+    <h1 style="font-size: 24px; margin-bottom: 20px; text-align: center; color: #333333;">
+      Here is your link!
+    </h1>
+    
+    <p style="font-size: 16px; margin-bottom: 30px; text-align: center; color: #666666;">
+      You have been invited to create a user on {{ .SiteURL }}. Follow this link to accept the invite:
+    </p>
+    
+    <!-- Magic Link Button -->
+    <div style="text-align: center; margin: 40px 0; padding: 30px; background-color: #f8f9fa; border-radius: 8px; border: 2px solid #e9ecef;">
+      <a href="{{ .Token }}" style="display: inline-block; background-color: #3b82f6; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+        Accept Invitation
+      </a>
+      <p style="font-size: 14px; color: #666666; margin: 20px 0 0;">
+        This link will expire after use
+      </p>
+    </div>
+    
+    <p style="font-size: 16px; margin-bottom: 20px; text-align: center; color: #666666;">
+      If the button doesn't work, copy and paste this link into your browser:
+    </p>
+    
+    <!-- Alternative Link -->
+    <div style="text-align: center; margin: 20px 0; padding: 15px; background-color: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;">
+      <p style="font-size: 12px; color: #666666; margin: 0; word-break: break-all; font-family: 'Courier New', monospace;">
+        {{ .Token }}
+      </p>
+    </div>
+    
+    <!-- Security Notice -->
+    <div style="margin: 30px 0; padding: 20px; background-color: #e7f3ff; border-radius: 6px; border: 1px solid #b3d9ff;">
+      <p style="font-size: 14px; color: #0066cc; margin: 0; text-align: center;">
+        ℹ️ <strong>Note:</strong> This magic link can only be used once and will expire after you click it.
+      </p>
+    </div>
+    
+    <!-- Help Section -->
+    <div style="border-top: 1px solid #e9ecef; padding-top: 30px; margin-top: 40px; text-align: center;">
+      <p style="font-size: 14px; color: #666666; margin-bottom: 10px;">
+        Didn't request this invitation? You can safely ignore this email.
+      </p>
+      <p style="font-size: 14px; color: #666666; margin: 0;">
+        Need help? Contact us at 
+        <a href="mailto:orbit@stickershuttle.com" style="color: #3b82f6; text-decoration: none;">
+          orbit@stickershuttle.com
+        </a>
+      </p>
+    </div>
+    
+    <!-- Footer -->
+    <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e9ecef; text-align: center;">
+      <p style="font-size: 12px; color: #999999; margin: 0;">
+        © 2024 Sticker Shuttle. All rights reserved.
+      </p>
+    </div>
+    
+  </div>
+  
+</body>
+</html> 

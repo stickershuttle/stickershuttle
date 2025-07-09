@@ -31,6 +31,18 @@ export default function Deals() {
   const { addToCart } = useCart();
   const router = useRouter();
 
+  // Get file type icon based on format
+  const getFileTypeIcon = (format: string) => {
+    const icons: { [key: string]: string } = {
+      'ai': 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751422400/ai-icon_hbqxvs.png',
+      'psd': 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751422400/psd-icon_hbqxvs.png',
+      'svg': 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751422400/svg-icon_hbqxvs.png',
+      'eps': 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751422400/eps-icon_hbqxvs.png',
+      'pdf': 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751422400/pdf-icon_hbqxvs.png'
+    };
+    return icons[format.toLowerCase()] || null;
+  };
+
   // Load active deal from localStorage
   useEffect(() => {
     const savedDeals = localStorage.getItem('sticker-shuttle-deals');
@@ -372,7 +384,7 @@ export default function Deals() {
                     <div className="max-w-lg mx-auto w-full mb-8">
                       {!uploadedFile ? (
                         <div 
-                          className="border-2 border-dashed border-white/30 rounded-xl p-8 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative"
+                          className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative"
                           onDrop={handleDrop}
                           onDragOver={handleDragOver}
                           onClick={() => document.getElementById('file-input')?.click()}
@@ -395,12 +407,16 @@ export default function Deals() {
                             </div>
                           ) : (
                             <div className="mb-4">
-                              <div className="text-4xl mb-3">📁</div>
+                              <div className="mb-3 flex justify-center -ml-4">
+                                <img 
+                                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751341811/StickerShuttleFileIcon4_gkhsu5.png" 
+                                  alt="Upload file" 
+                                  className="w-20 h-20 object-contain"
+                                />
+                              </div>
                               <p className="text-white font-medium text-base mb-2 hidden md:block">Drag or click to upload your file</p>
                               <p className="text-white font-medium text-base mb-2 md:hidden">Tap to add file</p>
-                              <p className="text-white/70 text-sm">Supported formats:</p>
-                              <p className="text-white/80 text-sm font-mono">.ai, .svg, .eps, .png, .jpg, .psd</p>
-                              <p className="text-white/60 text-xs mt-2">Max file size: 10MB</p>
+                              <p className="text-white/80 text-sm">All formats supported. Max file size: 25MB | 1 file per order</p>
                             </div>
                           )}
                         </div>
@@ -424,10 +440,41 @@ export default function Deals() {
                                 </div>
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="text-green-200 font-medium break-words">{uploadedFile.original_filename}</p>
-                                <p className="text-green-300/80 text-sm">
-                                  {(uploadedFile.bytes / 1024 / 1024).toFixed(2)} MB • {uploadedFile.format.toUpperCase()}
-                                </p>
+                                <p className="text-green-200 font-medium break-words text-left">{uploadedFile.original_filename}</p>
+                                
+                                {/* File Information - matching calculator format */}
+                                <div className="space-y-2 mt-2">
+                                  <div className="flex flex-wrap items-center gap-3 text-green-300/80 text-sm">
+                                    <span className="flex items-center gap-1">
+                                      <span className="text-green-400">📏</span>
+                                      {(uploadedFile.bytes / 1024 / 1024).toFixed(2)} MB
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <span className="text-green-400">🎨</span>
+                                      {uploadedFile.format.toUpperCase()}
+                                    </span>
+                                    {uploadedFile.width && uploadedFile.height && (
+                                      <span className="flex items-center gap-1">
+                                        <span className="text-green-400">📐</span>
+                                        {uploadedFile.width}x{uploadedFile.height}px
+                                      </span>
+                                    )}
+                                  </div>
+                                  
+                                  {/* File Type Icon */}
+                                  {getFileTypeIcon(uploadedFile.format) && (
+                                    <div className="flex items-center gap-2">
+                                      <img 
+                                        src={getFileTypeIcon(uploadedFile.format)!} 
+                                        alt={`${uploadedFile.format.toUpperCase()} file`}
+                                        className="w-6 h-6 object-contain opacity-80"
+                                      />
+                                      <span className="text-xs text-green-300/60">
+                                        Professional design file detected
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
@@ -447,6 +494,11 @@ export default function Deals() {
                               </button>
                             </div>
                           </div>
+                          {/* Upload Success Message - matching calculator format */}
+                          <div className="mt-2 flex items-center gap-2 text-green-300 text-sm">
+                            <span className="text-green-400">✅</span>
+                            <span>File uploaded successfully!</span>
+                          </div>
                         </div>
                       )}
 
@@ -459,19 +511,30 @@ export default function Deals() {
                         </div>
                       )}
                       
-                      <div className="mt-4 flex items-center bg-purple-500/20 backdrop-blur-md p-3 rounded-lg border border-purple-400/50">
-                        <input
-                          type="checkbox"
-                          id="uploadLater"
-                          checked={uploadLater}
-                          onChange={() => setUploadLater(!uploadLater)}
-                          className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
-                          disabled={!!uploadedFile}
-                        />
-                        <label htmlFor="uploadLater" className={`ml-2 text-sm font-medium ${uploadedFile ? 'text-white/50' : 'text-white'}`}>
-                          Upload Artwork Later
-                        </label>
-                      </div>
+                      {!uploadedFile && (
+                        <div className="mt-4 flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+                             style={{
+                               background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                               border: '1px solid rgba(147, 51, 234, 0.4)',
+                               backdropFilter: 'blur(12px)'
+                             }}>
+                          <button
+                            onClick={() => setUploadLater(!uploadLater)}
+                            disabled={!!uploadedFile}
+                            title={uploadLater ? "Disable upload later" : "Enable upload later"}
+                            className={`w-12 h-6 rounded-full transition-colors ${
+                              uploadLater ? 'bg-purple-500' : 'bg-white/20'
+                            } ${uploadedFile ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                              uploadLater ? 'translate-x-7' : 'translate-x-1'
+                            }`} />
+                          </button>
+                          <label className={`text-sm font-medium ${uploadedFile ? 'text-white/50' : 'text-purple-200'}`}>
+                            Upload Artwork Later
+                          </label>
+                        </div>
+                      )}
                       {uploadLater && !uploadedFile && (
                         <div className="mt-2 text-white/80 text-sm italic flex items-center">
                           <span role="img" aria-label="caution" className="mr-1">
@@ -483,23 +546,24 @@ export default function Deals() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
+                    <div className="flex flex-col sm:flex-row gap-8 items-center justify-center">
                       <button
                         onClick={() => setShowUpload(false)}
                         className="px-6 py-3 border border-white/30 text-white hover:bg-white/10 rounded-lg transition-colors backdrop-blur-md"
                       >
                         ← Back to Deal
                       </button>
-                      <button 
-                        onClick={handleAddToCart}
-                        disabled={!uploadedFile && !uploadLater} 
-                        className="primaryButton px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-105 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                        style={{
-                          transform: !uploadedFile && !uploadLater ? 'scale(1)' : 'scale(1.1)'
-                        }}
-                      >
-                        {!uploadedFile && !uploadLater ? "Please Upload Artwork or Select Upload Later" : `Add to Cart - $${activeDeal?.orderDetails.price || 29} →`}
-                      </button>
+                      {(uploadedFile || uploadLater) && (
+                        <button 
+                          onClick={handleAddToCart}
+                          className="primaryButton px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-105 rounded-lg"
+                          style={{
+                            transform: 'scale(1.1)'
+                          }}
+                        >
+                          Add to Cart - $${activeDeal?.orderDetails.price || 29} →
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}

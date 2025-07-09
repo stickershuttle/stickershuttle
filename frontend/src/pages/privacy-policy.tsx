@@ -32,7 +32,7 @@ const PrivacyPolicy: NextPage = () => {
                   <p>We collect information you provide directly to us, such as:</p>
                   <ul className="list-disc list-inside ml-4 space-y-2">
                     <li>Name and contact information (email address, phone number, mailing address)</li>
-                    <li>Payment information (processed securely through Stripe)</li>
+                    <li>Payment information (processed securely through industry-standard payment processors)</li>
                     <li>Account credentials and profile information</li>
                     <li>Order history and preferences</li>
                     <li>Design files and custom artwork you upload</li>
@@ -70,7 +70,7 @@ const PrivacyPolicy: NextPage = () => {
                 <p>We implement appropriate security measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. This includes:</p>
                 <ul className="list-disc list-inside ml-4 space-y-2">
                   <li>SSL encryption for data transmission</li>
-                  <li>Secure payment processing through Stripe</li>
+                  <li>Secure payment processing through industry-standard payment processors</li>
                   <li>Regular security audits and updates</li>
                   <li>Limited access to personal information on a need-to-know basis</li>
                 </ul>
@@ -102,14 +102,14 @@ const PrivacyPolicy: NextPage = () => {
 
               <section>
                 <h2 className="text-2xl font-semibold text-white mb-4">7. Third-Party Services</h2>
-                <p>Our website integrates with third-party services including:</p>
+                <p>Our website integrates with various third-party services to provide our services, including:</p>
                 <ul className="list-disc list-inside ml-4 space-y-2">
-                  <li><strong>Stripe:</strong> Payment processing</li>
-                  <li><strong>Supabase:</strong> Database and authentication</li>
-                  <li><strong>Cloudinary:</strong> Image storage and processing</li>
-                  <li><strong>EasyPost:</strong> Shipping and tracking</li>
-                  <li><strong>PostHog:</strong> Analytics and user insights</li>
-                  <li><strong>Klaviyo:</strong> Email marketing</li>
+                  <li>Payment processing services</li>
+                  <li>Database and authentication services</li>
+                  <li>Image storage and processing services</li>
+                  <li>Shipping and tracking services</li>
+                  <li>Analytics and user insights services</li>
+                  <li>Email marketing services</li>
                 </ul>
               </section>
 
@@ -127,7 +127,7 @@ const PrivacyPolicy: NextPage = () => {
                 <h2 className="text-2xl font-semibold text-white mb-4">10. Contact Us</h2>
                 <p>If you have any questions about this privacy policy, please contact us:</p>
                 <div className="mt-4 space-y-2">
-                  <p><strong>Email:</strong> privacy@stickershuttle.com</p>
+                  <p><strong>Email:</strong> orbit@stickershuttle.com</p>
                   <p><strong>Address:</strong> Sticker Shuttle Privacy Team</p>
                 </div>
               </section>

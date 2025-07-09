@@ -430,7 +430,7 @@ async function handleCheckoutSessionCompleted(session) {
             let calculatorSelections = {};
             
             // First, try to rebuild from simplified metadata fields
-            if (itemMetadata.size || itemMetadata.material || itemMetadata.cut) {
+            if (itemMetadata.size || itemMetadata.material || itemMetadata.cut || itemMetadata.whiteOption || itemMetadata.kissOption) {
               if (itemMetadata.size) {
                 calculatorSelections.size = {
                   type: 'size-preset',
@@ -452,6 +452,22 @@ async function handleCheckoutSessionCompleted(session) {
                   type: 'shape',
                   value: itemMetadata.cut,
                   displayValue: itemMetadata.cut,
+                  priceImpact: 0
+                };
+              }
+              if (itemMetadata.whiteOption) {
+                calculatorSelections.whiteOption = {
+                  type: 'white-base',
+                  value: itemMetadata.whiteOption,
+                  displayValue: itemMetadata.whiteOption,
+                  priceImpact: 0
+                };
+              }
+              if (itemMetadata.kissOption) {
+                calculatorSelections.kissOption = {
+                  type: 'finish',
+                  value: itemMetadata.kissOption,
+                  displayValue: itemMetadata.kissOption,
                   priceImpact: 0
                 };
               }
@@ -885,7 +901,7 @@ async function handleCheckoutSessionCompleted(session) {
           let calculatorSelections = {};
           
           // First, try to rebuild from simplified metadata fields
-          if (itemMetadata.size || itemMetadata.material || itemMetadata.cut) {
+          if (itemMetadata.size || itemMetadata.material || itemMetadata.cut || itemMetadata.whiteOption || itemMetadata.kissOption) {
             console.log('📝 Rebuilding calculator selections from simplified metadata...');
             if (itemMetadata.size) {
               calculatorSelections.size = {
@@ -908,6 +924,22 @@ async function handleCheckoutSessionCompleted(session) {
                 type: 'shape',
                 value: itemMetadata.cut,
                 displayValue: itemMetadata.cut,
+                priceImpact: 0
+              };
+            }
+            if (itemMetadata.whiteOption) {
+              calculatorSelections.whiteOption = {
+                type: 'white-base',
+                value: itemMetadata.whiteOption,
+                displayValue: itemMetadata.whiteOption,
+                priceImpact: 0
+              };
+            }
+            if (itemMetadata.kissOption) {
+              calculatorSelections.kissOption = {
+                type: 'finish',
+                value: itemMetadata.kissOption,
+                displayValue: itemMetadata.kissOption,
                 priceImpact: 0
               };
             }
@@ -965,7 +997,7 @@ async function handleCheckoutSessionCompleted(session) {
           let calculatorSelections = {};
           
           // First, try to rebuild from simplified metadata fields
-          if (itemMetadata.size || itemMetadata.material || itemMetadata.cut) {
+          if (itemMetadata.size || itemMetadata.material || itemMetadata.cut || itemMetadata.whiteOption || itemMetadata.kissOption) {
             if (itemMetadata.size) {
               calculatorSelections.size = {
                 type: 'size-preset',
@@ -987,6 +1019,22 @@ async function handleCheckoutSessionCompleted(session) {
                 type: 'shape',
                 value: itemMetadata.cut,
                 displayValue: itemMetadata.cut,
+                priceImpact: 0
+              };
+            }
+            if (itemMetadata.whiteOption) {
+              calculatorSelections.whiteOption = {
+                type: 'white-base',
+                value: itemMetadata.whiteOption,
+                displayValue: itemMetadata.whiteOption,
+                priceImpact: 0
+              };
+            }
+            if (itemMetadata.kissOption) {
+              calculatorSelections.kissOption = {
+                type: 'finish',
+                value: itemMetadata.kissOption,
+                displayValue: itemMetadata.kissOption,
                 priceImpact: 0
               };
             }
@@ -1088,7 +1136,7 @@ async function handleCheckoutSessionCompleted(session) {
           let calculatorSelections = {};
           
           // First, try to rebuild from simplified metadata fields
-          if (itemMetadata.size || itemMetadata.material || itemMetadata.cut) {
+          if (itemMetadata.size || itemMetadata.material || itemMetadata.cut || itemMetadata.whiteOption || itemMetadata.kissOption) {
             console.log('📝 Rebuilding calculator selections from simplified metadata...');
             if (itemMetadata.size) {
               calculatorSelections.size = {
@@ -1111,6 +1159,22 @@ async function handleCheckoutSessionCompleted(session) {
                 type: 'shape',
                 value: itemMetadata.cut,
                 displayValue: itemMetadata.cut,
+                priceImpact: 0
+              };
+            }
+            if (itemMetadata.whiteOption) {
+              calculatorSelections.whiteOption = {
+                type: 'white-base',
+                value: itemMetadata.whiteOption,
+                displayValue: itemMetadata.whiteOption,
+                priceImpact: 0
+              };
+            }
+            if (itemMetadata.kissOption) {
+              calculatorSelections.kissOption = {
+                type: 'finish',
+                value: itemMetadata.kissOption,
+                displayValue: itemMetadata.kissOption,
                 priceImpact: 0
               };
             }
@@ -1429,16 +1493,7 @@ function parseCalculatorSelectionsFromOrderNote(orderNote) {
     };
   }
   
-  // Parse white option if present (for clear/chrome/glitter stickers)
-  const whiteMatch = orderNote.match(/⚪ White Option: (.+?)(?:\n|$)/);
-  if (whiteMatch) {
-    selections.whiteOption = {
-      type: 'white-base',
-      value: whiteMatch[1].trim(),
-      displayValue: whiteMatch[1].trim(),
-      priceImpact: 0
-    };
-  }
+  // White options are stored per item in individual metadata - no global fallback needed
   
   // Parse kiss cut option if present (for sticker sheets)
   const kissCutMatch = orderNote.match(/✨ Kiss Cut: (.+?)(?:\n|$)/);

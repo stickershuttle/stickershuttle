@@ -20,8 +20,8 @@ export default function StoreCredit() {
 
   const userProfile = profileData?.getUserProfile;
   const isWholesale = userProfile?.isWholesaleCustomer || false;
-  const creditRate = isWholesale ? 10 : 5;
-  const creditRateDecimal = isWholesale ? 0.10 : 0.05;
+  const creditRate = isWholesale ? 2.5 : 5;
+  const creditRateDecimal = isWholesale ? 0.025 : 0.05;
 
   useEffect(() => {
     checkUser();

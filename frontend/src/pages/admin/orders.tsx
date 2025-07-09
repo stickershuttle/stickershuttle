@@ -235,6 +235,7 @@ const defaultColumns = [
   { id: 'shape', name: 'Shape', width: 'px-2', align: 'left' },
   { id: 'material', name: 'Material', width: 'px-2', align: 'left' },
   { id: 'size', name: 'Size', width: 'px-2', align: 'left' },
+  { id: 'location', name: 'Location', width: 'px-2', align: 'left' },
   { id: 'shipping', name: 'Shipping', width: 'px-2', align: 'left' },
   { id: 'actions', name: 'Actions', width: 'px-4', align: 'center' } // Reduced from px-6
 ];
@@ -268,6 +269,15 @@ export default function AdminOrders() {
   const [easyPostOrder, setEasyPostOrder] = useState<Order | null>(null);
   const [ordersWithLabels, setOrdersWithLabels] = useState<Set<string>>(new Set());
   const [orderLabelUrls, setOrderLabelUrls] = useState<Map<string, string>>(new Map());
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 25;
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus, searchTerm, sortColumn, sortDirection]);
 
   // Helper function to select an order and update URL
   const selectOrder = (order: Order) => {
@@ -367,6 +377,37 @@ export default function AdminOrders() {
     return position || 1;
   };
 
+  // Parse shipping address to get city/state in format "Columbus, OH"
+  const getShippingLocation = (shippingAddress: any) => {
+    if (!shippingAddress) return 'N/A';
+    
+    try {
+      // Handle both object and string formats
+      let addressObj;
+      if (typeof shippingAddress === 'string') {
+        addressObj = JSON.parse(shippingAddress);
+      } else {
+        addressObj = shippingAddress;
+      }
+      
+      const city = addressObj.city || addressObj.locality || '';
+      const state = addressObj.state || addressObj.province || addressObj.region || '';
+      
+      if (city && state) {
+        return `${city}, ${state.toUpperCase()}`;
+      } else if (city) {
+        return city;
+      } else if (state) {
+        return state.toUpperCase();
+      }
+      
+      return 'N/A';
+    } catch (error) {
+      console.warn('Error parsing shipping address:', error);
+      return 'N/A';
+    }
+  };
+
 
 
 
@@ -402,7 +443,7 @@ export default function AdminOrders() {
   }, []); // Remove router dependency to prevent loops
 
   // Filter and sort orders
-  const filteredOrders = React.useMemo(() => {
+  const allFilteredOrders = React.useMemo(() => {
     if (!data?.getAllOrders) return [];
 
     let orders = [...data.getAllOrders];
@@ -486,6 +527,13 @@ export default function AdminOrders() {
     return orders;
   }, [data, filterStatus, searchTerm, sortBy, sortOrder]);
 
+  // Calculate pagination values
+  const totalOrders = allFilteredOrders.length;
+  const totalPages = Math.ceil(totalOrders / ordersPerPage);
+  const startIndex = (currentPage - 1) * ordersPerPage;
+  const endIndex = startIndex + ordersPerPage;
+  const filteredOrders = allFilteredOrders.slice(startIndex, endIndex);
+
   // Handle order status update
   const handleStatusUpdate = async (orderId: string, statusType: string, value: string) => {
     try {
@@ -509,17 +557,38 @@ export default function AdminOrders() {
 
 
 
-  // Format date
+  // Format date with relative formatting
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
+    
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    const now = new Date();
+    
+    // Reset time to start of day for comparison
+    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const todayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    
+    const timeString = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
     });
+    
+    if (dateOnly.getTime() === todayOnly.getTime()) {
+      return `Today at ${timeString}`;
+    } else if (dateOnly.getTime() === yesterdayOnly.getTime()) {
+      return `Yesterday at ${timeString}`;
+    } else {
+      // For all other dates, show the full date
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
   };
 
   // Format currency
@@ -1116,7 +1185,7 @@ export default function AdminOrders() {
       <div className="min-h-screen" style={{ backgroundColor: '#030140' }}>
         {/* Main Content */}
         <div className="pt-8 pb-8">
-          <div className="w-full px-4 xl:px-6"> {/* Consistent padding on all screen sizes */}
+          <div className="w-full pl-2 pr-8"> {/* Reduced left padding, keep right padding */}
             {!selectedOrder ? (
               // Orders List View
               <>
@@ -1754,7 +1823,7 @@ export default function AdminOrders() {
 
                 {/* Desktop Orders Table */}
                 <div className="hidden xl:block rounded-2xl overflow-hidden glass-container">
-                  <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 450px)', overflowY: 'auto' }}>
+                  <div className="overflow-x-auto">
                     <table className="min-w-full">
                       <thead
                         className="border-b border-gray-700 sticky top-0 z-20"
@@ -1781,19 +1850,6 @@ export default function AdminOrders() {
                             Image
                           </th>
                           <th
-                            onClick={() => handleColumnSort('total')}
-                            className="px-3 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
-                          >
-                            <div className="flex items-center gap-1">
-                              Total
-                              {sortColumn === 'total' && (
-                                <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                                </svg>
-                              )}
-                            </div>
-                          </th>
-                          <th
                             onClick={() => handleColumnSort('order')}
                             className="px-3 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
                           >
@@ -1813,6 +1869,19 @@ export default function AdminOrders() {
                             <div className="flex items-center gap-1">
                               Customer
                               {sortColumn === 'customer' && (
+                                <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                </svg>
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleColumnSort('total')}
+                            className="px-3 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+                          >
+                            <div className="flex items-center gap-1">
+                              Total
+                              {sortColumn === 'total' && (
                                 <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
                                 </svg>
@@ -1843,6 +1912,9 @@ export default function AdminOrders() {
                           </th>
                           <th className="px-2 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
                             Size
+                          </th>
+                          <th className="px-2 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                            Location
                           </th>
                           <th className="px-2 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
                             Shipping
@@ -1960,12 +2032,6 @@ export default function AdminOrders() {
                                   )}
                                 </div>
                               </td>
-                              {/* Total */}
-                              <td className="px-3 py-4">
-                                <div className="text-base font-semibold" style={{ color: '#86efac' }}>
-                                  {formatCurrency(order.totalPrice)}
-                                </div>
-                              </td>
                               {/* Order Info */}
                               <td className="px-3 py-4">
                                 <div>
@@ -2010,6 +2076,12 @@ export default function AdminOrders() {
                                       </span>
                                     )}
                                   </div>
+                                </div>
+                              </td>
+                              {/* Total */}
+                              <td className="px-3 py-4">
+                                <div className="text-base font-semibold" style={{ color: '#86efac' }}>
+                                  {formatCurrency(order.totalPrice)}
                                 </div>
                               </td>
                               {/* Quantity */}
@@ -2065,6 +2137,13 @@ export default function AdminOrders() {
                                 ) : (
                                   <span className="text-gray-500">-</span>
                                 )}
+                              </td>
+                              {/* Location */}
+                              <td className="px-2 py-4">
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-cyan-300"
+                                  style={{ backgroundColor: 'rgba(34, 211, 238, 0.2)', border: '1px solid rgba(34, 211, 238, 0.3)' }}>
+                                  {getShippingLocation(order.shippingAddress)}
+                                </span>
                               </td>
                               {/* Shipping */}
                               <td className="px-2 py-4">
@@ -2150,6 +2229,75 @@ export default function AdminOrders() {
                         </div>
                       </div>
                     )}
+
+                    {/* Pagination Controls */}
+                    <div 
+                      className="px-6 py-4 border-t"
+                      style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        borderColor: 'rgba(255, 255, 255, 0.1)'
+                      }}
+                    >
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm text-gray-400">
+                            Showing {startIndex + 1}-{Math.min(endIndex, totalOrders)} of {totalOrders} orders
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setCurrentPage(currentPage - 1)}
+                              disabled={currentPage === 1}
+                              className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                              style={{
+                                background: currentPage === 1 ? 'rgba(255, 255, 255, 0.05)' : 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                                backdropFilter: 'blur(25px) saturate(180%)',
+                                border: '1px solid rgba(59, 130, 246, 0.4)',
+                                boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                                color: 'white'
+                              }}
+                            >
+                              Previous
+                            </button>
+                            
+                            {/* Page numbers */}
+                            <div className="flex items-center gap-1">
+                              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                <button
+                                  key={page}
+                                  onClick={() => setCurrentPage(page)}
+                                  className={`px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 ${
+                                    currentPage === page ? 'text-white' : 'text-gray-400'
+                                  }`}
+                                  style={{
+                                    background: currentPage === page 
+                                      ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                                      : 'rgba(255, 255, 255, 0.05)',
+                                    backdropFilter: 'blur(25px) saturate(180%)',
+                                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                                    boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                  }}
+                                >
+                                  {page}
+                                </button>
+                              ))}
+                            </div>
+                            
+                            <button
+                              onClick={() => setCurrentPage(currentPage + 1)}
+                              disabled={currentPage === totalPages}
+                              className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                              style={{
+                                background: currentPage === totalPages ? 'rgba(255, 255, 255, 0.05)' : 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                                backdropFilter: 'blur(25px) saturate(180%)',
+                                border: '1px solid rgba(59, 130, 246, 0.4)',
+                                boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                                color: 'white'
+                              }}
+                            >
+                              Next
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                   </div>
                 </div>
               </>
@@ -2205,21 +2353,7 @@ export default function AdminOrders() {
                           const size = selections.size || selections.sizePreset || {};
                           const itemImage = getProductImage(item);
                           
-                          // Fallback: If white option is missing but order note exists, parse it from order note
-                          if (!selections.whiteOption && selectedOrder.orderNote) {
-                            const whiteOptionMatch = selectedOrder.orderNote.match(/⚪ White Option: (.+?)(?:\n|$)/);
-                            if (whiteOptionMatch) {
-                              selections = {
-                                ...selections,
-                                whiteOption: {
-                                  type: 'white-base',
-                                  value: whiteOptionMatch[1].trim(),
-                                  displayValue: whiteOptionMatch[1].trim(),
-                                  priceImpact: 0
-                                }
-                              };
-                            }
-                          }
+                          // White options are stored per item in calculatorSelections - no fallback needed
                           
                           // Debug: Log what we have in selections to find missing white options
                           console.log('🔍 Admin mobile view - calculator selections debug:', {
@@ -2331,6 +2465,12 @@ export default function AdminOrders() {
                                       <div className="flex">
                                         <span className="text-gray-500 w-20">White Ink:</span>
                                         <span className="text-gray-300">{selections.whiteOption.displayValue}</span>
+                                      </div>
+                                    )}
+                                    {selections.kissOption?.displayValue && (
+                                      <div className="flex">
+                                        <span className="text-gray-500 w-20">Cut Options:</span>
+                                        <span className="text-gray-300">{selections.kissOption.displayValue}</span>
                                       </div>
                                     )}
                                   </div>
@@ -2697,21 +2837,7 @@ export default function AdminOrders() {
                           const size = selections.size || selections.sizePreset || {};
                           const itemImage = getProductImage(item);
                           
-                          // Fallback: If white option is missing but order note exists, parse it from order note
-                          if (!selections.whiteOption && selectedOrder.orderNote) {
-                            const whiteOptionMatch = selectedOrder.orderNote.match(/⚪ White Option: (.+?)(?:\n|$)/);
-                            if (whiteOptionMatch) {
-                              selections = {
-                                ...selections,
-                                whiteOption: {
-                                  type: 'white-base',
-                                  value: whiteOptionMatch[1].trim(),
-                                  displayValue: whiteOptionMatch[1].trim(),
-                                  priceImpact: 0
-                                }
-                              };
-                            }
-                          }
+                          // White options are stored per item in calculatorSelections - no fallback needed
                           
                           // Enhanced desktop order details view
                           const originalContent = (
@@ -2907,6 +3033,15 @@ export default function AdminOrders() {
                                         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-cyan-300"
                                           style={{ backgroundColor: 'rgba(6, 182, 212, 0.2)', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
                                           {selections.whiteOption.displayValue}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {selections.kissOption?.displayValue && (
+                                      <div className="flex flex-col">
+                                        <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Cut Options</span>
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-pink-300"
+                                          style={{ backgroundColor: 'rgba(236, 72, 153, 0.2)', border: '1px solid rgba(236, 72, 153, 0.3)' }}>
+                                          {selections.kissOption.displayValue}
                                         </span>
                                       </div>
                                     )}
@@ -3580,6 +3715,132 @@ export default function AdminOrders() {
                         </div>
                       </div>
                                         </div>
+
+                    {/* Pricing Overview */}
+                    <div className="glass-container p-6">
+                      <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <span className="text-xl">💰</span>
+                        Pricing Overview
+                      </h3>
+                      
+                      <div className="space-y-4">
+                        {/* Cost Per Sticker */}
+                        {(() => {
+                          const totalQuantity = selectedOrder.items.reduce((sum, item) => sum + item.quantity, 0);
+                          const totalCost = selectedOrder.totalPrice;
+                          const costPerSticker = totalQuantity > 0 ? totalCost / totalQuantity : 0;
+                          
+                          return (
+                            <div className="flex justify-between items-center p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                              <div className="flex items-center gap-2">
+                                <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                                <span className="text-sm text-blue-300">Cost per sticker</span>
+                              </div>
+                              <span className="font-semibold text-white">${costPerSticker.toFixed(2)}</span>
+                            </div>
+                          );
+                        })()}
+                        
+                        {/* Credits Used */}
+                        {(() => {
+                          // Parse credits used from order note or calculate from discount
+                          const orderNote = selectedOrder.orderNote || '';
+                          const creditsUsedMatch = orderNote.match(/Credits Used: \$([0-9.]+)/);
+                          const creditsUsed = creditsUsedMatch ? parseFloat(creditsUsedMatch[1]) : 0;
+                          
+                          return creditsUsed > 0 ? (
+                            <div className="flex justify-between items-center p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                              <div className="flex items-center gap-2">
+                                <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                </svg>
+                                <span className="text-sm text-red-300">Credits used</span>
+                              </div>
+                              <span className="font-semibold text-white">-${creditsUsed.toFixed(2)}</span>
+                            </div>
+                          ) : null;
+                        })()}
+                        
+                                                 {/* Credits Earned */}
+                         {(() => {
+                           // Calculate credits earned (typically 5% for regular, 2.5% for wholesale)
+                           const isWholesale = selectedOrder.customerEmail?.includes('@') && false; // You may want to check user profile
+                           const earningRate = isWholesale ? 0.025 : 0.05;
+                           const creditsEarned = selectedOrder.totalPrice * earningRate;
+                           
+                           return (
+                             <div className="flex justify-between items-center p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                               <div className="flex items-center gap-2">
+                                 <i className="fas fa-coins text-green-300"></i>
+                                 <span className="text-sm text-green-300">Credits earned ({(earningRate * 100).toFixed(1)}%)</span>
+                               </div>
+                               <span className="font-semibold text-white">+${creditsEarned.toFixed(2)}</span>
+                             </div>
+                           );
+                         })()}
+                        
+                                                 {/* Discounts Used */}
+                         {(() => {
+                           // Parse discount information from order note
+                           const orderNote = selectedOrder.orderNote || '';
+                           const discountMatch = orderNote.match(/Discount Code: (.+?) \(([0-9.]+)%\)/);
+                           const discountCode = discountMatch ? discountMatch[1] : null;
+                           const discountPercent = discountMatch ? parseFloat(discountMatch[2]) : 0;
+                           const discountAmount = discountPercent > 0 ? (selectedOrder.subtotalPrice || selectedOrder.totalPrice) * (discountPercent / 100) : 0;
+                           
+                           return discountCode ? (
+                             <div className="flex justify-between items-center p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                               <div className="flex items-center gap-2">
+                                 <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                 </svg>
+                                 <span className="text-sm text-purple-300">Discount ({discountCode})</span>
+                               </div>
+                               <span className="font-semibold text-white">-${discountAmount.toFixed(2)}</span>
+                             </div>
+                           ) : null;
+                         })()}
+                         
+                         {/* Rush Order Fee */}
+                         {(() => {
+                           // Check if it's a rush order and calculate the rush fee
+                           const orderNote = selectedOrder.orderNote || '';
+                           const isRushOrder = selectedOrder.is_rush_order || orderNote.includes('Rush Order') || orderNote.includes('🚀');
+                           
+                           if (isRushOrder) {
+                             // Calculate rush order fee (typically 40% of subtotal)
+                             const subtotal = selectedOrder.subtotalPrice || selectedOrder.totalPrice;
+                             const rushFee = subtotal * 0.4; // 40% rush fee
+                             
+                             // Parse rush fee from order note if available for more accuracy
+                             const rushFeeMatch = orderNote.match(/Rush.*?\$([0-9.]+)/i);
+                             const actualRushFee = rushFeeMatch ? parseFloat(rushFeeMatch[1]) : rushFee;
+                             
+                             return actualRushFee > 0 ? (
+                               <div className="flex justify-between items-center p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                                 <div className="flex items-center gap-2">
+                                   <span className="text-base">🚀</span>
+                                   <span className="text-sm text-orange-300">Rush Order (24-hour production)</span>
+                                 </div>
+                                 <span className="font-semibold text-white">+${actualRushFee.toFixed(2)}</span>
+                               </div>
+                             ) : null;
+                           }
+                           return null;
+                         })()}
+                        
+                                                 {/* Order Total */}
+                         <div className="flex justify-between items-center p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 border-dashed">
+                           <div className="flex items-center gap-2">
+                             <span className="text-base">💰</span>
+                             <span className="text-sm text-yellow-300 font-semibold">Order Total</span>
+                           </div>
+                           <span className="font-bold text-white text-lg">${selectedOrder.totalPrice.toFixed(2)}</span>
+                         </div>
+                      </div>
+                    </div>
 
                     {/* Shipping Address */}
                     {selectedOrder.shippingAddress && (

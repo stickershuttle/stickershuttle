@@ -108,7 +108,7 @@ const TermsAndConditions: NextPage = () => {
               <section>
                 <h2 className="text-2xl font-semibold text-white mb-4">6. Payment Terms</h2>
                 <ul className="list-disc list-inside ml-4 space-y-2">
-                  <li>Payment processed securely through Stripe</li>
+                  <li>Payment processed securely through industry-standard payment processors</li>
                   <li>Accepted payment methods: Credit cards, debit cards</li>
                   <li>Store credit and promotional codes may be applied</li>
                   <li>Failed payments may result in order cancellation</li>
@@ -182,8 +182,8 @@ const TermsAndConditions: NextPage = () => {
                 <h2 className="text-2xl font-semibold text-white mb-4">14. Contact Information</h2>
                 <p>For questions about these terms and conditions, please contact us:</p>
                 <div className="mt-4 space-y-2">
-                  <p><strong>Email:</strong> legal@stickershuttle.com</p>
-                  <p><strong>Support:</strong> support@stickershuttle.com</p>
+                  <p><strong>Email:</strong> orbit@stickershuttle.com</p>
+                  <p><strong>Support:</strong> orbit@stickershuttle.com</p>
                 </div>
               </section>
             </div>

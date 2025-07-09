@@ -255,13 +255,6 @@ export default function Blog() {
                         
                         {/* Content */}
                         <div className="p-6">
-                          {/* Category Badge */}
-                          {post.category && (
-                            <span className="inline-block px-3 py-1 text-xs font-medium text-purple-300 bg-purple-900/30 rounded-full mb-3">
-                              {post.category}
-                            </span>
-                          )}
-                          
                           {/* Title */}
                           <h2 className="text-xl font-bold text-white mb-2 line-clamp-2">
                             {post.title}

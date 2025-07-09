@@ -42,6 +42,7 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
   const [customHeight, setCustomHeight] = useState<string>('');
   const [selectedQuantity, setSelectedQuantity] = useState<string>('1');
   const [customQuantity, setCustomQuantity] = useState<string>('');
+  const [showSizeWarning, setShowSizeWarning] = useState<boolean>(false);
 
   const [selectedFinishing, setSelectedFinishing] = useState<string>('hemmed-grommeted');
   const [rushOrder, setRushOrder] = useState<boolean>(false);
@@ -100,15 +101,31 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
 
   // Calculate dynamic credit rate based on wholesale status
   const getCreditRate = () => {
-    if (!profile) return 0.05; // Default 5% for non-logged in users
+    if (!profile) return 0.05; // Default 5% for non-users
     
-    // Check if user is wholesale and approved
+    // Check if user is wholesale approved
     if (profile.is_wholesale_customer && profile.wholesale_status === 'approved') {
-      return profile.wholesale_credit_rate || 0.10; // Use profile rate or default 10%
+      return 0.025; // 2.5% for approved wholesale customers
     }
     
-    return 0.05; // Default 5% for regular users
-  }
+    return 0.05; // 5% for regular customers
+  };
+
+  // Check if user is wholesale approved
+  const isWholesaleApproved = () => {
+    if (!profile) return false;
+    return profile.is_wholesale_customer && profile.wholesale_status === 'approved';
+  };
+
+  // Calculate wholesale discount (15% off)
+  const calculateWholesaleDiscount = (originalPrice: number) => {
+    if (!isWholesaleApproved()) return { discountAmount: 0, finalPrice: originalPrice };
+    
+    const discountAmount = originalPrice * 0.15;
+    const finalPrice = originalPrice - discountAmount;
+    
+    return { discountAmount, finalPrice };
+  };
 
   const getTierPricing = (sqFt: number): number => {
     if (sqFt <= 10) return 4.50;
@@ -168,15 +185,34 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
     }
   };
 
-  const handleCustomSizeChange = (dimension: 'width' | 'height', value: string) => {
-    if (dimension === 'width') {
-      setCustomWidth(value);
-      validateCustomSize(value, customHeight);
-    } else {
-      setCustomHeight(value);
-      validateCustomSize(customWidth, value);
+  const handleCustomSizeChange = (dimension: "width" | "height", value: string) => {
+    // Validate input - only allow numbers and decimal points
+    const numericValue = value.replace(/[^0-9.]/g, '')
+    
+    // Check if value is below minimum or above maximum
+    const numValue = parseFloat(numericValue)
+    if (numValue < 0.5 && numericValue !== "") {
+      // Show warning message for minimum size
+      setShowSizeWarning(true)
+      return
     }
-  };
+    if (numValue > 14) {
+      // Show warning message for maximum size
+      setShowSizeWarning(true)
+      return
+    }
+    
+    // Reset warning if entering valid value
+    if (showSizeWarning && numValue >= 0.5 && numValue <= 14) {
+      setShowSizeWarning(false)
+    }
+    
+    if (dimension === "width") {
+      setCustomWidth(numericValue)
+    } else {
+      setCustomHeight(numericValue)
+    }
+  }
 
   const calculatePricing = () => {
     const sqFt = calculateSquareFootage();
@@ -193,7 +229,7 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
         instagramFee: 0,
         total: 0,
         perUnit: 0,
-        sqFt: sqFt
+        sqFt
       };
     }
 
@@ -270,7 +306,25 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
       console.log('File uploaded successfully with metadata:', result);
     } catch (error) {
       console.error('Upload failed:', error);
-      setUploadError(error instanceof Error ? error.message : 'Upload failed');
+      
+      // Provide customer-friendly error messages
+      let customerMessage = 'Upload failed. Please try again.'
+      
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase()
+        
+        if (errorMessage.includes('file size too large') || errorMessage.includes('maximum is')) {
+          customerMessage = 'Your file is too large. Please compress your image or use a smaller file (max 25MB).'
+        } else if (errorMessage.includes('network error') || errorMessage.includes('timeout')) {
+          customerMessage = 'Connection issue. Please check your internet and try again.'
+        } else if (errorMessage.includes('invalid') || errorMessage.includes('format')) {
+          customerMessage = 'Invalid file format. Please use .AI, .EPS, .PSD, .SVG, .PNG, .JPG, or .PDF files.'
+        } else if (errorMessage.includes('400') || errorMessage.includes('413')) {
+          customerMessage = 'File upload failed. Please try a different file or contact support.'
+        }
+      }
+      
+      setUploadError(customerMessage);
     } finally {
       setIsUploading(false);
       setUploadProgress(null);
@@ -392,13 +446,7 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
         }
       `}</style>
       <div 
-        className="rounded-2xl p-4 md:p-8 shadow-2xl"
-        style={{
-          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05))',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
-        }}
+        className="rounded-2xl p-4 md:p-8 shadow-2xl container-style"
       >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left Column - Configuration */}
@@ -598,7 +646,7 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
             <input
               id="file-input"
               type="file"
-              accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd,.pdf"
+              accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd,.pdf,.zip"
               onChange={handleFileSelect}
               className="hidden"
               aria-label="Upload artwork file"
@@ -845,6 +893,20 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
                 <label className="text-sm font-medium text-purple-200">
                   Post this order to Instagram
                 </label>
+                <div className="relative group">
+                  <span className="text-purple-300 cursor-help text-sm font-medium select-none">ⓘ</span>
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block z-50 w-64">
+                    <div className="text-white text-xs rounded-lg px-3 py-2 whitespace-normal" style={{
+                      background: 'rgba(30, 41, 59, 0.95)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                      backdropFilter: 'blur(12px)'
+                    }}>
+                      We may still post your order on Instagram even if not selected, put in the notes below if you explicitly don't want us to post your order.
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-700"></div>
+                    </div>
+                  </div>
+                </div>
               </div>
               
               {/* Instagram handle input - right under Instagram toggle */}
@@ -886,11 +948,40 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
           </div>
 
           {/* Pricing Breakdown */}
-          <div className="bg-white/5 rounded-lg p-4">
+          <div className="container-style p-6 transition-colors duration-200">
             <h3 className="text-white font-semibold mb-3">Pricing Breakdown</h3>
             
             {pricing.total > 0 ? (
               <div className="space-y-2 text-sm">
+                {/* Wholesale pricing display */}
+                {isWholesaleApproved() && pricing.total > 0 && (
+                  <div className="mb-3 p-3 rounded-lg text-sm"
+                       style={{
+                         background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(34, 197, 94, 0.15) 50%, rgba(34, 197, 94, 0.05) 100%)',
+                         border: '1px solid rgba(34, 197, 94, 0.4)',
+                         backdropFilter: 'blur(12px)'
+                       }}>
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center text-white/80">
+                        <span>Competitive Price:</span>
+                        <span>${pricing.total.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-orange-300 font-medium">
+                        <span>Aggressive Price:</span>
+                        <span>${(pricing.total * 1.3).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-red-300 font-medium">
+                        <span>Homerun Price:</span>
+                        <span>${(pricing.total * 1.5).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-green-300 font-medium">
+                                                  <span>Your Price:</span>
+                        <span>${calculateWholesaleDiscount(pricing.total).finalPrice.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex justify-between text-gray-300">
                   <span>Base ({pricing.sqFt} sq ft × ${getTierPricing(pricing.sqFt).toFixed(2)}/sq ft)</span>
                   <span>${pricing.basePrice.toFixed(2)}</span>
@@ -939,10 +1030,12 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
                 <div className="border-t border-white/20 pt-2 mt-3">
                   <div className="flex justify-between text-white font-semibold text-xl">
                     <span>Total:</span>
-                    <span className="text-green-200">${pricing.total.toFixed(2)}</span>
+                    <span className="text-green-200">
+                      ${isWholesaleApproved() ? calculateWholesaleDiscount(pricing.total).finalPrice.toFixed(2) : pricing.total.toFixed(2)}
+                    </span>
                   </div>
                   <div className="text-right text-gray-300 text-sm">
-                    ${pricing.perUnit.toFixed(2)} per banner
+                    ${(isWholesaleApproved() ? calculateWholesaleDiscount(pricing.total).finalPrice / (selectedQuantity === 'Custom' ? parseInt(customQuantity) || 1 : parseInt(selectedQuantity)) : pricing.perUnit).toFixed(2)} per banner
                   </div>
                   {/* Store Credit Notification */}
                   <div className="mt-3 mb-2 px-3 py-1.5 rounded-lg text-xs font-medium text-left"
@@ -953,7 +1046,7 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
                        }}>
                     <span className="flex items-center justify-start gap-1.5 text-yellow-200">
                       <i className="fas fa-coins text-yellow-300"></i>
-                      You'll earn ${(pricing.total * getCreditRate()).toFixed(2)} in store credit on this order!
+                      You'll earn ${((isWholesaleApproved() ? calculateWholesaleDiscount(pricing.total).finalPrice : pricing.total) * getCreditRate()).toFixed(2)} in store credit on this order!
                     </span>
                   </div>
                 </div>
@@ -992,7 +1085,7 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              Add to Cart - ${pricing.total.toFixed(2)}
+              Add to Cart - ${isWholesaleApproved() ? calculateWholesaleDiscount(pricing.total).finalPrice.toFixed(2) : pricing.total.toFixed(2)}
             </span>
           </button>
         </div>

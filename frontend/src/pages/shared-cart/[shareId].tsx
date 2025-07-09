@@ -22,6 +22,7 @@ import DiscountCodeInput from "@/components/DiscountCodeInput";
 import { UPDATE_USER_PROFILE_NAMES, CREATE_USER_PROFILE } from "@/lib/profile-mutations";
 import { TRACK_KLAVIYO_EVENT } from "@/lib/klaviyo-mutations";
 import { GET_SHARED_CART } from "@/lib/admin-mutations";
+import { GET_USER_PROFILE } from "@/lib/profile-mutations";
 
 // Available configuration options
 const SHAPE_OPTIONS = ["Custom Shape", "Circle", "Oval", "Rectangle", "Square"];
@@ -471,6 +472,17 @@ export default function SharedCartPage() {
   const [createUserProfile] = useMutation(CREATE_USER_PROFILE);
 
   const userCredits = creditData?.getUserCreditBalance?.balance || 0;
+
+  // Query for user profile to get wholesale status
+  const { data: profileData } = useQuery(GET_USER_PROFILE, {
+    variables: { userId: user?.id || '' },
+    skip: !user?.id,
+  });
+
+  const userProfile = profileData?.getUserProfile;
+  const isWholesale = userProfile?.isWholesaleCustomer || false;
+  const creditRate = isWholesale ? 2.5 : 5;
+  const creditRateDecimal = isWholesale ? 0.025 : 0.05;
 
   // Check user authentication
   useEffect(() => {
@@ -976,10 +988,13 @@ export default function SharedCartPage() {
   const safeDiscountAmount = safeParseFloat(discountAmount, 0);
   const safeCreditToApply = safeParseFloat(creditToApply, 0);
   
-  // Add blind shipment fee
-  const blindShipmentFee = isBlindShipment ? 5.00 : 0;
+  // Add blind shipment fee (free for wholesale customers)
+  const blindShipmentFee = isBlindShipment && !isWholesale ? 5.00 : 0;
   
-  const afterDiscounts = safeSubtotal - safeReorderDiscount - safeDiscountAmount;
+  // Calculate wholesale discount (15% off for wholesale customers)
+  const wholesaleDiscount = isWholesale ? safeSubtotal * 0.15 : 0;
+  
+  const afterDiscounts = safeSubtotal - safeReorderDiscount - safeDiscountAmount - wholesaleDiscount;
   const finalTotal = Math.max(0, afterDiscounts - safeCreditToApply + blindShipmentFee);
 
   // Calculate rush order breakdown
@@ -987,8 +1002,6 @@ export default function SharedCartPage() {
     if (item.customization.selections?.rush?.value === true) {
       // Calculate what the price would be without rush
       const basePrice = item.totalPrice / 1.4; // Remove 40% markup
-      const rushCost = item.totalPrice - basePrice;
-      acc.totalRushCost += rushCost;
       acc.baseSubtotal += basePrice;
       acc.hasRushItems = true;
     } else {
@@ -996,6 +1009,11 @@ export default function SharedCartPage() {
     }
     return acc;
   }, { totalRushCost: 0, baseSubtotal: 0, hasRushItems: false });
+
+  // Calculate rush fee as 40% of the base subtotal (this gives the expected user experience)
+  if (rushOrderBreakdown.hasRushItems) {
+    rushOrderBreakdown.totalRushCost = rushOrderBreakdown.baseSubtotal * 0.4;
+  }
 
   const totalQuantity = updatedCart.reduce((sum, item) => sum + item.quantity, 0);
   const hasRushOrder = updatedCart.some(item => item.customization.selections?.rush?.value === true);
@@ -2005,6 +2023,12 @@ export default function SharedCartPage() {
                         </div>
                       </div>
                     )}
+                    {wholesaleDiscount > 0 && (
+                      <div className="flex justify-between text-blue-300">
+                        <span>Wholesale Discount (15%)</span>
+                        <span>-${wholesaleDiscount.toFixed(2)}</span>
+                      </div>
+                    )}
                     {appliedDiscount && (
                       <div className="flex justify-between text-purple-300">
                         <span>Discount ({appliedDiscount.code})</span>
@@ -2025,10 +2049,10 @@ export default function SharedCartPage() {
                     )}
                     <hr className="border-white/20 my-3" />
                     {/* Total Savings */}
-                    {(reorderDiscount > 0 || discountAmount > 0 || creditToApply > 0) && (
+                    {(reorderDiscount > 0 || discountAmount > 0 || creditToApply > 0 || wholesaleDiscount > 0) && (
                       <div className="flex justify-between text-green-400 font-semibold">
                         <span>Total Savings</span>
-                        <span>-${(reorderDiscount + discountAmount + creditToApply).toFixed(2)}</span>
+                        <span>-${(reorderDiscount + discountAmount + creditToApply + wholesaleDiscount).toFixed(2)}</span>
                       </div>
                     )}
                     <div className="flex justify-between text-xl font-bold text-white">
@@ -2046,115 +2070,115 @@ export default function SharedCartPage() {
                         <span>$0.00</span>
                       </div>
                     ) : (
-                      <div className="flex justify-between text-green-400 text-sm font-medium mt-3 pt-3 border-t border-white/10">
+                      <div className="flex justify-between text-yellow-400 text-sm font-medium mt-3 pt-3 border-t border-white/10">
                         <span className="flex items-center gap-2">
-                          <span>💰</span>
-                          Store Credit Earned (5%)
+                          <i className="fas fa-coins"></i>
+                          Store Credit Earned ({creditRate}%)
                         </span>
-                        <span>+${(finalTotal * 0.05).toFixed(2)}</span>
+                        <span>+${(finalTotal * creditRateDecimal).toFixed(2)}</span>
                       </div>
                     )}
                   </div>
 
                   {/* Store Credit Section */}
                   {user && userCredits > 0 && (
-                    <div 
-                      className={`rounded-2xl overflow-hidden mb-4 ${appliedDiscount ? 'opacity-50 pointer-events-none' : ''}`}
-                      style={{
-                        background: userCredits >= 100 
-                          ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.6) 0%, rgba(248, 113, 113, 0.4) 25%, rgba(254, 202, 202, 0.25) 50%, rgba(239, 68, 68, 0.15) 75%, rgba(254, 202, 202, 0.1) 100%)'
-                          : 'linear-gradient(135deg, rgba(250, 204, 21, 0.6) 0%, rgba(255, 215, 0, 0.4) 25%, rgba(250, 204, 21, 0.25) 50%, rgba(255, 193, 7, 0.15) 75%, rgba(250, 204, 21, 0.1) 100%)',
-                        backdropFilter: 'blur(25px) saturate(200%)',
-                        border: userCredits >= 100 ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid rgba(255, 215, 0, 0.5)',
-                        boxShadow: userCredits >= 100 
-                          ? 'rgba(239, 68, 68, 0.125) 0px 4px 20px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          : 'rgba(250, 204, 21, 0.125) 0px 4px 20px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                      }}
-                    >
-                      <div className="px-6 py-4">
-                        {appliedDiscount && (
-                          <div className="mb-3 p-2 rounded-lg bg-red-500/20 border border-red-400/30">
-                            <p className="text-red-200 text-xs text-center">
-                              🚫 Cannot use store credit with discount codes. Remove "{appliedDiscount.code}" to use store credit.
-                            </p>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <span className="text-2xl">{userCredits >= 100 ? '🚨' : '🎉'}</span>
-                            <div>
-                              <h3 className="text-lg font-bold text-white">
-                                ${userCredits.toFixed(2)} Store Credit
-                              </h3>
-                              <p className={`text-sm ${userCredits >= 100 ? 'text-red-300' : 'text-yellow-300'}`}>
-                                {userCredits >= 100 ? 'Limit reached ($100.00)' : appliedDiscount ? 'Cannot use with discount' : 'Available to use'}
+                    <div className="mb-6">
+                      <div 
+                        className="rounded-xl border overflow-hidden"
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          backdropFilter: 'blur(20px)',
+                          border: '1px solid rgba(250, 204, 21, 0.3)',
+                          boxShadow: 'rgba(250, 204, 21, 0.15) 0px 4px 16px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                        }}
+                      >
+                        <div className="px-6 py-4">
+                          {appliedDiscount && (
+                            <div className="mb-3 p-2 rounded-lg bg-red-500/20 border border-red-400/30">
+                              <p className="text-red-200 text-xs text-center">
+                                🚫 Cannot use store credit with discount codes. Remove "{appliedDiscount.code}" to use store credit.
                               </p>
-                              {userCredits >= 100 && (
-                                <p className="text-red-200 text-xs mt-1">
-                                  Spend credits to earn more on future orders
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <span className="text-2xl">{userCredits >= 100 ? '🚨' : '🎉'}</span>
+                              <div>
+                                <h3 className="text-lg font-bold text-white">
+                                  ${userCredits.toFixed(2)} Store Credit
+                                </h3>
+                                <p className={`text-sm ${userCredits >= 100 ? 'text-red-300' : 'text-yellow-300'}`}>
+                                  {userCredits >= 100 ? 'Limit reached ($100.00)' : appliedDiscount ? 'Cannot use with discount' : 'Available to use'}
                                 </p>
-                              )}
+                                {userCredits >= 100 && (
+                                  <p className="text-red-200 text-xs mt-1">
+                                    Spend credits to earn more on future orders
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <input
-                            type="number"
-                            min="0"
-                            max={Math.min(safeParseFloat(userCredits, 0), safeParseFloat(afterDiscounts, 0))}
-                            value={appliedDiscount ? '' : (creditToApply > 0 ? safeParseFloat(creditToApply, 0) : '')}
-                            onChange={(e) => {
-                              if (!appliedDiscount) {
-                                const value = safeParseFloat(e.target.value, 0);
-                                const safeUserCredits = safeParseFloat(userCredits, 0);
-                                const safeAfterDiscounts = safeParseFloat(afterDiscounts, 0);
-                                setCreditToApply(Math.min(value, safeUserCredits, safeAfterDiscounts));
-                              }
-                            }}
-                            disabled={appliedDiscount !== null}
-                            className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/50 focus:outline-none focus:border-yellow-400 focus:bg-white/10 transition-all store-credit-input disabled:opacity-50 disabled:cursor-not-allowed"
-                            placeholder={appliedDiscount ? "Disabled" : "Enter amount..."}
-                          />
-                          <button
-                            onClick={() => {
-                              if (!appliedDiscount) {
-                                const safeUserCredits = safeParseFloat(userCredits, 0);
-                                const safeAfterDiscounts = safeParseFloat(afterDiscounts, 0);
-                                setCreditToApply(Math.min(safeUserCredits, safeAfterDiscounts));
-                              }
-                            }}
-                            disabled={appliedDiscount !== null}
-                            className="px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                            style={{
-                              background: userCredits >= 100 
-                                ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.5) 0%, rgba(248, 113, 113, 0.35) 50%, rgba(254, 202, 202, 0.2) 100%)'
-                                : 'linear-gradient(135deg, rgba(255, 215, 0, 0.5) 0%, rgba(250, 204, 21, 0.35) 50%, rgba(255, 193, 7, 0.2) 100%)',
-                              backdropFilter: 'blur(25px) saturate(200%)',
-                              border: userCredits >= 100 ? '1px solid rgba(239, 68, 68, 0.6)' : '1px solid rgba(255, 215, 0, 0.6)',
-                              boxShadow: userCredits >= 100 
-                                ? 'rgba(239, 68, 68, 0.15) 0px 4px 16px, rgba(255, 255, 255, 0.4) 0px 1px 0px inset'
-                                : 'rgba(250, 204, 21, 0.15) 0px 4px 16px, rgba(255, 255, 255, 0.4) 0px 1px 0px inset'
-                            }}
-                          >
-                            Use All
-                          </button>
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              max={Math.min(safeParseFloat(userCredits, 0), safeParseFloat(afterDiscounts, 0))}
+                              value={appliedDiscount ? '' : (creditToApply > 0 ? safeParseFloat(creditToApply, 0) : '')}
+                              onChange={(e) => {
+                                if (!appliedDiscount) {
+                                  const value = safeParseFloat(e.target.value, 0);
+                                  const safeUserCredits = safeParseFloat(userCredits, 0);
+                                  const safeAfterDiscounts = safeParseFloat(afterDiscounts, 0);
+                                  setCreditToApply(Math.min(value, safeUserCredits, safeAfterDiscounts));
+                                }
+                              }}
+                              disabled={appliedDiscount !== null}
+                              className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/50 focus:outline-none focus:border-yellow-400 focus:bg-white/10 transition-all store-credit-input disabled:opacity-50 disabled:cursor-not-allowed"
+                              placeholder={appliedDiscount ? "Disabled" : "Enter amount..."}
+                            />
+                            <button
+                              onClick={() => {
+                                if (!appliedDiscount) {
+                                  const safeUserCredits = safeParseFloat(userCredits, 0);
+                                  const safeAfterDiscounts = safeParseFloat(afterDiscounts, 0);
+                                  setCreditToApply(Math.min(safeUserCredits, safeAfterDiscounts));
+                                }
+                              }}
+                              disabled={appliedDiscount !== null}
+                              className="px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                              style={{
+                                background: userCredits >= 100 
+                                  ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.5) 0%, rgba(248, 113, 113, 0.35) 50%, rgba(254, 202, 202, 0.2) 100%)'
+                                  : 'linear-gradient(135deg, rgba(255, 215, 0, 0.5) 0%, rgba(250, 204, 21, 0.35) 50%, rgba(255, 193, 7, 0.2) 100%)',
+                                backdropFilter: 'blur(25px) saturate(200%)',
+                                border: userCredits >= 100 ? '1px solid rgba(239, 68, 68, 0.6)' : '1px solid rgba(255, 215, 0, 0.6)',
+                                boxShadow: userCredits >= 100 
+                                  ? 'rgba(239, 68, 68, 0.15) 0px 4px 16px, rgba(255, 255, 255, 0.4) 0px 1px 0px inset'
+                                  : 'rgba(250, 204, 21, 0.15) 0px 4px 16px, rgba(255, 255, 255, 0.4) 0px 1px 0px inset'
+                              }}
+                            >
+                              Use All
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
                   )}
 
                   {/* Discount Code Section */}
-                  <div className="mb-6">
-                    <DiscountCodeInput
-                      orderAmount={subtotal}
-                      onDiscountApplied={setAppliedDiscount}
-                      currentAppliedDiscount={appliedDiscount}
-                      hasReorderDiscount={hasReorderItems}
-                      reorderDiscountAmount={reorderDiscount}
-                      hasStoreCredits={creditToApply > 0}
-                      className="w-full"
-                    />
-                  </div>
+                  {!isWholesale && (
+                    <div className="mb-6">
+                      <DiscountCodeInput
+                        orderAmount={subtotal}
+                        onDiscountApplied={setAppliedDiscount}
+                        currentAppliedDiscount={appliedDiscount}
+                        hasReorderDiscount={hasReorderItems}
+                        reorderDiscountAmount={reorderDiscount}
+                        hasStoreCredits={creditToApply > 0}
+                        className="w-full"
+                      />
+                    </div>
+                  )}
 
                   {/* Guest Checkout Form */}
                   {!user && (

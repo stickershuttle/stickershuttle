@@ -169,6 +169,18 @@ export default function FileUploadToEmail({ userData, onUploadComplete }: FileUp
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  // Get file type icon based on format
+  const getFileTypeIcon = (format: string) => {
+    const icons: { [key: string]: string } = {
+      'ai': 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751422400/ai-icon_hbqxvs.png',
+      'psd': 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751422400/psd-icon_hbqxvs.png',
+      'svg': 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751422400/svg-icon_hbqxvs.png',
+      'eps': 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751422400/eps-icon_hbqxvs.png',
+      'pdf': 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751422400/pdf-icon_hbqxvs.png'
+    };
+    return icons[format.toLowerCase()] || null;
+  };
+
   return (
     <div className="space-y-4">
       {/* Message Input */}
@@ -257,9 +269,46 @@ export default function FileUploadToEmail({ userData, onUploadComplete }: FileUp
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-green-200 font-medium break-words">{uploadedFile.name}</p>
-                  <p className="text-green-300/80 text-sm">
-                    {formatFileSize(uploadedFile.size)} • {uploadedFile.cloudinaryResult.format.toUpperCase()}
-                  </p>
+                  
+                  {/* File Information - matching calculator format */}
+                  <div className="space-y-2 mt-2">
+                    <div className="flex flex-wrap items-center gap-3 text-green-300/80 text-sm">
+                      <span className="flex items-center gap-1">
+                        <span className="text-green-400">📏</span>
+                        {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="text-green-400">🎨</span>
+                        {uploadedFile.cloudinaryResult.format.toUpperCase()}
+                      </span>
+                      {uploadedFile.cloudinaryResult.width && uploadedFile.cloudinaryResult.height && (
+                        <span className="flex items-center gap-1">
+                          <span className="text-green-400">📐</span>
+                          {uploadedFile.cloudinaryResult.width}x{uploadedFile.cloudinaryResult.height}px
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* File Type Icon */}
+                    {getFileTypeIcon(uploadedFile.cloudinaryResult.format) && (
+                      <div className="flex items-center gap-2">
+                        <img 
+                          src={getFileTypeIcon(uploadedFile.cloudinaryResult.format)!} 
+                          alt={`${uploadedFile.cloudinaryResult.format.toUpperCase()} file`}
+                          className="w-6 h-6 object-contain opacity-80"
+                        />
+                        <span className="text-xs text-green-300/60">
+                          Professional design file detected
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Upload Success Message */}
+                  <div className="flex items-center gap-2 text-green-300 text-sm mt-2">
+                    <span className="text-green-400">✅</span>
+                    <span>File uploaded successfully!</span>
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">

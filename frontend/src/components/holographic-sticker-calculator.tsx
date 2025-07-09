@@ -60,6 +60,9 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
+  // Size limit warning state
+  const [showSizeWarning, setShowSizeWarning] = useState(false)
+
   // User and profile states
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
@@ -106,15 +109,31 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
 
   // Calculate dynamic credit rate based on wholesale status
   const getCreditRate = () => {
-    if (!profile) return 0.05; // Default 5% for non-logged in users
+    if (!profile) return 0.05; // Default 5% for non-users
     
-    // Check if user is wholesale and approved
+    // Check if user is wholesale approved
     if (profile.is_wholesale_customer && profile.wholesale_status === 'approved') {
-      return profile.wholesale_credit_rate || 0.10; // Use profile rate or default 10%
+      return 0.025; // 2.5% for approved wholesale customers
     }
     
-    return 0.05; // Default 5% for regular users
-  }
+    return 0.05; // 5% for regular customers
+  };
+
+  // Check if user is wholesale approved
+  const isWholesaleApproved = () => {
+    if (!profile) return false;
+    return profile.is_wholesale_customer && profile.wholesale_status === 'approved';
+  };
+
+  // Calculate wholesale discount (15% off)
+  const calculateWholesaleDiscount = (originalPrice: number) => {
+    if (!isWholesaleApproved()) return { discountAmount: 0, finalPrice: originalPrice };
+    
+    const discountAmount = originalPrice * 0.15;
+    const finalPrice = originalPrice - discountAmount;
+    
+    return { discountAmount, finalPrice };
+  };
 
   // Auto-expand textarea when additionalNotes changes
   useEffect(() => {
@@ -457,14 +476,36 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
     if (size !== "Custom size") {
       setCustomWidth("")
       setCustomHeight("")
+      setShowSizeWarning(false) // Reset warning when leaving custom size
     }
   }
 
   const handleCustomSizeChange = (dimension: "width" | "height", value: string) => {
+    // Validate input - only allow numbers and decimal points
+    const numericValue = value.replace(/[^0-9.]/g, '')
+    
+    // Check if value is below minimum or above maximum
+    const numValue = parseFloat(numericValue)
+    if (numValue < 0.5 && numericValue !== "") {
+      // Show warning message for minimum size
+      setShowSizeWarning(true)
+      return
+    }
+    if (numValue > 14) {
+      // Show warning message for maximum size
+      setShowSizeWarning(true)
+      return
+    }
+    
+    // Reset warning if entering valid value
+    if (showSizeWarning && numValue >= 0.5 && numValue <= 14) {
+      setShowSizeWarning(false)
+    }
+    
     if (dimension === "width") {
-      setCustomWidth(value)
+      setCustomWidth(numericValue)
     } else {
-      setCustomHeight(value)
+      setCustomHeight(numericValue)
     }
   }
 
@@ -537,7 +578,25 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
       console.log('File uploaded successfully with metadata:', result)
     } catch (error) {
       console.error('Upload failed:', error)
-      setUploadError(error instanceof Error ? error.message : 'Upload failed')
+      
+      // Provide customer-friendly error messages
+      let customerMessage = 'Upload failed. Please try again.'
+      
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase()
+        
+        if (errorMessage.includes('file size too large') || errorMessage.includes('maximum is')) {
+          customerMessage = 'Your file is too large. Please compress your image or use a smaller file (max 25MB).'
+        } else if (errorMessage.includes('network error') || errorMessage.includes('timeout')) {
+          customerMessage = 'Connection issue. Please check your internet and try again.'
+        } else if (errorMessage.includes('invalid') || errorMessage.includes('format')) {
+          customerMessage = 'Invalid file format. Please use .AI, .EPS, .PSD, .SVG, .PNG, .JPG, or .PDF files.'
+        } else if (errorMessage.includes('400') || errorMessage.includes('413')) {
+          customerMessage = 'File upload failed. Please try a different file or contact support.'
+        }
+      }
+      
+      setUploadError(customerMessage)
     } finally {
       setIsUploading(false)
       setUploadProgress(null)
@@ -862,23 +921,125 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                 ))}
               </div>
               {selectedSize === "Custom size" && (
-                <div className="mt-3 flex gap-3">
-                  <input
-                    type="text"
-                    placeholder="W"
-                    value={customWidth}
-                    onChange={(e) => handleCustomSizeChange("width", e.target.value)}
-                    className="w-1/2 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive"
-                  />
-                  <input
-                    type="text"
-                    placeholder="H"
-                    value={customHeight}
-                    onChange={(e) => handleCustomSizeChange("height", e.target.value)}
-                    className="w-1/2 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive"
-                  />
+                <div className="mt-3 space-y-2">
+                  <div className="flex gap-3">
+                    <input
+                      type="number"
+                      placeholder="W"
+                      value={customWidth}
+                      onChange={(e) => handleCustomSizeChange("width", e.target.value)}
+                      max="14"
+                      step="0.1"
+                      className="w-1/2 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <input
+                      type="number"
+                      placeholder="H"
+                      value={customHeight}
+                      onChange={(e) => handleCustomSizeChange("height", e.target.value)}
+                      max="14"
+                      step="0.1"
+                      className="w-1/2 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                  </div>
+                  {showSizeWarning && (
+                    <div className="text-xs text-orange-300 font-medium">
+                      📏 Size must be between 0.5" and 14". Please enter a valid size.
+                    </div>
+                  )}
                 </div>
               )}
+            </div>
+
+            {/* White Options Section - Mobile Only */}
+            <div className="md:hidden md:col-span-3 lg:col-span-6 container-style p-4 lg:p-6 transition-colors duration-200 mb-1">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
+                <span className="text-blue-400">⚪</span>
+                White Options
+              </h2>
+              
+              <div className="grid grid-cols-1 gap-4">
+                {/* Color Only */}
+                <button
+                  onClick={() => setSelectedWhiteOption("color-only")}
+                  className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
+                    ${
+                      selectedWhiteOption === "color-only"
+                        ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
+                        : "hover:bg-white/10 border-white/20 text-white/80"
+                    }`}
+                >
+                  <div className="flex items-center mb-2">
+                    <div className="text-2xl mr-3">🎨</div>
+                    <h3 className="font-semibold text-white">
+                      Color Only
+                    </h3>
+                  </div>
+                  <p className="text-gray-300 text-sm mb-2">
+                    Default option. We will only print the colors your provided, minus white.
+                  </p>
+                  <div className="flex items-center text-sm">
+                    <span className="text-green-400 font-medium">✅ Standard Pricing</span>
+                  </div>
+                  {selectedWhiteOption === "color-only" && (
+                    <span className="absolute top-1 right-2 text-[10px] text-blue-300 font-medium">Selected</span>
+                  )}
+                </button>
+
+                {/* Partial White Ink */}
+                <button
+                  onClick={() => setSelectedWhiteOption("partial-white")}
+                  className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
+                    ${
+                      selectedWhiteOption === "partial-white"
+                        ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
+                        : "hover:bg-white/10 border-white/20 text-white/80"
+                    }`}
+                >
+                  <div className="flex items-center mb-2">
+                    <div className="text-2xl mr-3">👩‍🦳</div>
+                    <h3 className="font-semibold text-white">
+                      Partial White Ink
+                    </h3>
+                  </div>
+                  <p className="text-gray-300 text-sm mb-2">
+                    Also a great option when adding specific white elements to your design.
+                  </p>
+                  <div className="flex items-center text-sm">
+                    <span className="text-yellow-400 font-medium">+5% pricing</span>
+                  </div>
+                  {selectedWhiteOption === "partial-white" && (
+                    <span className="absolute top-1 right-2 text-[10px] text-blue-300 font-medium">Selected</span>
+                  )}
+                </button>
+
+                {/* Full White Ink */}
+                <button
+                  onClick={() => setSelectedWhiteOption("full-white")}
+                  className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
+                    ${
+                      selectedWhiteOption === "full-white"
+                        ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
+                        : "hover:bg-white/10 border-white/20 text-white/80"
+                    }`}
+                >
+                  <div className="flex items-center mb-2">
+                    <div className="text-2xl mr-3">⚪</div>
+                    <h3 className="font-semibold text-white">
+                      Full White Ink
+                    </h3>
+                  </div>
+                  <p className="text-gray-300 text-sm mb-2">
+                    <strong>Caution:</strong> This is best if you only want the offset border to be holographic.
+                  </p>
+                  <div className="flex items-center text-sm">
+                    <span className="text-yellow-400 font-medium">+10% pricing</span>
+                  </div>
+                  {selectedWhiteOption === "full-white" && (
+                    <span className="absolute top-1 right-2 text-[10px] text-blue-300 font-medium">Selected</span>
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Quantity Selection */}
@@ -890,7 +1051,7 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                 </span>
               </h2>
               <div className="space-y-2 relative">
-                {["50", "100", "200", "300", "500", "750", "1,000", "2,500", "Custom"].map((amount) => {
+                {["50", "100", "200", "300", "500", "1,000", "2,500", "Custom"].map((amount) => {
                   const numericAmount = Number.parseInt(amount.replace(",", ""))
                   const area = calculateArea(selectedSize, customWidth, customHeight)
 
@@ -1081,71 +1242,178 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
               )}
               {totalPrice && (
                 <div className="mt-3 space-y-1">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-semibold text-white/80">Total:</span>
-                      <span className="text-lg font-medium text-green-200">
-                        {totalPrice}
-                      </span>
+                  {/* Wholesale pricing display */}
+                  {isWholesaleApproved() && totalPrice && (
+                    <div className="mb-3 p-3 rounded-lg text-sm"
+                         style={{
+                           background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(34, 197, 94, 0.15) 50%, rgba(34, 197, 94, 0.05) 100%)',
+                           border: '1px solid rgba(34, 197, 94, 0.4)',
+                           backdropFilter: 'blur(12px)'
+                         }}>
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center text-white/80">
+                          <span>Competitive Price:</span>
+                          <span>{totalPrice}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-orange-300 font-medium">
+                          <span>Aggressive Price:</span>
+                          <span>${(parseFloat(totalPrice.replace('$', '')) * 1.3).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-red-300 font-medium">
+                          <span>Homerun Price:</span>
+                          <span>${(parseFloat(totalPrice.replace('$', '')) * 1.5).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-green-300 font-medium">
+                          <span>Your Price:</span>
+                          <span>${calculateWholesaleDiscount(parseFloat(totalPrice.replace('$', ''))).finalPrice.toFixed(2)}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="px-2 py-1 text-xs font-medium rounded-lg border text-purple-200 relative"
-                        style={{
-                          background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
-                          border: '1px solid rgba(147, 51, 234, 0.4)',
-                          backdropFilter: 'blur(12px)'
-                        }}
-                      >
-                        {costPerSticker}
-                      </span>
-                      {(() => {
-                        const area = calculateArea(selectedSize, customWidth, customHeight)
-                        const qty = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
-                        
-                        if (area > 0 && qty > 0) {
-                          let discount = 0
-                          if (realPricingData && realPricingData.quantityDiscounts && qty > 50) {
-                            let applicableQuantity = 50;
-                            for (const row of realPricingData.quantityDiscounts) {
-                              if (qty >= row.quantity) {
-                                applicableQuantity = row.quantity;
-                              } else {
-                                break;
-                              }
-                            }
+                  )}
+                  
+                  <div className="flex justify-between items-center">
+                    {/* For wholesale accounts, flip the layout */}
+                    {isWholesaleApproved() ? (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="px-2 py-1 text-xs font-medium rounded-lg border text-purple-200 relative"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                              border: '1px solid rgba(147, 51, 234, 0.4)',
+                              backdropFilter: 'blur(12px)'
+                            }}
+                          >
+                            {(() => {
+                              const originalPrice = parseFloat(totalPrice.replace('$', ''));
+                              const finalPrice = calculateWholesaleDiscount(originalPrice).finalPrice;
+                              const quantity = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity);
+                              return `$${(finalPrice / quantity).toFixed(2)}/ea.`;
+                            })()}
+                          </span>
+                          {(() => {
+                            const area = calculateArea(selectedSize, customWidth, customHeight)
+                            const qty = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
                             
-                            const quantityRow = realPricingData.quantityDiscounts.find(row => row.quantity === applicableQuantity);
-                            if (quantityRow) {
-                              const availableSqInches = Object.keys(quantityRow.discounts)
-                                .map(k => parseInt(k))
-                                .sort((a, b) => a - b);
-                              
-                              let applicableSqInches = availableSqInches[0];
-                              for (const sqIn of availableSqInches) {
-                                if (area >= sqIn) {
-                                  applicableSqInches = sqIn;
-                                } else {
-                                  break;
+                            if (area > 0 && qty > 0) {
+                              let discount = 0
+                              if (realPricingData && realPricingData.quantityDiscounts && qty > 50) {
+                                let applicableQuantity = 50;
+                                for (const row of realPricingData.quantityDiscounts) {
+                                  if (qty >= row.quantity) {
+                                    applicableQuantity = row.quantity;
+                                  } else {
+                                    break;
+                                  }
+                                }
+                                
+                                const quantityRow = realPricingData.quantityDiscounts.find(row => row.quantity === applicableQuantity);
+                                if (quantityRow) {
+                                  const availableSqInches = Object.keys(quantityRow.discounts)
+                                    .map(k => parseInt(k))
+                                    .sort((a, b) => a - b);
+                                  
+                                  let applicableSqInches = availableSqInches[0];
+                                  for (const sqIn of availableSqInches) {
+                                    if (area >= sqIn) {
+                                      applicableSqInches = sqIn;
+                                    } else {
+                                      break;
+                                    }
+                                  }
+                                  
+                                  const discountDecimal = quantityRow.discounts[applicableSqInches] || 0;
+                                  discount = discountDecimal * 100;
                                 }
                               }
                               
-                              const discountDecimal = quantityRow.discounts[applicableSqInches] || 0;
-                              discount = discountDecimal * 100;
+                              if (discount > 0.5) {
+                                return (
+                                  <span className="text-sm font-medium text-green-300">
+                                    {Math.round(discount)}% off
+                                  </span>
+                                )
+                              }
                             }
-                          }
-                          
-                          if (discount > 0.5) {
-                            return (
-                              <span className="text-sm font-medium text-green-300">
-                                {Math.round(discount)}% off
-                              </span>
-                            )
-                          }
-                        }
-                        return null
-                      })()}
-                    </div>
+                            return null
+                          })()}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-semibold text-white/80">Total:</span>
+                          <span className="text-lg font-medium text-green-200">
+                            ${calculateWholesaleDiscount(parseFloat(totalPrice.replace('$', ''))).finalPrice.toFixed(2)}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      /* Regular customer layout */
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-semibold text-white/80">Total:</span>
+                          <span className="text-lg font-medium text-green-200">
+                            {totalPrice}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="px-2 py-1 text-xs font-medium rounded-lg border text-purple-200 relative"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                              border: '1px solid rgba(147, 51, 234, 0.4)',
+                              backdropFilter: 'blur(12px)'
+                            }}
+                          >
+                            {costPerSticker}
+                          </span>
+                          {(() => {
+                            const area = calculateArea(selectedSize, customWidth, customHeight)
+                            const qty = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity)
+                            
+                            if (area > 0 && qty > 0) {
+                              let discount = 0
+                              if (realPricingData && realPricingData.quantityDiscounts && qty > 50) {
+                                let applicableQuantity = 50;
+                                for (const row of realPricingData.quantityDiscounts) {
+                                  if (qty >= row.quantity) {
+                                    applicableQuantity = row.quantity;
+                                  } else {
+                                    break;
+                                  }
+                                }
+                                
+                                const quantityRow = realPricingData.quantityDiscounts.find(row => row.quantity === applicableQuantity);
+                                if (quantityRow) {
+                                  const availableSqInches = Object.keys(quantityRow.discounts)
+                                    .map(k => parseInt(k))
+                                    .sort((a, b) => a - b);
+                                  
+                                  let applicableSqInches = availableSqInches[0];
+                                  for (const sqIn of availableSqInches) {
+                                    if (area >= sqIn) {
+                                      applicableSqInches = sqIn;
+                                    } else {
+                                      break;
+                                    }
+                                  }
+                                  
+                                  const discountDecimal = quantityRow.discounts[applicableSqInches] || 0;
+                                  discount = discountDecimal * 100;
+                                }
+                              }
+                              
+                              if (discount > 0.5) {
+                                return (
+                                  <span className="text-sm font-medium text-green-300">
+                                    {Math.round(discount)}% off
+                                  </span>
+                                )
+                              }
+                            }
+                            return null
+                          })()}
+                        </div>
+                      </>
+                    )}
                   </div>
                   {/* Store Credit Notification */}
                   {totalPrice && (
@@ -1157,7 +1425,13 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                          }}>
                       <span className="flex items-center justify-start gap-1.5 text-yellow-200">
                         <i className="fas fa-coins text-yellow-300"></i>
-                        You'll earn ${(parseFloat(totalPrice.replace('$', '')) * getCreditRate()).toFixed(2)} in store credit on this order!
+                        You'll earn ${(() => {
+                          const originalPrice = parseFloat(totalPrice.replace('$', ''));
+                          const finalPrice = isWholesaleApproved() 
+                            ? calculateWholesaleDiscount(originalPrice).finalPrice 
+                            : originalPrice;
+                          return (finalPrice * getCreditRate()).toFixed(2);
+                        })()} in store credit on this order!
                       </span>
                     </div>
                   )}
@@ -1175,7 +1449,7 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
           </div>
 
           {/* White Options Section */}
-          <div className="mb-6">
+          <div className="mb-6 hidden md:block">
             <div className="container-style p-6 transition-colors duration-200">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
                 <span className="text-blue-400">⚪</span>
@@ -1282,7 +1556,7 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                   <input
                     id="file-input"
                     type="file"
-                    accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd"
+                    accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd,.zip"
                     onChange={handleFileSelect}
                     className="hidden"
                     aria-label="Upload artwork file"
@@ -1569,6 +1843,20 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                       <label className="text-sm font-medium text-purple-200">
                         Post this order to Instagram
                       </label>
+                      <div className="relative group">
+                        <span className="text-purple-300 cursor-help text-sm font-medium select-none">ⓘ</span>
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block z-50 w-64">
+                          <div className="text-white text-xs rounded-lg px-3 py-2 whitespace-normal" style={{
+                            background: 'rgba(30, 41, 59, 0.95)',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                            backdropFilter: 'blur(12px)'
+                          }}>
+                            We may still post your order on Instagram even if not selected, put in the notes below if you explicitly don't want us to post your order.
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-700"></div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                     
                     {/* Instagram handle input - right under Instagram toggle */}

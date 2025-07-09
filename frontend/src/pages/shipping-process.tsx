@@ -12,28 +12,28 @@ export default function ShippingProcess() {
 
   const faqs = [
     {
-      question: "How long does shipping take?",
-      answer: "Standard shipping takes 3-5 business days after production is complete. Production typically takes 24-48 hours after proof approval. Rush shipping options are available for faster delivery."
+      question: "How long does it take to ship?",
+      answer: "For most cases, 2-5 business days. At checkout, you'll be able to split Next-Day Air with us. All orders with 1,000+ stickers get upgraded to Next-Day Air."
     },
     {
-      question: "Do you ship internationally?",
-      answer: "Yes! We ship worldwide. International shipping times vary by destination, typically 7-14 business days. Customs fees and duties may apply based on your local regulations."
+      question: "Where do you ship from?",
+      answer: "Sticker Shuttle is located and operated out of Denver, CO. We print and ship everything from this location."
     },
     {
-      question: "Is shipping free?",
-      answer: "Yes, we offer free standard shipping on all orders within the United States. For rush shipping or international orders, additional fees may apply."
+      question: "Can you do expedited shipping?",
+      answer: "Absolutely. At checkout, you can select to split Next-Day Air via UPS with us."
     },
     {
-      question: "Can I track my order?",
-      answer: "Absolutely! Once your order ships, you'll receive a tracking number via email. You can also track your orders in real-time through your account dashboard."
+      question: "Can you ship to all 50 states?",
+      answer: "Yes. Hawaii, Alaska, and Puerto Rico... we got you."
     },
     {
-      question: "What if my order is damaged or lost?",
-      answer: "We've got you covered! If your order arrives damaged or gets lost in transit, contact us immediately. We'll replace it at no cost or provide a full refund."
+      question: "What if my stickers come damaged?",
+      answer: "Contact us immediately and we'll find a resolution we're both happy with!"
     },
     {
-      question: "Can I change my shipping address?",
-      answer: "You can update your shipping address before your order goes into production. Once it's shipped, we can't modify the address, but you may be able to redirect through the carrier."
+      question: "What if I don't receive my package?",
+      answer: "Again, no biggie! Sometimes s happens in transit, and it can get lost. We'll send you some more if it's been ten days and you haven't recieved your stickers."
     }
   ];
 
@@ -88,7 +88,7 @@ export default function ShippingProcess() {
             ></div>
             
             <div className="text-center relative z-10">
-              {/* Desktop Stars - Above Title */}
+              {/* Desktop Stars, Facebook, and Google - Above Title */}
               <div className="hidden md:flex items-center justify-center gap-2 mb-4">
                 <div className="flex gap-1">
                   {Array.from({ length: 5 }).map((_, i) => (
@@ -104,9 +104,14 @@ export default function ShippingProcess() {
                   ))}
                 </div>
                 <div className="flex items-center gap-1">
-                  <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                   </svg>
+                  <img 
+                    src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/24px.svg" 
+                    alt="Google" 
+                    className="h-4 w-4 opacity-80"
+                  />
                 </div>
               </div>
 
@@ -120,7 +125,7 @@ export default function ShippingProcess() {
                 </p>
               </div>
 
-              {/* Mobile Stars - Above Title */}
+              {/* Mobile Stars, Facebook, and Google - Above Title */}
               <div className="md:hidden flex items-center justify-center gap-2 mb-4">
                 <div className="flex gap-1">
                   {Array.from({ length: 5 }).map((_, i) => (
@@ -136,9 +141,14 @@ export default function ShippingProcess() {
                   ))}
                 </div>
                 <div className="flex items-center gap-1">
-                  <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                   </svg>
+                  <img 
+                    src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/24px.svg" 
+                    alt="Google" 
+                    className="h-4 w-4 opacity-80"
+                  />
                 </div>
               </div>
 
@@ -163,7 +173,7 @@ export default function ShippingProcess() {
                   Free Shipping
                 </span>
                 <span className="px-3 py-1 text-xs font-medium bg-white/20 text-white rounded-full">
-                  3-5 Days
+                  2-4 Days
                 </span>
                 <span className="px-3 py-1 text-xs font-medium bg-white/20 text-white rounded-full">
                   Real-time Tracking
@@ -202,7 +212,7 @@ export default function ShippingProcess() {
                   We ship to all 50 states.
                 </h2>
                 <p className="text-gray-300 text-base mb-6">
-                  Our strategically located fulfillment center ensures fast, reliable delivery across all 50 states. We partner with trusted carriers to get your custom stickers to you quickly and safely.
+                  While we may talk a lot about space, we take pride in helping our communities by operating out of the United States. All orders are printed and shipped out of Denver, CO. Nothing is outsourced. Plus, all of our material is also made in the U.S.
                 </p>
                 
                 <div className="space-y-4 mb-6">
@@ -221,7 +231,7 @@ export default function ShippingProcess() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
-                    <span className="text-white font-medium">3-5 business day delivery</span>
+                    <span className="text-white font-medium">2-4 business day delivery</span>
                   </div>
                   
                   <div className="flex items-center gap-3">
@@ -310,38 +320,102 @@ export default function ShippingProcess() {
       {/* FAQ Section */}
       <section className="py-8">
         <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
-          <div className="container-style p-6 md:p-8">
-            <h2 className="text-2xl md:text-3xl font-bold text-white mb-6 text-center">
-              Common Questions
+          <div className="text-center mb-8">
+            <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
+              Common questions:
             </h2>
-            
-            <div className="space-y-4">
-              {faqs.map((faq, index) => (
-                <div key={index} className="border-b border-white/10 last:border-b-0">
-                  <button
-                    onClick={() => toggleFaq(index)}
-                    className="w-full text-left py-4 flex items-center justify-between text-white hover:text-purple-300 transition-colors"
-                  >
-                    <span className="font-medium pr-4">{faq.question}</span>
-                    <svg
-                      className={`w-5 h-5 transition-transform ${expandedFaq === index ? 'rotate-180' : ''}`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                  
-                  {expandedFaq === index && (
-                    <div className="pb-4">
-                      <p className="text-gray-300 text-sm leading-relaxed">
-                        {faq.answer}
-                      </p>
-                    </div>
-                  )}
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* How long does it take to ship? */}
+            <div className="container-style p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                 </div>
-              ))}
+                <h3 className="text-white font-semibold text-lg">How long does it take to ship?</h3>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                For most cases, 2-5 business days. At checkout, you'll be able to split Next-Day Air with us. All orders with 1,000+ stickers get upgraded to Next-Day Air.
+              </p>
+            </div>
+
+            {/* Where do you ship from? */}
+            <div className="container-style p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-white font-semibold text-lg">Where do you ship from?</h3>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                Sticker Shuttle is located and operated out of Denver, CO. We print and ship everything from this location.
+              </p>
+            </div>
+
+            {/* Can you do expedited shipping? */}
+            <div className="container-style p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <h3 className="text-white font-semibold text-lg">Can you do expedited shipping?</h3>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                Absolutely. At checkout, you can select to split Next-Day Air via UPS with us.
+              </p>
+            </div>
+
+            {/* Can you ship to all 50 states? */}
+            <div className="container-style p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-white font-semibold text-lg">Can you ship to all 50 states?</h3>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                Yes. Hawaii, Alaska, and Puerto Rico... we got you.
+              </p>
+            </div>
+
+            {/* What if my stickers come damaged? */}
+            <div className="container-style p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.865-.833-2.635 0L4.18 14.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <h3 className="text-white font-semibold text-lg">What if my stickers come damaged?</h3>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                Contact us immediately and we'll find a resolution we're both happy with!
+              </p>
+            </div>
+
+            {/* What if I don't receive my package? */}
+            <div className="container-style p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                  </svg>
+                </div>
+                <h3 className="text-white font-semibold text-lg">What if I don't receive my package?</h3>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                Again, no biggie! Sometimes s happens in transit, and it can get lost. We'll send you some more if it's been ten days and you haven't recieved your stickers.
+              </p>
             </div>
           </div>
         </div>

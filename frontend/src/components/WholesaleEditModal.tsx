@@ -142,7 +142,7 @@ const WholesaleEditModal: React.FC<WholesaleEditModalProps> = ({
               aria-label="Credit Rate"
             >
               <option value={0.05}>5% (Standard)</option>
-              <option value={0.10}>10% (Wholesale)</option>
+                                        <option value={0.025}>2.5% (Wholesale)</option>
               <option value={0.15}>15% (Premium)</option>
               <option value={0.20}>20% (VIP)</option>
             </select>

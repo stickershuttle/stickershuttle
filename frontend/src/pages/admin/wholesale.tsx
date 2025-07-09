@@ -16,6 +16,7 @@ const GET_PENDING_WHOLESALE_APPLICATIONS = gql`
       userId
       firstName
       lastName
+      email
       companyName
       wholesaleMonthlyCustomers
       wholesaleOrderingFor
@@ -34,6 +35,7 @@ const GET_ALL_WHOLESALE_CUSTOMERS = gql`
       userId
       firstName
       lastName
+      email
       companyName
       wholesaleMonthlyCustomers
       wholesaleOrderingFor
@@ -70,6 +72,25 @@ const APPROVE_WHOLESALE_APPLICATION = gql`
 const REJECT_WHOLESALE_APPLICATION = gql`
   mutation RejectWholesaleApplication($userId: ID!, $rejectedBy: ID!) {
     rejectWholesaleApplication(userId: $userId, rejectedBy: $rejectedBy) {
+      success
+      message
+      userProfile {
+        id
+        userId
+        firstName
+        lastName
+        companyName
+        wholesaleStatus
+        wholesaleCreditRate
+        wholesaleApprovedAt
+      }
+    }
+  }
+`;
+
+const REVOKE_WHOLESALE_ACCESS = gql`
+  mutation RevokeWholesaleAccess($userId: ID!, $revokedBy: ID!) {
+    revokeWholesaleAccess(userId: $userId, revokedBy: $revokedBy) {
       success
       message
       userProfile {
@@ -130,6 +151,7 @@ const WholesaleAdmin = () => {
   // Mutations
   const [approveApplication] = useMutation(APPROVE_WHOLESALE_APPLICATION);
   const [rejectApplication] = useMutation(REJECT_WHOLESALE_APPLICATION);
+  const [revokeWholesaleAccess] = useMutation(REVOKE_WHOLESALE_ACCESS);
 
   React.useEffect(() => {
     checkAuth();
@@ -199,6 +221,40 @@ const WholesaleAdmin = () => {
       }
     } catch (error) {
       console.error('❌ Error rejecting application:', error);
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleRevokeAccess = async (customer: any) => {
+    if (!user?.id) return;
+    
+    // Confirm the action since this is irreversible
+    if (!confirm(`Are you sure you want to revoke wholesale access for ${customer.firstName} ${customer.lastName}?\n\nThis will:\n• Remove their 15% discount\n• Change their credit rate from 2.5% to 5%\n• Keep their account and clients intact\n\nThis action cannot be undone.`)) {
+      return;
+    }
+    
+    setProcessing(customer.userId);
+    try {
+      const { data } = await revokeWholesaleAccess({
+        variables: {
+          userId: customer.userId,
+          revokedBy: user.id
+        }
+      });
+
+      if (data?.revokeWholesaleAccess?.success) {
+        console.log('✅ Wholesale access revoked:', data.revokeWholesaleAccess.message);
+        refetchAll();
+        refetchAnalytics();
+        refetchPerformers();
+      } else {
+        console.error('❌ Revoke failed:', data?.revokeWholesaleAccess?.message);
+        alert('Failed to revoke wholesale access. Please try again.');
+      }
+    } catch (error) {
+      console.error('❌ Error revoking wholesale access:', error);
+      alert('Error revoking wholesale access. Please try again.');
     } finally {
       setProcessing(null);
     }
@@ -489,6 +545,7 @@ const WholesaleAdmin = () => {
                           {application.firstName} {application.lastName}
                         </h3>
                         <p className="text-gray-300">{application.companyName}</p>
+                        <p className="text-blue-300 text-sm">{application.email}</p>
                         <p className="text-sm text-gray-400">Applied: {formatDate(application.createdAt)}</p>
                       </div>
                       <div className="flex space-x-2">
@@ -570,6 +627,7 @@ const WholesaleAdmin = () => {
                           {getStatusBadge(customer.wholesaleStatus)}
                         </div>
                         <p className="text-gray-300 mb-1">{customer.companyName}</p>
+                        <p className="text-blue-300 text-sm mb-2">{customer.email}</p>
                         <div className="grid md:grid-cols-4 gap-4 text-sm">
                           <div>
                             <span className="text-gray-400">Credit Rate:</span>
@@ -602,6 +660,21 @@ const WholesaleAdmin = () => {
                         >
                           Edit
                         </button>
+                        {customer.wholesaleStatus === 'approved' && (
+                          <button
+                            onClick={() => handleRevokeAccess(customer)}
+                            disabled={processing === customer.userId}
+                            className="px-4 py-2 rounded-lg font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(239, 68, 68, 0.4)',
+                              boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                            }}
+                          >
+                            {processing === customer.userId ? 'Processing...' : 'Remove Access'}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

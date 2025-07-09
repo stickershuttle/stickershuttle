@@ -59,6 +59,9 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
+  // Size limit warning state
+  const [showSizeWarning, setShowSizeWarning] = useState(false)
+
   // User and profile states
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
@@ -464,14 +467,36 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     if (size !== "Custom size") {
       setCustomWidth("")
       setCustomHeight("")
+      setShowSizeWarning(false) // Reset warning when leaving custom size
     }
   }
 
   const handleCustomSizeChange = (dimension: "width" | "height", value: string) => {
+    // Validate input - only allow numbers and decimal points
+    const numericValue = value.replace(/[^0-9.]/g, '')
+    
+    // Check if value is below minimum or above maximum
+    const numValue = parseFloat(numericValue)
+    if (numValue < 0.5 && numericValue !== "") {
+      // Show warning message for minimum size
+      setShowSizeWarning(true)
+      return
+    }
+    if (numValue > 14) {
+      // Show warning message for maximum size
+      setShowSizeWarning(true)
+      return
+    }
+    
+    // Reset warning if entering valid value
+    if (showSizeWarning && numValue >= 0.5 && numValue <= 14) {
+      setShowSizeWarning(false)
+    }
+    
     if (dimension === "width") {
-      setCustomWidth(value)
+      setCustomWidth(numericValue)
     } else {
-      setCustomHeight(value)
+      setCustomHeight(numericValue)
     }
   }
 
@@ -503,7 +528,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     // Check file size (25MB limit)
     const maxSize = 25 * 1024 * 1024; // 25MB
     if (file.size > maxSize) {
-      return { valid: false, error: 'File size must be less than 25MB' };
+      return { valid: false, error: 'Your file is too large. Please compress your image or use a smaller file (max 25MB).' };
     }
 
     // Get file extension from filename
@@ -523,7 +548,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     const extensionAllowed = fileExtension && allowedExtensions.includes(fileExtension);
     
     if (!typeAllowed && !extensionAllowed) {
-      return { valid: false, error: 'File must be a design file (.ai, .eps, .psd, .svg) or image (.jpg, .png, .gif, .webp) or PDF' };
+      return { valid: false, error: 'Invalid file format. Please use .AI, .EPS, .PSD, .SVG, .PNG, .JPG, or .PDF files.' };
     }
 
     return { valid: true };
@@ -575,7 +600,25 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
       console.log('File uploaded successfully with metadata:', result)
     } catch (error) {
       console.error('Upload failed:', error)
-      setUploadError(error instanceof Error ? error.message : 'Upload failed')
+      
+      // Provide customer-friendly error messages
+      let customerMessage = 'Upload failed. Please try again.'
+      
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase()
+        
+        if (errorMessage.includes('file size too large') || errorMessage.includes('maximum is')) {
+          customerMessage = 'Your file is too large. Please compress your image or use a smaller file (max 25MB).'
+        } else if (errorMessage.includes('network error') || errorMessage.includes('timeout')) {
+          customerMessage = 'Connection issue. Please check your internet and try again.'
+        } else if (errorMessage.includes('invalid') || errorMessage.includes('format')) {
+          customerMessage = 'Invalid file format. Please use .AI, .EPS, .PSD, .SVG, .PNG, .JPG, or .PDF files.'
+        } else if (errorMessage.includes('400') || errorMessage.includes('413')) {
+          customerMessage = 'File upload failed. Please try a different file or contact support.'
+        }
+      }
+      
+      setUploadError(customerMessage)
     } finally {
       setIsUploading(false)
       setUploadProgress(null)
@@ -689,14 +732,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
                 priceImpact: 0 
               }
             }),
-            ...(isWholesaleApproved() && {
-              wholesale: {
-                type: "finish" as const,
-                value: true,
-                displayValue: "15% Wholesale Discount",
-                priceImpact: -discountAmount
-              }
-            })
+
           },
           totalPrice: finalTotalPrice,
           customFiles: uploadedFile ? [uploadedFile.secure_url] : [],
@@ -921,21 +957,32 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
                 ))}
               </div>
               {selectedSize === "Custom size" && (
-                <div className="mt-3 flex gap-3">
-                  <input
-                    type="text"
-                    placeholder="W"
-                    value={customWidth}
-                    onChange={(e) => handleCustomSizeChange("width", e.target.value)}
-                    className="w-1/2 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive"
-                  />
-                  <input
-                    type="text"
-                    placeholder="H"
-                    value={customHeight}
-                    onChange={(e) => handleCustomSizeChange("height", e.target.value)}
-                    className="w-1/2 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive"
-                  />
+                <div className="mt-3 space-y-2">
+                  <div className="flex gap-3">
+                    <input
+                      type="number"
+                      placeholder="W"
+                      value={customWidth}
+                      onChange={(e) => handleCustomSizeChange("width", e.target.value)}
+                      max="14"
+                      step="0.1"
+                      className="w-1/2 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <input
+                      type="number"
+                      placeholder="H"
+                      value={customHeight}
+                      onChange={(e) => handleCustomSizeChange("height", e.target.value)}
+                      max="14"
+                      step="0.1"
+                      className="w-1/2 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                  </div>
+                  {showSizeWarning && (
+                    <div className="text-xs text-orange-300 font-medium">
+                      📏 Size must be between 0.5" and 14". Please enter a valid size.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -948,7 +995,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
                 </span>
               </h2>
               <div className="space-y-2 relative">
-                {["50", "100", "200", "300", "500", "750", "1,000", "2,500", "Custom"].map((amount) => {
+                {["50", "100", "200", "300", "500", "1,000", "2,500", "Custom"].map((amount) => {
                   const numericAmount = Number.parseInt(amount.replace(",", ""))
                   const area = calculateArea(selectedSize, customWidth, customHeight)
 
@@ -1357,7 +1404,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
                   <input
                     id="file-input"
                     type="file"
-                    accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd"
+                    accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd,.zip"
                     onChange={handleFileSelect}
                     className="hidden"
                     aria-label="Upload artwork file"
@@ -1645,6 +1692,20 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
                         <label className="text-sm font-medium text-purple-200">
                           Post this order to Instagram
                         </label>
+                        <div className="relative group">
+                          <span className="text-purple-300 cursor-help text-sm font-medium select-none">ⓘ</span>
+                          <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block z-50 w-64">
+                            <div className="text-white text-xs rounded-lg px-3 py-2 whitespace-normal" style={{
+                              background: 'rgba(30, 41, 59, 0.95)',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                              backdropFilter: 'blur(12px)'
+                            }}>
+                              We may still post your order on Instagram even if not selected, put in the notes below if you explicitly don't want us to post your order.
+                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-700"></div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                       
                       {/* Instagram handle input - right under Instagram toggle */}

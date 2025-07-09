@@ -13,6 +13,10 @@ if (process.env.NODE_ENV !== 'production') {
 if (process.env.NODE_ENV !== 'production' && !process.env.RAILWAY_ENVIRONMENT) {
   require('dotenv').config();
   console.log('📧 Loaded .env file - RESEND_API_KEY configured:', !!process.env.RESEND_API_KEY);
+} else if (!process.env.RAILWAY_ENVIRONMENT) {
+  // Always load .env file if not in Railway environment (local development)
+  require('dotenv').config();
+  console.log('📧 Loaded .env file for local development - RESEND_API_KEY configured:', !!process.env.RESEND_API_KEY);
 }
 
 // Initialize Sentry error monitoring (must be first)
@@ -996,6 +1000,7 @@ const typeDefs = gql`
     # Admin wholesale mutations
     approveWholesaleApplication(userId: ID!, approvedBy: ID!): WholesaleApprovalResult!
     rejectWholesaleApplication(userId: ID!, rejectedBy: ID!): WholesaleApprovalResult!
+    revokeWholesaleAccess(userId: ID!, revokedBy: ID!): WholesaleApprovalResult!
     updateWholesaleCustomer(userId: ID!, input: UpdateWholesaleCustomerInput!): WholesaleApprovalResult!
     
     # Tax exemption mutations
@@ -1121,6 +1126,7 @@ const typeDefs = gql`
     userId: ID!
     firstName: String
     lastName: String
+    email: String
     displayName: String
     bio: String
     phoneNumber: String
@@ -2743,6 +2749,25 @@ const resolvers = {
 
         if (error) throw error;
 
+        // Get all user profiles to map emails to user IDs
+        const { data: userProfiles, error: profilesError } = await client
+          .from('user_profiles')
+          .select('user_id, email');
+
+        if (profilesError) {
+          console.warn('Error fetching user profiles:', profilesError);
+        }
+
+        // Create email to user_id mapping
+        const emailToUserIdMap = new Map();
+        if (userProfiles) {
+          userProfiles.forEach(profile => {
+            if (profile.email && profile.user_id) {
+              emailToUserIdMap.set(profile.email.toLowerCase(), profile.user_id);
+            }
+          });
+        }
+
         // Group orders by customer email
         const customerMap = new Map();
 
@@ -2751,8 +2776,11 @@ const resolvers = {
           if (!email) return;
 
           if (!customerMap.has(email)) {
+            // Try to get the actual user_id from user_profiles, fallback to email
+            const userId = emailToUserIdMap.get(email) || email;
+            
             customerMap.set(email, {
-              id: email, // Use email as ID for now
+              id: userId, // Use actual user_id when available, fallback to email for guests
               email: order.customer_email,
               firstName: order.customer_first_name,
               lastName: order.customer_last_name,
@@ -2764,7 +2792,8 @@ const resolvers = {
               marketingOptIn: false,
               orders: [],
               lastOrderDate: null,
-              firstOrderDate: null
+              firstOrderDate: null,
+              hasUserProfile: emailToUserIdMap.has(email) // Flag to indicate if they have a user profile
             });
           }
 
@@ -3468,11 +3497,36 @@ const resolvers = {
 
         console.log(`✅ Found ${profiles?.length || 0} pending wholesale applications`);
         
+        // Get emails for all user IDs
+        const userIds = profiles?.map(p => p.user_id) || [];
+        let emailMap = {};
+        
+        if (userIds.length > 0) {
+          try {
+            const { data: authUsers, error: authError } = await client
+              .from('auth.users')
+              .select('id, email')
+              .in('id', userIds);
+            
+            if (authError) {
+              console.warn('⚠️ Could not fetch emails from auth.users:', authError);
+            } else {
+              emailMap = authUsers?.reduce((map, user) => {
+                map[user.id] = user.email;
+                return map;
+              }, {}) || {};
+            }
+          } catch (emailError) {
+            console.warn('⚠️ Error fetching emails:', emailError);
+          }
+        }
+        
         return (profiles || []).map(profile => ({
           id: profile.id,
           userId: profile.user_id,
           firstName: profile.first_name,
           lastName: profile.last_name,
+          email: emailMap[profile.user_id] || profile.email || 'No email',
           displayName: profile.display_name,
           bio: profile.bio,
           profilePhotoUrl: profile.profile_photo_url,
@@ -3532,11 +3586,36 @@ const resolvers = {
 
         console.log(`✅ Found ${profiles?.length || 0} wholesale customers`);
         
+        // Get emails for all user IDs
+        const userIds = profiles?.map(p => p.user_id) || [];
+        let emailMap = {};
+        
+        if (userIds.length > 0) {
+          try {
+            const { data: authUsers, error: authError } = await client
+              .from('auth.users')
+              .select('id, email')
+              .in('id', userIds);
+            
+            if (authError) {
+              console.warn('⚠️ Could not fetch emails from auth.users:', authError);
+            } else {
+              emailMap = authUsers?.reduce((map, user) => {
+                map[user.id] = user.email;
+                return map;
+              }, {}) || {};
+            }
+          } catch (emailError) {
+            console.warn('⚠️ Error fetching emails:', emailError);
+          }
+        }
+        
         return (profiles || []).map(profile => ({
           id: profile.id,
           userId: profile.user_id,
           firstName: profile.first_name,
           lastName: profile.last_name,
+          email: emailMap[profile.user_id] || profile.email || 'No email',
           displayName: profile.display_name,
           bio: profile.bio,
           profilePhotoUrl: profile.profile_photo_url,
@@ -7467,12 +7546,11 @@ const resolvers = {
 
         const client = supabaseClient.getServiceClient();
         
-        // Get a random default avatar
-        const { getRandomAvatar } = require('./avatar-utils');
-        const randomAvatar = getRandomAvatar();
-        console.log('🎭 Assigned random avatar:', randomAvatar);
+        // Use specific default avatar for all new signups
+        const defaultAvatar = 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751390215/StickerShuttle_Avatar1_dmnkat.png';
+        console.log('🎭 Assigned default avatar:', defaultAvatar);
         
-        // Create profile with random avatar
+        // Create profile with default avatar
         const displayName = firstName && lastName ? `${firstName} ${lastName}` : null;
         
         const { data: profile, error } = await client
@@ -7484,7 +7562,7 @@ const resolvers = {
             display_name: displayName,
             phone_number: phoneNumber,
             company_website: companyWebsite,
-            profile_photo_url: randomAvatar,
+            profile_photo_url: defaultAvatar,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           }, {
@@ -7498,7 +7576,7 @@ const resolvers = {
           throw new Error(`Failed to create profile: ${error.message}`);
         }
 
-        console.log('✅ Successfully created user profile with random avatar');
+        console.log('✅ Successfully created user profile with default avatar');
         
         return {
           success: true,
@@ -7810,10 +7888,9 @@ const resolvers = {
 
         const client = supabaseClient.getServiceClient();
         
-        // Get a random default avatar
-        const { getRandomAvatar } = require('./avatar-utils');
-        const randomAvatar = getRandomAvatar();
-        console.log('🎭 Assigned random avatar:', randomAvatar);
+        // Use specific default avatar for all new signups
+        const defaultAvatar = 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751390215/StickerShuttle_Avatar1_dmnkat.png';
+        console.log('🎭 Assigned default avatar:', defaultAvatar);
         
         // Create wholesale profile with 5% credit rate (pending approval)
         const displayName = `${input.firstName} ${input.lastName}`;
@@ -7835,7 +7912,7 @@ const resolvers = {
             wholesale_ordering_for: input.wholesaleOrderingFor,
             wholesale_fit_explanation: input.wholesaleFitExplanation,
             wholesale_status: 'pending',
-            profile_photo_url: randomAvatar,
+            profile_photo_url: defaultAvatar,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           }, {
@@ -8124,6 +8201,112 @@ const resolvers = {
         };
       } catch (error) {
         console.error('❌ Error in rejectWholesaleApplication:', error);
+        return {
+          success: false,
+          message: error.message,
+          userProfile: null
+        };
+      }
+    },
+
+    revokeWholesaleAccess: async (_, { userId, revokedBy }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        console.log('🚫 Revoking wholesale access:', { userId, revokedBy });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Profile service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Verify the customer exists and is currently approved
+        const { data: existingProfile, error: profileError } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        if (profileError || !existingProfile) {
+          throw new Error('User profile not found');
+        }
+
+        if (existingProfile.wholesale_status !== 'approved') {
+          throw new Error('User is not an approved wholesale customer');
+        }
+        
+        // Revoke wholesale access: reset to regular customer status
+        const updateData = {
+          wholesale_status: 'revoked',
+          wholesale_credit_rate: 0.05, // Reset to regular 5% credit rate
+          is_wholesale_customer: false, // Remove wholesale customer flag
+          wholesale_approved_at: new Date().toISOString(), // Track revocation time
+          wholesale_approved_by: revokedBy, // Track who revoked it
+          updated_at: new Date().toISOString()
+        };
+        
+        const { data: profile, error } = await client
+          .from('user_profiles')
+          .update(updateData)
+          .eq('user_id', userId)
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error revoking wholesale access:', error);
+          throw new Error(`Failed to revoke wholesale access: ${error.message}`);
+        }
+
+        console.log('✅ Successfully revoked wholesale access');
+
+        // Send revocation email notification
+        try {
+          const emailNotifications = require('./email-notifications');
+          await emailNotifications.sendWholesaleRevocationEmail({
+            userId: userId,
+            email: profile.email || '',
+            firstName: profile.first_name || 'Customer',
+            companyName: profile.company_name || ''
+          });
+          console.log('✅ Wholesale revocation email sent');
+        } catch (emailError) {
+          console.error('⚠️ Failed to send revocation email (non-critical):', emailError);
+          // Don't fail the whole operation if email fails
+        }
+        
+        return {
+          success: true,
+          message: 'Wholesale access revoked successfully. Customer returns to regular pricing and 5% store credit.',
+          userProfile: {
+            id: profile.id,
+            userId: profile.user_id,
+            firstName: profile.first_name,
+            lastName: profile.last_name,
+            displayName: profile.display_name,
+            bio: profile.bio,
+            profilePhotoUrl: profile.profile_photo_url,
+            bannerImageUrl: profile.banner_image_url,
+            profilePhotoPublicId: profile.profile_photo_public_id,
+            bannerImagePublicId: profile.banner_image_public_id,
+            companyName: profile.company_name,
+            isWholesaleCustomer: profile.is_wholesale_customer,
+            wholesaleCreditRate: profile.wholesale_credit_rate,
+            wholesaleMonthlyCustomers: profile.wholesale_monthly_customers,
+            wholesaleOrderingFor: profile.wholesale_ordering_for,
+            wholesaleFitExplanation: profile.wholesale_fit_explanation,
+            wholesaleStatus: profile.wholesale_status,
+            wholesaleApprovedAt: profile.wholesale_approved_at,
+            wholesaleApprovedBy: profile.wholesale_approved_by,
+            createdAt: profile.created_at,
+            updatedAt: profile.updated_at
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in revokeWholesaleAccess:', error);
         return {
           success: false,
           message: error.message,

@@ -68,7 +68,7 @@ const DMCACopyright: NextPage = () => {
                   }}
                 >
                   <p className="font-semibold text-white mb-2">DMCA Agent</p>
-                  <p><strong>Email:</strong> dmca@stickershuttle.com</p>
+                  <p><strong>Email:</strong> orbit@stickershuttle.com</p>
                   <p><strong>Subject Line:</strong> DMCA Takedown Request</p>
                   <p className="mt-4 text-sm text-gray-300">
                     Please note that we only accept DMCA notices sent to the designated agent above. 
@@ -155,9 +155,9 @@ const DMCACopyright: NextPage = () => {
                 <h2 className="text-2xl font-semibold text-white mb-4">Contact Information</h2>
                 <p>For all DMCA-related matters, please contact:</p>
                 <div className="mt-4 space-y-2">
-                  <p><strong>DMCA Agent Email:</strong> dmca@stickershuttle.com</p>
-                  <p><strong>General Support:</strong> support@stickershuttle.com</p>
-                  <p><strong>Legal Department:</strong> legal@stickershuttle.com</p>
+                  <p><strong>DMCA Agent Email:</strong> orbit@stickershuttle.com</p>
+                  <p><strong>General Support:</strong> orbit@stickershuttle.com</p>
+                  <p><strong>Legal Department:</strong> orbit@stickershuttle.com</p>
                 </div>
               </section>
             </div>

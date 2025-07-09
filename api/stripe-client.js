@@ -119,6 +119,8 @@ class StripeClient {
                   size: item.calculatorSelections?.size?.displayValue || '',
                   material: item.calculatorSelections?.material?.displayValue || '',
                   cut: item.calculatorSelections?.cut?.displayValue || '',
+                  whiteOption: item.calculatorSelections?.whiteOption?.displayValue || '',
+                  kissOption: item.calculatorSelections?.kissOption?.displayValue || '',
                   // Add essential product info
                   category: item.category || 'custom-stickers',
                   actualQuantity: item.quantity.toString(), // Store actual quantity in metadata

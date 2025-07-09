@@ -498,6 +498,7 @@ const getUserCreditHistory = async (userId) => {
     // Format transactions
     const formattedTransactions = (transactions || []).map(t => ({
       id: t.id,
+      userId: t.user_id,
       amount: t.amount,
       balance: t.balance,
       reason: t.reason,

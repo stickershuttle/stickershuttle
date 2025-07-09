@@ -271,30 +271,7 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
                       let selections = calculatorSelections || {};
                       const orderNote = selectedOrderForInvoice.orderNote || '';
                       
-                      // Add fallback data from order note if missing in calculator selections (only for specialty stickers)
-                      if (!selections.whiteOption && orderNote) {
-                        // Only show white option fallback for products that actually support white options
-                        const itemName = itemData.name || item.name || '';
-                        const supportsWhiteOption = itemName.toLowerCase().includes('holographic') || 
-                                                  itemName.toLowerCase().includes('chrome') ||
-                                                  itemName.toLowerCase().includes('glitter') || 
-                                                  itemName.toLowerCase().includes('clear');
-                        
-                        if (supportsWhiteOption) {
-                          const whiteOptionMatch = orderNote.match(/⚪ White Option: (.+?)(?:\n|$)/);
-                          if (whiteOptionMatch) {
-                            selections = {
-                              ...selections,
-                              whiteOption: {
-                                type: 'white-base',
-                                value: whiteOptionMatch[1].trim(),
-                                displayValue: whiteOptionMatch[1].trim(),
-                                priceImpact: 0
-                              }
-                            };
-                          }
-                        }
-                      }
+                      // White options are stored per item in calculatorSelections - no fallback needed
                       
                       return Object.keys(selections).length > 0 && (
                         <div className="bg-black/20 rounded-lg p-4 border border-white/5 mb-4">
@@ -338,6 +315,15 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
                                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-cyan-300"
                                   style={{ backgroundColor: 'rgba(6, 182, 212, 0.2)', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
                                   {selections.whiteOption.displayValue}
+                                </span>
+                              </div>
+                            )}
+                            {selections.kissOption?.displayValue && (
+                              <div className="flex flex-col">
+                                <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Cut Options</span>
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-pink-300"
+                                  style={{ backgroundColor: 'rgba(236, 72, 153, 0.2)', border: '1px solid rgba(236, 72, 153, 0.3)' }}>
+                                  {selections.kissOption.displayValue}
                                 </span>
                               </div>
                             )}

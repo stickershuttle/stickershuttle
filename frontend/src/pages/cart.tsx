@@ -371,8 +371,12 @@ const calculateDeliveryDate = (totalQuantity: number, hasRushOrder: boolean) => 
 
 
 // Helper function to format option name
-const formatOptionName = (type: string) => {
+const formatOptionName = (type: string, key?: string) => {
   if (typeof type !== 'string') return "Option";
+  
+  // Handle special field names
+  if (key === 'kissOption') return "Kiss Cut Options";
+  if (key === 'whiteOption') return "White Ink";
   
   switch (type) {
     case "shape":
@@ -382,7 +386,7 @@ const formatOptionName = (type: string) => {
     case "size-preset":
       return "Size";
     case "white-base":
-      return "White Option";
+      return "White Ink";
     default:
       // Handle hyphenated names (like "size-preset")
       return type.split("-")
@@ -452,8 +456,8 @@ export default function CartPage() {
 
   const userProfile = profileData?.getUserProfile;
   const isWholesale = userProfile?.isWholesaleCustomer || false;
-  const creditRate = isWholesale ? 10 : 5;
-  const creditRateDecimal = isWholesale ? 0.10 : 0.05;
+  const creditRate = isWholesale ? 2.5 : 5;
+  const creditRateDecimal = isWholesale ? 0.025 : 0.05;
 
   // Mutations for user profile
   const [updateUserProfileNames] = useMutation(UPDATE_USER_PROFILE_NAMES);
@@ -1022,10 +1026,13 @@ export default function CartPage() {
   const safeDiscountAmount = safeParseFloat(discountAmount, 0);
   const safeCreditToApply = safeParseFloat(creditToApply, 0);
   
-  // Add blind shipment fee
-  const blindShipmentFee = isBlindShipment ? 5.00 : 0;
+  // Add blind shipment fee (free for wholesale customers)
+  const blindShipmentFee = isBlindShipment && !isWholesale ? 5.00 : 0;
   
-  const afterDiscounts = safeSubtotal - safeReorderDiscount - safeDiscountAmount;
+  // Calculate wholesale discount (15% off for wholesale customers)
+  const wholesaleDiscount = isWholesale ? safeSubtotal * 0.15 : 0;
+  
+  const afterDiscounts = safeSubtotal - safeReorderDiscount - safeDiscountAmount - wholesaleDiscount;
   const finalTotal = Math.max(0, afterDiscounts - safeCreditToApply + blindShipmentFee);
 
   // Calculate rush order breakdown
@@ -1033,8 +1040,6 @@ export default function CartPage() {
     if (item.customization.selections?.rush?.value === true) {
       // Calculate what the price would be without rush
       const basePrice = item.totalPrice / 1.4; // Remove 40% markup
-      const rushCost = item.totalPrice - basePrice;
-      acc.totalRushCost += rushCost;
       acc.baseSubtotal += basePrice;
       acc.hasRushItems = true;
     } else {
@@ -1042,6 +1047,11 @@ export default function CartPage() {
     }
     return acc;
   }, { totalRushCost: 0, baseSubtotal: 0, hasRushItems: false });
+
+  // Calculate rush fee as 40% of the base subtotal (this gives the expected user experience)
+  if (rushOrderBreakdown.hasRushItems) {
+    rushOrderBreakdown.totalRushCost = rushOrderBreakdown.baseSubtotal * 0.4;
+  }
 
   const totalQuantity = updatedCart.reduce((sum, item) => sum + item.quantity, 0);
   const hasRushOrder = updatedCart.some(item => item.customization.selections?.rush?.value === true);
@@ -1568,7 +1578,7 @@ export default function CartPage() {
                                   <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
                                     <div className="flex items-center gap-2">
                                       <span className="text-lg">{getOptionEmoji(sel.type || '', sel.value)}</span>
-                                      <span className="text-xs font-medium text-gray-400 uppercase">{formatOptionName(sel.type || '')}</span>
+                                      <span className="text-xs font-medium text-gray-400 uppercase">{formatOptionName(sel.type || '', key)}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <span className="text-white font-medium">{typeof sel.displayValue === 'string' ? sel.displayValue : 'N/A'}</span>
@@ -1882,7 +1892,7 @@ export default function CartPage() {
                   <div className="space-y-3 mb-6">
                     <div className="flex justify-between text-gray-300">
                       <span>Subtotal ({totalQuantity} stickers)</span>
-                      <span>${subtotal.toFixed(2)}</span>
+                      <span>${rushOrderBreakdown.hasRushItems ? rushOrderBreakdown.baseSubtotal.toFixed(2) : subtotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-blue-300">
                       <span>You're paying</span>
@@ -1909,6 +1919,12 @@ export default function CartPage() {
                         </div>
                       </div>
                     )}
+                    {wholesaleDiscount > 0 && (
+                      <div className="flex justify-between text-blue-300">
+                        <span>Wholesale Discount (15%)</span>
+                        <span>-${wholesaleDiscount.toFixed(2)}</span>
+                      </div>
+                    )}
                     {appliedDiscount && (
                       <div className="flex justify-between text-purple-300">
                         <span>Discount ({appliedDiscount.code})</span>
@@ -1929,10 +1945,10 @@ export default function CartPage() {
                     )}
                     <hr className="border-white/20 my-3" />
                     {/* Total Savings */}
-                    {(reorderDiscount > 0 || discountAmount > 0 || creditToApply > 0) && (
+                    {(reorderDiscount > 0 || discountAmount > 0 || creditToApply > 0 || wholesaleDiscount > 0) && (
                       <div className="flex justify-between text-green-400 font-semibold">
                         <span>Total Savings</span>
-                        <span>-${(reorderDiscount + discountAmount + creditToApply).toFixed(2)}</span>
+                        <span>-${(reorderDiscount + discountAmount + creditToApply + wholesaleDiscount).toFixed(2)}</span>
                       </div>
                     )}
                     <div className="flex justify-between text-xl font-bold text-white">
@@ -1953,7 +1969,7 @@ export default function CartPage() {
                       <div className="flex justify-between text-yellow-400 text-sm font-medium mt-3 pt-3 border-t border-white/10">
                         <span className="flex items-center gap-2">
                           <i className="fas fa-coins"></i>
-                          Store Credit Earned ({creditRate}%{isWholesale && ' Wholesale'})
+                          Store Credit Earned ({creditRate}%)
                         </span>
                         <span>+${(finalTotal * creditRateDecimal).toFixed(2)}</span>
                       </div>
@@ -2048,17 +2064,19 @@ export default function CartPage() {
                   )}
 
                   {/* Discount Code Section */}
-                  <div className="mb-6">
-                    <DiscountCodeInput
-                      orderAmount={subtotal}
-                      onDiscountApplied={setAppliedDiscount}
-                      currentAppliedDiscount={appliedDiscount}
-                      hasReorderDiscount={hasReorderItems}
-                      reorderDiscountAmount={reorderDiscount}
-                      hasStoreCredits={creditToApply > 0}
-                      className="w-full"
-                    />
-                  </div>
+                  {!isWholesale && (
+                    <div className="mb-6">
+                      <DiscountCodeInput
+                        orderAmount={subtotal}
+                        onDiscountApplied={setAppliedDiscount}
+                        currentAppliedDiscount={appliedDiscount}
+                        hasReorderDiscount={hasReorderItems}
+                        reorderDiscountAmount={reorderDiscount}
+                        hasStoreCredits={creditToApply > 0}
+                        className="w-full"
+                      />
+                    </div>
+                  )}
 
                   {/* Guest Checkout Form */}
                   {!user && (

@@ -4,6 +4,24 @@ const FROM_EMAIL = 'Sticker Shuttle <orbit@stickershuttle.com>';
 const REPLY_TO_EMAIL = 'orbit@stickershuttle.com';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://stickershuttle.com';
 
+// Rate limiting for email sends (Resend allows 2 requests per second)
+let lastEmailSent = 0;
+const EMAIL_RATE_LIMIT_MS = 600; // 600ms between emails (slightly more than 500ms for safety)
+
+// Helper function to ensure we don't exceed rate limits
+const waitForRateLimit = async () => {
+  const now = Date.now();
+  const timeSinceLastEmail = now - lastEmailSent;
+  
+  if (timeSinceLastEmail < EMAIL_RATE_LIMIT_MS) {
+    const waitTime = EMAIL_RATE_LIMIT_MS - timeSinceLastEmail;
+    console.log(`⏳ Rate limiting: waiting ${waitTime}ms before sending next email`);
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+  
+  lastEmailSent = Date.now();
+};
+
 // Email templates
 const getOrderStatusEmailTemplate = (orderData, newStatus) => {
   const statusMessages = {
@@ -151,7 +169,7 @@ const getProofNotificationTemplate = (orderData, proofUrl) => {
   return getOrderStatusEmailTemplate(orderData, 'Proof Sent');
 };
 
-// Send email function
+// Send email function with rate limiting
 const sendEmail = async (to, subject, html) => {
   if (!RESEND_API_KEY) {
     console.error('❌ RESEND_API_KEY not configured');
@@ -159,6 +177,9 @@ const sendEmail = async (to, subject, html) => {
   }
 
   try {
+    // Apply rate limiting before sending
+    await waitForRateLimit();
+    
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -176,6 +197,12 @@ const sendEmail = async (to, subject, html) => {
 
     if (!response.ok) {
       const errorData = await response.json();
+      // Special handling for rate limit errors
+      if (response.status === 429) {
+        console.error('❌ Rate limit exceeded, retrying after delay...');
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+        return await sendEmail(to, subject, html); // Retry once
+      }
       throw new Error(`Resend API error: ${errorData.message}`);
     }
 
@@ -792,8 +819,8 @@ const sendUserFileUpload = async (userData, fileBuffer, fileName, fileSize, mime
 // Function to check if customer is first-time by counting their previous paid orders
 const isFirstTimeCustomer = async (customerEmail) => {
   try {
-    const { getSupabaseServiceClient } = require('./supabase-client');
-    const client = getSupabaseServiceClient();
+    const supabaseClient = require('./supabase-client');
+    const client = supabaseClient.getServiceClient();
     
     console.log(`🔍 Checking if ${customerEmail} is a first-time customer...`);
     
@@ -1161,6 +1188,133 @@ const sendWholesaleApprovalEmail = async (userData) => {
   }
 };
 
+// Wholesale revocation email template
+const getWholesaleRevocationEmailTemplate = (userData) => {
+  return {
+    subject: `Important Notice: Wholesale Access Update`,
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wholesale Access Update</title>
+</head>
+<body style="margin: 0; padding: 20px; background-color: #ffffff; color: #1a1a1a; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; min-height: 100vh;">
+  <div style="max-width: 600px; margin: 0 auto; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 16px; overflow: hidden;">
+    
+    <!-- Header -->
+    <div style="background: #f1f3f5; border-bottom: 1px solid #e9ecef; padding: 30px 20px; text-align: center;">
+      <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #1a1a1a;">
+        📋 Account Update
+      </h1>
+      <p style="margin: 10px 0 0 0; font-size: 16px; font-weight: 400; color: #4b5563;">
+        Important changes to your wholesale access
+      </p>
+    </div>
+
+    <!-- Main Content -->
+    <div style="padding: 30px 20px;">
+      <div style="background: #ffffff; border: 1px solid #e9ecef; border-left: 4px solid #F59E0B; padding: 20px; margin-bottom: 30px; border-radius: 12px;">
+        <p style="margin: 0 0 15px 0; font-size: 18px; line-height: 1.6; font-weight: 600; color: #1a1a1a;">
+          Hi ${userData.firstName || 'there'}!
+        </p>
+        <p style="margin: 0 0 15px 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #1a1a1a;">
+          We're writing to inform you that your wholesale access for <strong>${userData.companyName || 'your account'}</strong> has been updated.
+        </p>
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #1a1a1a;">
+          Your account has been returned to regular customer status. <strong>Your account remains active</strong> and you can continue placing orders as usual.
+        </p>
+      </div>
+
+      <!-- Changes Section -->}
+      <div style="background: #ffffff; border: 1px solid #e9ecef; padding: 20px; margin-bottom: 30px; border-radius: 12px;">
+        <h3 style="margin: 0 0 15px 0; font-size: 18px; font-weight: 600; color: #1a1a1a;">What's Changed:</h3>
+        <ul style="margin: 0; padding-left: 20px; font-size: 16px; line-height: 1.8; color: #1a1a1a;">
+          <li>Wholesale discount (15% off) has been removed</li>  
+          <li>Store credit rate changed from 2.5% to 5% (you now earn more!)</li>
+          <li>All existing store credits remain in your account</li>
+          <li>Your client relationships and order history are preserved</li>
+        </ul>
+      </div>
+
+      <!-- What Stays the Same -->}
+      <div style="background: #ffffff; border: 1px solid #e9ecef; border-left: 4px solid #10B981; padding: 20px; margin-bottom: 30px; border-radius: 12px;">
+        <h3 style="margin: 0 0 15px 0; font-size: 18px; font-weight: 600; color: #1a1a1a;">What Stays the Same:</h3>
+        <ul style="margin: 0; padding-left: 20px; font-size: 16px; line-height: 1.8; color: #1a1a1a;">
+          <li><strong>Your account remains active</strong> - no interruption to service</li>
+          <li><strong>Order history preserved</strong> - all past orders remain accessible</li>
+          <li><strong>Store credits maintained</strong> - use your existing credits anytime</li>
+          <li><strong>Higher credit rate</strong> - earn 5% back instead of 2.5%!</li>
+        </ul>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="text-align: center; margin-bottom: 30px;">
+        <a href="${FRONTEND_URL}/cart" style="display: inline-block; background-color: #3B82F6; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+          Continue Shopping
+        </a>
+        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background-color: #10B981; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+          View Account
+        </a>
+      </div>
+
+      <!-- Support Section -->
+      <div style="border-top: 1px solid #e9ecef; padding-top: 20px; text-align: center;">
+        <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 400; color: #4b5563;">
+          Questions about these changes?
+        </p>
+        <a href="${FRONTEND_URL}/contact-us" style="color: #3b82f6; text-decoration: none; font-weight: 600; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+          Contact Support
+        </a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background: #f1f3f5; border-top: 1px solid #e9ecef; padding: 20px; text-align: center;">
+      <!-- Logo -->
+      <div style="margin-bottom: 15px;">
+        <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751567428/LogoDarktGreyStickerShuttle_lpvvnc.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
+      </div>
+      
+      <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 400; color: #4b5563;">
+        Thank you for your continued business!
+      </p>
+      <p style="margin: 0; font-size: 12px; font-weight: 400; color: #6b7280;">
+        This email was sent to ${userData.email} regarding your account status
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+    `
+  };
+};
+
+// Send wholesale revocation email
+const sendWholesaleRevocationEmail = async (userData) => {
+  try {
+    console.log('📧 Sending wholesale revocation email to:', userData.email);
+    
+    if (!userData.email) {
+      console.log('❌ No email provided for wholesale revocation notification');
+      return { success: false, error: 'No email provided' };
+    }
+
+    const template = getWholesaleRevocationEmailTemplate(userData);
+    const result = await sendEmail(userData.email, template.subject, template.html);
+    
+    if (result.success) {
+      console.log(`✅ Wholesale revocation email sent to ${userData.email}`);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('❌ Error sending wholesale revocation email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 // Template for customer artwork upload notification
 const getCustomerArtworkUploadTemplate = (orderData, itemData) => {
   const adminEmail = 'orbit@stickershuttle.com';
@@ -1295,89 +1449,34 @@ const getFirstOrderThankYouTemplate = (orderData) => {
     html: `
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Thank you for your support!</title>
-</head>
-<body style="margin: 0; padding: 20px; background-color: #ffffff; color: #1a1a1a; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; min-height: 100vh;">
-  <div style="max-width: 600px; margin: 0 auto; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 16px; overflow: hidden;">
-    
-    <!-- Header -->
-    <div style="background: #f1f3f5; border-bottom: 1px solid #e9ecef; padding: 30px 20px; text-align: center;">
-      <h1 style="margin: 0; font-size: 26px; font-weight: 600; color: #1a1a1a;">
-        Hi ${firstName},
-      </h1>
-    </div>
+  <body style="font-family: Arial, sans-serif; font-size: 16px; color: #000; line-height: 1.6; background: #fff; margin: 0; padding: 0;">
+    <div style="padding: 0 20px;">
+      <p>Hi ${firstName},</p>
 
-    <!-- Main Content -->
-    <div style="padding: 30px 20px;">
-      <!-- Personal Message -->
-      <div style="background: #ffffff; border: 1px solid #e9ecef; padding: 25px; margin-bottom: 30px; border-radius: 12px;">
-        <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #1a1a1a;">
-          We seriously value every one of our customers, so I wanted to send a quick note to say thank you for supporting our business.
-        </p>
-        <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #1a1a1a;">
-          Sometimes it can feel like a lot running a small business, but every time an order comes through like yours it makes it that much easier! :)
-        </p>
-        <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #1a1a1a;">
-          If you have any questions before your order arrives, please reach out. We're always happy to help in any way we can.
-        </p>
-        <p style="margin: 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #1a1a1a;">
-          We hope to make more for you soon!
-        </p>
-      </div>
-
-      <!-- Signature -->
-      <div style="background: #ffffff; border: 1px solid #e9ecef; padding: 25px; margin-bottom: 30px; border-radius: 12px;">
-        <p style="margin: 0 0 10px 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #1a1a1a;">
-          Thanks,
-        </p>
-        <p style="margin: 0 0 5px 0; font-size: 18px; font-weight: 600; color: #1a1a1a;">
-          Justin Fowler
-        </p>
-        <p style="margin: 0 0 10px 0; font-size: 16px; font-weight: 400; color: #4b5563;">
-          Owner @ Sticker Shuttle
-        </p>
-        <a href="https://www.stickershuttle.com" style="color: #3b82f6; text-decoration: none; font-weight: 500; font-size: 16px;">
-          www.stickershuttle.com
-        </a>
-      </div>
-
-      <!-- Action Button -->
-      <div style="text-align: center; margin-bottom: 30px;">
-        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background-color: #3B82F6; color: #ffffff; padding: 15px 40px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-          Track Your Order
-        </a>
-      </div>
-
-      <!-- Support Section -->
-      <div style="border-top: 1px solid #e9ecef; padding-top: 20px; text-align: center;">
-        <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px; font-weight: 400;">
-          Questions about your order or need help?
-        </p>
-        <a href="${FRONTEND_URL}/contact-us" style="color: #3b82f6; text-decoration: none; font-weight: 600; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-          Contact Support
-        </a>
-      </div>
-    </div>
-
-    <!-- Footer -->
-    <div style="background: #f1f3f5; border-top: 1px solid #e9ecef; padding: 20px; text-align: center;">
-      <!-- Logo -->
-      <div style="margin-bottom: 15px;">
-        <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751567428/LogoDarktGreyStickerShuttle_lpvvnc.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
-      </div>
-      
-      <p style="margin: 0 0 10px 0; color: #4b5563; font-size: 14px; font-weight: 400;">
-        Thank you for choosing Sticker Shuttle!
+      <p>
+        We seriously value every one of our customers, so I wanted to send a quick note to say thank you for supporting our business.
       </p>
-      <p style="margin: 0; color: #6b7280; font-size: 12px; font-weight: 400;">
-        This email was sent to ${orderData.customerEmail} regarding your recent order
+
+      <p>
+        Sometimes it can feel like a lot running a small business, but every time an order comes through like yours it makes it that much easier! :)
+      </p>
+
+      <p>
+        If you have any questions before your order arrives, please reach out. We're always happy to help in any way we can.
+      </p>
+
+      <p>
+        We hope to make more for you soon!
+      </p>
+
+      <p>
+        Thanks,<br />
+        Justin Fowler<br />
+        Owner @ Sticker Shuttle<br />
+        <a href="https://www.stickershuttle.com" style="color: #000;">www.stickershuttle.com</a>
       </p>
     </div>
-  </div>
-</body>
+  </body>
 </html>
     `
   };
@@ -1400,8 +1499,8 @@ const scheduleFirstOrderThankYou = async (orderData) => {
     }
 
     // Get database client
-    const { getSupabaseServiceClient } = require('./supabase-client');
-    const client = getSupabaseServiceClient();
+    const supabaseClient = require('./supabase-client');
+    const client = supabaseClient.getServiceClient();
 
     // Check if we've already scheduled this email in the database
     const { data: existingEmail, error: checkError } = await client
@@ -1634,8 +1733,8 @@ const bulkSyncUsersToResendAudience = async (audienceId = null) => {
     console.log('🔄 Starting bulk sync of all users to Resend audience...');
 
     // Get database client
-    const { getSupabaseServiceClient } = require('./supabase-client');
-    const client = getSupabaseServiceClient();
+    const supabaseClient = require('./supabase-client');
+    const client = supabaseClient.getServiceClient();
 
     // Get all users from auth.users
     const { data: authUsers, error: authError } = await client.auth.admin.listUsers();
@@ -1741,4 +1840,24 @@ const bulkSyncUsersToResendAudience = async (audienceId = null) => {
     console.error('❌ Error in bulk sync to Resend audience:', error);
     return { success: false, error: error.message };
   }
+};
+
+// Export all functions for use in other modules
+module.exports = {
+  sendEmail,
+  sendOrderStatusNotification,
+  sendOrderStatusNotificationEnhanced,
+  sendProofNotification,
+  sendAdminNewOrderNotification,
+  sendAdminProofActionNotification,
+  sendWelcomeEmail,
+  sendWholesaleApprovalEmail,
+  sendWholesaleRevocationEmail,
+  sendCustomerArtworkUploadNotification,
+  sendUserFileUpload,
+  addContactToResendAudience,
+  updateContactInResendAudience,
+  bulkSyncUsersToResendAudience,
+  scheduleFirstOrderThankYou,
+  isFirstTimeCustomer
 }; 
