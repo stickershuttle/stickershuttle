@@ -21,7 +21,7 @@ export async function onAuthStateChange(callback: (event: string, session: any) 
 export async function resetPassword(email: string) {
   const supabase = getSupabase()
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: getCanonicalUrl('/reset-password')
+    redirectTo: 'https://stickershuttle.com/reset-password'
   })
   return { error }
 }
