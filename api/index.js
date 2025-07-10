@@ -383,11 +383,8 @@ app.get('/api/placeholder/:width/:height', (req, res) => {
   res.send(svg);
 });
 
-// Add Stripe webhook routes (before body parsing middleware)
-app.use('/webhooks', stripeWebhookHandlers);
-
-// Add EasyPost webhook routes (before Apollo setup)
-app.use('/webhooks', stripeWebhookHandlers);
+// Add Stripe webhook routes with raw body parsing (CRITICAL: must be before any JSON parsing)
+app.use('/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookHandlers);
 
 // Add EasyPost webhook endpoint with enhanced tracking
 app.post('/webhooks/easypost', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -931,6 +928,7 @@ const typeDefs = gql`
     # Customer order mutations
     createCustomerOrder(input: CustomerOrderInput!): CustomerOrder
     updateOrderStatus(orderId: ID!, statusUpdate: OrderStatusInput!): CustomerOrder
+    markOrderAsDelivered(orderId: ID!): CustomerOrder
     claimGuestOrders(userId: ID!, email: String!): ClaimResult
     
     # Proof mutations
@@ -4655,6 +4653,83 @@ const resolvers = {
         return updatedOrder;
       } catch (error) {
         console.error('Error updating order status:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    markOrderAsDelivered: async (_, { orderId }, { user }) => {
+      try {
+        // Require admin authentication
+        requireAdminAuth(user);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Order service is currently unavailable');
+        }
+        
+        // Get the current order
+        const client = supabaseClient.getServiceClient();
+        const { data: currentOrder, error: fetchError } = await client
+          .from('orders_main')
+          .select('*')
+          .eq('id', orderId)
+          .single();
+          
+        if (fetchError) {
+          throw new Error(`Failed to fetch order: ${fetchError.message}`);
+        }
+        
+        if (!currentOrder) {
+          throw new Error('Order not found');
+        }
+        
+        // Update the order status to delivered
+        const statusUpdate = {
+          orderStatus: 'Delivered',
+          fulfillmentStatus: 'fulfilled',
+          proof_status: 'delivered'
+        };
+        
+        const { data: updatedOrder, error: updateError } = await client
+          .from('orders_main')
+          .update({
+            order_status: statusUpdate.orderStatus,
+            fulfillment_status: statusUpdate.fulfillmentStatus,
+            proof_status: statusUpdate.proof_status,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', orderId)
+          .select(`
+            *,
+            order_items_new(*)
+          `)
+          .single();
+          
+        if (updateError) {
+          throw new Error(`Failed to update order status: ${updateError.message}`);
+        }
+        
+        // Send delivered email notification to customer
+        try {
+          console.log('📧 Sending delivered email notification to customer...');
+          const emailNotifications = require('./email-notifications');
+          
+          const emailResult = await emailNotifications.sendOrderStatusNotification(
+            updatedOrder, 
+            'Delivered'
+          );
+          
+          if (emailResult.success) {
+            console.log(`✅ Delivered email sent successfully for order ${updatedOrder.order_number}`);
+          } else {
+            console.error('❌ Delivered email failed:', emailResult.error);
+          }
+        } catch (emailError) {
+          console.error('⚠️ Failed to send delivered email (order still marked as delivered):', emailError);
+        }
+        
+        return updatedOrder;
+      } catch (error) {
+        console.error('Error marking order as delivered:', error);
         throw new Error(error.message);
       }
     },

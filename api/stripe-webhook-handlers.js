@@ -8,11 +8,8 @@ const serverAnalytics = require('./business-analytics');
 
 const router = express.Router();
 
-// Middleware to parse raw body for webhook verification
-router.use(express.raw({ type: 'application/json' }));
-
-// Main webhook endpoint
-router.post('/stripe', async (req, res) => {
+// Main webhook endpoint (raw body parsing is now handled at the app level)
+router.post('/', async (req, res) => {
   const sig = req.headers['stripe-signature'];
   const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
