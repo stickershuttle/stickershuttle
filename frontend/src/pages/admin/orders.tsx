@@ -124,6 +124,19 @@ const SEND_PROOFS = gql`
   }
 `;
 
+// Mutation to mark order as delivered
+const MARK_ORDER_AS_DELIVERED = gql`
+  mutation MarkOrderAsDelivered($orderId: ID!) {
+    markOrderAsDelivered(orderId: $orderId) {
+      id
+      orderStatus
+      fulfillmentStatus
+      proof_status
+      orderUpdatedAt
+    }
+  }
+`;
+
 // Admin check - add your admin email(s) here
 const ADMIN_EMAILS = ['justin@stickershuttle.com']; // Add all admin emails here
 
@@ -340,6 +353,7 @@ export default function AdminOrders() {
   const [updateOrderStatus] = useMutation(UPDATE_ORDER_STATUS);
   const [sendProofs] = useMutation(SEND_PROOFS);
   const [getEasyPostLabel] = useMutation(GET_EASYPOST_LABEL);
+  const [markOrderAsDelivered, { loading: markingDelivered }] = useMutation(MARK_ORDER_AS_DELIVERED);
 
   // Calculate customer statistics
   const getCustomerStats = (customerEmail: string | undefined) => {
@@ -919,6 +933,28 @@ export default function AdminOrders() {
     }
   };
 
+  // Convert hex color to 5% opacity rgba for row background
+  const getRowBackgroundColor = (status: string) => {
+    const hexColor = getLEDGlowColor(status);
+    
+    // Convert hex to RGB
+    const hex = hexColor.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    
+    // Return rgba with 5% opacity
+    return `rgba(${r}, ${g}, ${b}, 0.07)`;
+  };
+
+  const getStatusBorderColor = (status: string) => {
+    return getLEDGlowColor(status);
+  };
+
+  const isDeliveredOrder = (status: string) => {
+    return status === 'Delivered' || status === 'Assume Delivered';
+  };
+
 
 
   // Group items by product name and sum quantities
@@ -967,6 +1003,25 @@ export default function AdminOrders() {
       alert('Failed to send proofs. Please try again.');
     } finally {
       setSendingProofs(false);
+    }
+  };
+
+  // Handle mark as delivered
+  const handleMarkAsDelivered = async (orderId: string) => {
+    try {
+      await markOrderAsDelivered({
+        variables: { orderId: orderId }
+      });
+      
+      // Refetch to update order status
+      refetch();
+      
+      // Show success message
+      alert('Order marked as delivered successfully! Customer will receive an email notification.');
+      
+    } catch (error) {
+      console.error('Error marking order as delivered:', error);
+      alert('Failed to mark order as delivered. Please try again.');
     }
   };
 
@@ -1727,7 +1782,9 @@ export default function AdminOrders() {
                                 onClick={() => selectOrder(order)}
                                 className="flex items-center px-4 py-4 cursor-pointer active:bg-white/5 transition-colors"
                                 style={{
-                                  borderBottom: orderIndex < orders.length - 1 ? '1px solid rgba(255, 255, 255, 0.08)' : 'none'
+                                  borderBottom: orderIndex < orders.length - 1 ? '1px solid rgba(255, 255, 255, 0.08)' : 'none',
+                                  borderLeft: `4px solid ${getStatusBorderColor(getProofStatus(order))}`,
+                                  backgroundColor: isDeliveredOrder(getProofStatus(order)) ? 'rgba(0, 0, 0, 0.5)' : 'transparent'
                                 }}
                               >
                                 {/* Design Image */}
@@ -1942,7 +1999,8 @@ export default function AdminOrders() {
                               className="cursor-pointer table-row-hover"
                               style={{
                                 borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                                backgroundColor: 'rgba(3, 1, 64, 0.3)'
+                                borderLeft: `4px solid ${getStatusBorderColor(getProofStatus(order))}`,
+                                backgroundColor: isDeliveredOrder(getProofStatus(order)) ? 'rgba(0, 0, 0, 0.15)' : 'transparent'
                               }}
                               onClick={() => selectOrder(order)}
                             >
@@ -3711,6 +3769,48 @@ export default function AdminOrders() {
                                 <p className="text-sm text-white">{selectedOrder.customerPhone}</p>
                               </div>
                             )}
+                          </div>
+                        </div>
+                        
+                        {/* Order Actions */}
+                        <div className="pt-4 border-t border-gray-700 border-opacity-30">
+                          <p className="text-xs text-gray-500 uppercase tracking-wider mb-3">Order Actions</p>
+                          <div className="space-y-2">
+                            {/* Mark as Delivered Button - Only show if not already delivered */}
+                            {selectedOrder.orderStatus !== 'Delivered' && selectedOrder.fulfillmentStatus !== 'fulfilled' && (
+                              <button
+                                onClick={() => handleMarkAsDelivered(selectedOrder.id)}
+                                disabled={markingDelivered}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                                  backdropFilter: 'blur(25px) saturate(180%)',
+                                  border: '1px solid rgba(34, 197, 94, 0.4)',
+                                  boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                }}
+                              >
+                                {markingDelivered ? (
+                                  <>
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    Marking as Delivered...
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Mark as Delivered
+                                  </>
+                                )}
+                              </button>
+                            )}
+                            
+                            {/* Order Status for reference */}
+                            <div className="text-center">
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${getProofStatusColor(getProofStatus(selectedOrder))}`}>
+                                Current Status: {getProofStatus(selectedOrder)}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
