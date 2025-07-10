@@ -8,13 +8,21 @@ interface LayoutProps {
   title?: string;
   description?: string;
   ogImage?: string;
+  keywords?: string;
+  canonical?: string;
+  structuredData?: object;
+  preconnect?: string[];
 }
 
 export default function Layout({ 
   children, 
   title = "Sticker Shuttle - Premium Custom Stickers & Vinyl Banners", 
   description,
-  ogImage 
+  ogImage,
+  keywords,
+  canonical,
+  structuredData,
+  preconnect
 }: LayoutProps) {
   return (
     <>
@@ -22,6 +30,10 @@ export default function Layout({
         title={title}
         description={description}
         ogImage={ogImage}
+        keywords={keywords}
+        canonical={canonical}
+        structuredData={structuredData}
+        preconnect={preconnect}
       />
       
       <div className="min-h-screen text-white relative" style={{ backgroundColor: '#030140', fontFamily: 'Inter, sans-serif' }}>
