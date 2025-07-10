@@ -5,6 +5,7 @@ import AIFileImage from './AIFileImage';
 import { getSupabase } from '@/lib/supabase';
 import { useCart } from '@/components/CartContext';
 import { useRouter } from 'next/navigation';
+import { generateCartItemId } from '@/types/product';
 
 interface VinylBannerCalculatorProps {
   initialBasePricing: {
@@ -303,7 +304,7 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
         selectedSize,
         customWidth: customWidth || undefined,
         customHeight: customHeight || undefined,
-        selectedMaterial: selectedFinishing, // Use selectedMaterial field for finishing
+        selectedMaterial: selectedFinishing, // Banner finishing options (using selectedMaterial field)
         selectedQuantity,
         customQuantity: customQuantity || undefined,
         rushOrder,
@@ -390,26 +391,102 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
     return null;
   };
 
-  const handleAddToCart = () => {
-    if (pricing.total === 0) return;
-    
+  const createCartItem = () => {
+    const sqFt = calculateSquareFootage();
     const quantity = selectedQuantity === 'Custom' ? parseInt(customQuantity) || 1 : parseInt(selectedQuantity);
     
-    const cartItem = {
-      productType: 'vinyl-banners',
-      productId: 'VB-001',
-      size: selectedSize === 'custom' ? `${customWidth}' × ${customHeight}'` : selectedSize,
-      finishing: selectedFinishing,
-      quantity,
-      rushOrder,
-      postToInstagram,
-      unitPrice: pricing.perUnit,
-      totalPrice: pricing.total,
-      uploadedFile: uploadedFile?.original_filename || null
+    // Apply wholesale discount if applicable
+    const { discountAmount, finalPrice } = calculateWholesaleDiscount(pricing.total);
+    const finalUnitPrice = isWholesaleApproved() ? finalPrice / quantity : pricing.perUnit;
+    const finalTotalPrice = isWholesaleApproved() ? finalPrice : pricing.total;
+
+    return {
+      id: generateCartItemId(),
+      product: {
+        id: "vinyl-banners",
+        sku: "SS-VB-CUSTOM",
+        name: "Vinyl Banners",
+        category: "vinyl-banners" as const,
+        description: "Heavy-duty vinyl banners perfect for outdoor advertising, events, and business signage",
+        shortDescription: "Professional outdoor signage, durable and weather-resistant",
+        basePrice: finalUnitPrice,
+        pricingModel: "per-unit" as const,
+        images: [],
+        defaultImage: "",
+        features: [],
+        attributes: [],
+        customizable: true,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      customization: {
+        productId: "vinyl-banners",
+        selections: {
+          size: { 
+            type: "size-preset" as const, 
+            value: selectedSize === 'custom' ? `${customWidth}' × ${customHeight}'` : selectedSize,
+            displayValue: selectedSize === 'custom' ? `${customWidth}' × ${customHeight}'` : selectedSize,
+            priceImpact: 0 
+          },
+          material: { 
+            type: "finish" as const, 
+            value: selectedFinishing, 
+            displayValue: finishingOptions.find(f => f.value === selectedFinishing)?.label || selectedFinishing, 
+            priceImpact: 0 
+          },
+          rush: { 
+            type: "finish" as const, 
+            value: rushOrder, 
+            displayValue: rushOrder ? "Rush Order" : "Standard", 
+            priceImpact: rushOrder ? finalTotalPrice * 0.35 : 0 
+          },
+          ...(postToInstagram && !isWholesaleApproved() && {
+            instagram: { 
+              type: "finish" as const, 
+              value: instagramUsername, 
+              displayValue: instagramUsername ? `@${instagramUsername}` : "Instagram Opt-in", 
+              priceImpact: 0 
+            }
+          }),
+        },
+        totalPrice: finalTotalPrice,
+        customFiles: uploadedFile ? [uploadedFile.secure_url] : [],
+        notes: "",
+        instagramOptIn: postToInstagram && !isWholesaleApproved(),
+        additionalInfo: {
+          instagramHandle: (postToInstagram && !isWholesaleApproved()) ? instagramUsername : undefined,
+          uploadLater: uploadLater,
+          sqFt: sqFt,
+          ...(isWholesaleApproved() && {
+            originalPrice: pricing.total,
+            wholesaleDiscount: discountAmount
+          })
+        }
+      },
+      quantity: quantity,
+      unitPrice: finalUnitPrice,
+      totalPrice: finalTotalPrice,
+      addedAt: new Date().toISOString()
     };
+  };
+
+  const handleCheckout = () => {
+    if (pricing.total === 0) return;
     
-    console.log('Adding to cart:', cartItem);
-    alert('Added to cart! (Cart functionality to be implemented)');
+    const cartItem = createCartItem();
+    addToCart(cartItem);
+    // Redirect to cart page for checkout
+    router.push('/cart');
+  };
+
+  const handleAddToCartAndKeepShopping = () => {
+    if (pricing.total === 0) return;
+    
+    const cartItem = createCartItem();
+    addToCart(cartItem);
+    // Redirect to products page with success message
+    router.push('/products?added=true');
   };
 
   const handleQuantityChange = (amount: string) => {
@@ -1084,32 +1161,84 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
             )}
           </div>
 
-          {/* Add to Cart Button */}
-          <button
-            onClick={handleAddToCart}
-            disabled={pricing.total === 0}
-            className={`w-full py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 flex items-center justify-center relative overflow-hidden group ${
-              pricing.total > 0
-                ? 'hover:scale-[1.025] cursor-pointer'
-                : 'bg-gray-600 text-white cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100'
-            }`}
-            style={pricing.total > 0 ? {
-              background: 'linear-gradient(135deg, #ffd713, #ffed4e)',
-              color: '#030140',
-              fontWeight: 'bold',
-              border: 'solid',
-              borderWidth: '0.03125rem',
-              borderColor: '#e6c211',
-              boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)'
-            } : {}}
-          >
-            <span className="relative z-10 flex items-center justify-center gap-2">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add to Cart - ${isWholesaleApproved() ? calculateWholesaleDiscount(pricing.total).finalPrice.toFixed(2) : pricing.total.toFixed(2)}
-            </span>
-          </button>
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            {/* Conditional Button Display */}
+            {!pricing.total || pricing.total === 0 ? (
+              /* Single Configuration Required Button */
+              <button 
+                disabled={true}
+                className="w-full py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: '#666',
+                  color: 'white',
+                  fontWeight: 'bold'
+                }}
+              >
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Please Configure Your Banner Above
+                </span>
+              </button>
+            ) : (
+              /* Dual Buttons */
+              <div className="flex flex-col sm:flex-row gap-3">
+                {/* Add to Cart & Keep Shopping Button - Full width on mobile, 50% on desktop */}
+                <button 
+                  onClick={handleAddToCartAndKeepShopping}
+                  className="w-full sm:w-1/2 py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group hover:scale-[1.0025] cursor-pointer"
+                  style={{
+                    background: 'linear-gradient(135deg, #ffd713, #ffed4e)',
+                    color: '#030140',
+                    fontWeight: 'bold',
+                    border: '0.03125rem solid #e6c211',
+                    boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)'
+                  }}
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span className="hidden sm:inline">Add & Keep Shopping</span>
+                    <span className="sm:hidden">Add & Keep Shopping</span>
+                  </span>
+                </button>
+
+                {/* Checkout Button - Full width on mobile, 50% on desktop */}
+                <button 
+                  onClick={handleCheckout}
+                  className="w-full sm:w-1/2 py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group hover:scale-[1.025] cursor-pointer"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                    color: 'white',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span>Checkout</span>
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {/* Helpful text */}
+            <div className="text-center py-2">
+              <p className="text-white/60 text-sm">
+                {!pricing.total || pricing.total === 0
+                  ? "Complete your banner configuration to proceed"
+                  : "Items will be added to your cart for review before checkout"
+                }
+              </p>
+            </div>
+          </div>
         </div>
       </div>
       </div>

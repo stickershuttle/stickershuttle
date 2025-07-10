@@ -50,6 +50,21 @@ const capitalize = (str: string): string => {
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
+const getItemTypeName = (productCategory: string, quantity: number): string => {
+  switch (productCategory) {
+    case 'vinyl-banners':
+      return quantity === 1 ? 'banner' : 'banners';
+    case 'vinyl-stickers':
+    case 'holographic-stickers':
+    case 'chrome-stickers':
+    case 'glitter-stickers':
+    case 'clear-stickers':
+    case 'sticker-sheets':
+    default:
+      return quantity === 1 ? 'sticker' : 'stickers';
+  }
+};
+
 // Calculate area from size string
 const calculateAreaFromSize = (sizeString: string, customWidth?: string, customHeight?: string): number => {
   // Defensive check for undefined or null sizeString
@@ -112,6 +127,16 @@ const calculateItemPricing = (
       perSticker: 9.00,
       discountPercentage: 0,
       area: 9 // Default area for sample pack
+    };
+  }
+  
+  // For vinyl banners, use the original pricing from the calculator - don't recalculate
+  if (item.product.category === 'vinyl-banners') {
+    return {
+      total: item.totalPrice,
+      perSticker: item.unitPrice,
+      discountPercentage: 0,
+      area: (item.customization.additionalInfo as any)?.sqFt || 15 // Use stored square footage or default
     };
   }
   
@@ -367,14 +392,15 @@ const calculateDeliveryDate = (totalQuantity: number, hasRushOrder: boolean) => 
 
 
 // Helper function to format option name
-const formatOptionName = (type: string) => {
+const formatOptionName = (type: string, productCategory?: string) => {
   if (typeof type !== 'string') return "Option";
   
   switch (type) {
     case "shape":
       return "Shape";
     case "finish":
-      return "Material";
+      // For vinyl banners, show "Finishing" instead of "Material"
+      return productCategory === "vinyl-banners" ? "Finishing" : "Material";
     case "size-preset":
       return "Size";
     case "white-base":
@@ -1701,7 +1727,7 @@ export default function SharedCartPage() {
                                   <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
                                     <div className="flex items-center gap-2">
                                       <span className="text-lg">{getOptionEmoji(sel.type || '', sel.value)}</span>
-                                      <span className="text-xs font-medium text-gray-400 uppercase">{formatOptionName(sel.type || '')}</span>
+                                      <span className="text-xs font-medium text-gray-400 uppercase">{formatOptionName(sel.type || '', item.product.category)}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <span className="text-white font-medium">{typeof sel.displayValue === 'string' ? sel.displayValue : 'N/A'}</span>
@@ -1715,7 +1741,7 @@ export default function SharedCartPage() {
                                             toggleDropdown(item.id, optionType!, e.currentTarget);
                                           }}
                                           className="text-gray-400 hover:text-white transition-colors p-1"
-                                          title={`Change ${formatOptionName(sel.type || '').toLowerCase()}`}
+                                          title={`Change ${formatOptionName(sel.type || '', item.product.category).toLowerCase()}`}
                                         >
                                           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                                             <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
@@ -1996,12 +2022,36 @@ export default function SharedCartPage() {
                   <h3 className="text-xl font-semibold text-white mb-6">Order Summary</h3>
                   <div className="space-y-3 mb-6">
                     <div className="flex justify-between text-gray-300">
-                      <span>Subtotal ({totalQuantity} stickers)</span>
+                      <span>Subtotal ({totalQuantity} {(() => {
+                        // Determine the most common product type in cart
+                        const productTypes = updatedCart.map(item => item.product.category);
+                        const bannerCount = productTypes.filter(type => type === 'vinyl-banners').length;
+                        const stickerCount = productTypes.length - bannerCount;
+                        
+                        // If all items are banners, use banner terminology
+                        if (bannerCount > 0 && stickerCount === 0) {
+                          return getItemTypeName('vinyl-banners', totalQuantity);
+                        }
+                        // If mixed or all stickers, use sticker terminology
+                        return getItemTypeName('vinyl-stickers', totalQuantity);
+                      })()})</span>
                       <span>${subtotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-blue-300">
                       <span>You're paying</span>
-                      <span>${(subtotal / totalQuantity).toFixed(2)} per sticker</span>
+                      <span>${(subtotal / totalQuantity).toFixed(2)} per {(() => {
+                        // Determine the most common product type in cart
+                        const productTypes = updatedCart.map(item => item.product.category);
+                        const bannerCount = productTypes.filter(type => type === 'vinyl-banners').length;
+                        const stickerCount = productTypes.length - bannerCount;
+                        
+                        // If all items are banners, use banner terminology
+                        if (bannerCount > 0 && stickerCount === 0) {
+                          return getItemTypeName('vinyl-banners', 1);
+                        }
+                        // If mixed or all stickers, use sticker terminology
+                        return getItemTypeName('vinyl-stickers', 1);
+                      })()}</span>
                     </div>
                     <div className="flex justify-between text-green-300">
                       <span>Shipping</span>
