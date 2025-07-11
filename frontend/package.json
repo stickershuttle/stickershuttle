@@ -13,7 +13,8 @@
     "analyze": "ANALYZE=true npm run build",
     "lighthouse": "lighthouse http://localhost:3000 --output html --output-path ./lighthouse-report.html --chrome-flags=\"--headless\"",
     "sentry:sourcemaps": "sentry-cli sourcemaps inject --org sticker-shuttle --project sticker-shuttle-frontend .next && sentry-cli sourcemaps upload --org sticker-shuttle --project sticker-shuttle-frontend .next",
-    "test-redirects": "node check-redirects.js"
+    "test-redirects": "node check-redirects.js",
+    "test-sitemap": "node test-sitemap.js"
   },
   "dependencies": {
     "@apollo/client": "^3.13.8",
