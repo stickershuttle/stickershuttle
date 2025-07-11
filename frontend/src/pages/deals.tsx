@@ -44,16 +44,76 @@ export default function Deals() {
   };
 
   // Load active deal from localStorage
-  useEffect(() => {
+  const loadDealsFromStorage = useCallback(() => {
     const savedDeals = localStorage.getItem('sticker-shuttle-deals');
+    console.log('🔍 Loading deals from localStorage:', savedDeals);
     if (savedDeals) {
       const deals = JSON.parse(savedDeals);
+      console.log('📦 Parsed deals:', deals);
       const active = deals.find((deal: Deal) => deal.isActive);
+      console.log('🎯 Found active deal:', active);
       if (active) {
         setActiveDeal(active);
+      } else {
+        console.log('⚠️ No active deal found, setting to null');
+        setActiveDeal(null);
       }
+    } else {
+      console.log('⚠️ No deals in localStorage, setting to null');
+      setActiveDeal(null);
     }
   }, []);
+
+  useEffect(() => {
+    // Initial load
+    loadDealsFromStorage();
+
+    // Listen for localStorage changes (when deals are updated from admin panel)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'sticker-shuttle-deals') {
+        console.log('📡 Storage event received, reloading deals');
+        loadDealsFromStorage();
+      }
+    };
+
+    // Listen for window focus (when user switches back to deals page)
+    const handleFocus = () => {
+      console.log('👁️ Window focus, reloading deals');
+      loadDealsFromStorage();
+    };
+
+    // Listen for visibility changes (when page becomes visible again)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('👀 Page visible, reloading deals');
+        loadDealsFromStorage();
+      }
+    };
+
+    // Listen for custom deals update event
+    const handleDealsUpdate = () => {
+      console.log('🔄 Custom deals update event received');
+      loadDealsFromStorage();
+    };
+
+    // Poll for changes every 10 seconds as a fallback (reduced frequency)
+    const interval = setInterval(() => {
+      loadDealsFromStorage();
+    }, 10000);
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('deals-updated', handleDealsUpdate);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('deals-updated', handleDealsUpdate);
+      clearInterval(interval);
+    };
+  }, [loadDealsFromStorage]);
 
   const handleFileUpload = async (file: File) => {
     const validation = validateFile(file);
@@ -198,7 +258,7 @@ export default function Deals() {
   };
 
   return (
-    <Layout title="100 Custom Stickers for $29 - Sticker Shuttle Deals">
+    <Layout title={activeDeal ? `${activeDeal.headline.replace('\n', ' ')} - Sticker Shuttle Deals` : "100 Custom Stickers for $29 - Sticker Shuttle Deals"}>
         {/* Hero Section */}
         <section className="py-4 -mt-4 md:mt-0">
           <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">

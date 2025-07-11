@@ -113,6 +113,10 @@ export default function AdminDeals() {
   const saveDeals = (updatedDeals: Deal[]) => {
     localStorage.setItem('sticker-shuttle-deals', JSON.stringify(updatedDeals));
     setDeals(updatedDeals);
+    
+    // Dispatch custom event to notify deals page of changes
+    window.dispatchEvent(new CustomEvent('deals-updated'));
+    console.log('🚀 Deals saved and event dispatched:', updatedDeals);
   };
 
   // Handle form changes
