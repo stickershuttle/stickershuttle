@@ -233,6 +233,246 @@ const nextConfig = {
   // Add redirects for SEO
   async redirects() {
     return [
+      // === SHOPIFY MIGRATION REDIRECTS ===
+      // These redirect old Shopify URLs to new custom site URLs
+      
+      // Product Collection Redirects
+      {
+        source: '/collections/all',
+        destination: '/products',
+        permanent: true,
+      },
+      {
+        source: '/collections/stickers',
+        destination: '/products',
+        permanent: true,
+      },
+      {
+        source: '/collections/vinyl-stickers',
+        destination: '/products/vinyl-stickers',
+        permanent: true,
+      },
+      {
+        source: '/collections/custom-stickers',
+        destination: '/products/vinyl-stickers',
+        permanent: true,
+      },
+      {
+        source: '/collections/holographic-stickers',
+        destination: '/products/holographic-stickers',
+        permanent: true,
+      },
+      {
+        source: '/collections/clear-stickers',
+        destination: '/products/clear-stickers',
+        permanent: true,
+      },
+      {
+        source: '/collections/chrome-stickers',
+        destination: '/products/chrome-stickers',
+        permanent: true,
+      },
+      {
+        source: '/collections/glitter-stickers',
+        destination: '/products/glitter-stickers',
+        permanent: true,
+      },
+      {
+        source: '/collections/bumper-stickers',
+        destination: '/products/vinyl-stickers',
+        permanent: true,
+      },
+      {
+        source: '/collections/vinyl-banners',
+        destination: '/products/vinyl-banners',
+        permanent: true,
+      },
+      {
+        source: '/collections/sticker-sheets',
+        destination: '/products/sticker-sheets',
+        permanent: true,
+      },
+      {
+        source: '/collections/sample-packs',
+        destination: '/products/sample-packs',
+        permanent: true,
+      },
+      
+      // Individual Product Redirects (common Shopify product handle patterns)
+      {
+        source: '/products/vinyl-sticker',
+        destination: '/products/vinyl-stickers',
+        permanent: true,
+      },
+      {
+        source: '/products/custom-vinyl-stickers',
+        destination: '/products/vinyl-stickers',
+        permanent: true,
+      },
+      {
+        source: '/products/holographic-sticker',
+        destination: '/products/holographic-stickers',
+        permanent: true,
+      },
+      {
+        source: '/products/clear-sticker',
+        destination: '/products/clear-stickers',
+        permanent: true,
+      },
+      {
+        source: '/products/chrome-sticker',
+        destination: '/products/chrome-stickers',
+        permanent: true,
+      },
+      {
+        source: '/products/glitter-sticker',
+        destination: '/products/glitter-stickers',
+        permanent: true,
+      },
+      {
+        source: '/products/bumper-sticker',
+        destination: '/products/vinyl-stickers',
+        permanent: true,
+      },
+      {
+        source: '/products/vinyl-banner',
+        destination: '/products/vinyl-banners',
+        permanent: true,
+      },
+      {
+        source: '/products/sticker-sheet',
+        destination: '/products/sticker-sheets',
+        permanent: true,
+      },
+      {
+        source: '/products/sample-pack',
+        destination: '/products/sample-packs',
+        permanent: true,
+      },
+      
+      // Cart and Checkout Redirects
+      {
+        source: '/cart',
+        destination: '/cart',
+        permanent: true,
+      },
+      {
+        source: '/checkout',
+        destination: '/cart',
+        permanent: true,
+      },
+      
+      // Account and Authentication Redirects
+      {
+        source: '/account',
+        destination: '/account/dashboard',
+        permanent: true,
+      },
+      {
+        source: '/account/login',
+        destination: '/login',
+        permanent: true,
+      },
+      {
+        source: '/account/register',
+        destination: '/signup',
+        permanent: true,
+      },
+      {
+        source: '/account/addresses',
+        destination: '/account/dashboard',
+        permanent: true,
+      },
+      {
+        source: '/account/orders',
+        destination: '/account/dashboard?view=all-orders',
+        permanent: true,
+      },
+      
+      // Policy and Info Page Redirects
+      {
+        source: '/pages/privacy-policy',
+        destination: '/privacy-policy',
+        permanent: true,
+      },
+      {
+        source: '/pages/terms-of-service',
+        destination: '/terms-and-conditions',
+        permanent: true,
+      },
+      {
+        source: '/pages/shipping-policy',
+        destination: '/shipping-process',
+        permanent: true,
+      },
+      {
+        source: '/pages/refund-policy',
+        destination: '/returns',
+        permanent: true,
+      },
+      {
+        source: '/pages/contact',
+        destination: '/contact',
+        permanent: true,
+      },
+      {
+        source: '/pages/contact-us',
+        destination: '/contact',
+        permanent: true,
+      },
+      {
+        source: '/pages/about',
+        destination: '/',
+        permanent: true,
+      },
+      {
+        source: '/pages/about-us',
+        destination: '/',
+        permanent: true,
+      },
+      
+      // Blog Redirects
+      {
+        source: '/blogs/news',
+        destination: '/blog',
+        permanent: true,
+      },
+      {
+        source: '/blogs/news/:slug',
+        destination: '/blog/:slug',
+        permanent: true,
+      },
+      {
+        source: '/blogs/sticker-news',
+        destination: '/blog',
+        permanent: true,
+      },
+      {
+        source: '/blogs/sticker-news/:slug',
+        destination: '/blog/:slug',
+        permanent: true,
+      },
+      
+      // Search Redirects
+      {
+        source: '/search',
+        destination: '/products',
+        permanent: true,
+      },
+      
+      // Common Shopify URL patterns
+      {
+        source: '/discount/:code',
+        destination: '/products',
+        permanent: true,
+      },
+      {
+        source: '/collections/:collection/products/:product',
+        destination: '/products/:product',
+        permanent: true,
+      },
+      
+      // === EXISTING REDIRECTS ===
       // Redirect old URLs to new ones (example)
       {
         source: '/products/vinyl',
