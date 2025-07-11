@@ -472,6 +472,68 @@ const nextConfig = {
         permanent: true,
       },
       
+      // === CATCH-ALL REDIRECTS ===
+      // Redirect any remaining /collections/* to /products
+      {
+        source: '/collections/:path*',
+        destination: '/products',
+        permanent: true,
+      },
+      // Redirect any remaining /blogs/* to /blog
+      {
+        source: '/blogs/:path*',
+        destination: '/blog',
+        permanent: true,
+      },
+      
+      // === SPECIFIC CUSTOM REDIRECTS ===
+      // Custom redirects for specific URLs you identified
+      {
+        source: '/pages/material-cost-calculator',
+        destination: '/',
+        permanent: true,
+      },
+      {
+        source: '/products/stickers',
+        destination: '/products/vinyl-stickers',
+        permanent: true,
+      },
+      {
+        source: '/pages/deals',
+        destination: '/deals',
+        permanent: true,
+      },
+      {
+        source: '/collections/custom-stickers-1',
+        destination: '/products/vinyl-stickers',
+        permanent: true,
+      },
+      {
+        source: '/products/holographic-sticker-custom',
+        destination: '/products/holographic-stickers',
+        permanent: true,
+      },
+      {
+        source: '/products/25-free-small-business-sticker-files-eps-ai',
+        destination: '/',
+        permanent: true,
+      },
+      {
+        source: '/products/sample',
+        destination: '/products/sample-packs',
+        permanent: true,
+      },
+      {
+        source: '/products/mini-banners',
+        destination: '/',
+        permanent: true,
+      },
+      {
+        source: '/blogs/all-blogs',
+        destination: '/blog',
+        permanent: true,
+      },
+      
       // === EXISTING REDIRECTS ===
       // Redirect old URLs to new ones (example)
       {

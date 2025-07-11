@@ -62,6 +62,21 @@ const urlsToTest = [
   // Other
   '/search',
   '/checkout',
+  
+  // Custom specific redirects
+  '/pages/material-cost-calculator',
+  '/products/stickers',
+  '/pages/deals',
+  '/collections/custom-stickers-1',
+  '/products/holographic-sticker-custom',
+  '/products/25-free-small-business-sticker-files-eps-ai',
+  '/products/sample',
+  '/products/mini-banners',
+  '/blogs/all-blogs',
+  
+  // Test catch-all patterns
+  '/collections/any-collection-name',
+  '/blogs/any-blog-post',
 ];
 
 const baseUrl = process.argv[2] || 'https://stickershuttle.com';
