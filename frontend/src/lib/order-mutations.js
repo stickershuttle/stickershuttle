@@ -251,6 +251,24 @@ export const UPDATE_ORDER_STATUS = gql`
   }
 `;
 
+// Mutation to update order shipping address
+export const UPDATE_ORDER_SHIPPING_ADDRESS = gql`
+  mutation UpdateOrderShippingAddress($orderId: ID!, $shippingAddress: ShippingAddressInput!) {
+    updateOrderShippingAddress(orderId: $orderId, shippingAddress: $shippingAddress) {
+      success
+      message
+      order {
+        id
+        orderNumber
+        customerFirstName
+        customerLastName
+        customerEmail
+        shippingAddress
+      }
+    }
+  }
+`;
+
 // Mutation to update proof status
 export const UPDATE_PROOF_STATUS = gql`
   mutation UpdateProofStatus($orderId: ID!, $proofId: ID!, $status: String!, $customerNotes: String) {
