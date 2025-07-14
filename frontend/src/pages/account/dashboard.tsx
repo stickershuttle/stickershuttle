@@ -1175,8 +1175,10 @@ function Dashboard() {
   };
 
   // Load wholesale clients when user is a wholesale customer (with rate limiting protection)
+  const [clientsLoaded, setClientsLoaded] = useState(false);
+  
   React.useEffect(() => {
-    if (!loading && profile && (user as any)?.id && wholesaleClients.length === 0 && !clientsLoading) {
+    if (!loading && profile && (user as any)?.id && !clientsLoaded && !clientsLoading) {
       const isWholesaleApproved = profile.wholesale_status === 'approved' || 
                                 profile.wholesaleStatus === 'approved' || 
                                 profile.isWholesaleCustomer;
@@ -1192,9 +1194,11 @@ function Dashboard() {
             fetchPolicy: 'cache-first' // Use cache to reduce API calls
           }).then(() => {
             setClientsLoading(false);
+            setClientsLoaded(true);
           }).catch((error: any) => {
             console.warn('Wholesale clients fetch failed:', error);
             setClientsLoading(false);
+            setClientsLoaded(true);
             
             // Don't retry on rate limit errors - let user manually refresh if needed
             if (error?.message?.includes('429') || error?.message?.includes('rate')) {
@@ -1206,7 +1210,7 @@ function Dashboard() {
         return () => clearTimeout(timeoutId);
       }
     }
-  }, [loading, profile, (user as any)?.id, clientsLoading]);
+  }, [loading, profile, (user as any)?.id]);
 
   // Handler functions
   const handleReorder = async (orderId: string) => {

@@ -68,6 +68,7 @@ export const useStripeCheckout = () => {
                 unitPrice: unitPrice,
                 totalPrice: totalPrice,
                 calculatorSelections: item.customization?.selections || item.calculatorSelections || {},
+                customization: item.customization || {}, // Add full customization object
                 customFiles: item.customization?.customFiles || item.customFiles || [],
                 customerNotes: item.customization?.notes || item.customerNotes || '',
                 instagramHandle: item.customization?.instagramHandle || item.instagramHandle || '',

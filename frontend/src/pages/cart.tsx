@@ -2455,10 +2455,7 @@ export default function CartPage() {
                     <div className="hidden">
                       <CartCheckoutButton
                         key={`checkout-${user?.id || 'guest'}`} // Force re-render when user changes
-                        cartItems={updatedCart.map(item => ({
-                          ...item,
-                          totalPrice: item.customization.isReorder ? item.totalPrice * 0.9 : item.totalPrice
-                        }))}
+                        cartItems={updatedCart} // Don't pre-apply reorder discount - let backend handle it
                         className="cart-checkout-button-trigger"
                         creditsToApply={safeParseFloat(creditToApply, 0)}
                         discountCode={appliedDiscount?.code}

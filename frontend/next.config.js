@@ -380,11 +380,6 @@ const nextConfig = {
       
       // Cart and Checkout Redirects
       {
-        source: '/cart',
-        destination: '/cart',
-        permanent: true,
-      },
-      {
         source: '/checkout',
         destination: '/cart',
         permanent: true,

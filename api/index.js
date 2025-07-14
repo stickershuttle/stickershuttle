@@ -1714,6 +1714,7 @@ const typeDefs = gql`
     unitPrice: Float!
     totalPrice: Float
     calculatorSelections: JSON!
+    customization: JSON
     customFiles: [String]
     customerNotes: String
     instagramHandle: String
@@ -5895,6 +5896,44 @@ const resolvers = {
           }
         }
 
+        // Step 2.5: Check for reorder discount (10% off reordered items only)
+        let reorderDiscount = 0;
+        
+        // Debug: log cart items to see reorder flag structure
+        console.log('🔍 Checking cart items for reorder flags:', input.cartItems.map(item => ({
+          productName: item.productName,
+          calculatorSelections: item.calculatorSelections,
+          customization: item.customization,
+          isReorderInCalc: item.calculatorSelections?.isReorder,
+          isReorderInCustom: item.customization?.isReorder
+        })));
+        
+        const reorderItems = input.cartItems.filter(item => 
+          item.calculatorSelections?.isReorder === true || 
+          item.customization?.isReorder === true
+        );
+        
+        console.log('🔍 Filtered reorder items:', reorderItems.map(item => ({
+          productName: item.productName,
+          totalPrice: item.totalPrice,
+          isReorder: item.customization?.isReorder || item.calculatorSelections?.isReorder
+        })));
+        
+        if (reorderItems.length > 0) {
+          const reorderItemsSubtotal = reorderItems.reduce((sum, item) => {
+            return sum + safeParseFloat(item.totalPrice, 0);
+          }, 0);
+          
+          reorderDiscount = reorderItemsSubtotal * 0.1; // 10% discount on reordered items only
+          
+          console.log('🔄 Reorder discount applied:', {
+            reorderItemsCount: reorderItems.length,
+            reorderItemsSubtotal: reorderItemsSubtotal.toFixed(2),
+            reorderDiscount: reorderDiscount.toFixed(2),
+            discountPercentage: '10%'
+          });
+        }
+
         // Step 3: Prepare order in Supabase (as pending payment)
         console.log('🔍 Checking Supabase client status...');
         console.log('Supabase ready?', supabaseClient.isReady());
@@ -5909,10 +5948,11 @@ const resolvers = {
               financial_status: 'pending',
               subtotal_price: cartSubtotal,
               total_tax: 0, // Will be updated after Stripe checkout
-              total_price: cartSubtotal - discountAmount - actualCreditsApplied - wholesaleDiscount + blindShipmentFee,
+              total_price: cartSubtotal - discountAmount - actualCreditsApplied - wholesaleDiscount - reorderDiscount + blindShipmentFee,
               discount_code: input.discountCode || null,
               discount_amount: discountAmount || 0,
               wholesale_discount: wholesaleDiscount || 0,
+              reorder_discount: reorderDiscount || 0,
               credits_applied: actualCreditsApplied || 0,
               credit_transaction_id: creditTransactionId || null,
               currency: 'USD',
@@ -6031,28 +6071,78 @@ const resolvers = {
             
             console.log('🌐 Using frontend URL for Stripe redirects:', baseUrl);
             
-            // Calculate final cart total with wholesale discount
-            const cartTotal = cartSubtotal - discountAmount - actualCreditsApplied - wholesaleDiscount + blindShipmentFee;
+            // Calculate final cart total with all discounts
+            const cartTotal = cartSubtotal - discountAmount - actualCreditsApplied - wholesaleDiscount - reorderDiscount + blindShipmentFee;
+            
+            console.log('💰 Final cart total calculation:', {
+              cartSubtotal: cartSubtotal.toFixed(2),
+              discountAmount: discountAmount.toFixed(2),
+              actualCreditsApplied: actualCreditsApplied.toFixed(2),
+              wholesaleDiscount: wholesaleDiscount.toFixed(2),
+              reorderDiscount: reorderDiscount.toFixed(2),
+              blindShipmentFee: blindShipmentFee.toFixed(2),
+              cartTotal: cartTotal.toFixed(2)
+            });
             
             const checkoutData = {
               lineItems: [
                 ...input.cartItems.map(item => {
-                  // Apply wholesale discount to individual line items for Stripe
+                  // Calculate proportional discount for this line item
                   const originalTotalPrice = safeParseFloat(item.totalPrice, 0);
                   const originalUnitPrice = safeParseFloat(item.unitPrice, 0);
-                  const discountedTotalPrice = wholesaleDiscount > 0 ? originalTotalPrice * 0.85 : originalTotalPrice; // 15% off
-                  const discountedUnitPrice = wholesaleDiscount > 0 ? originalUnitPrice * 0.85 : originalUnitPrice; // 15% off
                   
-                  return {
-                  name: item.productName,
-                    description: `${item.productName} - Custom Configuration${wholesaleDiscount > 0 ? ' (Wholesale 15% Off)' : ''}`,
+                  // Calculate what portion of the total discount this item should bear
+                  const itemProportion = originalTotalPrice / cartSubtotal;
+                  const itemWholesaleDiscount = wholesaleDiscount * itemProportion;
+                  
+                  // Check if this item is a reorder item
+                  const isReorderItem = item.calculatorSelections?.isReorder === true || item.customization?.isReorder === true;
+                  const itemReorderDiscount = isReorderItem ? (originalTotalPrice * 0.1) : 0;
+                  
+                  // Apply discounts to get final line item price
+                  const totalItemDiscount = itemWholesaleDiscount + itemReorderDiscount;
+                  const discountedTotalPrice = originalTotalPrice - totalItemDiscount;
+                  const discountedUnitPrice = discountedTotalPrice / item.quantity;
+                  
+                  console.log('🔍 Line item discount calculation:', {
+                    productName: item.productName,
+                    originalTotalPrice: originalTotalPrice,
+                    itemProportion: itemProportion,
+                    itemWholesaleDiscount: itemWholesaleDiscount,
+                    itemReorderDiscount: itemReorderDiscount,
+                    totalItemDiscount: totalItemDiscount,
+                    discountedTotalPrice: discountedTotalPrice,
+                    isReorderItem: isReorderItem
+                  });
+                  
+                  // Build discount description
+                  const discountDescriptions = [];
+                  if (wholesaleDiscount > 0) discountDescriptions.push('Wholesale 15% Off');
+                  if (isReorderItem) discountDescriptions.push('Reorder 10% Off');
+                  const discountText = discountDescriptions.length > 0 ? ` (${discountDescriptions.join(' + ')})` : '';
+                  
+                  const lineItem = {
+                    name: item.productName,
+                    description: `${item.productName} - Custom Configuration${discountText}`,
                     unitPrice: discountedUnitPrice,
-                    totalPrice: discountedTotalPrice, // Apply wholesale discount to line items
-                  quantity: item.quantity,
-                  productId: item.productId,
-                  sku: item.sku,
-                  calculatorSelections: item.calculatorSelections
+                    totalPrice: discountedTotalPrice,
+                    quantity: item.quantity,
+                    productId: item.productId,
+                    sku: item.sku,
+                    calculatorSelections: item.calculatorSelections
                   };
+                  
+                  console.log('📦 Final line item for Stripe:', {
+                    name: lineItem.name,
+                    originalTotalPrice: originalTotalPrice,
+                    finalTotalPrice: lineItem.totalPrice,
+                    discountText: discountText,
+                    isReorderItem: isReorderItem,
+                    wholesaleDiscount: wholesaleDiscount > 0 ? '15%' : 'none',
+                    reorderDiscount: isReorderItem ? '10%' : 'none'
+                  });
+                  
+                  return lineItem;
                 }),
                 // Add blind shipment fee as a line item if applicable
                 ...(blindShipmentFee > 0 ? [{
@@ -6086,10 +6176,12 @@ const resolvers = {
                 discountAmount: discountAmount.toFixed(2),
                 creditsApplied: actualCreditsApplied.toFixed(2),
                 wholesaleDiscount: wholesaleDiscount.toFixed(2),
+                reorderDiscount: reorderDiscount.toFixed(2),
                 totalAmount: cartTotal.toFixed(2),
                 customerEmail: input.customerInfo.email,
                 discountCode: input.discountCode || null,
-                isWholesaleCustomer: userProfile?.is_wholesale_customer && userProfile?.wholesale_status === 'approved'
+                isWholesaleCustomer: userProfile?.is_wholesale_customer && userProfile?.wholesale_status === 'approved',
+                hasReorderItems: reorderItems.length > 0
               }
             };
 
@@ -6100,6 +6192,10 @@ const resolvers = {
               firstItem: checkoutData.lineItems[0]
             }, null, 2));
 
+            // Log the total amount that Stripe will charge
+            const totalLineItemAmount = checkoutData.lineItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+            console.log('💰 Total line item amount for Stripe:', totalLineItemAmount.toFixed(2));
+            
             const sessionResult = await stripeClient.createCheckoutSession(checkoutData);
             
             if (sessionResult.success) {
