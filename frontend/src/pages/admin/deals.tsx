@@ -116,7 +116,6 @@ export default function AdminDeals() {
     
     // Dispatch custom event to notify deals page of changes
     window.dispatchEvent(new CustomEvent('deals-updated'));
-    console.log('🚀 Deals saved and event dispatched:', updatedDeals);
   };
 
   // Handle form changes

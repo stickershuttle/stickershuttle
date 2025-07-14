@@ -492,19 +492,24 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     
     // Check if value is below minimum or above maximum
     const numValue = parseFloat(numericValue)
+    
+    // Check if user is admin
+    const isAdmin = user?.email === 'justin@stickershuttle.com'
+    const maxSize = isAdmin ? 50 : 14 // Admin can go up to 50", regular users limited to 14"
+    
     if (numValue < 0.5 && numericValue !== "") {
       // Show warning message for minimum size
       setShowSizeWarning(true)
       return
     }
-    if (numValue > 14) {
+    if (numValue > maxSize) {
       // Show warning message for maximum size
       setShowSizeWarning(true)
       return
     }
     
     // Reset warning if entering valid value
-    if (showSizeWarning && numValue >= 0.5 && numValue <= 14) {
+    if (showSizeWarning && numValue >= 0.5 && numValue <= maxSize) {
       setShowSizeWarning(false)
     }
     
@@ -979,7 +984,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
                       placeholder="W"
                       value={customWidth}
                       onChange={(e) => handleCustomSizeChange("width", e.target.value)}
-                      max="14"
+                      max={user?.email === 'justin@stickershuttle.com' ? "50" : "14"}
                       step="0.1"
                       className="w-1/2 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
@@ -988,14 +993,14 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
                       placeholder="H"
                       value={customHeight}
                       onChange={(e) => handleCustomSizeChange("height", e.target.value)}
-                      max="14"
+                      max={user?.email === 'justin@stickershuttle.com' ? "50" : "14"}
                       step="0.1"
                       className="w-1/2 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
                   {showSizeWarning && (
                     <div className="text-xs text-orange-300 font-medium">
-                      📏 Size must be between 0.5" and 14". Please enter a valid size.
+                      📏 Size must be between 0.5" and {user?.email === 'justin@stickershuttle.com' ? "50" : "14"}". Please enter a valid size.
                     </div>
                   )}
                 </div>

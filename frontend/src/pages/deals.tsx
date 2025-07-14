@@ -46,27 +46,53 @@ export default function Deals() {
 
   // Load active deal from localStorage
   const loadDealsFromStorage = useCallback(() => {
-    const savedDeals = localStorage.getItem('sticker-shuttle-deals');
-    console.log('🔍 Loading deals from localStorage:', savedDeals);
-    if (savedDeals) {
-      const deals = JSON.parse(savedDeals);
-      console.log('📦 Parsed deals:', deals);
-      const active = deals.find((deal: Deal) => deal.isActive);
-      console.log('🎯 Found active deal:', active);
+    try {
+      const savedDeals = localStorage.getItem('sticker-shuttle-deals');
       
-      // Set the first deal as default (fallback)
-      if (deals.length > 0) {
-        setDefaultDeal(deals[0]);
-      }
-      
-      if (active) {
-        setActiveDeal(active);
+      if (savedDeals) {
+        const deals = JSON.parse(savedDeals);
+        const active = deals.find((deal: Deal) => deal.isActive);
+        
+        // Set the first deal as default (fallback)
+        if (deals.length > 0) {
+          setDefaultDeal(deals[0]);
+        }
+        
+        if (active) {
+          setActiveDeal(active);
+        } else {
+          const fallbackDeal = deals.length > 0 ? deals[0] : null;
+          setActiveDeal(fallbackDeal);
+        }
       } else {
-        console.log('⚠️ No active deal found, using first deal as active');
-        setActiveDeal(deals.length > 0 ? deals[0] : null);
+        // Create a default deal if none exists
+        const defaultDealData = {
+          id: 'default-deal-fallback',
+          name: '100 Stickers Deal',
+          headline: '100 custom\nstickers for $39',
+          buttonText: 'Order Now →',
+          pills: [
+            '🏷️ Matte Vinyl Stickers',
+            '📏 3" Max Width', 
+            '🚀 Ships Next Day',
+            '👽 Not a conspiracy theory, just great deals.'
+          ],
+          isActive: true,
+          orderDetails: {
+            material: 'Matte',
+            size: '3"',
+            quantity: 100,
+            price: 39
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        setActiveDeal(defaultDealData);
+        setDefaultDeal(defaultDealData);
       }
-    } else {
-      console.log('⚠️ No deals in localStorage, setting to null');
+    } catch (error) {
+      console.error('Error loading deals:', error);
       setActiveDeal(null);
       setDefaultDeal(null);
     }
@@ -79,28 +105,24 @@ export default function Deals() {
     // Listen for localStorage changes (when deals are updated from admin panel)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'sticker-shuttle-deals') {
-        console.log('📡 Storage event received, reloading deals');
         loadDealsFromStorage();
       }
     };
 
     // Listen for window focus (when user switches back to deals page)
     const handleFocus = () => {
-      console.log('👁️ Window focus, reloading deals');
       loadDealsFromStorage();
     };
 
     // Listen for visibility changes (when page becomes visible again)
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log('👀 Page visible, reloading deals');
         loadDealsFromStorage();
       }
     };
 
     // Listen for custom deals update event
     const handleDealsUpdate = () => {
-      console.log('🔄 Custom deals update event received');
       loadDealsFromStorage();
     };
 
@@ -324,6 +346,8 @@ export default function Deals() {
                     <p className="text-lg text-orange-400 mb-4 mt-1 font-bold" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
                       🔥 Limited Time Deal
                     </p>
+                    
+
                     
                     <h1 className="text-5xl sm:text-6xl md:text-7xl mb-4 md:mb-8 leading-none relative" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
                       {(activeDeal || defaultDeal) ? (

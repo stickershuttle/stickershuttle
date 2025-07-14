@@ -928,6 +928,7 @@ const typeDefs = gql`
     # Customer order mutations
     createCustomerOrder(input: CustomerOrderInput!): CustomerOrder
     updateOrderStatus(orderId: ID!, statusUpdate: OrderStatusInput!): CustomerOrder
+    updateOrderShippingAddress(orderId: ID!, shippingAddress: ShippingAddressInput!): OrderShippingAddressResult
     markOrderAsDelivered(orderId: ID!): CustomerOrder
     claimGuestOrders(userId: ID!, email: String!): ClaimResult
     
@@ -1520,7 +1521,7 @@ const typeDefs = gql`
 
   type KlaviyoAllListsProfilesResult {
     success: Boolean!
-    profiles: [KlaviyoProfile!]!
+    profiles: [KlaviyoProfile!]
     totalProfiles: Int!
     uniqueProfiles: Int!
     profilesByList: [KlaviyoListSummary!]!
@@ -1542,7 +1543,7 @@ const typeDefs = gql`
 
   type KlaviyoAllProfilesResult {
     success: Boolean!
-    profiles: [KlaviyoProfile!]!
+    profiles: [KlaviyoProfile!]
     totalProfiles: Int!
     uniqueProfiles: Int!
     profilesBySource: [KlaviyoSourceSummary!]!
@@ -1733,6 +1734,34 @@ const typeDefs = gql`
     trackingNumber: String
     trackingCompany: String
     trackingUrl: String
+  }
+
+  input ShippingAddressInput {
+    first_name: String
+    last_name: String
+    company: String
+    address1: String
+    address2: String
+    city: String
+    state: String
+    zip: String
+    country: String
+    phone: String
+  }
+
+  type OrderShippingAddressResult {
+    success: Boolean!
+    message: String!
+    order: OrderInfo
+  }
+
+  type OrderInfo {
+    id: ID!
+    orderNumber: String
+    customerFirstName: String
+    customerLastName: String
+    customerEmail: String
+    shippingAddress: JSON
   }
 
   input PackageDimensionsInput {
@@ -4657,6 +4686,56 @@ const resolvers = {
       }
     },
 
+    updateOrderShippingAddress: async (_, { orderId, shippingAddress }) => {
+      try {
+        console.log('📋 Updating order shipping address:', { orderId, shippingAddress });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Order service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Update the order shipping address
+        const { data: updatedOrder, error } = await client
+          .from('orders_main')
+          .update({
+            shipping_address: shippingAddress,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', orderId)
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error updating order shipping address:', error);
+          throw new Error(`Failed to update shipping address: ${error.message}`);
+        }
+
+        console.log('✅ Successfully updated order shipping address');
+        
+        return {
+          success: true,
+          message: 'Shipping address updated successfully',
+          order: {
+            id: updatedOrder.id,
+            orderNumber: updatedOrder.order_number,
+            customerFirstName: updatedOrder.customer_first_name,
+            customerLastName: updatedOrder.customer_last_name,
+            customerEmail: updatedOrder.customer_email,
+            shippingAddress: updatedOrder.shipping_address
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in updateOrderShippingAddress:', error);
+        return {
+          success: false,
+          message: error.message,
+          order: null
+        };
+      }
+    },
+
     markOrderAsDelivered: async (_, { orderId }, { user }) => {
       try {
         // Require admin authentication
@@ -7541,28 +7620,24 @@ const resolvers = {
 
         const client = supabaseClient.getServiceClient();
         
-        // Call the database function we created
-        const { data, error } = await client.rpc('update_user_profile_names', {
-          p_user_id: userId,
-          p_first_name: firstName,
-          p_last_name: lastName
-        });
+        // Use direct table update instead of missing RPC function
+        const updateData = {
+          first_name: firstName,
+          last_name: lastName,
+          display_name: firstName && lastName ? `${firstName} ${lastName}` : null,
+          updated_at: new Date().toISOString()
+        };
+
+        const { data: profile, error } = await client
+          .from('user_profiles')
+          .update(updateData)
+          .eq('user_id', userId)
+          .select('*')
+          .single();
 
         if (error) {
           console.error('❌ Error updating user profile names:', error);
           throw new Error(`Failed to update profile: ${error.message}`);
-        }
-
-        // Fetch the updated profile
-        const { data: profile, error: fetchError } = await client
-          .from('user_profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .single();
-
-        if (fetchError) {
-          console.error('❌ Error fetching updated profile:', fetchError);
-          throw new Error('Profile updated but failed to fetch result');
         }
 
         console.log('✅ Successfully updated user profile names');

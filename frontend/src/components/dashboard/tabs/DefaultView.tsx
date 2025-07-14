@@ -82,6 +82,11 @@ const DefaultView: React.FC<DefaultViewProps> = ({
   const endIndex = startIndex + ordersPerPage;
   const currentOrders = orders.slice(startIndex, endIndex);
 
+  // Helper function to check if an order contains deal items
+  const isOrderFromDeal = (order: any) => {
+    return order.items?.some((item: any) => item.calculatorSelections?.isDeal === true);
+  };
+
   // Default view content is rendered here
   return (
     <>
@@ -583,22 +588,22 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                   <div className="flex flex-col gap-2">
                     <button
                       onClick={() => handleReorder(lastDeliveredOrder.id)}
-                      disabled={reorderingId === lastDeliveredOrder.id}
+                      disabled={reorderingId === lastDeliveredOrder.id || isOrderFromDeal(lastDeliveredOrder)}
                       className="px-6 py-3 rounded-lg font-bold transition-all duration-200 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[140px]"
                       style={{
-                        backgroundColor: reorderingId === lastDeliveredOrder.id ? '#666' : '#ffd713',
+                        backgroundColor: reorderingId === lastDeliveredOrder.id || isOrderFromDeal(lastDeliveredOrder) ? '#666' : '#ffd713',
                         color: '#030140',
-                        boxShadow: reorderingId === lastDeliveredOrder.id ? 'none' : '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
+                        boxShadow: reorderingId === lastDeliveredOrder.id || isOrderFromDeal(lastDeliveredOrder) ? 'none' : '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
                         border: 'solid',
                         borderWidth: '0.03125rem',
-                        borderColor: reorderingId === lastDeliveredOrder.id ? '#666' : '#e6c211'
+                        borderColor: reorderingId === lastDeliveredOrder.id || isOrderFromDeal(lastDeliveredOrder) ? '#666' : '#e6c211'
                       }}
                     >
                       {reorderingId === lastDeliveredOrder.id ? (
                         <>
                           <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
                           Adding...
                         </>
@@ -608,7 +613,11 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                         </>
                       )}
                     </button>
-                    <p className="text-xs text-gray-400 text-center">Save 10% • Same Great Quality</p>
+                    {isOrderFromDeal(lastDeliveredOrder) ? (
+                      <p className="text-xs text-gray-500 text-center">Re-order Disabled for Deals</p>
+                    ) : (
+                      <p className="text-xs text-gray-400 text-center">Save 10% • Same Great Quality</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -779,11 +788,16 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                           </button>
                           <button
                             onClick={() => handleReorder(order.id)}
-                            className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
+                            disabled={isOrderFromDeal(order)}
+                            className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                             style={{
-                              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
+                              background: isOrderFromDeal(order) 
+                                ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(107, 114, 128, 0.25) 50%, rgba(107, 114, 128, 0.1) 100%)'
+                                : 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
                               backdropFilter: 'blur(25px) saturate(180%)',
-                              border: '1px solid rgba(245, 158, 11, 0.4)',
+                              border: isOrderFromDeal(order) 
+                                ? '1px solid rgba(107, 114, 128, 0.4)'
+                                : '1px solid rgba(245, 158, 11, 0.4)',
                               boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
                               color: 'white'
                             }}
@@ -793,6 +807,9 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                             </svg>
                             Reorder
                           </button>
+                          {isOrderFromDeal(order) && (
+                            <p className="text-xs text-gray-500 text-center mt-1">Re-order Disabled for Deals</p>
+                          )}
                           {isOrderShippedWithTracking(order) && (
                             <button
                               onClick={() => handleTrackOrder(order)}
@@ -872,38 +889,29 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                           >
                             View Details
                           </button>
-                          <button
-                            onClick={() => handleReorder(order.id)}
-                            className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
-                            style={{
-                              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
-                              backdropFilter: 'blur(25px) saturate(180%)',
-                              border: '1px solid rgba(245, 158, 11, 0.4)',
-                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
-                              color: 'white'
-                            }}
-                          >
-                            Reorder
-                          </button>
-                          {isOrderShippedWithTracking(order) && (
+                          <div className="flex-1 flex flex-col">
                             <button
-                              onClick={() => handleTrackOrder(order)}
-                              className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
+                              onClick={() => handleReorder(order.id)}
+                              disabled={isOrderFromDeal(order)}
+                              className="px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                               style={{
-                                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                                background: isOrderFromDeal(order) 
+                                  ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(107, 114, 128, 0.25) 50%, rgba(107, 114, 128, 0.1) 100%)'
+                                  : 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
                                 backdropFilter: 'blur(25px) saturate(180%)',
-                                border: '1px solid rgba(34, 197, 94, 0.4)',
+                                border: isOrderFromDeal(order) 
+                                  ? '1px solid rgba(107, 114, 128, 0.4)'
+                                  : '1px solid rgba(245, 158, 11, 0.4)',
                                 boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
                                 color: 'white'
                               }}
                             >
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
-                              </svg>
-                              Track Order
+                              Reorder
                             </button>
-                          )}
+                            {isOrderFromDeal(order) && (
+                              <p className="text-xs text-gray-500 text-center mt-1">Re-order Disabled for Deals</p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1356,11 +1364,16 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                           </button>
                           <button
                             onClick={() => handleReorder(order.id)}
-                            className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1"
+                            disabled={isOrderFromDeal(order)}
+                            className="px-3 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                             style={{
-                              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
+                              background: isOrderFromDeal(order) 
+                                ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(107, 114, 128, 0.25) 50%, rgba(107, 114, 128, 0.1) 100%)'
+                                : 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
                               backdropFilter: 'blur(25px) saturate(180%)',
-                              border: '1px solid rgba(245, 158, 11, 0.4)',
+                              border: isOrderFromDeal(order) 
+                                ? '1px solid rgba(107, 114, 128, 0.4)'
+                                : '1px solid rgba(245, 158, 11, 0.4)',
                               boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
                               color: 'white'
                             }}
@@ -1370,6 +1383,9 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                             </svg>
                             Reorder
                           </button>
+                          {isOrderFromDeal(order) && (
+                            <p className="text-xs text-gray-500 text-center mt-1">Re-order Disabled for Deals</p>
+                          )}
                           {isOrderShippedWithTracking(order) && (
                             <button
                               onClick={() => handleTrackOrder(order)}
@@ -1449,38 +1465,29 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                           >
                             View Details
                           </button>
-                          <button
-                            onClick={() => handleReorder(order.id)}
-                            className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
-                            style={{
-                              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
-                              backdropFilter: 'blur(25px) saturate(180%)',
-                              border: '1px solid rgba(245, 158, 11, 0.4)',
-                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
-                              color: 'white'
-                            }}
-                          >
-                            Reorder
-                          </button>
-                          {isOrderShippedWithTracking(order) && (
+                          <div className="flex-1 flex flex-col">
                             <button
-                              onClick={() => handleTrackOrder(order)}
-                              className="flex-1 px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1"
+                              onClick={() => handleReorder(order.id)}
+                              disabled={isOrderFromDeal(order)}
+                              className="px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                               style={{
-                                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                                background: isOrderFromDeal(order) 
+                                  ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(107, 114, 128, 0.25) 50%, rgba(107, 114, 128, 0.1) 100%)'
+                                  : 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
                                 backdropFilter: 'blur(25px) saturate(180%)',
-                                border: '1px solid rgba(34, 197, 94, 0.4)',
+                                border: isOrderFromDeal(order) 
+                                  ? '1px solid rgba(107, 114, 128, 0.4)'
+                                  : '1px solid rgba(245, 158, 11, 0.4)',
                                 boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
                                 color: 'white'
                               }}
                             >
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
-                              </svg>
-                              Track Order
+                              Reorder
                             </button>
-                          )}
+                            {isOrderFromDeal(order) && (
+                              <p className="text-xs text-gray-500 text-center mt-1">Re-order Disabled for Deals</p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>

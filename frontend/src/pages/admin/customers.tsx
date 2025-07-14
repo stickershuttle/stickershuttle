@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from '@/components/AdminLayout';
-import { useQuery, gql } from '@apollo/client';
+import { useQuery, useMutation, gql } from '@apollo/client';
 import { getSupabase } from '../../lib/supabase';
+import { UPDATE_USER_PROFILE_NAMES } from '../../lib/profile-mutations';
 
 // GraphQL query to get all customers
 const GET_ALL_CUSTOMERS = gql`
@@ -53,8 +54,17 @@ export default function AdminCustomers() {
   const [sortColumn, setSortColumn] = useState<string>('lastOrder');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+  
+  // Name editing modal states
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSuccess, setEditSuccess] = useState(false);
 
-  const { data, loading: customersLoading, error } = useQuery(GET_ALL_CUSTOMERS);
+  const { data, loading: customersLoading, error, refetch } = useQuery(GET_ALL_CUSTOMERS);
+  const [updateUserProfileNames] = useMutation(UPDATE_USER_PROFILE_NAMES);
 
   // Debug logging
   useEffect(() => {
@@ -65,6 +75,62 @@ export default function AdminCustomers() {
       customers: data?.getAllCustomers
     });
   }, [customersLoading, error, data]);
+
+  // Handle opening edit modal
+  const handleEditCustomerName = (customer: Customer, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent row click navigation
+    setEditingCustomer(customer);
+    setEditFirstName(customer.firstName || '');
+    setEditLastName(customer.lastName || '');
+    setEditError(null);
+    setEditSuccess(false);
+  };
+
+  // Handle saving customer name
+  const handleSaveCustomerName = async () => {
+    if (!editingCustomer) return;
+
+    setEditLoading(true);
+    setEditError(null);
+
+    try {
+      const result = await updateUserProfileNames({
+        variables: {
+          userId: editingCustomer.id,
+          firstName: editFirstName.trim(),
+          lastName: editLastName.trim()
+        }
+      });
+
+      if (result.data?.updateUserProfileNames?.success) {
+        setEditSuccess(true);
+        // Refresh the customers list to show updated names
+        await refetch();
+        
+        // Close modal after a short delay to show success
+        setTimeout(() => {
+          setEditingCustomer(null);
+          setEditSuccess(false);
+        }, 1000);
+      } else {
+        setEditError(result.data?.updateUserProfileNames?.message || 'Failed to update customer name');
+      }
+    } catch (error) {
+      console.error('Error updating customer name:', error);
+      setEditError('An error occurred while updating the customer name');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // Handle closing edit modal
+  const handleCloseEditModal = () => {
+    setEditingCustomer(null);
+    setEditFirstName('');
+    setEditLastName('');
+    setEditError(null);
+    setEditSuccess(false);
+  };
 
   // Check if user is admin
   useEffect(() => {
@@ -507,11 +573,25 @@ export default function AdminCustomers() {
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-base font-semibold text-white truncate">
-                          {customer.firstName || customer.lastName
-                            ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim()
-                            : 'Unknown Customer'}
-                        </h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-semibold text-white truncate flex-1">
+                            {customer.firstName || customer.lastName
+                              ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim()
+                              : 'Unknown Customer'}
+                          </h3>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditCustomerName(customer, e);
+                            }}
+                            className="p-1.5 rounded-lg text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500 hover:bg-opacity-10 transition-all"
+                            title="Edit Name"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                        </div>
                         <p className="text-sm text-gray-400 truncate">{customer.email}</p>
                         {customer.city && customer.state && (
                           <p className="text-xs text-gray-500 mt-1">{customer.city}, {customer.state}</p>
@@ -547,8 +627,22 @@ export default function AdminCustomers() {
                           <span className="text-xs text-purple-400">Returning</span>
                         )}
                       </div>
-                      <div className="text-xs text-gray-500">
-                        Last order: {formatDate(customer.lastOrderDate)}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/admin/customers/${encodeURIComponent(customer.email)}/dashboard`);
+                          }}
+                          className="p-1.5 rounded-lg text-green-400 hover:text-green-300 hover:bg-green-500 hover:bg-opacity-10 transition-all"
+                          title="View Customer Dashboard"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                        </button>
+                        <div className="text-xs text-gray-500">
+                          Last order: {formatDate(customer.lastOrderDate)}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -692,10 +786,24 @@ export default function AdminCustomers() {
                         {/* Name */}
                         <td className="pl-6 pr-3 py-4">
                           <div>
-                            <div className="text-sm font-medium text-white">
-                              {customer.firstName || customer.lastName
-                                ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim()
-                                : 'Unknown Customer'}
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-white">
+                                {customer.firstName || customer.lastName
+                                  ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim()
+                                  : 'Unknown Customer'}
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditCustomerName(customer, e);
+                                }}
+                                className="p-1 rounded text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500 hover:bg-opacity-10 transition-all"
+                                title="Edit Name"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
                             </div>
                             {customer.totalOrders > 1 && (
                               <div className="text-xs text-purple-400 mt-0.5">
@@ -817,6 +925,30 @@ export default function AdminCustomers() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                               </svg>
                             </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/admin/customers/${encodeURIComponent(customer.email)}/dashboard`);
+                              }}
+                              className="p-1.5 rounded-lg text-green-400 hover:text-green-300 hover:bg-green-500 hover:bg-opacity-10 transition-all"
+                              title="View Customer Dashboard"
+                            >
+                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditCustomerName(customer, e);
+                              }}
+                              className="p-1.5 rounded-lg text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500 hover:bg-opacity-10 transition-all"
+                              title="Edit Name"
+                            >
+                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -840,6 +972,86 @@ export default function AdminCustomers() {
             </div>
           </div>
         </div>
+
+                 {/* Name Editing Modal */}
+         {editingCustomer && (
+           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+             <div className="rounded-lg p-6 w-full max-w-md"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                    backdropFilter: 'blur(12px)'
+                  }}>
+               <h3 className="text-xl font-bold text-white mb-4">Edit Customer Name</h3>
+               <div className="mb-4">
+                 <label htmlFor="editFirstName" className="block text-sm font-medium text-gray-300 mb-1">First Name</label>
+                 <input
+                   type="text"
+                   id="editFirstName"
+                   value={editFirstName}
+                   onChange={(e) => setEditFirstName(e.target.value)}
+                   className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                   style={{
+                     background: 'rgba(255, 255, 255, 0.05)',
+                     border: '1px solid rgba(255, 255, 255, 0.1)',
+                     boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                     backdropFilter: 'blur(12px)'
+                   }}
+                 />
+               </div>
+               <div className="mb-4">
+                 <label htmlFor="editLastName" className="block text-sm font-medium text-gray-300 mb-1">Last Name</label>
+                 <input
+                   type="text"
+                   id="editLastName"
+                   value={editLastName}
+                   onChange={(e) => setEditLastName(e.target.value)}
+                   className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                   style={{
+                     background: 'rgba(255, 255, 255, 0.05)',
+                     border: '1px solid rgba(255, 255, 255, 0.1)',
+                     boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                     backdropFilter: 'blur(12px)'
+                   }}
+                 />
+               </div>
+               {editError && (
+                 <div className="text-red-400 text-sm mb-4">{editError}</div>
+               )}
+               {editSuccess && (
+                 <div className="text-green-400 text-sm mb-4">Name updated successfully!</div>
+               )}
+               <div className="flex justify-end gap-2">
+                 <button
+                   onClick={handleCloseEditModal}
+                   className="px-4 py-2 text-white rounded hover:bg-gray-700 transition-colors"
+                   style={{
+                     background: 'rgba(255, 255, 255, 0.05)',
+                     border: '1px solid rgba(255, 255, 255, 0.1)',
+                     boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                     backdropFilter: 'blur(12px)'
+                   }}
+                 >
+                   Cancel
+                 </button>
+                 <button
+                   onClick={handleSaveCustomerName}
+                   className="px-4 py-2 text-white rounded transition-colors"
+                   style={{
+                     background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                     backdropFilter: 'blur(25px) saturate(180%)',
+                     border: '1px solid rgba(59, 130, 246, 0.4)',
+                     boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                   }}
+                   disabled={editLoading}
+                 >
+                   {editLoading ? 'Saving...' : 'Save Changes'}
+                 </button>
+               </div>
+             </div>
+           </div>
+         )}
       </div>
     </AdminLayout>
   );

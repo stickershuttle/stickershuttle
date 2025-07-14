@@ -44,6 +44,11 @@ const AllOrdersView: React.FC<AllOrdersViewProps> = ({
   const endIndex = startIndex + ordersPerPage;
   const currentOrders = orders.slice(startIndex, endIndex);
 
+  // Helper function to check if an order contains deal items
+  const isOrderFromDeal = (order: any) => {
+    return order.items?.some((item: any) => item.calculatorSelections?.isDeal === true);
+  };
+
   return (
     <div className="space-y-6 mobile-content">
       <div className="flex items-center justify-between mobile-container">
@@ -75,7 +80,7 @@ const AllOrdersView: React.FC<AllOrdersViewProps> = ({
         <div className="container-style p-6">
           <div className="text-center">
             <div className="text-3xl font-bold text-green-400 mb-2">
-              {orders.reduce((sum, order) => sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0)}
+              {orders.reduce((sum: number, order: any) => sum + order.items.reduce((itemSum: number, item: any) => itemSum + item.quantity, 0), 0)}
             </div>
             <div className="text-sm text-gray-300">Total Stickers</div>
           </div>
@@ -117,7 +122,7 @@ const AllOrdersView: React.FC<AllOrdersViewProps> = ({
         <div className="divide-y divide-white/5">
           {currentOrders.map((order) => {
             // Calculate total stickers
-            const totalStickers = order.items.reduce((sum, item) => {
+            const totalStickers = order.items.reduce((sum: number, item: any) => {
               const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
               return sum + (itemData.quantity || item.quantity || 0);
             }, 0);
@@ -131,7 +136,7 @@ const AllOrdersView: React.FC<AllOrdersViewProps> = ({
                     {/* Preview Column - Side by Side Images */}
                     <div className="col-span-3">
                       <div className="flex gap-2 flex-wrap">
-                        {order.items.map((item, index) => {
+                        {order.items.map((item: any, index: number) => {
                           // Get the full item data with images
                           const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
                           
@@ -196,7 +201,7 @@ const AllOrdersView: React.FC<AllOrdersViewProps> = ({
                           // Group items by product type and sum quantities
                           const productTypes: { [key: string]: number } = {};
                           
-                          order.items.forEach(item => {
+                          order.items.forEach((item: any) => {
                             const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
                             const quantity = itemData.quantity || item.quantity || 0;
                             const name = itemData.name || item.name || 'Custom Sticker';
@@ -286,22 +291,32 @@ const AllOrdersView: React.FC<AllOrdersViewProps> = ({
                           </svg>
                           View Details
                         </button>
-                        <button
-                          onClick={() => handleReorder(order.id)}
-                          className="px-3 py-1 rounded text-xs font-medium transition-colors duration-150 cursor-pointer flex items-center gap-1"
-                          style={{
-                            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
-                            backdropFilter: 'blur(25px) saturate(180%)',
-                            border: '1px solid rgba(245, 158, 11, 0.4)',
-                            boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
-                            color: 'white'
-                          }}
-                        >
-                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                            <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-                          </svg>
-                          Reorder
-                        </button>
+                        <div className="flex flex-col">
+                          <button
+                            onClick={() => handleReorder(order.id)}
+                            disabled={isOrderFromDeal(order)}
+                            className="px-3 py-1 rounded text-xs font-medium transition-colors duration-150 cursor-pointer flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{
+                              background: isOrderFromDeal(order) 
+                                ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(107, 114, 128, 0.25) 50%, rgba(107, 114, 128, 0.1) 100%)'
+                                : 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: isOrderFromDeal(order) 
+                                ? '1px solid rgba(107, 114, 128, 0.4)'
+                                : '1px solid rgba(245, 158, 11, 0.4)',
+                              boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                              color: 'white'
+                            }}
+                          >
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                            </svg>
+                            Reorder
+                          </button>
+                          {isOrderFromDeal(order) && (
+                            <p className="text-xs text-gray-500 text-center mt-1">Re-order Disabled for Deals</p>
+                          )}
+                        </div>
                       
                       {order.status === 'Proof Review Needed' && (
                         <button
@@ -377,7 +392,7 @@ const AllOrdersView: React.FC<AllOrdersViewProps> = ({
 
                       {/* Preview Images */}
                       <div className="flex gap-2 flex-wrap">
-                        {order.items.map((item, index) => {
+                        {order.items.map((item: any, index: number) => {
                           const itemData = order._fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id) || item;
                           let productImage = null;
                           if (itemData.customFiles?.[0]) {
