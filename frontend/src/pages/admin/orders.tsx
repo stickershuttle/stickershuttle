@@ -5,6 +5,7 @@ import ProofUpload from '@/components/ProofUpload';
 import ItemSpecificProofUpload from '@/components/ItemSpecificProofUpload';
 import AIFileImage from '@/components/AIFileImage';
 import EasyPostShipping from '@/components/EasyPostShipping';
+import ShipOrderModal from '@/components/ShipOrderModal';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { getSupabase } from '../../lib/supabase';
 import { CREATE_EASYPOST_SHIPMENT, BUY_EASYPOST_LABEL, GET_EASYPOST_LABEL } from '../../lib/easypost-mutations';
@@ -301,6 +302,9 @@ export default function AdminOrders() {
   const [shippingAddressLoading, setShippingAddressLoading] = useState(false);
   const [shippingAddressError, setShippingAddressError] = useState<string | null>(null);
   const [shippingAddressSuccess, setShippingAddressSuccess] = useState(false);
+
+  // Ship order modal state
+  const [showShipOrderModal, setShowShipOrderModal] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -1882,7 +1886,7 @@ export default function AdminOrders() {
                                 style={{
                                   borderBottom: orderIndex < orders.length - 1 ? '1px solid rgba(255, 255, 255, 0.08)' : 'none',
                                   borderLeft: `4px solid ${getStatusBorderColor(getProofStatus(order))}`,
-                                  backgroundColor: isDeliveredOrder(getProofStatus(order)) ? 'rgba(0, 0, 0, 0.5)' : 'transparent'
+                                  backgroundColor: isDeliveredOrder(getProofStatus(order)) ? 'rgba(0, 0, 0, 0.6)' : 'transparent'
                                 }}
                               >
                                 {/* Design Image */}
@@ -2098,7 +2102,7 @@ export default function AdminOrders() {
                               style={{
                                 borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
                                 borderLeft: `4px solid ${getStatusBorderColor(getProofStatus(order))}`,
-                                backgroundColor: isDeliveredOrder(getProofStatus(order)) ? 'rgba(0, 0, 0, 0.15)' : 'transparent'
+                                backgroundColor: isDeliveredOrder(getProofStatus(order)) ? 'rgba(0, 0, 0, 0.25)' : 'transparent'
                               }}
                               onClick={() => selectOrder(order)}
                             >
@@ -2336,8 +2340,7 @@ export default function AdminOrders() {
                                       style={{
                                         background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
                                         backdropFilter: 'blur(25px) saturate(180%)',
-                                        border: '1px solid rgba(34, 197, 94, 0.4)',
-                                        boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                        border: '1px solid rgba(34, 197, 94, 0.4)'
                                       }}
                                       title="View Tracking"
                                     >
@@ -2355,8 +2358,7 @@ export default function AdminOrders() {
                                       style={{
                                         background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
                                         backdropFilter: 'blur(25px) saturate(180%)',
-                                        border: '1px solid rgba(34, 197, 94, 0.4)',
-                                        boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                        border: '1px solid rgba(34, 197, 94, 0.4)'
                                       }}
                                       title="Create Shipping Label"
                                     >
@@ -2797,8 +2799,7 @@ export default function AdminOrders() {
                             style={{
                               background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
                               backdropFilter: 'blur(25px) saturate(180%)',
-                              border: '1px solid rgba(59, 130, 246, 0.4)',
-                              boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                              border: '1px solid rgba(59, 130, 246, 0.4)'
                             }}
                           >
                             View Tracking
@@ -2810,8 +2811,7 @@ export default function AdminOrders() {
                             style={{
                               background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.4) 0%, rgba(234, 179, 8, 0.25) 50%, rgba(234, 179, 8, 0.1) 100%)',
                               backdropFilter: 'blur(25px) saturate(180%)',
-                              border: '1px solid rgba(234, 179, 8, 0.4)',
-                              boxShadow: 'rgba(234, 179, 8, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                              border: '1px solid rgba(234, 179, 8, 0.4)'
                             }}
                           >
                             Order New Label
@@ -2824,8 +2824,7 @@ export default function AdminOrders() {
                           style={{
                             background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
                             backdropFilter: 'blur(25px) saturate(180%)',
-                            border: '1px solid rgba(59, 130, 246, 0.4)',
-                            boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                            border: '1px solid rgba(59, 130, 246, 0.4)'
                           }}
                         >
                           Create shipping label
@@ -2867,8 +2866,7 @@ export default function AdminOrders() {
                           style={{
                             background: 'linear-gradient(135deg, rgba(75, 85, 99, 0.4) 0%, rgba(75, 85, 99, 0.25) 50%, rgba(75, 85, 99, 0.1) 100%)',
                             backdropFilter: 'blur(25px) saturate(180%)',
-                            border: '1px solid rgba(75, 85, 99, 0.4)',
-                            boxShadow: 'rgba(75, 85, 99, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                            border: '1px solid rgba(75, 85, 99, 0.4)'
                           }}
                         >
                           <svg className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2883,8 +2881,7 @@ export default function AdminOrders() {
                           style={{
                             background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.4) 0%, rgba(234, 179, 8, 0.25) 50%, rgba(234, 179, 8, 0.1) 100%)',
                             backdropFilter: 'blur(25px) saturate(180%)',
-                            border: '1px solid rgba(234, 179, 8, 0.4)',
-                            boxShadow: 'rgba(234, 179, 8, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                            border: '1px solid rgba(234, 179, 8, 0.4)'
                           }}
                         >
                           <svg className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2900,8 +2897,7 @@ export default function AdminOrders() {
                         style={{
                           background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.4) 0%, rgba(234, 179, 8, 0.25) 50%, rgba(234, 179, 8, 0.1) 100%)',
                           backdropFilter: 'blur(25px) saturate(180%)',
-                          border: '1px solid rgba(234, 179, 8, 0.4)',
-                          boxShadow: 'rgba(234, 179, 8, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          border: '1px solid rgba(234, 179, 8, 0.4)'
                         }}
                       >
                         <svg className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3104,8 +3100,7 @@ export default function AdminOrders() {
                                             style={{
                                               background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
                                               backdropFilter: 'blur(25px) saturate(180%)',
-                                              border: '1px solid rgba(59, 130, 246, 0.4)',
-                                              boxShadow: 'rgba(59, 130, 246, 0.3) 0px 4px 16px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                              border: '1px solid rgba(59, 130, 246, 0.4)'
                                             }}
                                             title="Download original file"
                                           >
@@ -3168,8 +3163,7 @@ export default function AdminOrders() {
                                           style={{
                                             background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
                                             backdropFilter: 'blur(25px) saturate(180%)',
-                                            border: '1px solid rgba(34, 197, 94, 0.4)',
-                                            boxShadow: 'rgba(34, 197, 94, 0.3) 0px 4px 16px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                            border: '1px solid rgba(34, 197, 94, 0.4)'
                                           }}
                                           title={`Upload proof for Item #${idx + 1}: ${item.productName}`}
                                         >
@@ -3549,8 +3543,7 @@ export default function AdminOrders() {
                             style={{
                               background: 'linear-gradient(135deg, rgba(75, 85, 99, 0.4) 0%, rgba(75, 85, 99, 0.25) 50%, rgba(75, 85, 99, 0.1) 100%)',
                               backdropFilter: 'blur(25px) saturate(180%)',
-                              border: '1px solid rgba(75, 85, 99, 0.4)',
-                              boxShadow: 'rgba(75, 85, 99, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                              border: '1px solid rgba(75, 85, 99, 0.4)'
                             }}
                           >
                             <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3565,8 +3558,7 @@ export default function AdminOrders() {
                             style={{
                               background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.4) 0%, rgba(234, 179, 8, 0.25) 50%, rgba(234, 179, 8, 0.1) 100%)',
                               backdropFilter: 'blur(25px) saturate(180%)',
-                              border: '1px solid rgba(234, 179, 8, 0.4)',
-                              boxShadow: 'rgba(234, 179, 8, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                              border: '1px solid rgba(234, 179, 8, 0.4)'
                             }}
                           >
                             <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3586,8 +3578,7 @@ export default function AdminOrders() {
                                 style={{
                                   background: 'linear-gradient(135deg, rgba(75, 85, 99, 0.4) 0%, rgba(75, 85, 99, 0.25) 50%, rgba(75, 85, 99, 0.1) 100%)',
                                   backdropFilter: 'blur(25px) saturate(180%)',
-                                  border: '1px solid rgba(75, 85, 99, 0.4)',
-                                  boxShadow: 'rgba(75, 85, 99, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                  border: '1px solid rgba(75, 85, 99, 0.4)'
                                 }}
                               >
                                 <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3602,8 +3593,7 @@ export default function AdminOrders() {
                                 style={{
                                   background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.4) 0%, rgba(234, 179, 8, 0.25) 50%, rgba(234, 179, 8, 0.1) 100%)',
                                   backdropFilter: 'blur(25px) saturate(180%)',
-                                  border: '1px solid rgba(234, 179, 8, 0.4)',
-                                  boxShadow: 'rgba(234, 179, 8, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                  border: '1px solid rgba(234, 179, 8, 0.4)'
                                 }}
                               >
                                 <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3907,6 +3897,62 @@ export default function AdminOrders() {
                         <div className="pt-4 border-t border-gray-700 border-opacity-30">
                           <p className="text-xs text-gray-500 uppercase tracking-wider mb-3">Order Actions</p>
                           <div className="space-y-2">
+                            {/* Mark as Approved Button - Only show if not already approved/printing */}
+                            {selectedOrder.proof_status !== 'approved' && selectedOrder.orderStatus !== 'Printing' && 
+                             selectedOrder.orderStatus !== 'Shipped' && selectedOrder.orderStatus !== 'Delivered' && 
+                             selectedOrder.fulfillmentStatus !== 'fulfilled' && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await updateOrderStatus({
+                                      variables: {
+                                        orderId: selectedOrder.id,
+                                        statusUpdate: {
+                                          proof_status: 'approved',
+                                          orderStatus: 'Printing'
+                                        }
+                                      }
+                                    });
+                                    refetch();
+                                  } catch (error) {
+                                    console.error('Error approving order:', error);
+                                    alert('Failed to approve order. Please try again.');
+                                  }
+                                }}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105"
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(251, 146, 60, 0.4) 0%, rgba(251, 146, 60, 0.25) 50%, rgba(251, 146, 60, 0.1) 100%)',
+                                  backdropFilter: 'blur(25px) saturate(180%)',
+                                  border: '1px solid rgba(251, 146, 60, 0.4)'
+                                }}
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                Mark as Approved
+                              </button>
+                            )}
+
+                            {/* Mark as Shipped Button - Only show if not already shipped or delivered */}
+                            {selectedOrder.orderStatus !== 'Shipped' && selectedOrder.orderStatus !== 'Delivered' && 
+                             selectedOrder.fulfillmentStatus !== 'fulfilled' && selectedOrder.proof_status !== 'shipped' && (
+                              <button
+                                onClick={() => setShowShipOrderModal(true)}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105"
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.4) 0%, rgba(168, 85, 247, 0.25) 50%, rgba(168, 85, 247, 0.1) 100%)',
+                                  backdropFilter: 'blur(25px) saturate(180%)',
+                                  border: '1px solid rgba(168, 85, 247, 0.4)'
+                                }}
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                                Mark as Shipped
+                              </button>
+                            )}
+
                             {/* Mark as Delivered Button - Only show if not already delivered */}
                             {selectedOrder.orderStatus !== 'Delivered' && selectedOrder.fulfillmentStatus !== 'fulfilled' && (
                               <button
@@ -3916,8 +3962,7 @@ export default function AdminOrders() {
                                 style={{
                                   background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
                                   backdropFilter: 'blur(25px) saturate(180%)',
-                                  border: '1px solid rgba(34, 197, 94, 0.4)',
-                                  boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                                  border: '1px solid rgba(34, 197, 94, 0.4)'
                                 }}
                               >
                                 {markingDelivered ? (
@@ -4484,8 +4529,7 @@ export default function AdminOrders() {
                      style={{
                        background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.4) 0%, rgba(234, 179, 8, 0.25) 50%, rgba(234, 179, 8, 0.1) 100%)',
                        backdropFilter: 'blur(25px) saturate(180%)',
-                       border: '1px solid rgba(234, 179, 8, 0.4)',
-                       boxShadow: 'rgba(234, 179, 8, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                       border: '1px solid rgba(234, 179, 8, 0.4)'
                      }}
                    >
                      <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -4792,6 +4836,25 @@ export default function AdminOrders() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Ship Order Modal */}
+        {selectedOrder && (
+          <ShipOrderModal
+            isOpen={showShipOrderModal}
+            onClose={() => setShowShipOrderModal(false)}
+            order={{
+              id: selectedOrder.id,
+              orderNumber: selectedOrder.orderNumber,
+              customerFirstName: selectedOrder.customerFirstName,
+              customerLastName: selectedOrder.customerLastName,
+              customerEmail: selectedOrder.customerEmail
+            }}
+            onOrderUpdated={() => {
+              refetch();
+              setShowShipOrderModal(false);
+            }}
+          />
         )}
       </div>
     </AdminLayout>

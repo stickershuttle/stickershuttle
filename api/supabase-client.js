@@ -335,10 +335,32 @@ class SupabaseClient {
         const client = this.getServiceClient();
 
         try {
+            // Map GraphQL field names (camelCase) to database field names (snake_case)
+            const dbStatusUpdates = {};
+            
+            if (statusUpdates.orderStatus) {
+                dbStatusUpdates.order_status = statusUpdates.orderStatus;
+            }
+            if (statusUpdates.fulfillmentStatus) {
+                dbStatusUpdates.fulfillment_status = statusUpdates.fulfillmentStatus;
+            }
+            if (statusUpdates.financialStatus) {
+                dbStatusUpdates.financial_status = statusUpdates.financialStatus;
+            }
+            if (statusUpdates.trackingNumber) {
+                dbStatusUpdates.tracking_number = statusUpdates.trackingNumber;
+            }
+            if (statusUpdates.trackingCompany) {
+                dbStatusUpdates.tracking_company = statusUpdates.trackingCompany;
+            }
+            if (statusUpdates.trackingUrl) {
+                dbStatusUpdates.tracking_url = statusUpdates.trackingUrl;
+            }
+
             const { data, error } = await client
                 .from('orders_main')
                 .update({
-                    ...statusUpdates,
+                    ...dbStatusUpdates,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', orderId)
