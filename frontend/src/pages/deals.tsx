@@ -28,6 +28,7 @@ export default function Deals() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadLater, setUploadLater] = useState(false);
   const [activeDeal, setActiveDeal] = useState<Deal | null>(null);
+  const [defaultDeal, setDefaultDeal] = useState<Deal | null>(null);
   const { addToCart } = useCart();
   const router = useRouter();
 
@@ -52,15 +53,22 @@ export default function Deals() {
       console.log('📦 Parsed deals:', deals);
       const active = deals.find((deal: Deal) => deal.isActive);
       console.log('🎯 Found active deal:', active);
+      
+      // Set the first deal as default (fallback)
+      if (deals.length > 0) {
+        setDefaultDeal(deals[0]);
+      }
+      
       if (active) {
         setActiveDeal(active);
       } else {
-        console.log('⚠️ No active deal found, setting to null');
-        setActiveDeal(null);
+        console.log('⚠️ No active deal found, using first deal as active');
+        setActiveDeal(deals.length > 0 ? deals[0] : null);
       }
     } else {
       console.log('⚠️ No deals in localStorage, setting to null');
       setActiveDeal(null);
+      setDefaultDeal(null);
     }
   }, []);
 
@@ -127,15 +135,19 @@ export default function Deals() {
     setUploadProgress(null);
 
     try {
+      const currentDeal = activeDeal || defaultDeal;
+      const dealPrice = currentDeal?.orderDetails.price || 29;
+      const dealQuantity = currentDeal?.orderDetails.quantity || 100;
+      
       const result = await uploadToCloudinary(
         file,
         {
           selectedCut: "Custom Shape",
-          selectedMaterial: "Matte",
-          selectedSize: "3\" Max Width",
-          selectedQuantity: "100",
-          totalPrice: "$29.00",
-          costPerSticker: "$0.29/ea."
+          selectedMaterial: currentDeal?.orderDetails.material || "Matte",
+          selectedSize: `${currentDeal?.orderDetails.size || "3\"" } Max Width`,
+          selectedQuantity: dealQuantity.toString(),
+          totalPrice: `$${dealPrice.toFixed(2)}`,
+          costPerSticker: `$${(dealPrice / dealQuantity).toFixed(2)}/ea.`
         },
         (progress) => setUploadProgress(progress),
         'deals-orders'
@@ -177,7 +189,8 @@ export default function Deals() {
   };
 
   const handleAddToCart = () => {
-    const dealDetails = activeDeal?.orderDetails || {
+    const currentDeal = activeDeal || defaultDeal;
+    const dealDetails = currentDeal?.orderDetails || {
       material: 'Matte',
       size: '3"',
       quantity: 100,
@@ -185,17 +198,17 @@ export default function Deals() {
     };
 
     const product = {
-      id: activeDeal ? `deals-${activeDeal.id}` : "deals-vinyl-stickers-100",
-      sku: activeDeal ? `SS-VS-${activeDeal.id.toUpperCase()}` : "SS-VS-DEAL100",
-      name: activeDeal?.name || "100 Custom Stickers - Special Deal",
-      description: activeDeal ? `${activeDeal.name} - ${activeDeal.headline.replace('\n', ' ')}` : "Limited time deal: 100 custom vinyl stickers for just $29",
-      shortDescription: activeDeal?.name || "100 Custom Stickers Deal",
+      id: currentDeal ? `deals-${currentDeal.id}` : "deals-vinyl-stickers-100",
+      sku: currentDeal ? `SS-VS-${currentDeal.id.toUpperCase()}` : "SS-VS-DEAL100",
+      name: currentDeal?.name || "100 Custom Stickers - Special Deal",
+      description: currentDeal ? `${currentDeal.name} - ${currentDeal.headline.replace('\n', ' ')}` : `Limited time deal: 100 custom vinyl stickers for just $${dealDetails.price}`,
+      shortDescription: currentDeal?.name || "100 Custom Stickers Deal",
       category: "vinyl-stickers" as const,
       basePrice: dealDetails.price / dealDetails.quantity,
       pricingModel: "flat-rate" as const,
       images: [uploadedFile?.secure_url || "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591677/Alien_USA_Map_y6wkf4.png"],
       defaultImage: uploadedFile?.secure_url || "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591677/Alien_USA_Map_y6wkf4.png",
-      features: activeDeal ? activeDeal.pills.map(pill => pill.replace(/[^\w\s]/g, '').trim()) : ["Matte Vinyl", "3\" Max Width", "Ships Next Day", "Custom Shape"],
+      features: currentDeal ? currentDeal.pills.map(pill => pill.replace(/[^\w\s]/g, '').trim()) : ["Matte Vinyl", "3\" Max Width", "Ships Next Day", "Custom Shape"],
       customizable: true,
       isActive: true,
       createdAt: new Date().toISOString(),
@@ -258,7 +271,7 @@ export default function Deals() {
   };
 
   return (
-    <Layout title={activeDeal ? `${activeDeal.headline.replace('\n', ' ')} - Sticker Shuttle Deals` : "100 Custom Stickers for $29 - Sticker Shuttle Deals"}>
+    <Layout title={(activeDeal || defaultDeal) ? `${(activeDeal || defaultDeal)!.headline.replace('\n', ' ')} - Sticker Shuttle Deals` : "100 Custom Stickers for $29 - Sticker Shuttle Deals"}>
         {/* Hero Section */}
         <section className="py-4 -mt-4 md:mt-0">
           <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
@@ -313,8 +326,8 @@ export default function Deals() {
                     </p>
                     
                     <h1 className="text-5xl sm:text-6xl md:text-7xl mb-4 md:mb-8 leading-none relative" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
-                      {activeDeal ? (
-                        activeDeal.headline.split('\n').map((line, index) => (
+                      {(activeDeal || defaultDeal) ? (
+                        (activeDeal || defaultDeal)!.headline.split('\n').map((line, index) => (
                           <span key={index} className="block">{line}</span>
                         ))
                       ) : (
@@ -325,8 +338,8 @@ export default function Deals() {
                       )}
                     </h1>
                     <div className="flex flex-wrap justify-center gap-3 mb-6 md:mb-10">
-                      {activeDeal ? (
-                        activeDeal.pills.map((pill, index) => {
+                      {(activeDeal || defaultDeal) ? (
+                        (activeDeal || defaultDeal)!.pills.map((pill, index) => {
                           // Determine pill color based on content
                           let bgColor = 'rgba(255, 255, 255, 0.05)';
                           let borderColor = 'rgba(255, 255, 255, 0.1)';
@@ -419,7 +432,7 @@ export default function Deals() {
                           transform: 'scale(1.1)'
                         }}
                       >
-                        {activeDeal?.buttonText || 'Order Now →'}
+                        {(activeDeal || defaultDeal)?.buttonText || 'Order Now →'}
                       </button>
                     </div>
                   </>

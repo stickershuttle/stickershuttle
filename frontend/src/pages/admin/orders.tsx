@@ -8,6 +8,7 @@ import EasyPostShipping from '@/components/EasyPostShipping';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { getSupabase } from '../../lib/supabase';
 import { CREATE_EASYPOST_SHIPMENT, BUY_EASYPOST_LABEL, GET_EASYPOST_LABEL } from '../../lib/easypost-mutations';
+import { UPDATE_ORDER_SHIPPING_ADDRESS } from '../../lib/order-mutations';
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
@@ -282,6 +283,24 @@ export default function AdminOrders() {
   const [easyPostOrder, setEasyPostOrder] = useState<Order | null>(null);
   const [ordersWithLabels, setOrdersWithLabels] = useState<Set<string>>(new Set());
   const [orderLabelUrls, setOrderLabelUrls] = useState<Map<string, string>>(new Map());
+  
+  // Shipping address editing states
+  const [editingShippingAddress, setEditingShippingAddress] = useState<Order | null>(null);
+  const [shippingAddressForm, setShippingAddressForm] = useState({
+    first_name: '',
+    last_name: '',
+    company: '',
+    address1: '',
+    address2: '',
+    city: '',
+    state: '',
+    zip: '',
+    country: '',
+    phone: ''
+  });
+  const [shippingAddressLoading, setShippingAddressLoading] = useState(false);
+  const [shippingAddressError, setShippingAddressError] = useState<string | null>(null);
+  const [shippingAddressSuccess, setShippingAddressSuccess] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -354,6 +373,7 @@ export default function AdminOrders() {
   const [sendProofs] = useMutation(SEND_PROOFS);
   const [getEasyPostLabel] = useMutation(GET_EASYPOST_LABEL);
   const [markOrderAsDelivered, { loading: markingDelivered }] = useMutation(MARK_ORDER_AS_DELIVERED);
+  const [updateOrderShippingAddress] = useMutation(UPDATE_ORDER_SHIPPING_ADDRESS);
 
   // Calculate customer statistics
   const getCustomerStats = (customerEmail: string | undefined) => {
@@ -1023,6 +1043,84 @@ export default function AdminOrders() {
       console.error('Error marking order as delivered:', error);
       alert('Failed to mark order as delivered. Please try again.');
     }
+  };
+
+  // Handle opening shipping address edit modal
+  const handleEditShippingAddress = (order: Order) => {
+    setEditingShippingAddress(order);
+    
+    // Pre-populate form with existing address data
+    const shippingAddr = order.shippingAddress || {};
+    setShippingAddressForm({
+      first_name: shippingAddr.first_name || order.customerFirstName || '',
+      last_name: shippingAddr.last_name || order.customerLastName || '',
+      company: shippingAddr.company || '',
+      address1: shippingAddr.address1 || shippingAddr.line1 || '',
+      address2: shippingAddr.address2 || shippingAddr.line2 || '',
+      city: shippingAddr.city || '',
+      state: shippingAddr.state || shippingAddr.province || '',
+      zip: shippingAddr.zip || shippingAddr.postal_code || '',
+      country: shippingAddr.country || 'US',
+      phone: shippingAddr.phone || order.customerPhone || ''
+    });
+    
+    setShippingAddressError(null);
+    setShippingAddressSuccess(false);
+  };
+
+  // Handle saving shipping address
+  const handleSaveShippingAddress = async () => {
+    if (!editingShippingAddress) return;
+
+    setShippingAddressLoading(true);
+    setShippingAddressError(null);
+
+    try {
+      const result = await updateOrderShippingAddress({
+        variables: {
+          orderId: editingShippingAddress.id,
+          shippingAddress: shippingAddressForm
+        }
+      });
+
+      if (result.data?.updateOrderShippingAddress?.success) {
+        setShippingAddressSuccess(true);
+        // Refresh the orders list to show updated address
+        await refetch();
+        
+        // Close modal after a short delay to show success
+        setTimeout(() => {
+          setEditingShippingAddress(null);
+          setShippingAddressSuccess(false);
+        }, 1000);
+      } else {
+        setShippingAddressError(result.data?.updateOrderShippingAddress?.message || 'Failed to update shipping address');
+      }
+    } catch (error) {
+      console.error('Error updating shipping address:', error);
+      setShippingAddressError('An error occurred while updating the shipping address');
+    } finally {
+      setShippingAddressLoading(false);
+    }
+  };
+
+  // Handle closing shipping address edit modal
+  const handleCloseShippingModal = () => {
+    setEditingShippingAddress(null);
+    setShippingAddressForm({
+      first_name: '',
+      last_name: '',
+      company: '',
+      address1: '',
+      address2: '',
+      city: '',
+      state: '',
+      zip: '',
+      country: '',
+      phone: ''
+    });
+    setShippingAddressError(null);
+    setShippingAddressSuccess(false);
   };
 
 
@@ -2692,18 +2790,33 @@ export default function AdminOrders() {
                     {/* Mobile Action Buttons */}
                     <div className="mt-4 space-y-2">
                       {selectedOrder.trackingNumber ? (
-                        <button
-                          onClick={() => handleViewTracking(selectedOrder)}
-                          className="w-full py-3 rounded-lg text-sm font-medium text-white"
-                          style={{
-                            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                            backdropFilter: 'blur(25px) saturate(180%)',
-                            border: '1px solid rgba(59, 130, 246, 0.4)',
-                            boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
-                          }}
-                        >
-                          View Tracking
-                        </button>
+                        <>
+                          <button
+                            onClick={() => handleViewTracking(selectedOrder)}
+                            className="w-full py-3 rounded-lg text-sm font-medium text-white"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(59, 130, 246, 0.4)',
+                              boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                            }}
+                          >
+                            View Tracking
+                          </button>
+                          
+                          <button
+                            onClick={() => router.push(`/admin/shipping-labels/${selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}`)}
+                            className="w-full py-3 rounded-lg text-sm font-medium text-white"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.4) 0%, rgba(234, 179, 8, 0.25) 50%, rgba(234, 179, 8, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(234, 179, 8, 0.4)',
+                              boxShadow: 'rgba(234, 179, 8, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                            }}
+                          >
+                            Order New Label
+                          </button>
+                        </>
                       ) : (
                         <button
                           onClick={() => router.push(`/admin/shipping-labels/${selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}`)}
@@ -2747,21 +2860,39 @@ export default function AdminOrders() {
                     
                     {/* Tracking/Label Button */}
                     {selectedOrder.trackingNumber ? (
-                      <button
-                        onClick={() => handleViewTracking(selectedOrder)}
-                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105 h-[34px]"
-                        style={{
-                          background: 'linear-gradient(135deg, rgba(75, 85, 99, 0.4) 0%, rgba(75, 85, 99, 0.25) 50%, rgba(75, 85, 99, 0.1) 100%)',
-                          backdropFilter: 'blur(25px) saturate(180%)',
-                          border: '1px solid rgba(75, 85, 99, 0.4)',
-                          boxShadow: 'rgba(75, 85, 99, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                        }}
-                      >
-                        <svg className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                        </svg>
-                        View Tracking
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleViewTracking(selectedOrder)}
+                          className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105 h-[34px]"
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(75, 85, 99, 0.4) 0%, rgba(75, 85, 99, 0.25) 50%, rgba(75, 85, 99, 0.1) 100%)',
+                            backdropFilter: 'blur(25px) saturate(180%)',
+                            border: '1px solid rgba(75, 85, 99, 0.4)',
+                            boxShadow: 'rgba(75, 85, 99, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          }}
+                        >
+                          <svg className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                          View Tracking
+                        </button>
+                        
+                        <button
+                          onClick={() => router.push(`/admin/shipping-labels/${selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}`)}
+                          className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105 h-[34px]"
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.4) 0%, rgba(234, 179, 8, 0.25) 50%, rgba(234, 179, 8, 0.1) 100%)',
+                            backdropFilter: 'blur(25px) saturate(180%)',
+                            border: '1px solid rgba(234, 179, 8, 0.4)',
+                            boxShadow: 'rgba(234, 179, 8, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          }}
+                        >
+                          <svg className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Order New Label
+                        </button>
+                      </>
                     ) : (
                       <button
                         onClick={() => router.push(`/admin/shipping-labels/${selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}`)}
@@ -3957,13 +4088,30 @@ export default function AdminOrders() {
                           </div>
                         )}
                         
-                        <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${selectedOrder.is_blind_shipment ? 'text-blue-200' : 'text-white'}`}>
-                          <svg className={`w-5 h-5 ${selectedOrder.is_blind_shipment ? 'text-blue-400' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          Shipping Address
-                        </h3>
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className={`text-lg font-semibold flex items-center gap-2 ${selectedOrder.is_blind_shipment ? 'text-blue-200' : 'text-white'}`}>
+                            <svg className={`w-5 h-5 ${selectedOrder.is_blind_shipment ? 'text-blue-400' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            Shipping Address
+                          </h3>
+                          <button
+                            onClick={() => handleEditShippingAddress(selectedOrder)}
+                            className="px-3 py-1.5 text-sm font-medium rounded-lg text-white transition-all hover:scale-105"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                              backdropFilter: 'blur(25px) saturate(180%)',
+                              border: '1px solid rgba(59, 130, 246, 0.4)',
+                              boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                            }}
+                          >
+                            <svg className="w-4 h-4 mr-1 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Edit
+                          </button>
+                        </div>
                         <div className={`text-sm space-y-1 ${selectedOrder.is_blind_shipment ? 'text-blue-100' : 'text-gray-300'}`}>
                           {(selectedOrder.shippingAddress.first_name || selectedOrder.shippingAddress.last_name) && (
                             <p className={`font-medium ${selectedOrder.is_blind_shipment ? 'text-blue-200' : 'text-white'}`}>
@@ -4419,6 +4567,231 @@ export default function AdminOrders() {
               refetch();
             }}
           />
+        )}
+
+        {/* Shipping Address Edit Modal */}
+        {editingShippingAddress && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
+                 style={{
+                   background: 'rgba(255, 255, 255, 0.05)',
+                   border: '1px solid rgba(255, 255, 255, 0.1)',
+                   boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                   backdropFilter: 'blur(12px)'
+                 }}>
+              <h3 className="text-xl font-bold text-white mb-4">Edit Shipping Address</h3>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="first_name" className="block text-sm font-medium text-gray-300 mb-1">First Name</label>
+                    <input
+                      type="text"
+                      id="first_name"
+                      value={shippingAddressForm.first_name}
+                      onChange={(e) => setShippingAddressForm({...shippingAddressForm, first_name: e.target.value})}
+                      className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="last_name" className="block text-sm font-medium text-gray-300 mb-1">Last Name</label>
+                    <input
+                      type="text"
+                      id="last_name"
+                      value={shippingAddressForm.last_name}
+                      onChange={(e) => setShippingAddressForm({...shippingAddressForm, last_name: e.target.value})}
+                      className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
+                      }}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label htmlFor="company" className="block text-sm font-medium text-gray-300 mb-1">Company</label>
+                  <input
+                    type="text"
+                    id="company"
+                    value={shippingAddressForm.company}
+                    onChange={(e) => setShippingAddressForm({...shippingAddressForm, company: e.target.value})}
+                    className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                      backdropFilter: 'blur(12px)'
+                    }}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="address1" className="block text-sm font-medium text-gray-300 mb-1">Address Line 1</label>
+                  <input
+                    type="text"
+                    id="address1"
+                    value={shippingAddressForm.address1}
+                    onChange={(e) => setShippingAddressForm({...shippingAddressForm, address1: e.target.value})}
+                    className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                      backdropFilter: 'blur(12px)'
+                    }}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="address2" className="block text-sm font-medium text-gray-300 mb-1">Address Line 2</label>
+                  <input
+                    type="text"
+                    id="address2"
+                    value={shippingAddressForm.address2}
+                    onChange={(e) => setShippingAddressForm({...shippingAddressForm, address2: e.target.value})}
+                    className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                      backdropFilter: 'blur(12px)'
+                    }}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="city" className="block text-sm font-medium text-gray-300 mb-1">City</label>
+                    <input
+                      type="text"
+                      id="city"
+                      value={shippingAddressForm.city}
+                      onChange={(e) => setShippingAddressForm({...shippingAddressForm, city: e.target.value})}
+                      className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="state" className="block text-sm font-medium text-gray-300 mb-1">State</label>
+                    <input
+                      type="text"
+                      id="state"
+                      value={shippingAddressForm.state}
+                      onChange={(e) => setShippingAddressForm({...shippingAddressForm, state: e.target.value})}
+                      className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
+                      }}
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="zip" className="block text-sm font-medium text-gray-300 mb-1">ZIP Code</label>
+                    <input
+                      type="text"
+                      id="zip"
+                      value={shippingAddressForm.zip}
+                      onChange={(e) => setShippingAddressForm({...shippingAddressForm, zip: e.target.value})}
+                      className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="country" className="block text-sm font-medium text-gray-300 mb-1">Country</label>
+                    <input
+                      type="text"
+                      id="country"
+                      value={shippingAddressForm.country}
+                      onChange={(e) => setShippingAddressForm({...shippingAddressForm, country: e.target.value})}
+                      className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
+                      }}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label htmlFor="phone" className="block text-sm font-medium text-gray-300 mb-1">Phone</label>
+                  <input
+                    type="text"
+                    id="phone"
+                    value={shippingAddressForm.phone}
+                    onChange={(e) => setShippingAddressForm({...shippingAddressForm, phone: e.target.value})}
+                    className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                      backdropFilter: 'blur(12px)'
+                    }}
+                  />
+                </div>
+              </div>
+              
+              {shippingAddressError && (
+                <div className="text-red-400 text-sm mt-4">{shippingAddressError}</div>
+              )}
+              {shippingAddressSuccess && (
+                <div className="text-green-400 text-sm mt-4">Shipping address updated successfully!</div>
+              )}
+              
+              <div className="flex justify-end gap-2 mt-6">
+                <button
+                  onClick={handleCloseShippingModal}
+                  className="px-4 py-2 text-white rounded hover:bg-gray-700 transition-colors"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                    backdropFilter: 'blur(12px)'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveShippingAddress}
+                  className="px-4 py-2 text-white rounded transition-colors"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                  }}
+                  disabled={shippingAddressLoading}
+                >
+                  {shippingAddressLoading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </AdminLayout>
