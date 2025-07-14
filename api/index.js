@@ -993,7 +993,7 @@ const typeDefs = gql`
     updateUserProfileBanner(userId: ID!, bannerUrl: String, bannerPublicId: String, bannerTemplate: String, bannerTemplateId: Int): UserProfileResult!
     updateUserProfileCompany(userId: ID!, companyName: String!): UserProfileResult!
     updateUserProfileComprehensive(userId: ID!, input: UserProfileInput!): UserProfileResult!
-    updateWholesaleStatus(userId: ID!, isWholesaleCustomer: Boolean!): UserProfileResult!
+    updateWholesaleStatus(userId: ID!, isWholesaleCustomer: Boolean!, wholesaleCreditRate: Float): UserProfileResult!
     
     # Admin wholesale mutations
     approveWholesaleApplication(userId: ID!, approvedBy: ID!): WholesaleApprovalResult!
@@ -5863,7 +5863,39 @@ const resolvers = {
           }
         }
         
-        // Step 2: Prepare order in Supabase (as pending payment)
+        // Step 2: Check for wholesale discount (15% off for approved wholesale customers)
+        let wholesaleDiscount = 0;
+        let userProfile = null;
+        
+        if (input.userId && input.userId !== 'guest' && supabaseClient.isReady()) {
+          try {
+            console.log('🔍 Checking for wholesale discount eligibility...');
+            const client = supabaseClient.getServiceClient();
+            const { data: profile, error: profileError } = await client
+              .from('user_profiles')
+              .select('is_wholesale_customer, wholesale_status')
+              .eq('user_id', input.userId)
+              .single();
+
+            if (!profileError && profile) {
+              userProfile = profile;
+              if (profile.is_wholesale_customer && profile.wholesale_status === 'approved') {
+                wholesaleDiscount = cartSubtotal * 0.15; // 15% discount for wholesale customers
+                console.log('🏪 Wholesale discount applied:', {
+                  userId: input.userId,
+                  wholesaleStatus: profile.wholesale_status,
+                  cartSubtotal: cartSubtotal.toFixed(2),
+                  wholesaleDiscount: wholesaleDiscount.toFixed(2),
+                  discountPercentage: '15%'
+                });
+              }
+            }
+          } catch (profileError) {
+            console.warn('⚠️ Could not check wholesale status:', profileError);
+          }
+        }
+
+        // Step 3: Prepare order in Supabase (as pending payment)
         console.log('🔍 Checking Supabase client status...');
         console.log('Supabase ready?', supabaseClient.isReady());
 
@@ -5877,9 +5909,10 @@ const resolvers = {
               financial_status: 'pending',
               subtotal_price: cartSubtotal,
               total_tax: 0, // Will be updated after Stripe checkout
-              total_price: cartSubtotal - discountAmount - actualCreditsApplied + blindShipmentFee,
+              total_price: cartSubtotal - discountAmount - actualCreditsApplied - wholesaleDiscount + blindShipmentFee,
               discount_code: input.discountCode || null,
               discount_amount: discountAmount || 0,
+              wholesale_discount: wholesaleDiscount || 0,
               credits_applied: actualCreditsApplied || 0,
               credit_transaction_id: creditTransactionId || null,
               currency: 'USD',
@@ -5998,21 +6031,29 @@ const resolvers = {
             
             console.log('🌐 Using frontend URL for Stripe redirects:', baseUrl);
             
-            // Calculate final cart total
-            const cartTotal = cartSubtotal - discountAmount - actualCreditsApplied + blindShipmentFee;
+            // Calculate final cart total with wholesale discount
+            const cartTotal = cartSubtotal - discountAmount - actualCreditsApplied - wholesaleDiscount + blindShipmentFee;
             
             const checkoutData = {
               lineItems: [
-                ...input.cartItems.map(item => ({
+                ...input.cartItems.map(item => {
+                  // Apply wholesale discount to individual line items for Stripe
+                  const originalTotalPrice = safeParseFloat(item.totalPrice, 0);
+                  const originalUnitPrice = safeParseFloat(item.unitPrice, 0);
+                  const discountedTotalPrice = wholesaleDiscount > 0 ? originalTotalPrice * 0.85 : originalTotalPrice; // 15% off
+                  const discountedUnitPrice = wholesaleDiscount > 0 ? originalUnitPrice * 0.85 : originalUnitPrice; // 15% off
+                  
+                  return {
                   name: item.productName,
-                  description: `${item.productName} - Custom Configuration`,
-                  unitPrice: item.unitPrice,
-                  totalPrice: item.totalPrice, // Add totalPrice for accurate Stripe calculations
+                    description: `${item.productName} - Custom Configuration${wholesaleDiscount > 0 ? ' (Wholesale 15% Off)' : ''}`,
+                    unitPrice: discountedUnitPrice,
+                    totalPrice: discountedTotalPrice, // Apply wholesale discount to line items
                   quantity: item.quantity,
                   productId: item.productId,
                   sku: item.sku,
                   calculatorSelections: item.calculatorSelections
-                })),
+                  };
+                }),
                 // Add blind shipment fee as a line item if applicable
                 ...(blindShipmentFee > 0 ? [{
                   name: 'Blind Shipment Fee',
@@ -6044,9 +6085,11 @@ const resolvers = {
                 subtotalAmount: cartSubtotal.toFixed(2),
                 discountAmount: discountAmount.toFixed(2),
                 creditsApplied: actualCreditsApplied.toFixed(2),
+                wholesaleDiscount: wholesaleDiscount.toFixed(2),
                 totalAmount: cartTotal.toFixed(2),
                 customerEmail: input.customerInfo.email,
-                discountCode: input.discountCode || null
+                discountCode: input.discountCode || null,
+                isWholesaleCustomer: userProfile?.is_wholesale_customer && userProfile?.wholesale_status === 'approved'
               }
             };
 
@@ -8135,6 +8178,8 @@ const resolvers = {
         const updateData = {
           is_wholesale_customer: isWholesaleCustomer,
           wholesale_credit_rate: wholesaleCreditRate || (isWholesaleCustomer ? 0.025 : 0.05),
+          wholesale_status: isWholesaleCustomer ? 'approved' : null,
+          wholesale_approved_at: isWholesaleCustomer ? new Date().toISOString() : null,
           updated_at: new Date().toISOString()
         };
         
@@ -8169,6 +8214,8 @@ const resolvers = {
             companyName: profile.company_name,
             isWholesaleCustomer: profile.is_wholesale_customer,
             wholesaleCreditRate: profile.wholesale_credit_rate,
+            wholesaleStatus: profile.wholesale_status,
+            wholesaleApprovedAt: profile.wholesale_approved_at,
             createdAt: profile.created_at,
             updatedAt: profile.updated_at
           }

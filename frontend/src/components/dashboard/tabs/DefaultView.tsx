@@ -522,10 +522,11 @@ const DefaultView: React.FC<DefaultViewProps> = ({
         </div>
       </div>
 
-      {/* Quick Reorder - PRIORITY 2 */}
+      {/* Quick Reorder - PRIORITY 2 (Only show when there are active orders) */}
       {(() => {
         const lastDeliveredOrder = orders.filter(order => order.status === 'Delivered')[0];
-        return lastDeliveredOrder ? (
+        const hasActiveOrders = orders.filter(order => order.status !== 'Delivered' && order.status !== 'Cancelled').length > 0;
+        return lastDeliveredOrder && hasActiveOrders ? (
           <div 
             className="rounded-2xl overflow-hidden mb-6"
             style={{
