@@ -26,6 +26,27 @@ const GET_ALL_CUSTOMERS = gql`
   }
 `;
 
+// GraphQL query to get all users with order statistics
+const GET_ALL_USERS_WITH_ORDER_STATS = gql`
+  query GetAllUsersWithOrderStats {
+    getAllUsersWithOrderStats {
+      id
+      email
+      firstName
+      lastName
+      city
+      state
+      country
+      totalOrders
+      totalSpent
+      averageOrderValue
+      marketingOptIn
+      lastOrderDate
+      firstOrderDate
+    }
+  }
+`;
+
 // Admin check - add your admin email(s) here
 const ADMIN_EMAILS = ['justin@stickershuttle.com']; // Add all admin emails here
 
@@ -51,6 +72,7 @@ export default function AdminCustomers() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMarketingStatus, setFilterMarketingStatus] = useState('all');
+  const [filterCustomerType, setFilterCustomerType] = useState<'customers' | 'all-users'>('customers');
   const [sortColumn, setSortColumn] = useState<string>('lastOrder');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
@@ -64,6 +86,7 @@ export default function AdminCustomers() {
   const [editSuccess, setEditSuccess] = useState(false);
 
   const { data, loading: customersLoading, error, refetch } = useQuery(GET_ALL_CUSTOMERS);
+  const { data: allUsersData, loading: allUsersLoading, error: allUsersError, refetch: refetchAllUsers } = useQuery(GET_ALL_USERS_WITH_ORDER_STATS);
   const [updateUserProfileNames] = useMutation(UPDATE_USER_PROFILE_NAMES);
 
   // Debug logging
@@ -164,9 +187,15 @@ export default function AdminCustomers() {
 
   // Filter and sort customers
   const filteredCustomers = React.useMemo(() => {
-    if (!data?.getAllCustomers) return [];
+    let customers: Customer[] = [];
+    
+    if (filterCustomerType === 'customers' && data?.getAllCustomers) {
+      customers = [...data.getAllCustomers];
+    } else if (filterCustomerType === 'all-users' && allUsersData?.getAllUsersWithOrderStats) {
+      customers = [...allUsersData.getAllUsersWithOrderStats];
+    }
 
-    let customers = [...data.getAllCustomers];
+    if (customers.length === 0) return [];
 
     // Apply marketing status filter
     if (filterMarketingStatus !== 'all') {
@@ -228,7 +257,7 @@ export default function AdminCustomers() {
     });
 
     return customers;
-  }, [data, filterMarketingStatus, searchTerm, sortColumn, sortDirection]);
+  }, [data, allUsersData, filterMarketingStatus, filterCustomerType, searchTerm, sortColumn, sortDirection]);
 
   // Format date
   const formatDate = (dateString?: string) => {
@@ -274,16 +303,26 @@ export default function AdminCustomers() {
 
   // Calculate total stats
   const totalStats = React.useMemo(() => {
-    if (!data?.getAllCustomers) return { customers: 0, revenue: 0, subscribedCount: 0 };
+    let customers: Customer[] = [];
     
-    const customers = data.getAllCustomers;
+    if (filterCustomerType === 'customers' && data?.getAllCustomers) {
+      customers = data.getAllCustomers;
+    } else if (filterCustomerType === 'all-users' && allUsersData?.getAllUsersWithOrderStats) {
+      customers = allUsersData.getAllUsersWithOrderStats;
+    }
+    
+    if (customers.length === 0) return { customers: 0, revenue: 0, subscribedCount: 0 };
+    
     const revenue = customers.reduce((sum: number, customer: Customer) => sum + customer.totalSpent, 0);
     const subscribedCount = customers.filter((customer: Customer) => customer.marketingOptIn).length;
     
     return { customers: customers.length, revenue, subscribedCount };
-  }, [data]);
+  }, [data, allUsersData, filterCustomerType]);
 
-  if (loading || !isAdmin) {
+  const isLoading = loading || !isAdmin || (filterCustomerType === 'all-users' && allUsersLoading);
+  const hasError = error || (filterCustomerType === 'all-users' && allUsersError);
+
+  if (isLoading) {
     return (
       <AdminLayout>
         <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#030140' }}>
@@ -294,7 +333,7 @@ export default function AdminCustomers() {
   }
 
   // Display error if query failed
-  if (error) {
+  if (hasError) {
     return (
       <AdminLayout>
         <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#030140' }}>
@@ -305,7 +344,7 @@ export default function AdminCustomers() {
               </svg>
             </div>
             <h3 className="text-lg font-medium text-white mb-2">Error Loading Customers</h3>
-            <p className="text-sm text-gray-400 mb-4">{error.message}</p>
+            <p className="text-sm text-gray-400 mb-4">{error?.message || allUsersError?.message}</p>
             <button 
               onClick={() => window.location.reload()}
               className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
@@ -485,7 +524,31 @@ export default function AdminCustomers() {
 
             {/* Mobile/Tablet Filters */}
             <div className="xl:hidden mb-4">
-              {/* Filter pills */}
+              {/* Customer Type Filter */}
+              <div className="flex gap-2 mb-3">
+                <button 
+                  onClick={() => setFilterCustomerType('customers')}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                    filterCustomerType === 'customers' 
+                      ? 'bg-blue-500/20 text-blue-300 border-blue-500/40' 
+                      : 'bg-transparent text-gray-400 border-gray-600'
+                  }`}
+                >
+                  Customers with Orders
+                </button>
+                <button 
+                  onClick={() => setFilterCustomerType('all-users')}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                    filterCustomerType === 'all-users' 
+                      ? 'bg-orange-500/20 text-orange-300 border-orange-500/40' 
+                      : 'bg-transparent text-gray-400 border-gray-600'
+                  }`}
+                >
+                  All Users
+                </button>
+              </div>
+              
+              {/* Marketing Status Filter */}
               <div className="flex gap-2 overflow-x-auto pb-2 filter-pills-container">
                 <button 
                   onClick={() => setFilterMarketingStatus('all')}
@@ -522,7 +585,30 @@ export default function AdminCustomers() {
 
             {/* Desktop Filters */}
             <div className="hidden xl:flex justify-end items-center gap-3 mb-4">
-              {/* Filter Dropdown */}
+              {/* Customer Type Filter */}
+              <div className="relative">
+                <select
+                  aria-label="Filter by customer type"
+                  value={filterCustomerType}
+                  onChange={(e) => setFilterCustomerType(e.target.value as 'customers' | 'all-users')}
+                  className="appearance-none bg-transparent border border-white/20 rounded-xl px-4 py-2 pl-10 text-white text-sm font-medium focus:outline-none focus:border-purple-400 transition-all cursor-pointer hover:scale-105"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 8px center',
+                    backgroundSize: '16px',
+                    paddingRight: '32px'
+                  }}
+                >
+                  <option value="customers" style={{ backgroundColor: '#030140' }}>Customers with Orders</option>
+                  <option value="all-users" style={{ backgroundColor: '#030140' }}>All Users</option>
+                </select>
+                <svg className="w-4 h-4 text-blue-400 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              </div>
+
+              {/* Marketing Status Filter */}
               <div className="relative">
                 <select
                   aria-label="Filter customers by subscription status"
@@ -603,6 +689,9 @@ export default function AdminCustomers() {
                         </div>
                         <div className="text-xs text-gray-400">
                           {customer.totalOrders} order{customer.totalOrders !== 1 ? 's' : ''}
+                          {customer.totalOrders === 0 && (
+                            <span className="text-orange-400 ml-1">• No orders yet</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -641,7 +730,7 @@ export default function AdminCustomers() {
                           </svg>
                         </button>
                         <div className="text-xs text-gray-500">
-                          Last order: {formatDate(customer.lastOrderDate)}
+                          {customer.lastOrderDate ? `Last order: ${formatDate(customer.lastOrderDate)}` : 'No orders yet'}
                         </div>
                       </div>
                     </div>
@@ -810,6 +899,11 @@ export default function AdminCustomers() {
                                 Returning customer
                               </div>
                             )}
+                            {customer.totalOrders === 0 && (
+                              <div className="text-xs text-orange-400 mt-0.5">
+                                No orders yet
+                              </div>
+                            )}
                           </div>
                         </td>
                         
@@ -894,7 +988,7 @@ export default function AdminCustomers() {
                         {/* Last Order */}
                         <td className="px-3 py-4">
                           <div className="text-sm text-gray-300">
-                            {formatDate(customer.lastOrderDate)}
+                            {customer.lastOrderDate ? formatDate(customer.lastOrderDate) : 'No orders yet'}
                           </div>
                         </td>
                         

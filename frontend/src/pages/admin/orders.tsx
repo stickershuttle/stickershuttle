@@ -844,6 +844,403 @@ export default function AdminOrders() {
     }
   };
 
+  // Handle print order slip
+  const handlePrintOrderSlip = (order: Order) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    
+    const orderNumber = order.orderNumber || order.id.split('-')[0].toUpperCase();
+    const orderDate = formatDate(order.orderCreatedAt);
+    const customerName = `${order.customerFirstName || ''} ${order.customerLastName || ''}`.trim();
+    const customerEmail = order.customerEmail || '';
+    
+         // Calculate totals
+     const subtotal = order.subtotalPrice || order.items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+     const taxAmount = order.totalTax || 0;
+     const total = order.totalPrice || (subtotal + taxAmount);
+    
+         // Format address
+     const formatAddress = (address: any) => {
+       if (!address) return 'N/A';
+       
+       // Parse address if it's a JSON string
+       let addressObj;
+       try {
+         if (typeof address === 'string') {
+           addressObj = JSON.parse(address);
+         } else {
+           addressObj = address;
+         }
+       } catch (error) {
+         console.warn('Error parsing address:', error);
+         return 'N/A';
+       }
+       
+       const parts = [];
+       
+       // Name
+       if (addressObj.first_name || addressObj.last_name) {
+         parts.push(`${addressObj.first_name || ''} ${addressObj.last_name || ''}`.trim());
+       }
+       
+       // Company
+       if (addressObj.company) parts.push(addressObj.company);
+       
+       // Address lines
+       if (addressObj.address1) parts.push(addressObj.address1);
+       if (addressObj.address2) parts.push(addressObj.address2);
+       
+       // City, state, zip
+       const cityStateZip = [];
+       if (addressObj.city) cityStateZip.push(addressObj.city);
+       if (addressObj.state || addressObj.province) cityStateZip.push(addressObj.state || addressObj.province);
+       if (addressObj.zip || addressObj.postal_code) cityStateZip.push(addressObj.zip || addressObj.postal_code);
+       if (cityStateZip.length > 0) {
+         parts.push(cityStateZip.join(', '));
+       }
+       
+       // Country
+       if (addressObj.country) parts.push(addressObj.country);
+       
+       // Phone
+       if (addressObj.phone) parts.push(`Phone: ${addressObj.phone}`);
+       
+       return parts.filter(part => part && part.trim()).join('<br>');
+     };
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Order Slip - ${orderNumber}</title>
+                     <style>
+             body {
+               font-family: Arial, sans-serif;
+               margin: 0;
+               padding: 30px;
+               line-height: 1.3;
+               color: #333;
+               font-size: 14px;
+             }
+             .header {
+               text-align: center;
+               border-bottom: 2px solid #333;
+               padding-bottom: 15px;
+               margin-bottom: 20px;
+             }
+             .company-name {
+               font-size: 20px;
+               font-weight: bold;
+               color: #000;
+             }
+             .order-info {
+               display: flex;
+               justify-content: space-between;
+               margin-bottom: 20px;
+             }
+             .order-details, .customer-info {
+               flex: 1;
+             }
+             .order-details {
+               margin-right: 20px;
+             }
+             .section-title {
+               font-size: 14px;
+               font-weight: bold;
+               margin-bottom: 8px;
+               color: #000;
+               text-transform: uppercase;
+               border-bottom: 1px solid #ddd;
+               padding-bottom: 3px;
+             }
+             .items-table {
+               width: 100%;
+               border-collapse: collapse;
+               margin: 15px 0;
+               font-size: 12px;
+             }
+             .items-table th,
+             .items-table td {
+               border: 1px solid #ddd;
+               padding: 6px;
+               text-align: left;
+               vertical-align: top;
+             }
+             .items-table th {
+               background-color: #f5f5f5;
+               font-weight: bold;
+             }
+             .totals {
+               float: right;
+               width: 250px;
+               margin-top: 15px;
+             }
+             .total-line {
+               display: flex;
+               justify-content: space-between;
+               padding: 4px 0;
+               border-bottom: 1px solid #eee;
+             }
+             .total-line.final {
+               font-weight: bold;
+               font-size: 14px;
+               border-bottom: 2px solid #333;
+               border-top: 2px solid #333;
+               margin-top: 8px;
+               padding-top: 8px;
+             }
+             .addresses {
+               display: flex;
+               justify-content: space-between;
+               margin-top: 20px;
+             }
+             .address-section {
+               flex: 1;
+               margin-right: 20px;
+             }
+             .address-section:last-child {
+               margin-right: 0;
+             }
+             
+             /* 8.5x11 Letter size */
+             @media print {
+               body { 
+                 margin: 0; 
+                 padding: 0.5in;
+                 font-size: 12px;
+               }
+               .no-print { display: none; }
+               .header {
+                 margin-bottom: 15px;
+                 padding-bottom: 10px;
+               }
+               .company-name {
+                 font-size: 18px;
+               }
+               .order-info {
+                 margin-bottom: 15px;
+               }
+               .items-table {
+                 font-size: 10px;
+                 margin: 10px 0;
+               }
+               .items-table th,
+               .items-table td {
+                 padding: 4px;
+               }
+               .totals {
+                 width: 200px;
+                 margin-top: 10px;
+               }
+               .addresses {
+                 margin-top: 15px;
+               }
+             }
+             
+             /* 4x6 Photo/Postcard size */
+             @media print and (max-width: 6in) and (max-height: 4.5in) {
+               body { 
+                 padding: 0.15in;
+                 font-size: 7px;
+                 line-height: 1.0;
+               }
+               .header {
+                 margin-bottom: 4px;
+                 padding-bottom: 3px;
+                 border-bottom: 1px solid #333;
+               }
+               .company-name {
+                 font-size: 10px;
+               }
+               .order-info {
+                 margin-bottom: 4px;
+                 display: block;
+               }
+               .order-details {
+                 margin-right: 0;
+                 margin-bottom: 4px;
+               }
+               .customer-info {
+                 margin-bottom: 4px;
+               }
+               .section-title {
+                 font-size: 8px;
+                 margin-bottom: 2px;
+                 padding-bottom: 1px;
+                 border-bottom: 1px solid #ccc;
+               }
+               .items-table {
+                 font-size: 6px;
+                 margin: 3px 0;
+               }
+               .items-table th,
+               .items-table td {
+                 padding: 1px 2px;
+                 border: 1px solid #ccc;
+               }
+               .items-table th {
+                 font-size: 6px;
+               }
+               .totals {
+                 width: 100%;
+                 margin-top: 3px;
+                 font-size: 7px;
+                 clear: both;
+                 float: none;
+               }
+               .total-line {
+                 padding: 1px 0;
+                 border-bottom: 1px solid #ddd;
+               }
+               .total-line.final {
+                 font-size: 8px;
+                 margin-top: 2px;
+                 padding-top: 2px;
+                 border-top: 1px solid #333;
+                 border-bottom: 1px solid #333;
+               }
+               .addresses {
+                 margin-top: 4px;
+                 display: block;
+               }
+               .address-section {
+                 margin-right: 0;
+                 margin-bottom: 3px;
+                 display: block;
+               }
+               .address-section .section-title {
+                 font-size: 7px;
+                 margin-bottom: 1px;
+               }
+               .address-section div {
+                 font-size: 6px;
+                 line-height: 1.1;
+               }
+               p {
+                 margin: 1px 0;
+                 font-size: 6px;
+               }
+               strong {
+                 font-size: 6px;
+               }
+               /* Hide some elements to save space on 4x6 */
+               .order-info p:nth-child(n+4) {
+                 display: none;
+               }
+             }
+           </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="company-name">Sticker Shuttle</div>
+            <div>Order Slip</div>
+          </div>
+          
+          <div class="order-info">
+            <div class="order-details">
+                             <div class="section-title">Order Information</div>
+               <p><strong>Order Number:</strong> ${orderNumber}</p>
+               <p><strong>Order Date:</strong> ${orderDate}</p>
+               ${order.trackingNumber ? `<p><strong>Tracking Number:</strong> ${order.trackingNumber}</p>` : ''}
+               ${order.trackingCompany ? `<p><strong>Carrier:</strong> ${order.trackingCompany}</p>` : ''}
+            </div>
+            
+            <div class="customer-info">
+              <div class="section-title">Customer Information</div>
+              <p><strong>Name:</strong> ${customerName}</p>
+              <p><strong>Email:</strong> ${customerEmail}</p>
+              ${order.customerPhone ? `<p><strong>Phone:</strong> ${order.customerPhone}</p>` : ''}
+            </div>
+          </div>
+          
+          <div class="section-title">Order Items</div>
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Specifications</th>
+                <th>Quantity</th>
+                <th>Unit Price</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+                             ${order.items.map(item => {
+                 const selections = item.calculatorSelections || {};
+                 const extractValue = (key: string) => {
+                   const value = selections[key];
+                   return value && typeof value === 'object' ? value.label || value.value : value;
+                 };
+                 
+                 return `
+                 <tr>
+                   <td>${item.productName}</td>
+                   <td>
+                     ${extractValue('size') ? `Size: ${extractValue('size')}<br>` : ''}
+                     ${extractValue('material') ? `Material: ${extractValue('material')}<br>` : ''}
+                     ${extractValue('finish') ? `Finish: ${extractValue('finish')}<br>` : ''}
+                     ${extractValue('shape') ? `Shape: ${extractValue('shape')}<br>` : ''}
+                     ${extractValue('cut') ? `Cut: ${extractValue('cut')}<br>` : ''}
+                     ${item.customerNotes ? `Notes: ${item.customerNotes}` : ''}
+                   </td>
+                   <td>${item.quantity}</td>
+                   <td>$${item.unitPrice.toFixed(2)}</td>
+                   <td>$${item.totalPrice.toFixed(2)}</td>
+                 </tr>
+                 `;
+               }).join('')}
+            </tbody>
+          </table>
+          
+          <div class="totals">
+                         <div class="total-line">
+               <span>Subtotal:</span>
+               <span>$${subtotal.toFixed(2)}</span>
+             </div>
+             ${taxAmount > 0 ? `
+               <div class="total-line">
+                 <span>Tax:</span>
+                 <span>$${taxAmount.toFixed(2)}</span>
+               </div>
+             ` : ''}
+             <div class="total-line final">
+               <span>Total:</span>
+               <span>$${total.toFixed(2)}</span>
+             </div>
+          </div>
+          
+          <div style="clear: both;"></div>
+          
+          <div class="addresses">
+            <div class="address-section">
+              <div class="section-title">Billing Address</div>
+              <div>${formatAddress(order.billingAddress)}</div>
+            </div>
+            
+            <div class="address-section">
+              <div class="section-title">Shipping Address</div>
+              <div>${formatAddress(order.shippingAddress)}</div>
+            </div>
+          </div>
+          
+          
+          
+          <div style="margin-top: 40px; text-align: center; color: #666; font-size: 12px;">
+            Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
+          </div>
+        </body>
+      </html>
+    `;
+    
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    
+    // Print after content loads
+    printWindow.onload = function() {
+      printWindow.print();
+    };
+  };
+
   // Get proof status (updated with shipping statuses)
   const getProofStatus = (order: Order) => {
     // Check if this is a sample pack order (skip proof system)
@@ -2898,6 +3295,23 @@ export default function AdminOrders() {
                         Create Shipping Label
                       </button>
                     )}
+                    
+                    {/* Print Order Slip Button */}
+                    <button
+                      onClick={() => handlePrintOrderSlip(selectedOrder)}
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105 h-[34px]"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: '1px solid rgba(59, 130, 246, 0.4)',
+                        boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                      }}
+                    >
+                      <svg className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                      </svg>
+                      Print Order Slip
+                    </button>
                   </div>
                 </div>
 

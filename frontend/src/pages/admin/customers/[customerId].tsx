@@ -26,6 +26,27 @@ const GET_ALL_CUSTOMERS = gql`
   }
 `;
 
+// Import GET_ALL_USERS_WITH_ORDER_STATS query
+const GET_ALL_USERS_WITH_ORDER_STATS = gql`
+  query GetAllUsersWithOrderStats {
+    getAllUsersWithOrderStats {
+      id
+      email
+      firstName
+      lastName
+      city
+      state
+      country
+      totalOrders
+      totalSpent
+      averageOrderValue
+      marketingOptIn
+      lastOrderDate
+      firstOrderDate
+    }
+  }
+`;
+
 // Type definitions
 interface OrderItem {
   id: string;
@@ -131,6 +152,9 @@ export default function CustomerDetail() {
   // Get all customers to find the user ID
   const { data: customersData } = useQuery(GET_ALL_CUSTOMERS);
   
+  // Get all users (including those who haven't ordered) to find the user ID
+  const { data: allUsersData } = useQuery(GET_ALL_USERS_WITH_ORDER_STATS);
+  
   // Get user profile if we have a user ID
   const { data: userProfileData, refetch: refetchUserProfile, loading: userProfileLoading, error: userProfileError } = useQuery(GET_USER_PROFILE, {
     variables: { userId: customerUserId },
@@ -181,17 +205,30 @@ export default function CustomerDetail() {
     }
   }, [customerId]);
 
-  // Find customer user ID from customers data
+  // Find customer user ID from customers data or all users data
   useEffect(() => {
-    if (customersData?.getAllCustomers && customerEmail) {
-      const customer = customersData.getAllCustomers.find(
-        (c: any) => c.email.toLowerCase() === customerEmail.toLowerCase()
-      );
+    if (customerEmail) {
+      let customer = null;
+      
+      // First try to find in customers who have ordered
+      if (customersData?.getAllCustomers) {
+        customer = customersData.getAllCustomers.find(
+          (c: any) => c.email.toLowerCase() === customerEmail.toLowerCase()
+        );
+      }
+      
+      // If not found, try to find in all users (including those who haven't ordered)
+      if (!customer && allUsersData?.getAllUsersWithOrderStats) {
+        customer = allUsersData.getAllUsersWithOrderStats.find(
+          (c: any) => c.email.toLowerCase() === customerEmail.toLowerCase()
+        );
+      }
+      
       if (customer) {
         setCustomerUserId(customer.id);
       }
     }
-  }, [customersData, customerEmail]);
+  }, [customersData, allUsersData, customerEmail]);
 
   // Filter orders for this customer
   const customerOrders = React.useMemo(() => {
@@ -208,24 +245,52 @@ export default function CustomerDetail() {
 
   // Calculate customer stats (paid orders only)
   const customerStats = React.useMemo(() => {
-    if (!customerOrders.length) return null;
+    // Get customer info from either customers or all users data
+    let customer = null;
+    if (customersData?.getAllCustomers && customerEmail) {
+      customer = customersData.getAllCustomers.find(
+        (c: any) => c.email.toLowerCase() === customerEmail.toLowerCase()
+      );
+    }
+    if (!customer && allUsersData?.getAllUsersWithOrderStats && customerEmail) {
+      customer = allUsersData.getAllUsersWithOrderStats.find(
+        (c: any) => c.email.toLowerCase() === customerEmail.toLowerCase()
+      );
+    }
+    
+    if (!customer && !customerOrders.length) return null;
     
     // Filter to only include paid orders for stats calculation
     const paidOrders = customerOrders.filter((order: Order) => order.financialStatus === 'paid');
     
     if (!paidOrders.length) {
-      // If no paid orders, show basic info from any order
-      const anyOrder = customerOrders[0];
-      return {
-        firstName: anyOrder.customerFirstName,
-        lastName: anyOrder.customerLastName,
-        email: customerEmail,
-        totalOrders: 0,
-        totalSpent: 0,
-        averageOrderValue: 0,
-        firstOrderDate: null,
-        lastOrderDate: null
-      };
+      // If no paid orders, show basic info from customer data or any order
+      if (customer) {
+        return {
+          firstName: customer.firstName,
+          lastName: customer.lastName,
+          email: customerEmail,
+          totalOrders: customer.totalOrders || 0,
+          totalSpent: customer.totalSpent || 0,
+          averageOrderValue: customer.averageOrderValue || 0,
+          firstOrderDate: customer.firstOrderDate || null,
+          lastOrderDate: customer.lastOrderDate || null
+        };
+      } else if (customerOrders.length > 0) {
+        // Fallback to order data if no customer data
+        const anyOrder = customerOrders[0];
+        return {
+          firstName: anyOrder.customerFirstName,
+          lastName: anyOrder.customerLastName,
+          email: customerEmail,
+          totalOrders: 0,
+          totalSpent: 0,
+          averageOrderValue: 0,
+          firstOrderDate: null,
+          lastOrderDate: null
+        };
+      }
+      return null;
     }
     
     const totalSpent = paidOrders.reduce((sum: number, order: Order) => sum + (order.totalPrice || 0), 0);
@@ -243,7 +308,7 @@ export default function CustomerDetail() {
       firstOrderDate: firstOrder.orderCreatedAt || firstOrder.createdAt,
       lastOrderDate: lastOrder.orderCreatedAt || lastOrder.createdAt
     };
-  }, [customerOrders, customerEmail]);
+  }, [customerOrders, customerEmail, customersData, allUsersData]);
 
   // Format date
   const formatDate = (dateString?: string) => {
@@ -471,11 +536,14 @@ export default function CustomerDetail() {
                 <div className="stat-card p-4 xl:p-6">
                   <div className="text-xs text-gray-400 uppercase tracking-wider mb-1 xl:mb-2">Since</div>
                   <div className="text-sm xl:text-lg font-medium text-white">
-                    {new Date(customerStats.firstOrderDate).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    })}
+                    {customerStats.firstOrderDate ? 
+                      new Date(customerStats.firstOrderDate).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      }) : 
+                      'No orders yet'
+                    }
                   </div>
                 </div>
               </div>

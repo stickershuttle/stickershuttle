@@ -863,6 +863,7 @@ const typeDefs = gql`
     claimGuestOrders(userId: ID!, email: String!): ClaimResult
     getAllOrders: [CustomerOrder]
     getAllCustomers: [Customer!]!
+    getAllUsersWithOrderStats: [Customer!]!
     getAnalyticsData(timeRange: String): AnalyticsData
     
     # Review queries
@@ -2870,6 +2871,144 @@ const resolvers = {
       } catch (error) {
         console.error('Error fetching customers:', error);
         throw new Error('Failed to fetch customers');
+      }
+    },
+
+    getAllUsersWithOrderStats: async (parent, args, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      // Admin authentication required
+      requireAdminAuth(user);
+
+      try {
+        console.log('📋 Fetching all users with order statistics...');
+        const client = supabaseClient.getServiceClient();
+        
+        // Get all users from Supabase auth
+        const { data: authData, error: authError } = await client.auth.admin.listUsers();
+        
+        if (authError) {
+          console.error('❌ Error fetching auth users:', authError);
+          throw new Error('Failed to fetch users from auth');
+        }
+
+        const authUsers = authData.users || [];
+
+        // Get user profiles for additional info
+        const { data: profiles, error: profileError } = await client
+          .from('user_profiles')
+          .select('user_id, first_name, last_name, email, city, state, country, marketing_opt_in');
+        
+        if (profileError) {
+          console.warn('⚠️ Error fetching user profiles:', profileError);
+        }
+
+        // Get all orders to calculate statistics
+        const { data: orders, error: ordersError } = await client
+          .from('orders_main')
+          .select(`
+            *,
+            order_items_new(*)
+          `)
+          .order('order_created_at', { ascending: false });
+
+        if (ordersError) {
+          console.warn('⚠️ Error fetching orders:', ordersError);
+        }
+
+        // Create profile lookup map
+        const profileMap = new Map(
+          (profiles || []).map(p => [p.user_id, p])
+        );
+
+        // Group orders by user ID and email
+        const userOrdersMap = new Map();
+        const emailOrdersMap = new Map();
+
+        if (orders) {
+          orders.forEach(order => {
+            // Group by user_id if available
+            if (order.user_id) {
+              if (!userOrdersMap.has(order.user_id)) {
+                userOrdersMap.set(order.user_id, []);
+              }
+              userOrdersMap.get(order.user_id).push(order);
+            }
+
+            // Also group by email for guest orders
+            if (order.customer_email) {
+              const email = order.customer_email.toLowerCase();
+              if (!emailOrdersMap.has(email)) {
+                emailOrdersMap.set(email, []);
+              }
+              emailOrdersMap.get(email).push(order);
+            }
+          });
+        }
+
+        // Calculate statistics for each user
+        const usersWithStats = authUsers.map(user => {
+          const profile = profileMap.get(user.id);
+          const userOrders = userOrdersMap.get(user.id) || [];
+          const emailOrders = emailOrdersMap.get(user.email?.toLowerCase()) || [];
+          
+          // Combine orders from both user_id and email (deduplicate by order ID)
+          const allUserOrders = [...userOrders];
+          emailOrders.forEach(order => {
+            if (!allUserOrders.some(existingOrder => existingOrder.id === order.id)) {
+              allUserOrders.push(order);
+            }
+          });
+
+          // Calculate statistics from paid orders only
+          const paidOrders = allUserOrders.filter(order => order.financial_status === 'paid');
+          const totalOrders = paidOrders.length;
+          const totalSpent = paidOrders.reduce((sum, order) => sum + (Number(order.total_price) || 0), 0);
+          const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0;
+
+          // Get order dates
+          let firstOrderDate = null;
+          let lastOrderDate = null;
+          if (paidOrders.length > 0) {
+            const orderDates = paidOrders.map(order => new Date(order.order_created_at || order.created_at));
+            firstOrderDate = new Date(Math.min(...orderDates)).toISOString();
+            lastOrderDate = new Date(Math.max(...orderDates)).toISOString();
+          }
+
+          // Check marketing opt-in from profile or any order item
+          let marketingOptIn = profile?.marketing_opt_in || false;
+          if (!marketingOptIn && allUserOrders.length > 0) {
+            marketingOptIn = allUserOrders.some(order => 
+              order.order_items_new?.some(item => item.instagram_opt_in)
+            );
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            firstName: user.user_metadata?.first_name || profile?.first_name || null,
+            lastName: user.user_metadata?.last_name || profile?.last_name || null,
+            city: profile?.city || '',
+            state: profile?.state || '',
+            country: profile?.country || 'US',
+            totalOrders,
+            totalSpent,
+            averageOrderValue,
+            marketingOptIn,
+            lastOrderDate,
+            firstOrderDate,
+            orders: allUserOrders
+          };
+        });
+
+        console.log(`✅ Successfully fetched ${usersWithStats.length} users with order stats`);
+        return usersWithStats;
+      } catch (error) {
+        console.error('❌ Error in getAllUsersWithOrderStats:', error);
+        throw new Error(error.message);
       }
     },
 
