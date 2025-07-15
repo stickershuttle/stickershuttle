@@ -849,7 +849,7 @@ export default function AdminOrders() {
     // Check if this is a sample pack order (skip proof system)
     if (isSamplePackOrder(order)) {
       if (order.orderStatus === 'Assume Delivered' || order.fulfillmentStatus === 'fulfilled') {
-        return 'Assume Delivered';
+        return 'Delivered';
       }
       if (order.orderStatus === 'Shipped' || order.proof_status === 'shipped' || (order.fulfillmentStatus === 'partial' && order.trackingNumber)) {
         return 'Shipped';
@@ -870,7 +870,7 @@ export default function AdminOrders() {
     if (order.proof_status === 'approved') {
       // Check if label has been created
       if (order.trackingNumber && !order.proof_status?.includes('shipped')) {
-        return 'Label Created';
+        return 'Label Printed';
       }
       return 'Printing';
     }
@@ -906,8 +906,6 @@ export default function AdminOrders() {
         return 'bg-blue-900 bg-opacity-40 text-blue-300';
       case 'Proof Approved':
         return 'bg-green-900 bg-opacity-40 text-green-300';
-      case 'Label Created':
-        return 'bg-blue-900 bg-opacity-40 text-blue-300';
       case 'Label Printed':
         return 'bg-blue-900 bg-opacity-40 text-blue-300';
       case 'Shipped':
@@ -915,8 +913,6 @@ export default function AdminOrders() {
       case 'Out for Delivery':
         return 'bg-indigo-900 bg-opacity-40 text-indigo-300';
       case 'Delivered':
-        return 'bg-green-900 bg-opacity-40 text-green-300';
-      case 'Assume Delivered':
         return 'bg-green-900 bg-opacity-40 text-green-300';
       case 'Changes Requested':
         return 'bg-amber-900 bg-opacity-40 text-amber-300';
@@ -938,8 +934,6 @@ export default function AdminOrders() {
         return '#93c5fd'; // blue-300
       case 'Proof Approved':
         return '#86efac'; // green-300
-      case 'Label Created':
-        return '#93c5fd'; // blue-300
       case 'Label Printed':
         return '#93c5fd'; // blue-300
       case 'Shipped':
@@ -947,8 +941,6 @@ export default function AdminOrders() {
       case 'Out for Delivery':
         return '#a5b4fc'; // indigo-300
       case 'Delivered':
-        return '#86efac'; // green-300
-      case 'Assume Delivered':
         return '#86efac'; // green-300
       case 'Changes Requested':
         return '#fcd34d'; // amber-300
@@ -976,7 +968,7 @@ export default function AdminOrders() {
   };
 
   const isDeliveredOrder = (status: string) => {
-    return status === 'Delivered' || status === 'Assume Delivered';
+    return status === 'Delivered' || status === 'Shipped' || status === 'Label Printed';
   };
 
 

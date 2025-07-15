@@ -69,6 +69,9 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
   // Info tooltip state
   const [showInfoTooltip, setShowInfoTooltip] = useState(false)
 
+  // Minimum quantity error state
+  const [showMinQuantityError, setShowMinQuantityError] = useState(false)
+
   // Check for mobile on component mount and resize
   useEffect(() => {
     const checkMobile = () => {
@@ -247,14 +250,14 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     console.log(`Calculated Area: ${area.toFixed(2)} sq inches`)
     console.log(`Quantity: ${quantity}`)
 
-    if (area > 0 && quantity > 0) {
+    if (area > 0 && quantity >= 15) {
       const { total, perSticker } = calculatePrice(quantity, area, isRushOrder)
       console.log(`Total Price: $${total.toFixed(2)}`)
       console.log(`Price Per Sticker: $${perSticker.toFixed(2)}`)
       setTotalPrice(`$${total.toFixed(2)}`)
       setCostPerSticker(`$${perSticker.toFixed(2)}/ea.`)
     } else {
-      console.log("Invalid area or quantity, pricing not calculated")
+      console.log("Invalid area or quantity, or quantity below minimum (15), pricing not calculated")
       setTotalPrice("")
       setCostPerSticker("")
     }
@@ -530,8 +533,16 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
   const handleCustomQuantityChange = (value: string) => {
     setCustomQuantity(value)
     
-    // Show gold message for quantities 1,000+
     const qty = Number.parseInt(value) || 0
+    
+    // Check minimum quantity validation
+    if (value && qty > 0 && qty < 15) {
+      setShowMinQuantityError(true)
+    } else {
+      setShowMinQuantityError(false)
+    }
+    
+    // Show gold message for quantities 1,000+
     if (qty >= 1000) {
       setShowCustomGoldMessage(true)
       // Auto-dismiss after 3 seconds
@@ -1176,11 +1187,18 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
                 <div className="mt-3 space-y-2 relative">
                   <input
                     type="number"
-                    placeholder="Enter custom quantity"
+                    placeholder="Enter custom quantity (min 15)"
                     value={customQuantity}
                     onChange={(e) => handleCustomQuantityChange(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-yellow-400 backdrop-blur-md button-interactive [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
+                  
+                  {/* Minimum quantity error message */}
+                  {showMinQuantityError && (
+                    <div className="text-red-400 text-sm mt-1">
+                      15 is the minimum order quantity
+                    </div>
+                  )}
                   
                   {/* Custom Quantity Gold Message */}
                   {showCustomGoldMessage && (
