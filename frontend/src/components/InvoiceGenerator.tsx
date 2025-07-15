@@ -119,7 +119,7 @@ const useInvoiceGenerator = (invoiceData: InvoiceData) => {
               <strong>Sticker Shuttle</strong><br/>
               2981 S Harrison St.<br/>
               Denver, CO 80210<br/>
-              Email: support@stickershuttle.com<br/>
+                              Email: orbit@stickershuttle.com<br/>
               Website: stickershuttle.com
             </div>
           </div>
@@ -305,7 +305,7 @@ const useInvoiceGenerator = (invoiceData: InvoiceData) => {
         <!-- Footer -->
         <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 11px;">
           <p style="margin: 5px 0;">Thank you for choosing Sticker Shuttle!</p>
-          <p style="margin: 5px 0;">For questions about this invoice, contact us at support@stickershuttle.com</p>
+                          <p style="margin: 5px 0;">For questions about this invoice, contact us at orbit@stickershuttle.com</p>
           <p style="margin: 5px 0;">Visit us at stickershuttle.com</p>
         </div>
       </div>

@@ -50,16 +50,20 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
     subtotal: selectedOrderForInvoice.subtotal || selectedOrderForInvoice.totalPrice || selectedOrderForInvoice.total,
     tax: selectedOrderForInvoice.tax || 0,
     shipping: selectedOrderForInvoice.shipping || 0,
-    items: selectedOrderForInvoice.items.map((item: any) => ({
-      id: item.id,
-      productName: item.productName || item.name,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice || (item.price / item.quantity),
-      totalPrice: item.totalPrice || item.price,
-      customFiles: item.customFiles,
-      calculatorSelections: item.calculatorSelections || item._fullOrderData,
-      customerNotes: item.customerNotes
-    })),
+    items: selectedOrderForInvoice.items.map((item: any) => {
+      const itemData = item._fullItemData || item;
+      const customFiles = itemData.customFiles || itemData.custom_files || item.customFiles;
+      return {
+        id: item.id,
+        productName: item.productName || item.name,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice || (item.price / item.quantity),
+        totalPrice: item.totalPrice || item.price,
+        customFiles: customFiles,
+        calculatorSelections: item.calculatorSelections || item._fullOrderData,
+        customerNotes: item.customerNotes
+      };
+    }),
     trackingNumber: selectedOrderForInvoice.trackingNumber,
     trackingCompany: selectedOrderForInvoice.trackingCompany,
     customerEmail: selectedOrderForInvoice.customerEmail || user?.email,
@@ -79,7 +83,7 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
         <p className="text-gray-300 mb-6">Please select an order to view details.</p>
         <button
           onClick={() => setCurrentView('all-orders')}
-          className="px-6 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105"
+          className="px-6 py-3 rounded-lg font-medium transition-all duration-200"
           style={{
             background: 'linear-gradient(135deg, #8b5cf6, #a78bfa)',
             color: 'white'
@@ -107,9 +111,12 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentView('all-orders')}
-              className="px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105"
+              className="px-4 py-2 rounded-lg font-medium transition-all duration-200"
               style={{
-                background: 'linear-gradient(135deg, #8b5cf6, #a78bfa)',
+                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                backdropFilter: 'blur(25px) saturate(180%)',
+                border: '1px solid rgba(59, 130, 246, 0.4)',
+                boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
                 color: 'white'
               }}
             >
@@ -131,7 +138,7 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
                 <span className="font-medium">Status:</span> {selectedOrderForInvoice.orderStatus || 'Processing'}
               </p>
               <p className="text-gray-300">
-                <span className="font-medium">Total:</span> ${selectedOrderForInvoice.totalPrice.toFixed(2)}
+                <span className="font-medium">Total:</span> ${(selectedOrderForInvoice.totalPrice || selectedOrderForInvoice.total).toFixed(2)}
               </p>
             </div>
             <div className="space-y-2">
@@ -144,7 +151,7 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
         <div className="flex flex-wrap gap-3">
           <button 
             onClick={() => handleTrackOrder(selectedOrderForInvoice)}
-            className="px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105"
+            className="px-4 py-2 rounded-lg font-medium transition-all duration-200"
             style={{
               background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
               backdropFilter: 'blur(25px) saturate(180%)',
@@ -158,7 +165,7 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
           {!isOrderFromDeal(selectedOrderForInvoice) ? (
             <button
               onClick={() => handleReorder(selectedOrderForInvoice.id)}
-              className="px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105"
+              className="px-4 py-2 rounded-lg font-medium transition-all duration-200"
               style={{
                 background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
                 backdropFilter: 'blur(25px) saturate(180%)',
@@ -187,7 +194,7 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
           )}
           <button
             onClick={() => generatePrintPDF()}
-            className="px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105"
+            className="px-4 py-2 rounded-lg font-medium transition-all duration-200"
             style={{
               background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
               backdropFilter: 'blur(25px) saturate(180%)',
@@ -200,7 +207,7 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
           </button>
           <button
             onClick={() => generateDownloadPDF()}
-            className="px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105"
+            className="px-4 py-2 rounded-lg font-medium transition-all duration-200"
             style={{
               background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
               backdropFilter: 'blur(25px) saturate(180%)',
@@ -255,7 +262,8 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
                     }}>
                     {firstImage ? (
                         <AIFileImage
-                          cloudinaryUrl={firstImage}
+                          src={firstImage}
+                          filename={`${item.productName}-${index}`}
                           alt={`${item.productName} preview`}
                           className="w-full h-full object-cover"
                         />
@@ -313,7 +321,7 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
                       return Object.keys(selections).length > 0 && (
       <div className="mt-2 space-y-1">
         {Object.entries(selections).map(([key, value]: [string, any]) => {
-          if (key === 'isDeal' || !value) return null;
+          if (key === 'isDeal' || key === 'size' || key === 'sizePreset' || key === 'proof' || !value) return null;
           
           const displayValue = typeof value === 'object' ? value.displayValue || value.value : value;
           if (!displayValue) return null;
@@ -386,7 +394,6 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
         background: 'rgba(255, 255, 255, 0.03)',
         border: '1px solid rgba(255, 255, 255, 0.08)'
       }}>
-        <p className="text-xs text-gray-400 mb-2">Custom Options:</p>
         <div className="space-y-1">
           {instagramHandle && (
             <div className="flex items-center gap-2">
