@@ -129,6 +129,16 @@ const calculateItemPricing = (
     };
   }
   
+  // Check if this is an additional cost item - use fixed pricing
+  if (item.product.name === 'Additional Cost') {
+    return {
+      total: item.totalPrice,
+      perSticker: item.unitPrice,
+      discountPercentage: 0,
+      area: 1 // Default area for additional cost
+    };
+  }
+  
   // For vinyl banners, use the original pricing from the calculator - don't recalculate
   if (item.product.category === 'vinyl-banners') {
     return {
@@ -422,7 +432,7 @@ const formatOptionName = (type: string, key?: string, productCategory?: string) 
 };
 
 export default function CartPage() {
-  const { cart, removeFromCart, clearCart, updateCartItemQuantity, updateCartItemCustomization } = useCart();
+  const { cart, addToCart, removeFromCart, clearCart, updateCartItemQuantity, updateCartItemCustomization } = useCart();
   const [pricingData, setPricingData] = useState<{ basePricing: BasePriceRow[]; quantityDiscounts: QuantityDiscountRow[] } | null>(null);
   const [updatedCart, setUpdatedCart] = useState<CartItem[]>(cart);
   const [wishlistItems, setWishlistItems] = useState<string[]>([]);
@@ -467,6 +477,10 @@ export default function CartPage() {
   const [isCreatingSharedCart, setIsCreatingSharedCart] = useState(false);
   const [sharedCartUrl, setSharedCartUrl] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
+  
+  // Additional payment state
+  const [additionalPaymentAmount, setAdditionalPaymentAmount] = useState('');
+  const [selectedPercentage, setSelectedPercentage] = useState<number | null>(null);
 
   // Query for user credit balance
   const { data: creditData } = useQuery(GET_USER_CREDIT_BALANCE, {
@@ -969,16 +983,29 @@ export default function CartPage() {
     }
   };
 
-  // Calculate cart totals
+  // Calculate cart totals - exclude additional cost items from subtotal
   const subtotal = updatedCart.reduce((sum, item) => {
+    // Skip additional cost items - they should be added after discounts
+    if (item.product.name === 'Additional Cost') {
+      return sum;
+    }
     const itemTotal = typeof item.totalPrice === 'number' ? item.totalPrice : 0;
     return sum + itemTotal;
   }, 0);
 
-  // Check if cart contains reorder items and calculate discount only for reordered items
-  const hasReorderItems = updatedCart.some(item => item.customization.isReorder);
+  // Calculate additional payment total separately
+  const additionalPaymentTotal = updatedCart.reduce((sum, item) => {
+    if (item.product.name === 'Additional Cost') {
+      const itemTotal = typeof item.totalPrice === 'number' ? item.totalPrice : 0;
+      return sum + itemTotal;
+    }
+    return sum;
+  }, 0);
+
+  // Check if cart contains reorder items and calculate discount only for reordered items (excluding additional costs)
+  const hasReorderItems = updatedCart.some(item => item.customization.isReorder && item.product.name !== 'Additional Cost');
   const reorderItemsSubtotal = updatedCart.reduce((sum, item) => {
-    if (item.customization.isReorder) {
+    if (item.customization.isReorder && item.product.name !== 'Additional Cost') {
       const itemTotal = typeof item.totalPrice === 'number' ? item.totalPrice : 0;
       return sum + itemTotal;
     }
@@ -1046,6 +1073,70 @@ export default function CartPage() {
     }
   };
 
+  // Handle additional payment
+  const handleAdditionalPayment = (amount: number) => {
+    if (amount <= 0) return;
+    
+    // Remove existing additional cost item if any
+    const existingAdditionalCostIndex = updatedCart.findIndex(item => item.product.name === 'Additional Cost');
+    if (existingAdditionalCostIndex !== -1) {
+      removeFromCart(updatedCart[existingAdditionalCostIndex].id);
+    }
+    
+    // Create additional cost cart item
+    const additionalCostItem: CartItem = {
+      id: `additional-cost-${Date.now()}`,
+      product: {
+        id: 'additional-cost',
+        sku: 'SS-ADD-001',
+        name: 'Additional Cost',
+        category: 'vinyl-stickers',
+        basePrice: amount,
+        description: 'Additional payment added to order',
+        shortDescription: 'Additional payment',
+        images: [],
+        defaultImage: '',
+        features: [],
+        customizable: false,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      quantity: 1,
+      unitPrice: amount,
+      totalPrice: amount,
+      addedAt: new Date().toISOString(),
+      customization: {
+        productId: 'additional-cost',
+        selections: {},
+        totalPrice: amount,
+        customFiles: [],
+        notes: '',
+        isReorder: false,
+        isDeal: false
+      }
+    };
+    
+    addToCart(additionalCostItem);
+    
+    // Reset input
+    setAdditionalPaymentAmount('');
+    setSelectedPercentage(null);
+  };
+
+  const handlePercentageClick = (percentage: number) => {
+    setSelectedPercentage(percentage);
+    const amount = (safeSubtotal * percentage) / 100;
+    handleAdditionalPayment(amount);
+  };
+
+  const handleCustomAmountAdd = () => {
+    const amount = parseFloat(additionalPaymentAmount);
+    if (!isNaN(amount) && amount > 0) {
+      handleAdditionalPayment(amount);
+    }
+  };
+
   // Calculate final total with all discounts and credits - ensure no NaN values
   const safeSubtotal = safeParseFloat(subtotal, 0);
   const safeReorderDiscount = safeParseFloat(reorderDiscount, 0);
@@ -1059,7 +1150,7 @@ export default function CartPage() {
   const wholesaleDiscount = isWholesale ? safeSubtotal * 0.15 : 0;
   
   const afterDiscounts = safeSubtotal - safeReorderDiscount - safeDiscountAmount - wholesaleDiscount;
-  const finalTotal = Math.max(0, afterDiscounts - safeCreditToApply + blindShipmentFee);
+  const finalTotal = Math.max(0, afterDiscounts - safeCreditToApply + blindShipmentFee + additionalPaymentTotal);
 
   // Calculate rush order breakdown
   const rushOrderBreakdown = updatedCart.reduce((acc, item) => {
@@ -1456,7 +1547,14 @@ export default function CartPage() {
                       <div className="flex flex-col md:flex-row gap-6">
                         {/* Product Image */}
                         <div className="w-full md:w-48 flex-shrink-0 relative">
-                          {item.customization.customFiles?.[0] || item.product.name === 'Sample Pack by Sticker Shuttle' ? (
+                          {item.product.name === 'Additional Cost' ? (
+                            <div className="aspect-square rounded-xl overflow-hidden bg-gray-800/50 p-4 flex items-center justify-center">
+                              <div className="text-center">
+                                <div className="text-4xl mb-2">💰</div>
+                                <div className="text-sm text-gray-300 font-medium">Additional Cost</div>
+                              </div>
+                            </div>
+                          ) : item.customization.customFiles?.[0] || item.product.name === 'Sample Pack by Sticker Shuttle' ? (
                             <div className="aspect-square rounded-xl overflow-hidden bg-gray-800/50 p-4">
                               <AIFileImage
                                 src={item.customization.customFiles?.[0] || (item.product.name === 'Sample Pack by Sticker Shuttle' ? 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750890354/Sample-Pack_jsy2yf.png' : '')}
@@ -1521,6 +1619,9 @@ export default function CartPage() {
                                   className="w-8 h-8 object-contain"
                                 />
                               )}
+                              {item.product.name === 'Additional Cost' && (
+                                <span className="w-8 h-8 flex items-center justify-center text-green-400 text-xl">💰</span>
+                              )}
                               <h3 className="text-xl font-bold text-white">{item.product.name}</h3>
                             </div>
                             <div className="flex items-center gap-2">
@@ -1566,6 +1667,7 @@ export default function CartPage() {
                           )}
 
                           {/* Product Specifications */}
+                          {item.product.name !== 'Additional Cost' && (
                           <div className="mb-6">
                             <h4 className="text-xs font-semibold text-purple-400 uppercase tracking-wider mb-4">Product Specifications</h4>
                             
@@ -1739,9 +1841,10 @@ export default function CartPage() {
                               )}
                             </div>
                           </div>
+                          )}
 
                           {/* Quantity Section */}
-                          {!item.customization.isDeal && (
+                          {!item.customization.isDeal && item.product.name !== 'Additional Cost' && (
                             <div className="mb-6">
                               <h4 className="text-xs font-semibold text-green-400 uppercase tracking-wider mb-4">Quantity</h4>
                               
@@ -2594,6 +2697,68 @@ export default function CartPage() {
                       )}
                     </div>
                     
+                    {/* Additional Payment Section */}
+                    <div className="mt-6">
+                      <div className="p-4 rounded-lg"
+                           style={{
+                             background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(34, 197, 94, 0.15) 50%, rgba(34, 197, 94, 0.05) 100%)',
+                             border: '1px solid rgba(34, 197, 94, 0.4)',
+                             boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                             backdropFilter: 'blur(12px)'
+                           }}>
+                        <div className="mb-4">
+                          <h4 className="text-green-200 font-medium mb-2">Additional Payment</h4>
+                          <p className="text-xs text-green-200/80">Add extra amount to your order</p>
+                        </div>
+                        
+                        {/* Percentage Buttons */}
+                        <div className="flex gap-2 mb-4">
+                          {[5, 10, 15].map((percentage) => (
+                            <button
+                              key={percentage}
+                              onClick={() => handlePercentageClick(percentage)}
+                              className="flex-1 py-2 px-3 text-sm font-medium rounded-lg border transition-all duration-200 hover:scale-105"
+                              style={{
+                                background: selectedPercentage === percentage 
+                                  ? 'rgba(34, 197, 94, 0.3)' 
+                                  : 'rgba(255, 255, 255, 0.1)',
+                                border: selectedPercentage === percentage 
+                                  ? '1px solid rgba(34, 197, 94, 0.6)' 
+                                  : '1px solid rgba(255, 255, 255, 0.2)',
+                                color: selectedPercentage === percentage ? '#BBF7D0' : '#D1D5DB'
+                              }}
+                            >
+                              {percentage}% (${((safeSubtotal * percentage) / 100).toFixed(2)})
+                            </button>
+                          ))}
+                        </div>
+                        
+                        {/* Custom Amount Input */}
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            value={additionalPaymentAmount}
+                            onChange={(e) => setAdditionalPaymentAmount(e.target.value)}
+                            placeholder="Custom amount ($)"
+                            className="flex-1 px-3 py-2 text-sm rounded-lg border bg-black/20 text-white placeholder-gray-400 border-white/20 focus:border-green-400 focus:outline-none"
+                            min="0"
+                            step="0.01"
+                          />
+                          <button
+                            onClick={handleCustomAmountAdd}
+                            disabled={!additionalPaymentAmount || parseFloat(additionalPaymentAmount) <= 0}
+                            className="px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                            style={{
+                              background: 'rgba(34, 197, 94, 0.3)',
+                              border: '1px solid rgba(34, 197, 94, 0.6)',
+                              color: '#BBF7D0'
+                            }}
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                    </div>
 
                   </div>
                 </div>
@@ -2966,6 +3131,7 @@ export default function CartPage() {
     </Layout>
   );
 } 
+
 
 
 
