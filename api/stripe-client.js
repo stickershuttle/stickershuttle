@@ -149,7 +149,10 @@ class StripeClient {
           discountAmount: orderData.cartMetadata?.discountAmount || '0.00',
           creditsApplied: orderData.cartMetadata?.creditsApplied || '0.00',
           totalAmount: orderData.cartMetadata?.totalAmount || '0.00',
-          isTaxExempt: isTaxExempt.toString()
+          isTaxExempt: isTaxExempt.toString(),
+          // Additional payment fields
+          isAdditionalPayment: orderData.cartMetadata?.isAdditionalPayment?.toString() || 'false',
+          originalOrderId: orderData.cartMetadata?.originalOrderId || ''
         },
         shipping_address_collection: {
           allowed_countries: ['US', 'CA'], // Add more countries as needed

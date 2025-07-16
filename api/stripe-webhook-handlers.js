@@ -172,6 +172,12 @@ async function handleCheckoutSessionCompleted(session) {
     console.log('📋 Full session metadata:', metadata);
     console.log('🛒 Cart metadata:', cartMetadata);
     
+    // Check if this is an additional payment
+    if (metadata.isAdditionalPayment === 'true' && metadata.originalOrderId) {
+      console.log('💰 Processing additional payment for order:', metadata.originalOrderId);
+      return await handleAdditionalPaymentCompleted(session, metadata.originalOrderId, fullSession);
+    }
+    
     // Get customer info and shipping address
     const customer = fullSession.customer_details || {};
     const shippingAddress = fullSession.shipping_details?.address || fullSession.customer_details?.address || {};
@@ -1532,6 +1538,100 @@ function parseCalculatorSelectionsFromOrderNote(orderNote) {
   }
   
   return selections;
+}
+
+// Handle additional payment completion
+async function handleAdditionalPaymentCompleted(session, originalOrderId, fullSession) {
+  console.log('💰 Processing additional payment completion for order:', originalOrderId);
+  
+  try {
+    if (!supabaseClient.isReady()) {
+      console.error('❌ Supabase client not ready for additional payment');
+      return;
+    }
+
+    const client = supabaseClient.getServiceClient();
+    const customer = fullSession.customer_details || {};
+    
+    // Get the original order
+    const { data: originalOrder, error: orderError } = await client
+      .from('orders_main')
+      .select('*')
+      .eq('id', originalOrderId)
+      .single();
+      
+    if (orderError || !originalOrder) {
+      console.error('❌ Failed to find original order:', originalOrderId);
+      return;
+    }
+    
+    // Create additional order items from the line items
+    const additionalItems = [];
+    if (fullSession.line_items?.data) {
+      for (const lineItem of fullSession.line_items.data) {
+        const itemMetadata = lineItem.price.product.metadata || {};
+        const actualQuantity = parseInt(itemMetadata.actualQuantity) || 1;
+        const totalPrice = lineItem.amount_total / 100;
+        const unitPrice = totalPrice / actualQuantity;
+        
+        additionalItems.push({
+          order_id: originalOrderId,
+          product_id: itemMetadata.productId || 'additional-item',
+          product_name: lineItem.description || lineItem.price.product.name,
+          product_category: 'Additional Items',
+          sku: itemMetadata.sku || 'ADD-ON',
+          quantity: actualQuantity,
+          unit_price: unitPrice.toFixed(2),
+          total_price: totalPrice.toFixed(2),
+          calculator_selections: {},
+          custom_files: [],
+          customer_notes: itemMetadata.customerNotes || '',
+          fulfillment_status: 'unfulfilled',
+          is_additional_payment: true
+        });
+      }
+    }
+    
+    // Insert additional items
+    if (additionalItems.length > 0) {
+      await supabaseClient.createOrderItems(additionalItems);
+      console.log('✅ Created additional order items:', additionalItems.length);
+    }
+    
+    // Update original order total
+    const additionalAmount = (fullSession.amount_total / 100);
+    const newTotalPrice = parseFloat(originalOrder.total_price) + additionalAmount;
+    
+    await client
+      .from('orders_main')
+      .update({
+        total_price: newTotalPrice,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', originalOrderId);
+      
+    console.log('✅ Updated original order total:', newTotalPrice);
+    
+    // Send notification email to customer
+    try {
+      const emailNotifications = require('./email-notifications');
+      await emailNotifications.sendOrderStatusNotification(
+        {
+          ...originalOrder,
+          total_price: newTotalPrice,
+          customer_email: customer.email || originalOrder.customer_email
+        },
+        'Additional Payment Received'
+      );
+    } catch (emailError) {
+      console.error('⚠️ Failed to send additional payment notification:', emailError);
+    }
+    
+    console.log('✅ Additional payment processed successfully');
+    
+  } catch (error) {
+    console.error('❌ Error processing additional payment:', error);
+  }
 }
 
 module.exports = router; 

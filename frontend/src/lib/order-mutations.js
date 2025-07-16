@@ -19,6 +19,8 @@ export const GET_USER_ORDERS = gql`
       subtotalPrice
       totalTax
       totalPrice
+      discountAmount
+      creditsApplied
       currency
       customerFirstName
       customerLastName
@@ -169,6 +171,8 @@ export const GET_ORDER_BY_ID = gql`
       subtotalPrice
       totalTax
       totalPrice
+      discountAmount
+      creditsApplied
       currency
       customerFirstName
       customerLastName

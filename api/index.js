@@ -964,6 +964,7 @@ const typeDefs = gql`
     # Stripe mutations
     createStripeCheckoutSession(input: StripeCheckoutInput!): StripeCheckoutResult
     processStripeCartOrder(input: CartOrderInput!): StripeOrderProcessResult
+    createAdditionalPaymentLink(input: AdditionalPaymentInput!): AdditionalPaymentResponse
     
     # EasyPost shipping mutations
     createEasyPostShipment(orderId: ID!, packageDimensions: PackageDimensionsInput): EasyPostShipmentResult
@@ -1389,6 +1390,7 @@ const typeDefs = gql`
     proof_link: String
     discountCode: String
     discountAmount: Float
+    creditsApplied: Float
     wholesaleClientId: ID
   }
 
@@ -1432,6 +1434,7 @@ const typeDefs = gql`
     customerReplacementFile: String
     customerReplacementFileName: String
     customerReplacementAt: String
+    is_additional_payment: Boolean
   }
 
   type ClaimResult {
@@ -1720,6 +1723,21 @@ const typeDefs = gql`
     customerNotes: String
     instagramHandle: String
     instagramOptIn: Boolean
+  }
+
+  input AdditionalPaymentInput {
+    orderId: ID!
+    additionalItems: [CartItemInput!]!
+    customerEmail: String!
+    orderNote: String
+  }
+
+  type AdditionalPaymentResponse {
+    success: Boolean!
+    sessionId: String
+    checkoutUrl: String
+    message: String
+    errors: [String]
   }
 
   input CustomerInfoInput {
@@ -2256,7 +2274,8 @@ const resolvers = {
     proof_sent_at: (parent) => parent.proof_sent_at || parent.proofSentAt,
     proof_link: (parent) => parent.proof_link || parent.proofLink,
     discountCode: (parent) => parent.discount_code || parent.discountCode,
-    discountAmount: (parent) => parent.discount_amount || parent.discountAmount
+    discountAmount: (parent) => parent.discount_amount || parent.discountAmount,
+    creditsApplied: (parent) => parent.credits_applied || parent.creditsApplied
   },
 
   OrderItem: {
@@ -2277,7 +2296,8 @@ const resolvers = {
     instagramOptIn: (parent) => parent.instagram_opt_in || parent.instagramOptIn,
     fulfillmentStatus: (parent) => parent.fulfillment_status || parent.fulfillmentStatus,
     createdAt: (parent) => parent.created_at || parent.createdAt,
-    updatedAt: (parent) => parent.updated_at || parent.updatedAt
+    updatedAt: (parent) => parent.updated_at || parent.updatedAt,
+    is_additional_payment: (parent) => parent.is_additional_payment || parent.isAdditionalPayment
   },
 
   OrderProof: {
@@ -2389,35 +2409,50 @@ const resolvers = {
             customer_email: null
           };
           
-          // Fetch tracking data separately for each order
+          // Fetch tracking data and order totals separately for each order
           let trackingData = {
             tracking_number: null,
             tracking_company: null,
             tracking_url: null
           };
+          let orderTotals = {
+            subtotal_price: null,
+            total_tax: null,
+            total_price: null,
+            discount_amount: null,
+            credits_applied: null
+          };
           
           try {
             const { data: trackingInfo, error: trackingError } = await client
               .from('orders_main')
-              .select('tracking_number, tracking_company, tracking_url')
+              .select('tracking_number, tracking_company, tracking_url, subtotal_price, total_tax, total_price, discount_amount, credits_applied')
               .eq('id', order.order_id)
               .single();
               
             if (!trackingError && trackingInfo) {
-              trackingData = trackingInfo;
-              console.log(`📦 Tracking data for order ${order.order_id}:`, trackingData);
+              trackingData = {
+                tracking_number: trackingInfo.tracking_number,
+                tracking_company: trackingInfo.tracking_company,
+                tracking_url: trackingInfo.tracking_url
+              };
+              orderTotals = {
+                subtotal_price: trackingInfo.subtotal_price,
+                total_tax: trackingInfo.total_tax,
+                total_price: trackingInfo.total_price,
+                discount_amount: trackingInfo.discount_amount,
+                credits_applied: trackingInfo.credits_applied
+              };
+              console.log(`📦 Order ${order.order_id} - Tracking: ${trackingData.tracking_number}, Total: ${orderTotals.total_price}`);
             }
           } catch (err) {
-            console.log(`⚠️ Could not fetch tracking for order ${order.order_id}`);
+            console.log(`⚠️ Could not fetch tracking and totals for order ${order.order_id}`);
           }
           
-          // Calculate order total from items since RPC doesn't provide order-level total
-          const calculatedTotal = (order.items || []).reduce((sum, item) => {
-            const itemTotal = Number(item.total_price) || 0;
-            return sum + itemTotal;
-          }, 0);
+          // Use actual total_price from database (updated by Stripe webhook) instead of calculating from items
+          const actualTotal = Number(orderTotals.total_price) || 0;
           
-          console.log(`🔍 Order ${order.order_id} calculated total: ${calculatedTotal} from ${order.items?.length || 0} items`);
+          console.log(`🔍 Order ${order.order_id} actual total from database: ${actualTotal} (was previously calculating from items)`);
           console.log(`🔍 Order ${order.order_id} additional data:`, {
             hasProofs: orderExtras.proofs.length > 0,
             proofsCount: orderExtras.proofs.length,
@@ -2455,9 +2490,11 @@ const resolvers = {
             trackingNumber: trackingData.tracking_number || null, // Use fetched tracking data
             trackingCompany: trackingData.tracking_company || null,
             trackingUrl: trackingData.tracking_url || null,
-            subtotalPrice: null, // RPC doesn't return this
-            totalTax: null, // RPC doesn't return this
-            totalPrice: calculatedTotal, // Use calculated total from items
+            subtotalPrice: Number(orderTotals.subtotal_price) || 0, // Use actual subtotal from database
+            totalTax: Number(orderTotals.total_tax) || 0, // Use actual tax from database
+            totalPrice: actualTotal, // Use actual total from database (updated by Stripe webhook)
+            discountAmount: Number(orderTotals.discount_amount) || 0, // Use actual discount amount from database
+            creditsApplied: Number(orderTotals.credits_applied) || 0, // Use actual credits applied from database
             currency: 'USD', // RPC doesn't return this, default to USD
             customerFirstName: orderExtras.customer_first_name, // Now available from database fetch
             customerLastName: orderExtras.customer_last_name, // Now available from database fetch
@@ -2495,7 +2532,8 @@ const resolvers = {
               instagramOptIn: null, // RPC doesn't include this in items
               fulfillmentStatus: null, // RPC doesn't include this in items
               createdAt: null, // RPC doesn't include this in items
-              updatedAt: null // RPC doesn't include this in items
+              updatedAt: null, // RPC doesn't include this in items
+              is_additional_payment: Boolean(item.is_additional_payment)
             }))
           };
 
@@ -2597,7 +2635,11 @@ const resolvers = {
             instagramOptIn: item.instagram_opt_in,
             fulfillmentStatus: item.fulfillment_status,
             createdAt: item.created_at,
-            updatedAt: item.updated_at
+            updatedAt: item.updated_at,
+            customerReplacementFile: item.customer_replacement_file,
+            customerReplacementFileName: item.customer_replacement_file_name,
+            customerReplacementAt: item.customer_replacement_at,
+            is_additional_payment: Boolean(item.is_additional_payment)
           }))
         };
       } catch (error) {
@@ -2749,7 +2791,11 @@ const resolvers = {
             instagramOptIn: item.instagram_opt_in,
             fulfillmentStatus: item.fulfillment_status,
             createdAt: item.created_at,
-            updatedAt: item.updated_at
+            updatedAt: item.updated_at,
+            customerReplacementFile: item.customer_replacement_file,
+            customerReplacementFileName: item.customer_replacement_file_name,
+            customerReplacementAt: item.customer_replacement_at,
+            is_additional_payment: Boolean(item.is_additional_payment)
           }))
         }));
       } catch (error) {
@@ -4007,7 +4053,8 @@ const resolvers = {
                 updatedAt: item.updated_at,
                 customerReplacementFile: item.customer_replacement_file,
                 customerReplacementFileName: item.customer_replacement_file_name,
-                customerReplacementAt: item.customer_replacement_at
+                customerReplacementAt: item.customer_replacement_at,
+                is_additional_payment: Boolean(item.is_additional_payment)
               })),
               proofs: (proofs || []).map(proof => ({
                 id: proof.id,
@@ -6424,6 +6471,90 @@ const resolvers = {
           errors: [error.message],
           creditsApplied: 0,
           remainingCredits: 0
+        };
+      }
+    },
+
+    createAdditionalPaymentLink: async (_, { input }) => {
+      try {
+        console.log('🔗 Creating additional payment link for order:', input.orderId);
+        
+        if (!stripeClient.isReady() || !supabaseClient.isReady()) {
+          throw new Error('Payment service is currently unavailable');
+        }
+        
+        const client = supabaseClient.getServiceClient();
+        
+        // 1. Get the original order details
+        const { data: originalOrder, error: orderError } = await client
+          .from('orders_main')
+          .select('*')
+          .eq('id', input.orderId)
+          .single();
+          
+        if (orderError || !originalOrder) {
+          throw new Error('Original order not found');
+        }
+        
+        // 2. Calculate totals for additional items
+        const additionalTotal = input.additionalItems.reduce((sum, item) => {
+          return sum + (item.totalPrice || 0);
+        }, 0);
+        
+        // 3. Create checkout session for additional items
+        const baseUrl = process.env.NODE_ENV === 'development' 
+          ? 'http://localhost:3000' 
+          : 'https://stickershuttle.com';
+        
+        const checkoutData = {
+          lineItems: input.additionalItems.map(item => ({
+            name: item.productName || 'Additional Item',
+            description: `Additional items for Order #${originalOrder.order_number}`,
+            unitPrice: item.unitPrice || 0,
+            totalPrice: item.totalPrice || 0,
+            quantity: item.quantity || 1,
+            productId: item.productId || 'additional-item',
+            sku: item.sku || 'ADD-ON',
+            calculatorSelections: item.calculatorSelections || {}
+          })),
+          successUrl: `${baseUrl}/order-success?additional=true&orderId=${input.orderId}`,
+          cancelUrl: `${baseUrl}/account/dashboard`,
+          customerEmail: input.customerEmail,
+          customerFirstName: originalOrder.customer_first_name,
+          customerLastName: originalOrder.customer_last_name,
+          userId: originalOrder.user_id || 'guest',
+          orderNote: input.orderNote || `Additional items for Order #${originalOrder.order_number}`,
+          cartMetadata: {
+            itemCount: input.additionalItems.length,
+            subtotalAmount: additionalTotal.toFixed(2),
+            totalAmount: additionalTotal.toFixed(2),
+            customerEmail: input.customerEmail,
+            originalOrderId: input.orderId,
+            isAdditionalPayment: true
+          }
+        };
+        
+        const sessionResult = await stripeClient.createCheckoutSession(checkoutData);
+        
+        if (sessionResult.success) {
+          console.log(`✅ Additional payment link created for order ${originalOrder.order_number}`);
+          
+          return {
+            success: true,
+            sessionId: sessionResult.sessionId,
+            checkoutUrl: sessionResult.checkoutUrl,
+            message: 'Additional payment link created successfully'
+          };
+        } else {
+          throw new Error('Failed to create payment session');
+        }
+        
+      } catch (error) {
+        console.error('Error creating additional payment link:', error);
+        return {
+          success: false,
+          message: error.message,
+          errors: [error.message]
         };
       }
     },

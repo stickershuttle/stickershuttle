@@ -66,4 +66,17 @@ export const CREATE_STRIPE_CHECKOUT_SESSION = gql`
       error
     }
   }
+`;
+
+// Create additional payment link for existing order
+export const CREATE_ADDITIONAL_PAYMENT_LINK = gql`
+  mutation CreateAdditionalPaymentLink($input: AdditionalPaymentInput!) {
+    createAdditionalPaymentLink(input: $input) {
+      success
+      sessionId
+      checkoutUrl
+      message
+      errors
+    }
+  }
 `; 

@@ -6,6 +6,8 @@ import ItemSpecificProofUpload from '@/components/ItemSpecificProofUpload';
 import AIFileImage from '@/components/AIFileImage';
 import EasyPostShipping from '@/components/EasyPostShipping';
 import ShipOrderModal from '@/components/ShipOrderModal';
+import AdditionalPaymentLink from '@/components/AdditionalPaymentLink';
+import useInvoiceGenerator from '@/components/InvoiceGenerator';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { getSupabase } from '../../lib/supabase';
 import { CREATE_EASYPOST_SHIPMENT, BUY_EASYPOST_LABEL, GET_EASYPOST_LABEL } from '../../lib/easypost-mutations';
@@ -76,6 +78,7 @@ const GET_ALL_ORDERS = gql`
         customerReplacementFile
         customerReplacementFileName
         customerReplacementAt
+        is_additional_payment
       }
       proofs {
         id
@@ -220,6 +223,7 @@ interface Order {
     customerReplacementFile?: string;
     customerReplacementFileName?: string;
     customerReplacementAt?: string;
+    is_additional_payment?: boolean;
   }>;
   proofs?: Array<{
     id: string;
@@ -844,6 +848,29 @@ export default function AdminOrders() {
     }
   };
 
+  // Helper function to calculate additional payment amount
+  const calculateAdditionalPaymentAmount = (order: Order) => {
+    if (!order.items) return 0;
+    
+    return order.items
+      .filter(item => item.is_additional_payment)
+      .reduce((total, item) => total + (item.totalPrice || 0), 0);
+  };
+
+  // Helper function to get additional payment items
+  const getAdditionalPaymentItems = (order: Order) => {
+    if (!order.items) return [];
+    
+    return order.items.filter(item => item.is_additional_payment);
+  };
+
+  // Helper function to get original order items
+  const getOriginalOrderItems = (order: Order) => {
+    if (!order.items) return [];
+    
+    return order.items.filter(item => !item.is_additional_payment);
+  };
+
   // Handle print order slip
   const handlePrintOrderSlip = (order: Order) => {
     const printWindow = window.open('', '_blank');
@@ -1174,7 +1201,7 @@ export default function AdminOrders() {
                  
                  return `
                  <tr>
-                   <td>${item.productName}</td>
+                   <td>${item.productName}${item.is_additional_payment ? ' <span style="color: #fbbf24; font-weight: bold;">(Additional Payment)</span>' : ''}</td>
                    <td>
                      ${extractValue('size') ? `Size: ${extractValue('size')}<br>` : ''}
                      ${extractValue('material') ? `Material: ${extractValue('material')}<br>` : ''}
@@ -1375,11 +1402,15 @@ export default function AdminOrders() {
     const grouped = items.reduce((acc, item) => {
       const key = item.productName;
       if (!acc[key]) {
-        acc[key] = { ...item, totalQuantity: 0 };
+        acc[key] = { ...item, totalQuantity: 0, hasAdditionalPayment: false };
       }
       acc[key].totalQuantity += item.quantity;
+      // If any item in this group is an additional payment, mark the group
+      if (item.is_additional_payment) {
+        acc[key].hasAdditionalPayment = true;
+      }
       return acc;
-    }, {} as Record<string, Order['items'][0] & { totalQuantity: number }>);
+    }, {} as Record<string, Order['items'][0] & { totalQuantity: number; hasAdditionalPayment: boolean }>);
     
     return Object.values(grouped);
   };
@@ -2643,11 +2674,20 @@ export default function AdminOrders() {
                               <td className="pl-4 pr-2 py-4">
                                 <div className="space-y-1">
                                   {groupItemsByProduct(order.items).map((item: any, idx: number) => (
-                                    <div key={idx}>
+                                    <div key={idx} className="flex items-center gap-2">
                                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-purple-300"
                                         style={{ backgroundColor: 'rgba(147, 51, 234, 0.2)', border: '1px solid rgba(147, 51, 234, 0.3)' }}>
                                         {item.productName} {item.totalQuantity > 1 ? `x${item.totalQuantity}` : ''}
                                       </span>
+                                      {/* Show additional payment badge if any items in this group are additional payments */}
+                                      {item.hasAdditionalPayment && (
+                                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border border-amber-500/30">
+                                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                                          </svg>
+                                          +$
+                                        </span>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -2977,7 +3017,18 @@ export default function AdminOrders() {
                                 <div className="flex-1">
                                   <div className="flex justify-between items-start">
                                     <div>
-                                      <h4 className="font-semibold text-white text-base">{item.productName}</h4>
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <h4 className="font-semibold text-white text-base">{item.productName}</h4>
+                                        {/* Additional Payment Badge */}
+                                        {item.is_additional_payment && (
+                                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border border-amber-500/30">
+                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                                            </svg>
+                                            Additional Payment
+                                          </span>
+                                        )}
+                                      </div>
                                       <p className="text-sm text-gray-400 mt-1">SKU: {item.sku || 'N/A'}</p>
                                     </div>
                                     <div className="text-right">
@@ -3177,6 +3228,89 @@ export default function AdminOrders() {
                         </details>
                       </div>
                     )}
+
+                    {/* Mobile Additional Payment Notification */}
+                    {(() => {
+                      const additionalPaymentAmount = calculateAdditionalPaymentAmount(selectedOrder);
+                      const additionalPaymentItems = getAdditionalPaymentItems(selectedOrder);
+                      
+                      if (additionalPaymentAmount > 0) {
+                        const additionalPaymentInvoiceData = {
+                          orderNumber: `${selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}-ADD`,
+                          id: selectedOrder.id,
+                          orderDate: selectedOrder.orderCreatedAt || selectedOrder.createdAt || new Date().toISOString(),
+                          orderStatus: selectedOrder.orderStatus,
+                          totalPrice: additionalPaymentAmount,
+                          currency: 'USD',
+                          items: additionalPaymentItems.map((item, index) => ({
+                            id: index + 1,
+                            productName: item.productName,
+                            quantity: item.quantity,
+                            unitPrice: item.unitPrice,
+                            totalPrice: item.totalPrice,
+                            customFiles: item.customFiles,
+                            calculatorSelections: item.calculatorSelections,
+                            customerNotes: item.customerNotes
+                          })),
+                          trackingNumber: selectedOrder.trackingNumber,
+                          trackingCompany: selectedOrder.trackingCompany,
+                          subtotal: additionalPaymentAmount,
+                          tax: 0,
+                          shipping: 0,
+                          customerInfo: {
+                            name: `${selectedOrder.customerFirstName || ''} ${selectedOrder.customerLastName || ''}`.trim(),
+                            email: selectedOrder.customerEmail,
+                            phone: selectedOrder.customerPhone,
+                            address: selectedOrder.shippingAddress
+                          },
+                          billingAddress: selectedOrder.billingAddress
+                        };
+                        
+                        // eslint-disable-next-line react-hooks/rules-of-hooks
+                        const { generatePrintPDF } = useInvoiceGenerator(additionalPaymentInvoiceData);
+                        
+                        return (
+                          <div className="mb-4 p-4 rounded-lg" style={{
+                            backgroundColor: 'rgba(251, 191, 36, 0.15)',
+                            border: '2px solid rgba(251, 191, 36, 0.4)',
+                            boxShadow: 'rgba(251, 191, 36, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                            backdropFilter: 'blur(12px)'
+                          }}>
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-amber-500/20">
+                                <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                                </svg>
+                              </div>
+                              <div className="flex-1">
+                                <span className="text-sm font-bold text-amber-300">
+                                  💳 Additional Payment Made
+                                </span>
+                                <p className="text-xs text-amber-200 mt-1">
+                                  Customer paid <span className="font-bold">${additionalPaymentAmount.toFixed(2)}</span> for {additionalPaymentItems.length} item{additionalPaymentItems.length !== 1 ? 's' : ''}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => generatePrintPDF()}
+                              className="w-full py-2 rounded-lg text-sm font-medium text-amber-300 hover:text-amber-200 transition-all"
+                              style={{
+                                background: 'rgba(251, 191, 36, 0.2)',
+                                border: '1px solid rgba(251, 191, 36, 0.4)',
+                                backdropFilter: 'blur(12px)'
+                              }}
+                            >
+                              <svg className="w-4 h-4 inline mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V9a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                              </svg>
+                              Print Additional Payment Invoice
+                            </button>
+                          </div>
+                        );
+                      }
+                      
+                      return null;
+                    })()}
 
                     {/* Mobile Action Buttons */}
                     <div className="mt-4 space-y-2">
@@ -3410,6 +3544,94 @@ export default function AdminOrders() {
                         </p>
                       </div>
 
+                      {/* Additional Payment Notification */}
+                      {(() => {
+                        const additionalPaymentAmount = calculateAdditionalPaymentAmount(selectedOrder);
+                        const additionalPaymentItems = getAdditionalPaymentItems(selectedOrder);
+                        
+                        if (additionalPaymentAmount > 0) {
+                          // Invoice data for additional payment
+                          const additionalPaymentInvoiceData = {
+                            orderNumber: `${selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase()}-ADD`,
+                            id: selectedOrder.id,
+                            orderDate: selectedOrder.orderCreatedAt || selectedOrder.createdAt || new Date().toISOString(),
+                            orderStatus: selectedOrder.orderStatus,
+                            totalPrice: additionalPaymentAmount,
+                            currency: 'USD',
+                            items: additionalPaymentItems.map((item, index) => ({
+                              id: index + 1,
+                              productName: item.productName,
+                              quantity: item.quantity,
+                              unitPrice: item.unitPrice,
+                              totalPrice: item.totalPrice,
+                              customFiles: item.customFiles,
+                              calculatorSelections: item.calculatorSelections,
+                              customerNotes: item.customerNotes
+                            })),
+                            trackingNumber: selectedOrder.trackingNumber,
+                            trackingCompany: selectedOrder.trackingCompany,
+                            subtotal: additionalPaymentAmount,
+                            tax: 0,
+                            shipping: 0,
+                            customerInfo: {
+                              name: `${selectedOrder.customerFirstName || ''} ${selectedOrder.customerLastName || ''}`.trim(),
+                              email: selectedOrder.customerEmail,
+                              phone: selectedOrder.customerPhone,
+                              address: selectedOrder.shippingAddress
+                            },
+                            billingAddress: selectedOrder.billingAddress
+                          };
+                          
+                          // eslint-disable-next-line react-hooks/rules-of-hooks
+                          const { generatePrintPDF } = useInvoiceGenerator(additionalPaymentInvoiceData);
+                          
+                          return (
+                            <div className="mb-6 p-4 rounded-lg" style={{
+                              backgroundColor: 'rgba(251, 191, 36, 0.15)',
+                              border: '2px solid rgba(251, 191, 36, 0.4)',
+                              boxShadow: 'rgba(251, 191, 36, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                              backdropFilter: 'blur(12px)'
+                            }}>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-amber-500/20">
+                                    <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                                    </svg>
+                                  </div>
+                                  <div>
+                                    <span className="text-base font-bold text-amber-300">
+                                      💳 Additional Payment Made
+                                    </span>
+                                    <p className="text-sm text-amber-200 mt-1">
+                                      This customer made an additional payment of <span className="font-bold">${additionalPaymentAmount.toFixed(2)}</span> for {additionalPaymentItems.length} item{additionalPaymentItems.length !== 1 ? 's' : ''}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => generatePrintPDF()}
+                                    className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-300 hover:text-amber-200 transition-all"
+                                    style={{
+                                      background: 'rgba(251, 191, 36, 0.2)',
+                                      border: '1px solid rgba(251, 191, 36, 0.4)',
+                                      backdropFilter: 'blur(12px)'
+                                    }}
+                                  >
+                                    <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V9a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                    </svg>
+                                    Print
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+                        
+                        return null;
+                      })()}
+
                       {/* Order Items with Drag-and-Drop Proof Upload */}
                       <div className="space-y-4 mb-6">
                         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
@@ -3486,6 +3708,15 @@ export default function AdminOrders() {
                                     <div className="flex-1">
                                       <div className="flex items-center gap-2">
                                         <h4 className="font-semibold text-white text-base">{item.productName}</h4>
+                                        {/* Additional Payment Badge */}
+                                        {item.is_additional_payment && (
+                                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border border-amber-500/30">
+                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                                            </svg>
+                                            Additional Payment
+                                          </span>
+                                        )}
                                         {/* Download Button for this specific item */}
                                         {itemImage && (
                                           <button
@@ -4386,6 +4617,17 @@ export default function AdminOrders() {
                                 )}
                               </button>
                             )}
+
+                            {/* Additional Payment Link */}
+                            <AdditionalPaymentLink
+                              order={{
+                                id: selectedOrder.id,
+                                orderNumber: selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase(),
+                                customerEmail: selectedOrder.customerEmail || '',
+                                customerFirstName: selectedOrder.customerFirstName || '',
+                                customerLastName: selectedOrder.customerLastName || ''
+                              }}
+                            />
                             
                             {/* Order Status for reference */}
                             <div className="text-center">

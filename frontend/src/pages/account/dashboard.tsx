@@ -1224,12 +1224,48 @@ function Dashboard() {
     setReorderingId(orderId);
     
     try {
+      // Calculate original prices before discounts and credits
+      const orderData = order._fullOrderData;
+      const subtotalPrice = orderData.subtotalPrice || 0;
+      const discountAmount = orderData.discountAmount || 0;
+      const creditsApplied = orderData.creditsApplied || 0;
+      const totalDiscounts = discountAmount + creditsApplied;
+      
+      // Calculate the discount ratio to reverse it
+      const discountRatio = subtotalPrice > 0 ? totalDiscounts / subtotalPrice : 0;
+      
+      console.log('🔄 Reorder price calculation:', {
+        subtotalPrice,
+        discountAmount,
+        creditsApplied,
+        totalDiscounts,
+        discountRatio
+      });
+      
       // Add each item to cart directly
       order._fullOrderData?.items?.forEach((fullItem: any, index: number) => {
         const selections = fullItem.calculatorSelections || {};
         const quantity = fullItem.quantity || 1;
-        const unitPrice = fullItem.unitPrice || fullItem.unit_price || 0;
-        const totalPrice = fullItem.totalPrice || fullItem.total_price || 0;
+        
+        // Calculate original prices (before discounts/credits)
+        const storedUnitPrice = fullItem.unitPrice || fullItem.unit_price || 0;
+        const storedTotalPrice = fullItem.totalPrice || fullItem.total_price || 0;
+        
+        // Reverse the discount to get original prices
+        const originalUnitPrice = discountRatio > 0 ? storedUnitPrice / (1 - discountRatio) : storedUnitPrice;
+        const originalTotalPrice = discountRatio > 0 ? storedTotalPrice / (1 - discountRatio) : storedTotalPrice;
+        
+        console.log(`🔄 Item ${index + 1} price restoration:`, {
+          productName: fullItem.productName,
+          storedUnitPrice,
+          storedTotalPrice,
+          originalUnitPrice,
+          originalTotalPrice,
+          discountRatio
+        });
+        
+        const unitPrice = originalUnitPrice;
+        const totalPrice = originalTotalPrice;
           
         // Create cart item
         const cartItem = {
