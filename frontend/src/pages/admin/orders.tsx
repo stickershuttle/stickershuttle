@@ -11,7 +11,7 @@ import useInvoiceGenerator from '@/components/InvoiceGenerator';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { getSupabase } from '../../lib/supabase';
 import { CREATE_EASYPOST_SHIPMENT, BUY_EASYPOST_LABEL, GET_EASYPOST_LABEL } from '../../lib/easypost-mutations';
-import { UPDATE_ORDER_SHIPPING_ADDRESS } from '../../lib/order-mutations';
+import { UPDATE_ORDER_SHIPPING_ADDRESS, MARK_ORDER_READY_FOR_PICKUP, MARK_ORDER_PICKED_UP } from '../../lib/order-mutations';
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
@@ -381,6 +381,8 @@ export default function AdminOrders() {
   const [sendProofs] = useMutation(SEND_PROOFS);
   const [getEasyPostLabel] = useMutation(GET_EASYPOST_LABEL);
   const [markOrderAsDelivered, { loading: markingDelivered }] = useMutation(MARK_ORDER_AS_DELIVERED);
+  const [markOrderReadyForPickup, { loading: markingReadyForPickup }] = useMutation(MARK_ORDER_READY_FOR_PICKUP);
+  const [markOrderPickedUp, { loading: markingPickedUp }] = useMutation(MARK_ORDER_PICKED_UP);
   const [updateOrderShippingAddress] = useMutation(UPDATE_ORDER_SHIPPING_ADDRESS);
 
   // Calculate customer statistics
@@ -1466,6 +1468,44 @@ export default function AdminOrders() {
     } catch (error) {
       console.error('Error marking order as delivered:', error);
       alert('Failed to mark order as delivered. Please try again.');
+    }
+  };
+
+  // Handle mark as ready for pickup
+  const handleMarkAsReadyForPickup = async (orderId: string) => {
+    try {
+      await markOrderReadyForPickup({
+        variables: { orderId: orderId }
+      });
+      
+      // Refetch to update order status
+      refetch();
+      
+      // Show success message
+      alert('Order marked as ready for pickup! Customer will receive an email notification with pickup instructions.');
+      
+    } catch (error) {
+      console.error('Error marking order as ready for pickup:', error);
+      alert('Failed to mark order as ready for pickup. Please try again.');
+    }
+  };
+
+  // Handle mark as picked up
+  const handleMarkAsPickedUp = async (orderId: string) => {
+    try {
+      await markOrderPickedUp({
+        variables: { orderId: orderId }
+      });
+      
+      // Refetch to update order status
+      refetch();
+      
+      // Show success message
+      alert('Order marked as picked up! Customer will receive a pickup confirmation email.');
+      
+    } catch (error) {
+      console.error('Error marking order as picked up:', error);
+      alert('Failed to mark order as picked up. Please try again.');
     }
   };
 
@@ -4590,8 +4630,71 @@ export default function AdminOrders() {
                               </button>
                             )}
 
-                            {/* Mark as Delivered Button - Only show if not already delivered */}
-                            {selectedOrder.orderStatus !== 'Delivered' && selectedOrder.fulfillmentStatus !== 'fulfilled' && (
+                            {/* Local Pickup Buttons - Only show for local pickup orders */}
+                            {selectedOrder.shipping_method && selectedOrder.shipping_method.includes('Local Pickup') && (
+                              <>
+                                {/* Ready for Pickup Button - Only show if not already ready or delivered */}
+                                {selectedOrder.orderStatus !== 'Ready for Pickup' && selectedOrder.orderStatus !== 'Delivered' && 
+                                 selectedOrder.fulfillmentStatus !== 'fulfilled' && (
+                                  <button
+                                    onClick={() => handleMarkAsReadyForPickup(selectedOrder.id)}
+                                    disabled={markingReadyForPickup}
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    style={{
+                                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                                      backdropFilter: 'blur(25px) saturate(180%)',
+                                      border: '1px solid rgba(59, 130, 246, 0.4)'
+                                    }}
+                                  >
+                                    {markingReadyForPickup ? (
+                                      <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                        Marking as Ready...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                        </svg>
+                                        Ready for Pickup
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+
+                                {/* Picked Up Button - Only show if ready for pickup */}
+                                {selectedOrder.orderStatus === 'Ready for Pickup' && (
+                                  <button
+                                    onClick={() => handleMarkAsPickedUp(selectedOrder.id)}
+                                    disabled={markingPickedUp}
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    style={{
+                                      background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                                      backdropFilter: 'blur(25px) saturate(180%)',
+                                      border: '1px solid rgba(34, 197, 94, 0.4)'
+                                    }}
+                                  >
+                                    {markingPickedUp ? (
+                                      <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                        Marking as Picked Up...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Picked Up
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+                              </>
+                            )}
+
+                            {/* Mark as Delivered Button - Only show if not already delivered and not local pickup */}
+                            {selectedOrder.orderStatus !== 'Delivered' && selectedOrder.fulfillmentStatus !== 'fulfilled' && 
+                             (!selectedOrder.shipping_method || !selectedOrder.shipping_method.includes('Local Pickup')) && (
                               <button
                                 onClick={() => handleMarkAsDelivered(selectedOrder.id)}
                                 disabled={markingDelivered}

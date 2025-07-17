@@ -205,9 +205,22 @@ async function handleCheckoutSessionCompleted(session) {
       isExpressShipping = true;
       console.log('✅ Detected UPS 2nd Day Air from $20 shipping cost');
     } else if (shippingCostAmount === 0) {
-      shippingMethodName = 'UPS Ground';
-      isExpressShipping = false;
-      console.log('✅ Detected UPS Ground from $0 shipping cost');
+      // Check if it's local pickup or UPS Ground based on display_name
+      if (shippingOption && shippingOption.display_name) {
+        if (shippingOption.display_name.includes('Local Pickup')) {
+          shippingMethodName = 'Local Pickup (Denver, CO)';
+          isExpressShipping = false;
+          console.log('✅ Detected Local Pickup from display_name');
+        } else {
+          shippingMethodName = 'UPS Ground';
+          isExpressShipping = false;
+          console.log('✅ Detected UPS Ground from $0 shipping cost');
+        }
+      } else {
+        shippingMethodName = 'UPS Ground';
+        isExpressShipping = false;
+        console.log('✅ Detected UPS Ground from $0 shipping cost (no display_name)');
+      }
     } else {
       // Fallback: Try to get from display_name if available
       if (shippingOption && shippingOption.display_name) {

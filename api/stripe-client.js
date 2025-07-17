@@ -237,6 +237,26 @@ class StripeClient {
               },
             },
           },
+          {
+            shipping_rate_data: {
+              type: 'fixed_amount',
+              fixed_amount: {
+                amount: 0, // Free local pickup
+                currency: 'usd',
+              },
+              display_name: 'Local Pickup (Denver, CO)',
+              delivery_estimate: {
+                minimum: {
+                  unit: 'business_day',
+                  value: 1,
+                },
+                maximum: {
+                  unit: 'business_day',
+                  value: 1,
+                },
+              },
+            },
+          },
         ],
       });
 

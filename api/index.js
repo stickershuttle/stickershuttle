@@ -931,6 +931,8 @@ const typeDefs = gql`
     updateOrderStatus(orderId: ID!, statusUpdate: OrderStatusInput!): CustomerOrder
     updateOrderShippingAddress(orderId: ID!, shippingAddress: ShippingAddressInput!): OrderShippingAddressResult
     markOrderAsDelivered(orderId: ID!): CustomerOrder
+    markOrderReadyForPickup(orderId: ID!): CustomerOrder
+    markOrderPickedUp(orderId: ID!): CustomerOrder
     claimGuestOrders(userId: ID!, email: String!): ClaimResult
     
     # Proof mutations
@@ -5099,6 +5101,164 @@ const resolvers = {
         return updatedOrder;
       } catch (error) {
         console.error('Error marking order as delivered:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    markOrderReadyForPickup: async (_, { orderId }, { user }) => {
+      try {
+        // Require admin authentication
+        requireAdminAuth(user);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Order service is currently unavailable');
+        }
+        
+        // Get the current order
+        const client = supabaseClient.getServiceClient();
+        const { data: currentOrder, error: fetchError } = await client
+          .from('orders_main')
+          .select('*')
+          .eq('id', orderId)
+          .single();
+          
+        if (fetchError) {
+          throw new Error(`Failed to fetch order: ${fetchError.message}`);
+        }
+        
+        if (!currentOrder) {
+          throw new Error('Order not found');
+        }
+        
+        // Check if this is a local pickup order
+        if (!currentOrder.shipping_method || !currentOrder.shipping_method.includes('Local Pickup')) {
+          throw new Error('This order is not a local pickup order');
+        }
+        
+        // Update the order status to ready for pickup
+        const statusUpdate = {
+          orderStatus: 'Ready for Pickup',
+          fulfillmentStatus: 'fulfilled',
+          proof_status: 'ready_for_pickup'
+        };
+        
+        const { data: updatedOrder, error: updateError } = await client
+          .from('orders_main')
+          .update({
+            order_status: statusUpdate.orderStatus,
+            fulfillment_status: statusUpdate.fulfillmentStatus,
+            proof_status: statusUpdate.proof_status,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', orderId)
+          .select(`
+            *,
+            order_items_new(*)
+          `)
+          .single();
+          
+        if (updateError) {
+          throw new Error(`Failed to update order status: ${updateError.message}`);
+        }
+        
+        // Send pickup ready email notification to customer
+        try {
+          console.log('📧 Sending pickup ready email notification to customer...');
+          const emailNotifications = require('./email-notifications');
+          
+          const emailResult = await emailNotifications.sendPickupReadyNotification(updatedOrder);
+          
+          if (emailResult.success) {
+            console.log(`✅ Pickup ready email sent successfully for order ${updatedOrder.order_number}`);
+          } else {
+            console.error('❌ Pickup ready email failed:', emailResult.error);
+          }
+        } catch (emailError) {
+          console.error('⚠️ Failed to send pickup ready email (order still marked as ready for pickup):', emailError);
+        }
+        
+        return updatedOrder;
+      } catch (error) {
+        console.error('Error marking order as ready for pickup:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    markOrderPickedUp: async (_, { orderId }, { user }) => {
+      try {
+        // Require admin authentication
+        requireAdminAuth(user);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Order service is currently unavailable');
+        }
+        
+        // Get the current order
+        const client = supabaseClient.getServiceClient();
+        const { data: currentOrder, error: fetchError } = await client
+          .from('orders_main')
+          .select('*')
+          .eq('id', orderId)
+          .single();
+          
+        if (fetchError) {
+          throw new Error(`Failed to fetch order: ${fetchError.message}`);
+        }
+        
+        if (!currentOrder) {
+          throw new Error('Order not found');
+        }
+        
+        // Check if this is a local pickup order
+        if (!currentOrder.shipping_method || !currentOrder.shipping_method.includes('Local Pickup')) {
+          throw new Error('This order is not a local pickup order');
+        }
+        
+        // Update the order status to picked up (delivered)
+        const statusUpdate = {
+          orderStatus: 'Delivered',
+          fulfillmentStatus: 'fulfilled',
+          proof_status: 'delivered'
+        };
+        
+        const { data: updatedOrder, error: updateError } = await client
+          .from('orders_main')
+          .update({
+            order_status: statusUpdate.orderStatus,
+            fulfillment_status: statusUpdate.fulfillmentStatus,
+            proof_status: statusUpdate.proof_status,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', orderId)
+          .select(`
+            *,
+            order_items_new(*)
+          `)
+          .single();
+          
+        if (updateError) {
+          throw new Error(`Failed to update order status: ${updateError.message}`);
+        }
+        
+        // Send pickup completed email notification to customer
+        try {
+          console.log('📧 Sending pickup completed email notification to customer...');
+          const emailNotifications = require('./email-notifications');
+          
+          const emailResult = await emailNotifications.sendPickupCompletedNotification(updatedOrder);
+          
+          if (emailResult.success) {
+            console.log(`✅ Pickup completed email sent successfully for order ${updatedOrder.order_number}`);
+          } else {
+            console.error('❌ Pickup completed email failed:', emailResult.error);
+          }
+        } catch (emailError) {
+          console.error('⚠️ Failed to send pickup completed email (order still marked as delivered):', emailError);
+        }
+        
+        return updatedOrder;
+      } catch (error) {
+        console.error('Error marking order as picked up:', error);
         throw new Error(error.message);
       }
     },

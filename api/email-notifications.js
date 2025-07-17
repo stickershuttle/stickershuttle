@@ -1842,6 +1842,347 @@ const bulkSyncUsersToResendAudience = async (audienceId = null) => {
   }
 };
 
+// Send pickup notification emails
+const sendPickupReadyNotification = async (orderData) => {
+  try {
+    // Map different possible field names to standardized format
+    const normalizedOrderData = {
+      orderNumber: orderData.order_number || orderData.orderNumber || orderData.id || 'N/A',
+      customerEmail: orderData.customer_email || orderData.customerEmail || orderData.guest_email || orderData.guestEmail,
+      customerFirstName: orderData.customer_first_name || orderData.customerFirstName || orderData.firstName || '',
+      customerLastName: orderData.customer_last_name || orderData.customerLastName || orderData.lastName || '',
+      totalPrice: orderData.total_price || orderData.totalPrice || 0
+    };
+    
+    console.log(`📧 Sending pickup ready notification for order ${normalizedOrderData.orderNumber}`);
+    
+    if (!normalizedOrderData.customerEmail) {
+      console.log('❌ No customer email found for pickup ready notification');
+      return { success: false, error: 'No customer email' };
+    }
+
+    const template = getPickupReadyEmailTemplate(normalizedOrderData);
+    const result = await sendEmail(normalizedOrderData.customerEmail, template.subject, template.html);
+    
+    if (result.success) {
+      console.log(`✅ Pickup ready notification sent for order ${normalizedOrderData.orderNumber}`);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('❌ Error sending pickup ready notification:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+const sendPickupCompletedNotification = async (orderData) => {
+  try {
+    // Map different possible field names to standardized format
+    const normalizedOrderData = {
+      orderNumber: orderData.order_number || orderData.orderNumber || orderData.id || 'N/A',
+      customerEmail: orderData.customer_email || orderData.customerEmail || orderData.guest_email || orderData.guestEmail,
+      customerFirstName: orderData.customer_first_name || orderData.customerFirstName || orderData.firstName || '',
+      customerLastName: orderData.customer_last_name || orderData.customerLastName || orderData.lastName || '',
+      totalPrice: orderData.total_price || orderData.totalPrice || 0
+    };
+    
+    console.log(`📧 Sending pickup completed notification for order ${normalizedOrderData.orderNumber}`);
+    
+    if (!normalizedOrderData.customerEmail) {
+      console.log('❌ No customer email found for pickup completed notification');
+      return { success: false, error: 'No customer email' };
+    }
+
+    const template = getPickupCompletedEmailTemplate(normalizedOrderData);
+    const result = await sendEmail(normalizedOrderData.customerEmail, template.subject, template.html);
+    
+    if (result.success) {
+      console.log(`✅ Pickup completed notification sent for order ${normalizedOrderData.orderNumber}`);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('❌ Error sending pickup completed notification:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Email template for pickup ready notification
+const getPickupReadyEmailTemplate = (orderData) => {
+  const customerName = `${orderData.customerFirstName} ${orderData.customerLastName}`.trim() || 'Customer';
+  
+  return {
+    subject: `Your Order #${orderData.orderNumber} is Ready for Pickup! 📦`,
+    html: `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Order Ready for Pickup</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          }
+          .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 30px;
+          }
+          .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+          }
+          .pickup-badge {
+            background: #10b981;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 18px;
+            display: inline-block;
+            margin: 20px 0;
+          }
+          .order-details {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+          }
+          .pickup-info {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #2196f3;
+          }
+          .button {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px 0;
+          }
+          .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+          }
+          .highlight {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="logo">Sticker Shuttle</div>
+            <div class="pickup-badge">📦 Ready for Pickup!</div>
+          </div>
+
+          <h2>Hi ${customerName}!</h2>
+          
+          <p>Great news! Your custom sticker order is ready for pickup at our Denver location.</p>
+
+          <div class="order-details">
+            <h3>Order Details</h3>
+            <p><strong>Order Number:</strong> #${orderData.orderNumber}</p>
+            <p><strong>Total:</strong> $${orderData.totalPrice.toFixed(2)}</p>
+          </div>
+
+          <div class="pickup-info">
+            <h3>📍 Pickup Location</h3>
+            <p><strong>Address:</strong> 2981 S Harrison St, Denver, CO 80210</p>
+            <p><strong>Hours:</strong> Monday - Friday, 9 AM - 6 PM</p>
+            <p><strong>Phone:</strong> 303-219-0518</p>
+          </div>
+
+          <div class="highlight">
+            <h3>⚠️ Important Pickup Information</h3>
+            <ul>
+              <li>Your order will be placed near the right side gate with your order number attached.</li>
+              <li>This is a residential pickup, so please be respectful of the neighbors.</li>
+              <li>Orders are held for 2 business days, then shipped</li>
+              <li>Ring the white doorbell once you've picked up your order.</li>
+            </ul>
+          </div>
+
+          <p>Questions about your pickup? Reply to this email or contact us at <a href="mailto:orbit@stickershuttle.com">orbit@stickershuttle.com</a></p>
+
+          <div class="footer">
+            <p>Thank you for choosing Sticker Shuttle!</p>
+            <p>This email was sent regarding your order #${orderData.orderNumber}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+};
+
+// Email template for pickup completed notification
+const getPickupCompletedEmailTemplate = (orderData) => {
+  const customerName = `${orderData.customerFirstName} ${orderData.customerLastName}`.trim() || 'Customer';
+  
+  return {
+    subject: `Order #${orderData.orderNumber} Picked Up Successfully! ✅`,
+    html: `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Order Picked Up</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          }
+          .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 30px;
+          }
+          .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+          }
+          .success-badge {
+            background: #10b981;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 18px;
+            display: inline-block;
+            margin: 20px 0;
+          }
+          .order-details {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+          }
+          .thank-you {
+            background: #e8f5e8;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #10b981;
+          }
+          .button {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px 0;
+          }
+          .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+          }
+          .social-links {
+            text-align: center;
+            margin: 20px 0;
+          }
+          .social-links a {
+            color: #667eea;
+            text-decoration: none;
+            margin: 0 10px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="logo">Sticker Shuttle</div>
+            <div class="success-badge">✅ Successfully Picked Up!</div>
+          </div>
+
+          <h2>Hi ${customerName}!</h2>
+          
+          <p>This email confirms that your order has been successfully picked up from our Denver location.</p>
+
+          <div class="order-details">
+            <h3>Order Details</h3>
+            <p><strong>Order Number:</strong> #${orderData.orderNumber}</p>
+            <p><strong>Total:</strong> $${orderData.totalPrice.toFixed(2)}</p>
+            <p><strong>Status:</strong> Delivered via Local Pickup</p>
+            <p><strong>Pickup Date:</strong> ${new Date().toLocaleDateString()}</p>
+          </div>
+
+          <div class="thank-you">
+            <h3>🎉 Thank You for Your Business!</h3>
+            <p>We hope you love your custom stickers! Your support means everything to us.</p>
+          </div>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <h3>Love Your Stickers?</h3>
+            <p>We'd love to hear from you! Share your experience or show off your stickers:</p>
+            <div class="social-links">
+              <a href="https://stickershuttle.com/products">Order Again</a> |
+              <a href="mailto:orbit@stickershuttle.com">Contact Us</a>
+            </div>
+          </div>
+
+          <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h4>✨ Need More Stickers?</h4>
+            <p>Reorder your favorites or try something new! Use your order history to quickly reorder.</p>
+            <a href="https://stickershuttle.com/products" class="button">Browse Products</a>
+          </div>
+
+          <p>Questions or need support? Reply to this email or contact us at <a href="mailto:orbit@stickershuttle.com">orbit@stickershuttle.com</a></p>
+
+          <div class="footer">
+            <p>Thank you for choosing Sticker Shuttle!</p>
+            <p>This email was sent regarding your order #${orderData.orderNumber}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+};
+
 // Export all functions for use in other modules
 module.exports = {
   sendEmail,
@@ -1859,5 +2200,7 @@ module.exports = {
   updateContactInResendAudience,
   bulkSyncUsersToResendAudience,
   scheduleFirstOrderThankYou,
-  isFirstTimeCustomer
+  isFirstTimeCustomer,
+  sendPickupReadyNotification,
+  sendPickupCompletedNotification
 }; 

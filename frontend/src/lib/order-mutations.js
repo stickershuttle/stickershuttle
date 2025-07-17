@@ -317,4 +317,42 @@ export const UPDATE_PROOF_FILE_BY_CUSTOMER = gql`
       }
     }
   }
+`;
+
+// Mark order as ready for pickup
+export const MARK_ORDER_READY_FOR_PICKUP = gql`
+  mutation MarkOrderReadyForPickup($orderId: ID!) {
+    markOrderReadyForPickup(orderId: $orderId) {
+      id
+      orderNumber
+      orderStatus
+      fulfillmentStatus
+      proof_status
+      shipping_method
+      customerFirstName
+      customerLastName
+      customerEmail
+      totalPrice
+      updatedAt
+    }
+  }
+`;
+
+// Mark order as picked up
+export const MARK_ORDER_PICKED_UP = gql`
+  mutation MarkOrderPickedUp($orderId: ID!) {
+    markOrderPickedUp(orderId: $orderId) {
+      id
+      orderNumber
+      orderStatus
+      fulfillmentStatus
+      proof_status
+      shipping_method
+      customerFirstName
+      customerLastName
+      customerEmail
+      totalPrice
+      updatedAt
+    }
+  }
 `; 
