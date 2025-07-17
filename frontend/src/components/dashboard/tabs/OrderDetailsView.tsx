@@ -20,6 +20,38 @@ interface OrderDetailsViewProps {
   orders: any[];
 }
 
+// Helper function to safely format dates
+const formatOrderDate = (order: any, includeTime = false): string => {
+  // Try multiple date fields in order of preference
+  const dateValue = order.orderCreatedAt || order.created_at || order.date || order.orderDate;
+  
+  // If no date found, return fallback
+  if (!dateValue) {
+    return 'Date not available';
+  }
+  
+  const date = new Date(dateValue);
+  
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    return 'Invalid date';
+  }
+  
+  // Format the date
+  const options: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  };
+  
+  if (includeTime) {
+    options.hour = '2-digit';
+    options.minute = '2-digit';
+  }
+  
+  return date.toLocaleDateString('en-US', options);
+};
+
 const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
   selectedOrderForInvoice,
   setSelectedOrderForInvoice,
@@ -43,7 +75,7 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
   // Initialize invoice generator
   const invoiceData: InvoiceData = selectedOrderForInvoice ? {
     orderNumber: selectedOrderForInvoice.orderNumber || selectedOrderForInvoice.id,
-    orderDate: selectedOrderForInvoice.orderCreatedAt || selectedOrderForInvoice.date,
+    orderDate: selectedOrderForInvoice.orderCreatedAt || selectedOrderForInvoice.created_at || selectedOrderForInvoice.date || new Date().toISOString(),
     orderStatus: selectedOrderForInvoice.orderStatus || selectedOrderForInvoice.status,
     totalPrice: selectedOrderForInvoice.totalPrice || selectedOrderForInvoice.total,
     currency: selectedOrderForInvoice.currency || 'USD',
@@ -132,10 +164,10 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
             <div>
               <h3 className="text-lg font-semibold text-white mb-2">Order #{getOrderDisplayNumber(selectedOrderForInvoice)}</h3>
               <p className="text-gray-300">
-                <span className="font-medium">Date:</span> {new Date(selectedOrderForInvoice.orderCreatedAt).toLocaleDateString()}
+                <span className="font-medium">Date:</span> {formatOrderDate(selectedOrderForInvoice, true)}
               </p>
               <p className="text-gray-300">
-                <span className="font-medium">Status:</span> {selectedOrderForInvoice.orderStatus || 'Processing'}
+                <span className="font-medium">Status:</span> {selectedOrderForInvoice.orderStatus || selectedOrderForInvoice.status || 'Processing'}
               </p>
               <p className="text-gray-300">
                 <span className="font-medium">Total:</span> ${(selectedOrderForInvoice.totalPrice || selectedOrderForInvoice.total).toFixed(2)}

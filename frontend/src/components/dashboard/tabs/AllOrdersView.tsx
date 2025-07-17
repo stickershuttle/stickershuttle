@@ -18,6 +18,32 @@ interface AllOrdersViewProps {
   isOrderShippedWithTracking: (order: any) => boolean;
 }
 
+// Helper function to safely format dates
+const formatOrderDate = (order: any, options?: Intl.DateTimeFormatOptions): string => {
+  // Try multiple date fields in order of preference
+  const dateValue = order.orderCreatedAt || order.created_at || order.date || order.orderDate;
+  
+  // If no date found, return fallback
+  if (!dateValue) {
+    return 'Date not available';
+  }
+  
+  const date = new Date(dateValue);
+  
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    return 'Invalid date';
+  }
+  
+  // Use provided options or default
+  const defaultOptions: Intl.DateTimeFormatOptions = {
+    month: 'short',
+    day: 'numeric'
+  };
+  
+  return date.toLocaleDateString('en-US', options || defaultOptions);
+};
+
 const AllOrdersView: React.FC<AllOrdersViewProps> = ({
   orders,
   currentView,
@@ -237,10 +263,7 @@ const AllOrdersView: React.FC<AllOrdersViewProps> = ({
                     {/* Date Column */}
                     <div className="col-span-2">
                       <div className="text-xs text-gray-400">
-                        {new Date(order.date).toLocaleDateString('en-US', { 
-                          month: 'short', 
-                          day: 'numeric' 
-                        })}
+                        {formatOrderDate(order)}
                       </div>
                     </div>
                     

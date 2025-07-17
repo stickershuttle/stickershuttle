@@ -956,15 +956,70 @@ async function handleCheckoutSessionCompleted(session) {
             calculatorSelections = { ...calculatorSelections, ...orderNoteSelections };
           }
           
-          // Update order items with calculator selections
-          await client
+          console.log('🔍 Webhook: Attempting to update order item with unique stripe_line_item_id:', {
+            lineItemId: lineItem.id,
+            productId: itemMetadata.productId,
+            calculatorSelections: calculatorSelections
+          });
+          
+          // Update order items with calculator selections using stripe_line_item_id for unique matching
+          const updateResult = await client
             .from('order_items_new')
             .update({
               calculator_selections: calculatorSelections,
+              stripe_line_item_id: lineItem.id, // Ensure this is set
               updated_at: new Date().toISOString()
             })
             .eq('order_id', existingOrderId)
-            .eq('product_id', itemMetadata.productId || 'custom-product');
+            .eq('stripe_line_item_id', lineItem.id); // Use unique stripe line item ID instead of product_id
+          
+          if (updateResult.error) {
+            console.error('❌ Failed to update order item with stripe_line_item_id:', updateResult.error);
+            
+            // Fallback: try to match by product_id and order in array (for existing orders without stripe_line_item_id)
+            console.log('🔄 Fallback: Trying to match by product_id and creation order...');
+            
+            // Get existing order items to find the right one to update
+            const { data: existingItems, error: fetchError } = await client
+              .from('order_items_new')
+              .select('id, product_id, calculator_selections')
+              .eq('order_id', existingOrderId)
+              .eq('product_id', itemMetadata.productId || 'custom-product')
+              .order('created_at', { ascending: true });
+            
+            if (fetchError) {
+              console.error('❌ Failed to fetch existing order items:', fetchError);
+            } else if (existingItems && existingItems.length > 0) {
+              // Find the first item without calculator_selections or with incomplete selections
+              const itemToUpdate = existingItems.find(item => 
+                !item.calculator_selections || 
+                Object.keys(item.calculator_selections).length === 0 ||
+                !item.calculator_selections.size || 
+                !item.calculator_selections.material
+              ) || existingItems[0]; // fallback to first item
+              
+              if (itemToUpdate) {
+                console.log('🎯 Found order item to update:', itemToUpdate.id);
+                
+                const fallbackUpdate = await client
+                  .from('order_items_new')
+                  .update({
+                    calculator_selections: calculatorSelections,
+                    stripe_line_item_id: lineItem.id,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', itemToUpdate.id);
+                
+                if (fallbackUpdate.error) {
+                  console.error('❌ Fallback update also failed:', fallbackUpdate.error);
+                } else {
+                  console.log('✅ Successfully updated order item via fallback method');
+                }
+              }
+            }
+          } else {
+            console.log('✅ Successfully updated order item with stripe_line_item_id');
+          }
         }
       }
       
@@ -1193,6 +1248,7 @@ async function handleCheckoutSessionCompleted(session) {
           
           return {
             order_id: order.id,
+            stripe_line_item_id: lineItem.id, // Add unique Stripe line item ID
             product_id: itemMetadata.productId || 'custom-product',
             product_name: lineItem.description || lineItem.price.product.name,
             product_category: itemMetadata.category || 'Custom Stickers',
@@ -1576,6 +1632,7 @@ async function handleAdditionalPaymentCompleted(session, originalOrderId, fullSe
         
         additionalItems.push({
           order_id: originalOrderId,
+          stripe_line_item_id: lineItem.id, // Add unique Stripe line item ID
           product_id: itemMetadata.productId || 'additional-item',
           product_name: lineItem.description || lineItem.price.product.name,
           product_category: 'Additional Items',

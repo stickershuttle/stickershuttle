@@ -13,6 +13,38 @@ interface OrderDetailsPopupViewProps {
   getProductImage: (item: any, itemData?: any) => string | null;
 }
 
+// Helper function to safely format dates
+const formatOrderDate = (order: any, includeTime = false): string => {
+  // Try multiple date fields in order of preference
+  const dateValue = order.orderCreatedAt || order.created_at || order.date || order.orderDate;
+  
+  // If no date found, return fallback
+  if (!dateValue) {
+    return 'Date not available';
+  }
+  
+  const date = new Date(dateValue);
+  
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    return 'Invalid date';
+  }
+  
+  // Format the date
+  const options: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  };
+  
+  if (includeTime) {
+    options.hour = '2-digit';
+    options.minute = '2-digit';
+  }
+  
+  return date.toLocaleDateString('en-US', options);
+};
+
 const OrderDetailsPopupView: React.FC<OrderDetailsPopupViewProps> = ({
   selectedOrderForDetails,
   setSelectedOrderForDetails,
@@ -73,11 +105,7 @@ const OrderDetailsPopupView: React.FC<OrderDetailsPopupViewProps> = ({
             }}>
               <p className="text-sm text-gray-400 mb-1">Order Date</p>
               <p className="text-white font-medium">
-                {new Date(order.date).toLocaleDateString('en-US', { 
-                  month: 'long', 
-                  day: 'numeric',
-                  year: 'numeric' 
-                })}
+                {formatOrderDate(order)}
               </p>
             </div>
             

@@ -2676,11 +2676,114 @@ const resolvers = {
           proofs: data.proofs || [],
           proof_status: data.proof_status
         });
+        
+        // Debug proofs orderItemId when retrieved
+        if (data.proofs && data.proofs.length > 0) {
+          console.log('🔍 Retrieved proofs orderItemId debugging:');
+          data.proofs.forEach((proof, index) => {
+            console.log(`  Proof ${index + 1}:`, {
+              'proof.id': proof.id,
+              'proof.orderItemId': proof.orderItemId,
+              'proof.orderItemId type': typeof proof.orderItemId,
+              'proof.order_item_id': proof.order_item_id,
+              'proof keys': Object.keys(proof),
+              'raw proof': JSON.stringify(proof, null, 2)
+            });
+          });
+        }
 
-        // Return the order with proofs array (it's a JSONB column in the orders_main table)
+        // Debug order items before mapping
+        console.log('🔍 Order items before mapping:', data.items?.map(item => ({
+          id: item.id,
+          idType: typeof item.id,
+          productName: item.product_name
+        })));
+
+        // CRITICAL: Debug the mapping process
+        const mappedItems = (data.items || []).map(item => ({
+          id: String(item.id), // Convert to string for consistent ID matching
+          customerOrderId: String(data.id),
+          stripeLineItemId: item.stripe_line_item_id,
+          productId: String(item.product_id || 'custom-product'),
+          productName: String(item.product_name || 'Custom Product'),
+          productCategory: item.product_category,
+          sku: item.sku,
+          quantity: Number(item.quantity) || 1,
+          unitPrice: Number(item.unit_price) || 0,
+          totalPrice: Number(item.total_price) || 0,
+          calculatorSelections: item.calculator_selections || {},
+          customFiles: Array.isArray(item.custom_files) ? item.custom_files : [],
+          customerNotes: item.customer_notes,
+          instagramHandle: item.instagram_handle,
+          instagramOptIn: item.instagram_opt_in,
+          fulfillmentStatus: item.fulfillment_status,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+          customerReplacementFile: item.customer_replacement_file,
+          customerReplacementFileName: item.customer_replacement_file_name,
+          customerReplacementAt: item.customer_replacement_at,
+          is_additional_payment: Boolean(item.is_additional_payment)
+        }));
+
+        console.log('🔍 Order items after mapping:', mappedItems.map(item => ({
+          id: item.id,
+          idType: typeof item.id,
+          productName: item.productName
+        })));
+
+        // Check if any proof orderItemId matches any item id
+        if (data.proofs && data.proofs.length > 0 && mappedItems.length > 0) {
+          console.log('🔍 CRITICAL ID MATCHING TEST:');
+          data.proofs.forEach((proof, proofIndex) => {
+            console.log(`  Proof ${proofIndex + 1} (${proof.orderItemId}) matching test:`);
+            mappedItems.forEach((item, itemIndex) => {
+              const directMatch = proof.orderItemId === item.id;
+              const stringMatch = String(proof.orderItemId) === String(item.id);
+              console.log(`    Item ${itemIndex + 1} (${item.id}): direct=${directMatch}, string=${stringMatch}`);
+            });
+          });
+        }
+
+        // Return the order with proper item mapping (consistent with other functions)
         return {
-          ...data,
-          proofs: data.proofs || []
+          id: String(data.id),
+          userId: data.user_id ? String(data.user_id) : null,
+          guestEmail: data.guest_email,
+          stripePaymentIntentId: data.stripe_payment_intent_id,
+          stripeCheckoutSessionId: data.stripe_session_id,
+          orderNumber: data.order_number,
+          orderStatus: data.order_status || 'Processing',
+          fulfillmentStatus: data.fulfillment_status || 'unfulfilled',
+          financialStatus: data.financial_status || 'pending',
+          trackingNumber: data.tracking_number,
+          trackingCompany: data.tracking_company,
+          trackingUrl: data.tracking_url,
+          subtotalPrice: Number(data.subtotal_price) || 0,
+          totalTax: Number(data.total_tax) || 0,
+          totalPrice: Number(data.total_price) || 0,
+          currency: data.currency || 'USD',
+          customerFirstName: data.customer_first_name,
+          customerLastName: data.customer_last_name,
+          customerEmail: data.customer_email,
+          customerPhone: data.customer_phone,
+          shippingAddress: data.shipping_address,
+          billingAddress: data.billing_address,
+          shipping_method: data.shipping_method,
+          is_express_shipping: Boolean(data.is_express_shipping),
+          is_rush_order: Boolean(data.is_rush_order),
+          is_blind_shipment: Boolean(data.is_blind_shipment),
+          orderTags: data.order_tags,
+          orderNote: data.order_note,
+          orderCreatedAt: data.order_created_at,
+          orderUpdatedAt: data.order_updated_at,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+          proof_status: data.proof_status,
+          proof_sent_at: data.proof_sent_at,
+          proof_link: data.proof_link,
+          proofs: data.proofs || [],
+          // Map items with proper ID conversion (crucial for proof matching)
+          items: mappedItems
         };
       } catch (error) {
         console.error('Error fetching order by ID:', error);
@@ -5025,6 +5128,12 @@ const resolvers = {
           throw new Error('Order service is currently unavailable');
         }
         
+        // Debug logging
+        console.log('🔍 addOrderProof called with:', {
+          orderId,
+          proofData: JSON.stringify(proofData, null, 2)
+        });
+        
         // Add proof to database
         const client = supabaseClient.getServiceClient();
         
@@ -5055,9 +5164,30 @@ const resolvers = {
           cutLines: proofData.cutLines || null
         };
         
+        console.log('📝 Created new proof object:', JSON.stringify(newProof, null, 2));
+        console.log('🔍 Proof orderItemId details:', {
+          'proofData.orderItemId': proofData.orderItemId,
+          'proofData.orderItemId type': typeof proofData.orderItemId,
+          'newProof.orderItemId': newProof.orderItemId,
+          'newProof.orderItemId type': typeof newProof.orderItemId,
+          'is null': newProof.orderItemId === null,
+          'is undefined': newProof.orderItemId === undefined,
+          'is empty string': newProof.orderItemId === '',
+          'toString': String(newProof.orderItemId)
+        });
+        
         // Update proofs array
         const currentProofs = currentOrder.proofs || [];
         const updatedProofs = [...currentProofs, newProof];
+        
+        console.log('🔍 CRITICAL DEBUG - Before saving to database:', {
+          'newProof.orderItemId': newProof.orderItemId,
+          'newProof.orderItemId type': typeof newProof.orderItemId,
+          'updatedProofs length': updatedProofs.length,
+          'last proof in array': updatedProofs[updatedProofs.length - 1],
+          'last proof orderItemId': updatedProofs[updatedProofs.length - 1].orderItemId,
+          'JSON stringified newProof': JSON.stringify(newProof)
+        });
         
         // Update order with new proof
         const { data: updatedOrder, error: updateError } = await client
@@ -5074,7 +5204,14 @@ const resolvers = {
           throw new Error(`Failed to update order with proof: ${updateError.message}`);
         }
         
-               return updatedOrder;
+        console.log('🔍 CRITICAL DEBUG - After saving to database:', {
+          'updatedOrder.proofs': updatedOrder.proofs,
+          'proofs length': updatedOrder.proofs?.length,
+          'last proof from DB': updatedOrder.proofs?.[updatedOrder.proofs.length - 1],
+          'last proof orderItemId from DB': updatedOrder.proofs?.[updatedOrder.proofs.length - 1]?.orderItemId
+        });
+        
+        return updatedOrder;
      } catch (error) {
        console.error('Error adding order proof:', error);
        throw new Error(error.message);

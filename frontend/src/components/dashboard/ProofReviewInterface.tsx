@@ -55,7 +55,7 @@ const ProofReviewInterface: React.FC<ProofReviewInterfaceProps> = ({
   handleTrackOrder
 }) => {
   const [showValidationMessage, setShowValidationMessage] = React.useState<{[key: string]: boolean}>({});
-  
+
   const handleRequestChangesClick = (orderId: string, proofId: string) => {
     const hasComments = proofComments.trim().length > 0;
     const hasUploadedFile = stagedFile && stagedFile.orderId === orderId && stagedFile.proofId === proofId;
@@ -294,47 +294,9 @@ const ProofReviewInterface: React.FC<ProofReviewInterfaceProps> = ({
                       hour12: true 
                     })}
                   </p>
-                </div>
-              </div>
-
-              {/* Right - Order Summary & Actions */}
-              <div className="lg:col-span-2 space-y-4">
-                {/* Order Summary Container */}
-                <div 
-                  className="rounded-2xl p-4"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(12px)'
-                  }}
-                >
-                  <h4 className="text-sm font-semibold text-white mb-3">Order Summary</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-400">Product:</span>
-                      <span className="text-white">Vinyl Stickers</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-400">Material:</span>
-                      <span className="text-white">Matte</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-400">Size:</span>
-                      <span className="text-white">Medium (3")</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-400">Quantity:</span>
-                      <span className="text-white">100</span>
-                    </div>
-                    <div className="flex justify-between text-xs pt-2 border-t border-white/10">
-                      <span className="text-gray-400">Total:</span>
-                      <span className="text-green-400 font-semibold">${order.totalPrice || '$122.85'}</span>
-                    </div>
-                  </div>
-
+                  
                   {/* Production Info */}
-                  <div className="mt-4 pt-3 border-t border-white/10 space-y-2">
+                  <div className="mt-3 pt-2 border-t border-white/10 space-y-1">
                     <div className="flex items-center gap-2">
                       <img 
                         src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750314056/cmyk_nypyrn.png" 
@@ -347,10 +309,14 @@ const ProofReviewInterface: React.FC<ProofReviewInterfaceProps> = ({
                       <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <span className="text-white text-xs">Printed within 24-hrs of Approval</span>
+                      <span className="text-white text-xs">Printed within 48-hrs of Approval</span>
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Right - Actions */}
+              <div className="lg:col-span-2 space-y-4">
 
                 {/* Actions Container */}
                 <div 

@@ -124,6 +124,17 @@ export default function ItemSpecificProofUpload({
     
     console.log(`📦 ItemSpecificProofUpload: Processing ${files.length} files for item ${orderItem.id}`);
     
+    // Add detailed debugging about the order item
+    console.log('🔍 DETAILED ORDER ITEM DEBUG:', {
+      'orderItem.id': orderItem.id,
+      'orderItem.id type': typeof orderItem.id,
+      'orderItem.id string': String(orderItem.id),
+      'orderItem object': JSON.stringify(orderItem, null, 2),
+      'orderItem keys': Object.keys(orderItem),
+      'orderId': orderId,
+      'orderId type': typeof orderId
+    });
+    
     // Process all files, not just the first one
     for (const file of files) {
       await uploadProofForItem(file);
@@ -179,6 +190,14 @@ export default function ItemSpecificProofUpload({
         }
       });
 
+      console.log('🔍 ItemSpecificProofUpload debug:', {
+        orderId,
+        orderItemId: orderItem.id,
+        orderItemIdType: typeof orderItem.id,
+        fullOrderItem: orderItem,
+        mutationResult: result
+      });
+
       setUploadState(prev => ({ 
         ...prev, 
         isUploading: false, 
@@ -189,6 +208,7 @@ export default function ItemSpecificProofUpload({
       // Call the callback to refresh the parent component
       if (onProofUploaded) {
         const newProof = result.data?.addOrderProof?.proofs?.find((p: any) => p.proofTitle === file.name);
+        console.log('🔍 New proof found:', newProof);
         onProofUploaded(newProof);
       }
 
