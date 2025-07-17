@@ -14,6 +14,7 @@ import {
   calculateSquareInches,
   PRESET_SIZES 
 } from "@/utils/real-pricing";
+import { calculateCreditEarningsWithLimit } from "@/utils/cart-pricing";
 import { getSupabase } from "@/lib/supabase";
 import { createPortal } from "react-dom";
 import { GET_USER_CREDIT_BALANCE } from "@/lib/credit-mutations";
@@ -2111,23 +2112,54 @@ export default function CartPage() {
                     </div>
                     
                     {/* Store Credit Earnings */}
-                    {user && userCredits >= 100 ? (
-                      <div className="flex justify-between text-red-400 text-sm font-medium mt-3 pt-3 border-t border-white/10">
-                        <span className="flex items-center gap-2">
-                          <span>🚫</span>
-                          Credit Limit Reached
-                        </span>
-                        <span>$0.00</span>
-                      </div>
-                    ) : (
-                      <div className="flex justify-between text-yellow-400 text-sm font-medium mt-3 pt-3 border-t border-white/10">
-                        <span className="flex items-center gap-2">
-                          <i className="fas fa-coins"></i>
-                          Store Credit Earned ({creditRate}%)
-                        </span>
-                        <span>+${(finalTotal * creditRateDecimal).toFixed(2)}</span>
-                      </div>
-                    )}
+                    {(() => {
+                      if (!user) return null;
+                      
+                      const creditEarnings = calculateCreditEarningsWithLimit(
+                        finalTotal,
+                        userCredits,
+                        creditRateDecimal
+                      );
+                      
+                      if (creditEarnings.isLimitReached) {
+                        return (
+                          <div className="flex justify-between text-red-400 text-sm font-medium mt-3 pt-3 border-t border-white/10">
+                            <span className="flex items-center gap-2">
+                              <span>🚫</span>
+                              Credit Limit Reached
+                            </span>
+                            <span>$0.00</span>
+                          </div>
+                        );
+                      }
+                      
+                      if (creditEarnings.isLimitExceeded) {
+                        return (
+                          <div className="mt-3 pt-3 border-t border-white/10">
+                            <div className="flex justify-between text-yellow-400 text-sm font-medium">
+                              <span className="flex items-center gap-2">
+                                <i className="fas fa-coins"></i>
+                                Store Credit Earned ({creditRate}%)
+                              </span>
+                              <span>+${creditEarnings.creditAmount.toFixed(2)}</span>
+                            </div>
+                            <div className="text-xs text-yellow-300 mt-1">
+                              ⚠️ Capped at $100 limit (would have earned ${creditEarnings.potentialAmount.toFixed(2)})
+                            </div>
+                          </div>
+                        );
+                      }
+                      
+                      return (
+                        <div className="flex justify-between text-yellow-400 text-sm font-medium mt-3 pt-3 border-t border-white/10">
+                          <span className="flex items-center gap-2">
+                            <i className="fas fa-coins"></i>
+                            Store Credit Earned ({creditRate}%)
+                          </span>
+                          <span>+${creditEarnings.creditAmount.toFixed(2)}</span>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Store Credit Section */}

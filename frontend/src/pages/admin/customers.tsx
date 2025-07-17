@@ -525,10 +525,10 @@ export default function AdminCustomers() {
             {/* Mobile/Tablet Filters */}
             <div className="xl:hidden mb-4">
               {/* Customer Type Filter */}
-              <div className="flex gap-2 mb-3">
+              <div className="flex gap-2 mb-3 overflow-x-auto pb-2">
                 <button 
                   onClick={() => setFilterCustomerType('customers')}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                  className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                     filterCustomerType === 'customers' 
                       ? 'bg-blue-500/20 text-blue-300 border-blue-500/40' 
                       : 'bg-transparent text-gray-400 border-gray-600'
@@ -538,7 +538,7 @@ export default function AdminCustomers() {
                 </button>
                 <button 
                   onClick={() => setFilterCustomerType('all-users')}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                  className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                     filterCustomerType === 'all-users' 
                       ? 'bg-orange-500/20 text-orange-300 border-orange-500/40' 
                       : 'bg-transparent text-gray-400 border-gray-600'
@@ -552,7 +552,7 @@ export default function AdminCustomers() {
               <div className="flex gap-2 overflow-x-auto pb-2 filter-pills-container">
                 <button 
                   onClick={() => setFilterMarketingStatus('all')}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                  className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                     filterMarketingStatus === 'all' 
                       ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' 
                       : 'bg-transparent text-gray-400 border-gray-600'
@@ -562,7 +562,7 @@ export default function AdminCustomers() {
                 </button>
                 <button 
                   onClick={() => setFilterMarketingStatus('subscribed')}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                  className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                     filterMarketingStatus === 'subscribed' 
                       ? 'bg-green-500/20 text-green-300 border-green-500/40' 
                       : 'bg-transparent text-gray-400 border-gray-600'
@@ -572,7 +572,7 @@ export default function AdminCustomers() {
                 </button>
                 <button 
                   onClick={() => setFilterMarketingStatus('unsubscribed')}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                  className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                     filterMarketingStatus === 'unsubscribed' 
                       ? 'bg-gray-500/20 text-gray-300 border-gray-500/40' 
                       : 'bg-transparent text-gray-400 border-gray-600'

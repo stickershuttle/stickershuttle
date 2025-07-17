@@ -296,3 +296,59 @@ export function getPricingSummary(
   
   return summary;
 } 
+
+/**
+ * Calculate credit earnings with $100 limit consideration
+ * @param orderTotal - The total order amount
+ * @param currentBalance - User's current credit balance
+ * @param creditRate - The credit rate (0.05 for 5%, 0.025 for 2.5%)
+ * @returns Object with earning details and messaging
+ */
+export function calculateCreditEarningsWithLimit(
+  orderTotal: number,
+  currentBalance: number,
+  creditRate: number = 0.05
+): {
+  creditAmount: number;
+  potentialAmount: number;
+  isLimitReached: boolean;
+  isLimitExceeded: boolean;
+  message: string;
+} {
+  const CREDIT_LIMIT = 100;
+  
+  // If already at limit, no credits earned
+  if (currentBalance >= CREDIT_LIMIT) {
+    return {
+      creditAmount: 0,
+      potentialAmount: orderTotal * creditRate,
+      isLimitReached: true,
+      isLimitExceeded: false,
+      message: `You've reached the $${CREDIT_LIMIT.toFixed(2)} credit limit. Please use your existing credits to earn more.`
+    };
+  }
+  
+  const potentialAmount = orderTotal * creditRate;
+  const newPotentialBalance = currentBalance + potentialAmount;
+  
+  // If this order would exceed the limit, cap it
+  if (newPotentialBalance > CREDIT_LIMIT) {
+    const cappedAmount = CREDIT_LIMIT - currentBalance;
+    return {
+      creditAmount: cappedAmount,
+      potentialAmount: potentialAmount,
+      isLimitReached: false,
+      isLimitExceeded: true,
+      message: `You'll earn $${cappedAmount.toFixed(2)} in store credit (capped at $${CREDIT_LIMIT.toFixed(2)} limit). Without the limit, you would have earned $${potentialAmount.toFixed(2)}.`
+    };
+  }
+  
+  // Normal earning within limit
+  return {
+    creditAmount: potentialAmount,
+    potentialAmount: potentialAmount,
+    isLimitReached: false,
+    isLimitExceeded: false,
+    message: `You'll earn $${potentialAmount.toFixed(2)} in store credit on this order!`
+  };
+} 

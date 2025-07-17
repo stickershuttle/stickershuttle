@@ -517,7 +517,7 @@ export default function AbandonedCheckouts() {
                 <div className="flex gap-2 overflow-x-auto pb-2 filter-pills-container">
                   <button 
                     onClick={() => setSelectedTimeRange('all')}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                    className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                       selectedTimeRange === 'all' 
                         ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' 
                         : 'bg-transparent text-gray-400 border-gray-600'
@@ -527,7 +527,7 @@ export default function AbandonedCheckouts() {
                   </button>
                   <button 
                     onClick={() => setSelectedTimeRange('24h')}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                    className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                       selectedTimeRange === '24h' 
                         ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' 
                         : 'bg-transparent text-gray-400 border-gray-600'
@@ -537,7 +537,7 @@ export default function AbandonedCheckouts() {
                   </button>
                   <button 
                     onClick={() => setSelectedTimeRange('7d')}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                    className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                       selectedTimeRange === '7d' 
                         ? 'bg-orange-500/20 text-orange-300 border-orange-500/40' 
                         : 'bg-transparent text-gray-400 border-gray-600'
@@ -547,7 +547,7 @@ export default function AbandonedCheckouts() {
                   </button>
                   <button 
                     onClick={() => setSelectedTimeRange('30d')}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                    className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                       selectedTimeRange === '30d' 
                         ? 'bg-red-500/20 text-red-300 border-red-500/40' 
                         : 'bg-transparent text-gray-400 border-gray-600'

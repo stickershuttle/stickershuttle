@@ -763,9 +763,59 @@ const earnPointsFromPurchase = async (userId, orderTotal, orderId) => {
       };
     }
     
+    // Get current balance to check against $100 limit
+    const balanceInfo = await getUserCreditBalance(userId);
+    const currentBalance = parseFloat(balanceInfo.balance) || 0;
+    
+    console.log(`💰 Current credit balance: $${currentBalance.toFixed(2)}`);
+    
+    // Check if user has already reached the $100 limit
+    if (currentBalance >= 100) {
+      console.log(`⚠️ User ${userId} has reached the $100 credit limit. Current balance: $${currentBalance.toFixed(2)}`);
+      return {
+        success: false,
+        limitReached: true,
+        message: 'You have reached the $100 store credit limit. Please use your existing credits on future orders.',
+        pointsEarned: 0,
+        totalBalance: currentBalance,
+        creditRate: 0.05,
+        isWholesale: false,
+        orderId: orderId
+      };
+    }
+    
     // Use a fixed 5% credit rate for all users
     const creditRate = 0.05; // 5% cashback rate
-    const creditAmount = orderTotal * creditRate;
+    const potentialCreditAmount = orderTotal * creditRate;
+    
+    // Check if awarding full credits would exceed $100 limit
+    const newPotentialBalance = currentBalance + potentialCreditAmount;
+    let creditAmount = potentialCreditAmount;
+    let limitExceeded = false;
+    let cappedMessage = '';
+    
+    if (newPotentialBalance > 100) {
+      // Cap the credit amount to not exceed $100 total
+      creditAmount = 100 - currentBalance;
+      limitExceeded = true;
+      cappedMessage = `You were about to earn $${potentialCreditAmount.toFixed(2)} in store credits, but this would exceed your $100 limit. Your credits have been capped at $${creditAmount.toFixed(2)} to reach the maximum balance of $100.00.`;
+      console.log(`⚠️ Credit amount capped: ${potentialCreditAmount.toFixed(2)} → ${creditAmount.toFixed(2)} due to $100 limit`);
+    }
+    
+    // If credit amount is 0 or negative after capping, don't insert any credits
+    if (creditAmount <= 0) {
+      console.log(`⚠️ No credits to award after capping. Credit amount: ${creditAmount}`);
+      return {
+        success: false,
+        limitReached: true,
+        message: 'You have reached the $100 store credit limit. Please use your existing credits on future orders.',
+        pointsEarned: 0,
+        totalBalance: currentBalance,
+        creditRate: 0.05,
+        isWholesale: false,
+        orderId: orderId
+      };
+    }
     
     // Try to insert earned credits with additional safeguards
     try {
@@ -820,16 +870,25 @@ const earnPointsFromPurchase = async (userId, orderTotal, orderId) => {
       
       console.log(`✅ Credits earned successfully: ${creditAmount.toFixed(2)} (${Math.round(creditRate * 100)}% rate)`);
       
+      // Determine the appropriate message based on whether credits were capped
+      let successMessage;
+      if (limitExceeded) {
+        successMessage = cappedMessage;
+      } else {
+        successMessage = `$${creditAmount.toFixed(2)} earned from your recent order (${Math.round(creditRate * 100)}% rate)`;
+      }
+      
       return {
         success: true,
-        limitReached: false,
+        limitReached: limitExceeded,
+        limitExceededMessage: limitExceeded ? cappedMessage : null,
         pointsEarned: creditAmount,
         totalBalance: updatedBalance.balance,
         creditRate: creditRate,
         isWholesale: isWholesale,
         orderId: orderId,
         transactionId: data.id,
-        message: `$${creditAmount.toFixed(2)} earned from your recent order (${Math.round(creditRate * 100)}% rate)`
+        message: successMessage
       };
     } catch (insertError) {
       // Handle any database errors including constraint violations

@@ -2031,7 +2031,7 @@ export default function AdminOrders() {
                     <div className="flex gap-2 overflow-x-auto pb-2 filter-pills-container">
                     <button 
                       onClick={() => setFilterStatus('all')}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                      className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                         filterStatus === 'all' 
                           ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' 
                           : 'bg-transparent text-gray-400 border-gray-600'
@@ -2041,7 +2041,7 @@ export default function AdminOrders() {
                     </button>
                     <button 
                       onClick={() => setFilterStatus('building')}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                      className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                         filterStatus === 'building' 
                           ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' 
                           : 'bg-transparent text-gray-400 border-gray-600'
@@ -2051,7 +2051,7 @@ export default function AdminOrders() {
                     </button>
                     <button 
                       onClick={() => setFilterStatus('awaiting')}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                      className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                         filterStatus === 'awaiting' 
                           ? 'bg-orange-500/20 text-orange-300 border-orange-500/40' 
                           : 'bg-transparent text-gray-400 border-gray-600'
@@ -2061,7 +2061,7 @@ export default function AdminOrders() {
                     </button>
                     <button 
                       onClick={() => setFilterStatus('changes-requested')}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                      className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                         filterStatus === 'changes-requested' 
                           ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
                           : 'bg-transparent text-gray-400 border-gray-600'
@@ -2071,7 +2071,7 @@ export default function AdminOrders() {
                     </button>
                     <button 
                       onClick={() => setFilterStatus('printing')}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                      className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                         filterStatus === 'printing' 
                           ? 'bg-green-500/20 text-green-300 border-green-500/40' 
                           : 'bg-transparent text-gray-400 border-gray-600'
@@ -2081,7 +2081,7 @@ export default function AdminOrders() {
                     </button>
                     <button 
                       onClick={() => setFilterStatus('approved')}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                      className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                         filterStatus === 'approved' 
                           ? 'bg-green-500/20 text-green-300 border-green-500/40' 
                           : 'bg-transparent text-gray-400 border-gray-600'
@@ -2091,7 +2091,7 @@ export default function AdminOrders() {
                     </button>
                     <button 
                       onClick={() => setFilterStatus('label-printed')}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                      className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                         filterStatus === 'label-printed' 
                           ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40' 
                           : 'bg-transparent text-gray-400 border-gray-600'
@@ -2101,7 +2101,7 @@ export default function AdminOrders() {
                     </button>
                     <button 
                       onClick={() => setFilterStatus('shipped')}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                      className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                         filterStatus === 'shipped' 
                           ? 'bg-blue-500/20 text-blue-300 border-blue-500/40' 
                           : 'bg-transparent text-gray-400 border-gray-600'
@@ -2111,7 +2111,7 @@ export default function AdminOrders() {
                     </button>
                     <button 
                       onClick={() => setFilterStatus('out-for-delivery')}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                      className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                         filterStatus === 'out-for-delivery' 
                           ? 'bg-teal-500/20 text-teal-300 border-teal-500/40' 
                           : 'bg-transparent text-gray-400 border-gray-600'
@@ -2121,7 +2121,7 @@ export default function AdminOrders() {
                     </button>
                     <button 
                       onClick={() => setFilterStatus('delivered')}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                      className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                         filterStatus === 'delivered' 
                           ? 'bg-green-600/20 text-green-400 border-green-600/40' 
                           : 'bg-transparent text-gray-400 border-gray-600'
@@ -2486,7 +2486,7 @@ export default function AdminOrders() {
                           <th className="px-2 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
                             Shape
                           </th>
-                          <th className="px-2 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                          <th className="px-2 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider max-w-32">
                             Material
                           </th>
                           <th className="px-2 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
@@ -2704,9 +2704,9 @@ export default function AdminOrders() {
                                 )}
                               </td>
                               {/* Material */}
-                              <td className="px-2 py-4">
+                              <td className="px-2 py-4 max-w-32">
                                 {firstItemSelections.material?.displayValue ? (
-                                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-green-300"
+                                  <span className="inline-block px-3 py-1 rounded-full text-xs font-medium text-green-300 break-words"
                                     style={{ backgroundColor: 'rgba(145, 200, 72, 0.2)', border: '1px solid rgba(145, 200, 72, 0.3)' }}>
                                     {firstItemSelections.material.displayValue}
                                   </span>
