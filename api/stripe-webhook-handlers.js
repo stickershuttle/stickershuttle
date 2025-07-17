@@ -1,3 +1,21 @@
+/*
+ * Stripe Webhook Handlers
+ * 
+ * WEBHOOK SIGNATURE VERIFICATION FIXES:
+ * 1. Added debug logging to trace signature verification issues
+ * 2. Ensured body is properly converted from Buffer to string for Stripe verification
+ * 3. Added webhook secret format validation (must start with 'whsec_')
+ * 4. Enhanced error logging with detailed debug information
+ * 5. Added test endpoint at /webhooks/stripe/test-signature for diagnostics
+ * 
+ * COMMON WEBHOOK SIGNATURE VERIFICATION ISSUES:
+ * - Body not preserved as raw bytes (fixed by express.raw middleware)
+ * - Incorrect webhook secret format (should start with 'whsec_')
+ * - Body parsing middleware interfering (webhook routes must be defined before JSON parsing)
+ * - Environment variables not properly set in production
+ * - Third-party tools modifying the request body or headers
+ */
+
 const express = require('express');
 const stripeClient = require('./stripe-client');
 const supabaseClient = require('./supabase-client');
@@ -7,6 +25,31 @@ const { createGuestAccount, emailExists } = require('./guest-account-manager');
 const serverAnalytics = require('./business-analytics');
 
 const router = express.Router();
+
+// Test endpoint to verify webhook signature verification setup
+router.get('/test-signature', (req, res) => {
+  const diagnostics = {
+    webhook_secret_configured: !!process.env.STRIPE_WEBHOOK_SECRET,
+    webhook_secret_format: process.env.STRIPE_WEBHOOK_SECRET ? 
+      (process.env.STRIPE_WEBHOOK_SECRET.startsWith('whsec_') ? 'Valid' : 'Invalid (should start with whsec_)') : 
+      'Not configured',
+    webhook_secret_length: process.env.STRIPE_WEBHOOK_SECRET ? process.env.STRIPE_WEBHOOK_SECRET.length : 0,
+    stripe_client_ready: stripeClient.isReady(),
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString()
+  };
+
+  res.json(diagnostics);
+});
+
+// Simple health check for webhook route
+router.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    route: 'stripe-webhook-handlers',
+    timestamp: new Date().toISOString() 
+  });
+});
 
 // Main webhook endpoint (raw body parsing is now handled at the app level)
 router.post('/', async (req, res) => {
@@ -18,6 +61,24 @@ router.post('/', async (req, res) => {
     return res.status(500).send('Webhook configuration error');
   }
 
+  // Validate webhook secret format
+  if (!endpointSecret.startsWith('whsec_')) {
+    console.error('❌ STRIPE_WEBHOOK_SECRET has invalid format. Should start with "whsec_"');
+    console.error('❌ Current secret format:', endpointSecret.substring(0, 10) + '...');
+    return res.status(500).send('Webhook secret configuration error');
+  }
+
+  // Debug logging for webhook signature verification
+  console.log('🔍 Webhook signature verification debug:', {
+    hasSignature: !!sig,
+    hasEndpointSecret: !!endpointSecret,
+    bodyType: typeof req.body,
+    bodyIsBuffer: Buffer.isBuffer(req.body),
+    bodyLength: req.body ? req.body.length : 0,
+    contentType: req.headers['content-type'],
+    signatureHeader: sig ? sig.substring(0, 50) + '...' : 'NOT SET'
+  });
+
   let event;
 
   try {
@@ -26,10 +87,27 @@ router.post('/', async (req, res) => {
       console.log('⚠️  Development mode: Bypassing webhook signature verification');
       event = JSON.parse(req.body.toString());
     } else {
-      event = stripeClient.verifyWebhookSignature(req.body, sig, endpointSecret);
+      // Ensure body is in the correct format for Stripe webhook verification
+      let bodyForVerification = req.body;
+      
+      // If body is a Buffer, convert to string as Stripe expects
+      if (Buffer.isBuffer(req.body)) {
+        bodyForVerification = req.body.toString('utf8');
+      }
+      
+      console.log('🔍 Verifying webhook with body type:', typeof bodyForVerification);
+      event = stripeClient.verifyWebhookSignature(bodyForVerification, sig, endpointSecret);
     }
   } catch (err) {
     console.error('❌ Webhook signature verification failed:', err.message);
+    console.error('❌ Full error details:', {
+      message: err.message,
+      type: err.type,
+      code: err.code,
+      signature: sig,
+      bodyPreview: req.body ? req.body.toString().substring(0, 200) + '...' : 'NO BODY'
+    });
+    
     // In development, try to parse the body anyway to allow local testing
     if (process.env.NODE_ENV === 'development') {
       console.log('🔧 Development fallback: Attempting to parse webhook body without signature verification');

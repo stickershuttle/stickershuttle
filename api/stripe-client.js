@@ -351,11 +351,39 @@ class StripeClient {
       throw new Error('Stripe is not properly configured');
     }
 
+    // Debug logging for webhook signature verification
+    console.log('🔍 StripeClient webhook verification debug:', {
+      payloadType: typeof payload,
+      payloadIsBuffer: Buffer.isBuffer(payload),
+      payloadLength: payload ? payload.length : 0,
+      hasSignature: !!signature,
+      hasEndpointSecret: !!endpointSecret,
+      endpointSecretPrefix: endpointSecret ? endpointSecret.substring(0, 10) + '...' : 'NOT SET'
+    });
+
     try {
-      return this.stripe.webhooks.constructEvent(payload, signature, endpointSecret);
+      // Ensure payload is in the correct format for Stripe
+      let payloadForVerification = payload;
+      
+      // Stripe expects payload as string or Buffer, but string is more reliable
+      if (Buffer.isBuffer(payload)) {
+        payloadForVerification = payload.toString('utf8');
+      }
+      
+      console.log('🔍 Calling Stripe constructEvent with payload type:', typeof payloadForVerification);
+      return this.stripe.webhooks.constructEvent(payloadForVerification, signature, endpointSecret);
     } catch (error) {
-      console.error('Error verifying webhook signature:', error);
-      throw new Error(`Invalid webhook signature: ${error.message}`);
+      console.error('❌ Stripe webhook signature verification error:', {
+        message: error.message,
+        type: error.type,
+        code: error.code,
+        requestId: error.requestId,
+        payloadPreview: payload ? payload.toString().substring(0, 200) + '...' : 'NO PAYLOAD',
+        signaturePreview: signature ? signature.substring(0, 100) + '...' : 'NO SIGNATURE'
+      });
+      
+      // Re-throw the original Stripe error for better debugging
+      throw error;
     }
   }
 
