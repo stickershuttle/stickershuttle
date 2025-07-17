@@ -923,6 +923,7 @@ const typeDefs = gql`
     getUserCreditHistory(userId: ID!, limit: Int): [Credit!]!
     getUnreadCreditNotifications(userId: ID!): [CreditNotification!]!
     validateCreditApplication(userId: ID!, orderSubtotal: Float!, requestedCredits: Float!): CreditValidation!
+    getAllCreditTransactions(limit: Int, offset: Int): AllCreditTransactionsResult!
   }
 
   type Mutation {
@@ -1049,6 +1050,7 @@ const typeDefs = gql`
     
     # Credit mutations
     addCredits(userId: ID!, amount: Float!, reason: String!, expiresAt: String): CreditTransactionResult!
+    addCreditsToAllUsers(amount: Float!, reason: String!): AddCreditsToAllUsersResult!
     applyCreditsToOrder(userId: ID!, orderId: ID!, amount: Float!): CreditTransactionResult!
     reverseCredits(transactionId: ID!, reason: String!): CreditTransactionResult!
     markCreditNotificationAsRead(notificationId: ID!): Boolean!
@@ -1634,6 +1636,34 @@ const typeDefs = gql`
     fixed: Int!
     message: String
     error: String
+  }
+
+  type AddCreditsToAllUsersResult {
+    success: Boolean!
+    usersUpdated: Int!
+    message: String
+    error: String
+  }
+
+  type AllCreditTransactionsResult {
+    transactions: [CreditTransaction!]!
+    totalCount: Int!
+  }
+
+  type CreditTransaction {
+    id: ID!
+    userId: ID!
+    userEmail: String!
+    userName: String!
+    amount: Float!
+    balance: Float!
+    reason: String
+    transactionType: String!
+    orderId: ID
+    orderNumber: String
+    createdAt: String!
+    createdBy: ID
+    expiresAt: String
   }
 
   input KlaviyoCustomerInput {
@@ -4919,6 +4949,26 @@ const resolvers = {
           valid: false,
           message: 'Error validating credits',
           maxApplicable: 0
+        };
+      }
+    },
+
+    getAllCreditTransactions: async (_, { limit, offset }, context) => {
+      try {
+        // Admin authentication required
+        const { user } = context;
+        if (!user) {
+          throw new AuthenticationError('Authentication required');
+        }
+        requireAdminAuth(user);
+
+        const result = await creditHandlers.getAllCreditTransactions(limit, offset);
+        return result;
+      } catch (error) {
+        console.error('❌ Error getting all credit transactions:', error);
+        return {
+          transactions: [],
+          totalCount: 0
         };
       }
     }
@@ -10110,22 +10160,33 @@ const resolvers = {
         }
         requireAdminAuth(user);
 
-        const creditTransaction = await creditHandlers.addCredits(
+        const input = {
           userId,
           amount,
           reason,
-          'manual',
-          null,
-          user.id,
           expiresAt
-        );
+        };
+
+        const result = await creditHandlers.addUserCredits(input, user.id);
+
+        if (result.success) {
+          // Get the user's new balance
+          const balanceInfo = await creditHandlers.getUserCreditBalance(userId);
 
         return {
           success: true,
           message: `Successfully added ${amount} credits`,
-          credit: creditTransaction,
-          newBalance: creditTransaction.balance
+            credit: result.credit,
+            newBalance: balanceInfo.balance
         };
+        } else {
+          return {
+            success: false,
+            message: result.error || 'Failed to add credits',
+            credit: null,
+            newBalance: 0
+          };
+        }
       } catch (error) {
         console.error('❌ Error adding credits:', error);
         return {
@@ -10133,6 +10194,38 @@ const resolvers = {
           message: error.message,
           credit: null,
           newBalance: 0
+        };
+      }
+    },
+
+    addCreditsToAllUsers: async (_, { amount, reason }, context) => {
+      try {
+        // Admin authentication required
+        const { user } = context;
+        if (!user) {
+          throw new AuthenticationError('Authentication required');
+        }
+        requireAdminAuth(user);
+
+        const result = await creditHandlers.addCreditsToAllUsers(
+          amount,
+          reason,
+          user.id
+        );
+
+        return {
+          success: result.success,
+          usersUpdated: result.usersUpdated || 0,
+          message: result.success ? `Successfully added ${amount} credits to ${result.usersUpdated} users` : result.error,
+          error: result.success ? null : result.error
+        };
+      } catch (error) {
+        console.error('❌ Error adding credits to all users:', error);
+        return {
+          success: false,
+          usersUpdated: 0,
+          message: error.message,
+          error: error.message
         };
       }
     },

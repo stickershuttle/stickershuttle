@@ -190,16 +190,14 @@ function AdminCredits() {
     try {
       const { data } = await addUserCredits({
         variables: {
-          input: {
             userId: selectedUser.id,
             amount: parseFloat(creditAmount),
             reason: creditReason || 'Store credit added by admin',
-            expiresAt: expiryDate?.toISOString()
-          }
+          expiresAt: expiryDate?.toISOString() || null
         }
       });
 
-      if (data?.addUserCredits?.success) {
+      if (data?.addCredits?.success) {
         alert('Credits added successfully!');
         setShowAddCreditModal(false);
         setCreditAmount('');
@@ -209,7 +207,7 @@ function AdminCredits() {
         setUserSearchTerm('');
         refetchTransactions();
       } else {
-        alert(data?.addUserCredits?.error || 'Failed to add credits');
+        alert(data?.addCredits?.message || 'Failed to add credits');
       }
     } catch (error) {
       console.error('Error adding credits:', error);
@@ -253,7 +251,7 @@ function AdminCredits() {
         setCreditReason('');
         refetchTransactions();
       } else {
-        alert(data?.addCreditsToAllUsers?.error || 'Failed to add credits');
+        alert(data?.addCreditsToAllUsers?.message || 'Failed to add credits');
       }
     } catch (error) {
       console.error('Error adding credits to all users:', error);
@@ -522,7 +520,7 @@ function AdminCredits() {
                           <div>
                             <span className="text-gray-500 text-xs">Amount</span>
                             <p className={`text-white font-semibold ${transaction.transactionType === 'add' ? 'text-green-400' : 'text-red-400'}`}>
-                              {transaction.transactionType === 'add' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                              {transaction.transactionType === 'add' ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount))}
                             </p>
                           </div>
                           <div>
@@ -574,7 +572,7 @@ function AdminCredits() {
                           </td>
                           <td className="px-6 py-4 text-sm font-semibold">
                             <span className={transaction.transactionType === 'add' ? 'text-green-400' : 'text-red-400'}>
-                              {transaction.transactionType === 'add' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                              {transaction.transactionType === 'add' ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount))}
                             </span>
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-300">{transaction.reason}</td>

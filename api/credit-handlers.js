@@ -282,22 +282,43 @@ const addUserCredits = async (input, adminUserId) => {
     const { userId, amount, reason, expiresAt } = input;
     const client = supabase.getServiceClient();
     
-    const { data, error } = await client
-      .rpc('add_user_credits_with_limit', {
-        p_user_id: userId,
-        p_amount: amount,
-        p_reason: reason || 'Store credit added by admin'
-      });
+    // Get current user balance
+    const { data: existingCredits, error: balanceError } = await client
+      .from('credits')
+      .select('amount')
+      .eq('user_id', userId);
     
-    if (error) throw error;
+    if (balanceError) throw balanceError;
+    
+    // Calculate current balance and new balance
+    const currentBalance = existingCredits.reduce((sum, credit) => sum + parseFloat(credit.amount), 0);
+    const newBalance = currentBalance + parseFloat(amount);
+    
+    // Insert new credit transaction
+    const { data: creditData, error: insertError } = await client
+      .from('credits')
+      .insert({
+        user_id: userId,
+        amount: parseFloat(amount),
+        balance: newBalance,
+        reason: reason || 'Store credit added by admin',
+        transaction_type: 'earned',
+        created_at: new Date().toISOString(),
+        created_by: adminUserId,
+        expires_at: expiresAt || null
+      })
+      .select()
+      .single();
+    
+    if (insertError) throw insertError;
     
     // Format the credit data to match GraphQL schema
     const formattedCredit = {
-      id: data?.id || new Date().getTime().toString(),
+      id: creditData.id,
       userId: userId,
       amount: amount,
       reason: reason || 'Store credit added by admin',
-      createdAt: new Date().toISOString()
+      createdAt: creditData.created_at
     };
     
     return {
@@ -317,18 +338,60 @@ const addUserCredits = async (input, adminUserId) => {
 const addCreditsToAllUsers = async (amount, reason, adminUserId) => {
   try {
     const client = supabase.getServiceClient();
-    const { data, error } = await client
-      .rpc('add_credits_to_all_users', {
-        p_amount: amount,
-        p_reason: reason || 'Promotional credit',
-        p_created_by: adminUserId
-      });
     
-    if (error) throw error;
+    // Get all users from auth.users
+    const { data: { users }, error: usersError } = await client.auth.admin.listUsers();
+    
+    if (usersError) throw usersError;
+    
+    let usersUpdated = 0;
+    
+    // Process each user
+    for (const user of users) {
+      try {
+        // Get current user balance
+        const { data: existingCredits, error: balanceError } = await client
+          .from('credits')
+          .select('amount')
+          .eq('user_id', user.id);
+        
+        if (balanceError) {
+          console.error(`Error getting balance for user ${user.id}:`, balanceError);
+          continue;
+        }
+        
+        // Calculate current balance and new balance
+        const currentBalance = existingCredits.reduce((sum, credit) => sum + parseFloat(credit.amount), 0);
+        const newBalance = currentBalance + parseFloat(amount);
+        
+        // Insert new credit transaction
+        const { error: insertError } = await client
+          .from('credits')
+          .insert({
+            user_id: user.id,
+            amount: parseFloat(amount),
+            balance: newBalance,
+            reason: reason || 'Promotional credit',
+            transaction_type: 'earned',
+            created_at: new Date().toISOString(),
+            created_by: adminUserId
+          });
+        
+        if (insertError) {
+          console.error(`Error adding credits for user ${user.id}:`, insertError);
+          continue;
+        }
+        
+        usersUpdated++;
+      } catch (userError) {
+        console.error(`Error processing user ${user.id}:`, userError);
+        continue;
+      }
+    }
     
     return {
       success: true,
-      usersUpdated: data
+      usersUpdated: usersUpdated
     };
   } catch (error) {
     console.error('Error adding credits to all users:', error);

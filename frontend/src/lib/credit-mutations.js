@@ -40,11 +40,12 @@ export const MARK_CREDIT_NOTIFICATIONS_READ = gql`
   }
 `;
 
-// Admin: Add credits to a user
+// Admin: Add credits to a user (updated to match backend schema)
 export const ADD_USER_CREDITS = gql`
-  mutation AddUserCredits($input: AddUserCreditsInput!) {
-    addUserCredits(input: $input) {
+  mutation AddCredits($userId: ID!, $amount: Float!, $reason: String!, $expiresAt: String) {
+    addCredits(userId: $userId, amount: $amount, reason: $reason, expiresAt: $expiresAt) {
       success
+      message
       credit {
         id
         userId
@@ -52,17 +53,18 @@ export const ADD_USER_CREDITS = gql`
         reason
         createdAt
       }
-      error
+      newBalance
     }
   }
 `;
 
-// Admin: Add credits to all users
+// Admin: Add credits to all users (will need to add this mutation to backend)
 export const ADD_CREDITS_TO_ALL_USERS = gql`
   mutation AddCreditsToAllUsers($amount: Float!, $reason: String!) {
     addCreditsToAllUsers(amount: $amount, reason: $reason) {
       success
       usersUpdated
+      message
       error
     }
   }
@@ -103,12 +105,13 @@ export const GET_USER_CREDIT_HISTORY = gql`
       transactionType
       orderId
       createdAt
+      createdBy
       expiresAt
     }
   }
 `;
 
-// Admin: Get all users
+// Get all users for admin
 export const GET_ALL_USERS = gql`
   query GetAllUsers {
     getAllUsers {
@@ -118,62 +121,58 @@ export const GET_ALL_USERS = gql`
       lastName
       company
       createdAt
-      lastSignIn
     }
   }
 `;
 
-// Apply credits at checkout
+// Apply credits to order
 export const APPLY_CREDITS_TO_ORDER = gql`
-  mutation ApplyCreditsToOrder($orderId: ID!, $amount: Float!) {
-    applyCreditsToOrder(orderId: $orderId, amount: $amount) {
+  mutation ApplyCreditsToOrder($userId: ID!, $orderId: ID!, $amount: Float!) {
+    applyCreditsToOrder(userId: $userId, orderId: $orderId, amount: $amount) {
       success
-      remainingBalance
-      error
-    }
-  }
-`;
-
-// Get earned points/credits per order for the user
-export const GET_USER_EARNED_CREDITS_BY_ORDER = gql`
-  query GetUserEarnedCreditsByOrder($userId: ID!) {
-    getUserCreditHistory(userId: $userId) {
-      id
-      amount
-      reason
-      transactionType
-      orderId
-      createdAt
-    }
-  }
-`;
-
-// Restore credits for abandoned checkout
-export const RESTORE_CREDITS_FOR_ABANDONED_CHECKOUT = gql`
-  mutation RestoreCreditsForAbandonedCheckout($sessionId: String!, $reason: String) {
-    restoreCreditsForAbandonedCheckout(sessionId: $sessionId, reason: $reason) {
-      success
-      restoredCredits
-      restoredOrders
       message
-      error
+      credit {
+        id
+        userId
+        amount
+        reason
+        createdAt
+      }
+      newBalance
     }
   }
 `;
 
-// Cleanup abandoned checkouts
-export const CLEANUP_ABANDONED_CHECKOUTS = gql`
-  mutation CleanupAbandonedCheckouts($maxAgeHours: Int) {
-    cleanupAbandonedCheckouts(maxAgeHours: $maxAgeHours) {
+// Reverse credits (admin only)
+export const REVERSE_CREDITS = gql`
+  mutation ReverseCredits($transactionId: ID!, $reason: String!) {
+    reverseCredits(transactionId: $transactionId, reason: $reason) {
       success
-      totalRestored
-      restoredSessions
       message
-      error
+      credit {
+        id
+        userId
+        amount
+        reason
+        createdAt
+      }
+      newBalance
     }
-  }`;
+  }
+`;
 
-// Fix existing earned credit transactions
+// Validate credit application
+export const VALIDATE_CREDIT_APPLICATION = gql`
+  query ValidateCreditApplication($userId: ID!, $orderSubtotal: Float!, $requestedCredits: Float!) {
+    validateCreditApplication(userId: $userId, orderSubtotal: $orderSubtotal, requestedCredits: $requestedCredits) {
+      valid
+      message
+      maxApplicable
+    }
+  }
+`;
+
+// Fix existing earned credits (admin only)
 export const FIX_EXISTING_EARNED_CREDITS = gql`
   mutation FixExistingEarnedCredits {
     fixExistingEarnedCredits {
