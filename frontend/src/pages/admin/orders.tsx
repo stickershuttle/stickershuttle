@@ -15,6 +15,7 @@ import { UPDATE_ORDER_SHIPPING_ADDRESS, MARK_ORDER_READY_FOR_PICKUP, MARK_ORDER_
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
+import { GET_USER_PROFILE } from '../../lib/profile-mutations';
 
 
 // GraphQL query to get all orders for admin
@@ -288,6 +289,7 @@ export default function AdminOrders() {
   const [easyPostOrder, setEasyPostOrder] = useState<Order | null>(null);
   const [ordersWithLabels, setOrdersWithLabels] = useState<Set<string>>(new Set());
   const [orderLabelUrls, setOrderLabelUrls] = useState<Map<string, string>>(new Map());
+  const [customerProfiles, setCustomerProfiles] = useState<{[key: string]: any}>({});
   
   // Shipping address editing states
   const [editingShippingAddress, setEditingShippingAddress] = useState<Order | null>(null);
@@ -342,6 +344,36 @@ export default function AdminOrders() {
   }, []);
 
   const { data, loading: ordersLoading, error, refetch } = useQuery(GET_ALL_ORDERS);
+
+  // Function to fetch customer profile
+  const fetchCustomerProfile = async (userId: string) => {
+    if (!userId || customerProfiles[userId]) return;
+    
+    try {
+      const supabase = await getSupabase();
+      const { data: profileData, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+      
+      if (profileData && !error) {
+        setCustomerProfiles(prev => ({
+          ...prev,
+          [userId]: profileData
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching customer profile:', error);
+    }
+  };
+
+  // Fetch customer profiles for selected order
+  useEffect(() => {
+    if (selectedOrder?.userId) {
+      fetchCustomerProfile(selectedOrder.userId);
+    }
+  }, [selectedOrder?.userId]);
 
   // Handle selectedOrder parameter after data is loaded
   useEffect(() => {
@@ -1974,11 +2006,6 @@ export default function AdminOrders() {
                     >
                       <div className="flex items-center justify-between mb-1 lg:mb-2">
                         <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Total Sales</span>
-                        <div className="p-1 lg:p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(34, 197, 94, 0.2)' }}>
-                          <svg className="w-2 h-2 lg:w-3 lg:h-3 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </div>
                       </div>
                       <div className="text-sm lg:text-xl font-bold mb-1" style={{ color: '#86efac' }}>
                         {formatCurrency(timeFilteredAnalytics?.totalSales || 0)}
@@ -1997,11 +2024,6 @@ export default function AdminOrders() {
                     >
                       <div className="flex items-center justify-between mb-1 lg:mb-2">
                         <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Average Order</span>
-                        <div className="p-1 lg:p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)' }}>
-                          <svg className="w-2 h-2 lg:w-3 lg:h-3 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                          </svg>
-                        </div>
                       </div>
                       <div className="text-sm lg:text-xl font-bold text-white mb-1">
                         {formatCurrency(timeFilteredAnalytics?.avgOrderValue || 0)}
@@ -2020,11 +2042,6 @@ export default function AdminOrders() {
                     >
                       <div className="flex items-center justify-between mb-1 lg:mb-2">
                         <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Orders</span>
-                        <div className="p-1 lg:p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(147, 51, 234, 0.2)' }}>
-                          <svg className="w-2 h-2 lg:w-3 lg:h-3 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                          </svg>
-                        </div>
                       </div>
                       <div className="text-sm lg:text-xl font-bold text-white mb-1">
                         {timeFilteredAnalytics?.totalOrders || 0}
@@ -2043,16 +2060,11 @@ export default function AdminOrders() {
                     >
                       <div className="flex items-center justify-between mb-1 lg:mb-2">
                         <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Stickers</span>
-                        <div className="p-1 lg:p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(251, 146, 60, 0.2)' }}>
-                          <svg className="w-2 h-2 lg:w-3 lg:h-3 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                          </svg>
-                        </div>
                       </div>
                       <div className="text-sm lg:text-xl font-bold text-white mb-1">
-                        {timeFilteredAnalytics?.totalStickers || 0}
+                        {(timeFilteredAnalytics?.totalStickers || 0).toLocaleString()}
                       </div>
-                      <div className="text-xs text-gray-500 hidden lg:block">Units produced</div>
+                      <div className="text-xs text-gray-500 hidden lg:block">Stickers produced</div>
                     </div>
                   </div>
 
@@ -3659,7 +3671,7 @@ export default function AdminOrders() {
                                     }}
                                   >
                                     <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V9a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V9a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                     </svg>
                                     Print
                                   </button>
@@ -4056,7 +4068,7 @@ export default function AdminOrders() {
                         })}
                       </div>
 
-                                            {/* Order Summary Actions */}
+                      {/* Order Summary Actions */}
                       <div className="grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-gray-700 border-opacity-30">
                         {/* Left Column - Proof Actions (Hide for sample packs) */}
                         {!isSamplePackOrder(selectedOrder) ? (
@@ -4518,7 +4530,11 @@ export default function AdminOrders() {
                       <div className="space-y-4">
                         <div>
                           <p className="font-medium text-white text-lg">{selectedOrder.customerFirstName} {selectedOrder.customerLastName}</p>
-                          <p className="text-sm text-gray-400 mt-1">{selectedOrder.userId ? 'Registered Customer' : 'Guest Checkout'}</p>
+                          <p className="text-sm text-gray-400 mt-1">
+                            {selectedOrder.userId ? 
+                              (customerProfiles[selectedOrder.userId]?.companyName || 'Registered Customer') : 
+                              'Guest Checkout'}
+                          </p>
                           
                           {/* Customer Stats */}
                           {(() => {
@@ -4721,17 +4737,6 @@ export default function AdminOrders() {
                               </button>
                             )}
 
-                            {/* Additional Payment Link */}
-                            <AdditionalPaymentLink
-                              order={{
-                                id: selectedOrder.id,
-                                orderNumber: selectedOrder.orderNumber || selectedOrder.id.split('-')[0].toUpperCase(),
-                                customerEmail: selectedOrder.customerEmail || '',
-                                customerFirstName: selectedOrder.customerFirstName || '',
-                                customerLastName: selectedOrder.customerLastName || ''
-                              }}
-                            />
-                            
                             {/* Order Status for reference */}
                             <div className="text-center">
                               <span className={`px-3 py-1 rounded-full text-xs font-medium ${getProofStatusColor(getProofStatus(selectedOrder))}`}>
@@ -4743,129 +4748,78 @@ export default function AdminOrders() {
                       </div>
                                         </div>
 
-                    {/* Pricing Overview */}
+                    {/* Order Summary */}
                     <div className="glass-container p-6">
                       <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                        <span className="text-xl">💰</span>
-                        Pricing Overview
+                        <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        </svg>
+                        Order Summary
                       </h3>
                       
-                      <div className="space-y-4">
-                        {/* Cost Per Sticker */}
+                      <div className="space-y-3">
+                        {/* Subtotal */}
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-400">Subtotal</span>
+                          <span className="text-white">{formatCurrency(selectedOrder.subtotalPrice || selectedOrder.totalPrice)}</span>
+                        </div>
+
+                        {/* Credits Spent */}
                         {(() => {
-                          const totalQuantity = selectedOrder.items.reduce((sum, item) => sum + item.quantity, 0);
-                          const totalCost = selectedOrder.totalPrice;
-                          const costPerSticker = totalQuantity > 0 ? totalCost / totalQuantity : 0;
-                          
-                          return (
-                            <div className="flex justify-between items-center p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                              <div className="flex items-center gap-2">
-                                <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                </svg>
-                                <span className="text-sm text-blue-300">Cost per sticker</span>
-                              </div>
-                              <span className="font-semibold text-white">${costPerSticker.toFixed(2)}</span>
-                            </div>
-                          );
-                        })()}
-                        
-                        {/* Credits Used */}
-                        {(() => {
-                          // Parse credits used from order note or calculate from discount
-                          const orderNote = selectedOrder.orderNote || '';
-                          const creditsUsedMatch = orderNote.match(/Credits Used: \$([0-9.]+)/);
-                          const creditsUsed = creditsUsedMatch ? parseFloat(creditsUsedMatch[1]) : 0;
-                          
-                          return creditsUsed > 0 ? (
-                            <div className="flex justify-between items-center p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                              <div className="flex items-center gap-2">
-                                <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                                </svg>
-                                <span className="text-sm text-red-300">Credits used</span>
-                              </div>
-                              <span className="font-semibold text-white">-${creditsUsed.toFixed(2)}</span>
+                          const creditsSpent = (selectedOrder as any).creditsApplied || 0;
+                          return creditsSpent > 0 ? (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-red-400">Credits Used</span>
+                              <span className="text-red-400">-{formatCurrency(creditsSpent)}</span>
                             </div>
                           ) : null;
                         })()}
-                        
-                                                 {/* Credits Earned */}
-                         {(() => {
-                           // Calculate credits earned (typically 5% for regular, 2.5% for wholesale)
-                           const isWholesale = selectedOrder.customerEmail?.includes('@') && false; // You may want to check user profile
-                           const earningRate = isWholesale ? 0.025 : 0.05;
-                           const creditsEarned = selectedOrder.totalPrice * earningRate;
-                           
-                           return (
-                             <div className="flex justify-between items-center p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                               <div className="flex items-center gap-2">
-                                 <i className="fas fa-coins text-green-300"></i>
-                                 <span className="text-sm text-green-300">Credits earned ({(earningRate * 100).toFixed(1)}%)</span>
-                               </div>
-                               <span className="font-semibold text-white">+${creditsEarned.toFixed(2)}</span>
-                             </div>
-                           );
-                         })()}
-                        
-                                                 {/* Discounts Used */}
-                         {(() => {
-                           // Parse discount information from order note
-                           const orderNote = selectedOrder.orderNote || '';
-                           const discountMatch = orderNote.match(/Discount Code: (.+?) \(([0-9.]+)%\)/);
-                           const discountCode = discountMatch ? discountMatch[1] : null;
-                           const discountPercent = discountMatch ? parseFloat(discountMatch[2]) : 0;
-                           const discountAmount = discountPercent > 0 ? (selectedOrder.subtotalPrice || selectedOrder.totalPrice) * (discountPercent / 100) : 0;
-                           
-                           return discountCode ? (
-                             <div className="flex justify-between items-center p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                               <div className="flex items-center gap-2">
-                                 <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                 </svg>
-                                 <span className="text-sm text-purple-300">Discount ({discountCode})</span>
-                               </div>
-                               <span className="font-semibold text-white">-${discountAmount.toFixed(2)}</span>
-                             </div>
-                           ) : null;
-                         })()}
-                         
-                         {/* Rush Order Fee */}
-                         {(() => {
-                           // Check if it's a rush order and calculate the rush fee
-                           const orderNote = selectedOrder.orderNote || '';
-                           const isRushOrder = selectedOrder.is_rush_order || orderNote.includes('Rush Order') || orderNote.includes('🚀');
-                           
-                           if (isRushOrder) {
-                             // Calculate rush order fee (typically 40% of subtotal)
-                             const subtotal = selectedOrder.subtotalPrice || selectedOrder.totalPrice;
-                             const rushFee = subtotal * 0.4; // 40% rush fee
-                             
-                             // Parse rush fee from order note if available for more accuracy
-                             const rushFeeMatch = orderNote.match(/Rush.*?\$([0-9.]+)/i);
-                             const actualRushFee = rushFeeMatch ? parseFloat(rushFeeMatch[1]) : rushFee;
-                             
-                             return actualRushFee > 0 ? (
-                               <div className="flex justify-between items-center p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
-                                 <div className="flex items-center gap-2">
-                                   <span className="text-base">🚀</span>
-                                   <span className="text-sm text-orange-300">Rush Order (24-hour production)</span>
-                                 </div>
-                                 <span className="font-semibold text-white">+${actualRushFee.toFixed(2)}</span>
-                               </div>
-                             ) : null;
-                           }
-                           return null;
-                         })()}
-                        
-                                                 {/* Order Total */}
-                         <div className="flex justify-between items-center p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 border-dashed">
-                           <div className="flex items-center gap-2">
-                             <span className="text-base">💰</span>
-                             <span className="text-sm text-yellow-300 font-semibold">Order Total</span>
-                           </div>
-                           <span className="font-bold text-white text-lg">${selectedOrder.totalPrice.toFixed(2)}</span>
-                         </div>
+
+                        {/* Discounts Used */}
+                        {(() => {
+                          const discountAmount = (selectedOrder as any).discountAmount || 0;
+                          const orderNote = selectedOrder.orderNote || '';
+                          const discountMatch = orderNote.match(/Discount Code: (.+?) \(/);
+                          const discountCode = discountMatch ? discountMatch[1] : null;
+                          
+                          return discountAmount > 0 ? (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-purple-400">
+                                {discountCode ? `Discount (${discountCode})` : 'Discount Applied'}
+                              </span>
+                              <span className="text-purple-400">-{formatCurrency(discountAmount)}</span>
+                            </div>
+                          ) : null;
+                        })()}
+
+                        {/* Tax */}
+                        {selectedOrder.totalTax && selectedOrder.totalTax > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-400">Tax</span>
+                            <span className="text-white">{formatCurrency(selectedOrder.totalTax)}</span>
+                          </div>
+                        )}
+
+                        {/* Total */}
+                        <div className="flex justify-between text-base font-semibold pt-2 border-t border-gray-700">
+                          <span className="text-white">Total</span>
+                          <span style={{ color: '#86efac' }}>{formatCurrency(selectedOrder.totalPrice)}</span>
+                        </div>
+
+                        {/* Credits Earned */}
+                        {(() => {
+                          const profile = selectedOrder.userId ? customerProfiles[selectedOrder.userId] : null;
+                          const isWholesale = profile?.isWholesaleCustomer || false;
+                          const earningRate = isWholesale ? 0.025 : 0.05;
+                          const creditsEarned = selectedOrder.totalPrice * earningRate;
+                          
+                          return (
+                            <div className="flex justify-between text-sm pt-2 border-t border-gray-700">
+                              <span className="text-green-400">Credits Earned ({(earningRate * 100).toFixed(1)}%)</span>
+                              <span className="text-green-400">+{formatCurrency(creditsEarned)}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 

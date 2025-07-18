@@ -381,131 +381,133 @@ const WholesaleAdmin = () => {
               <div className="text-center text-gray-300 py-8">Loading analytics...</div>
             ) : (
               <div className="space-y-8">
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <WholesaleStatsCard
-                    title="Total Customers"
-                    value={analyticsData?.getWholesaleAnalytics?.totalWholesaleCustomers || 0}
-                    icon={<span>👥</span>}
-                  />
-                  <WholesaleStatsCard
-                    title="Total Revenue"
-                    value={`$${(analyticsData?.getWholesaleAnalytics?.totalWholesaleRevenue || 0).toLocaleString()}`}
-                    icon={<span>💰</span>}
-                  />
-                  <WholesaleStatsCard
-                    title="Avg Order Value"
-                    value={`$${(analyticsData?.getWholesaleAnalytics?.averageOrderValue || 0).toFixed(2)}`}
-                    icon={<span>📈</span>}
-                  />
-                  <WholesaleStatsCard
-                    title="Total Orders"
-                    value={analyticsData?.getWholesaleAnalytics?.totalOrders || 0}
-                    icon={<span>📦</span>}
-                  />
-                </div>
+                {/* Main Analytics Grid */}
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                  {/* Left Side - Analytics */}
+                  <div className="xl:col-span-2 space-y-8">
+                    {/* Stats Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      <WholesaleStatsCard
+                        title="Total Accounts"
+                        value={analyticsData?.getWholesaleAnalytics?.totalWholesaleCustomers || 0}
+                        icon={<span>👥</span>}
+                      />
+                      <WholesaleStatsCard
+                        title="Total Revenue"
+                        value={`$${(analyticsData?.getWholesaleAnalytics?.totalWholesaleRevenue || 0).toLocaleString()}`}
+                        icon={<span>💰</span>}
+                      />
+                      <WholesaleStatsCard
+                        title="Avg Order Value"
+                        value={`$${(analyticsData?.getWholesaleAnalytics?.averageOrderValue || 0).toFixed(2)}`}
+                        icon={<span>📈</span>}
+                      />
+                      <WholesaleStatsCard
+                        title="Total Orders"
+                        value={analyticsData?.getWholesaleAnalytics?.totalOrders || 0}
+                        icon={<span>📦</span>}
+                      />
+                    </div>
 
-                {/* Monthly Performance */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <WholesaleStatsCard
-                    title="Monthly Revenue"
-                    value={`$${(analyticsData?.getWholesaleAnalytics?.monthlyRevenue || 0).toLocaleString()}`}
-                    subtitle="Last 30 days"
-                    icon={<span>📊</span>}
-                    trend={{
-                      value: analyticsData?.getWholesaleAnalytics?.growthRate || 0,
-                      isPositive: (analyticsData?.getWholesaleAnalytics?.growthRate || 0) >= 0
-                    }}
-                  />
-                  <WholesaleStatsCard
-                    title="Monthly Orders"
-                    value={analyticsData?.getWholesaleAnalytics?.monthlyOrders || 0}
-                    subtitle="Last 30 days"
-                    icon={<span>🛒</span>}
-                  />
-                  <WholesaleStatsCard
-                    title="Growth Rate"
-                    value={`${(analyticsData?.getWholesaleAnalytics?.growthRate || 0).toFixed(1)}%`}
-                    subtitle="Month over month"
-                    icon={<span>📈</span>}
-                    trend={{
-                      value: analyticsData?.getWholesaleAnalytics?.growthRate || 0,
-                      isPositive: (analyticsData?.getWholesaleAnalytics?.growthRate || 0) >= 0
-                    }}
-                  />
-                </div>
+                    {/* Monthly Performance */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <WholesaleStatsCard
+                        title="Monthly Revenue"
+                        value={`$${(analyticsData?.getWholesaleAnalytics?.monthlyRevenue || 0).toLocaleString()}`}
+                        subtitle="Month to date"
+                        icon={<span>📊</span>}
+                        trend={{
+                          value: analyticsData?.getWholesaleAnalytics?.growthRate || 0,
+                          isPositive: (analyticsData?.getWholesaleAnalytics?.growthRate || 0) >= 0
+                        }}
+                      />
+                      <WholesaleStatsCard
+                        title="Monthly Orders"
+                        value={analyticsData?.getWholesaleAnalytics?.monthlyOrders || 0}
+                        subtitle="Month to date"
+                        icon={<span>🛒</span>}
+                      />
+                      <WholesaleStatsCard
+                        title="Growth Rate"
+                        value={`${(analyticsData?.getWholesaleAnalytics?.growthRate || 0).toFixed(1)}%`}
+                        subtitle="Month over month"
+                        icon={<span>📈</span>}
+                        trend={{
+                          value: analyticsData?.getWholesaleAnalytics?.growthRate || 0,
+                          isPositive: (analyticsData?.getWholesaleAnalytics?.growthRate || 0) >= 0
+                        }}
+                      />
+                    </div>
 
-                {/* Credit Rate Distribution */}
-                {analyticsData?.getWholesaleAnalytics?.creditRateDistribution && (
-                  <div
-                    className="p-6 rounded-xl"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                      backdropFilter: 'blur(12px)'
-                    }}
-                  >
-                    <h3 className="text-lg font-semibold text-white mb-4">Credit Rate Distribution</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {analyticsData.getWholesaleAnalytics.creditRateDistribution.map((rate: any) => (
-                        <div key={rate.creditRate} className="text-center">
-                          <div className="text-2xl font-bold text-white">
-                            {(rate.creditRate * 100).toFixed(0)}%
-                          </div>
-                          <div className="text-sm text-gray-300">
-                            {rate.customerCount} customers
-                          </div>
-                          <div className="text-xs text-gray-400">
-                            {rate.percentage.toFixed(1)}% of total
-                          </div>
+
+                  </div>
+
+                  {/* Right Side - Top Performers */}
+                  <div className="xl:col-span-1">
+                    <div
+                      className="p-6 rounded-xl h-fit"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
+                      }}
+                    >
+                      <h3 className="text-lg font-semibold text-white mb-4">🏆 Top Performers</h3>
+                      
+                      {performersLoading ? (
+                        <div className="text-center text-gray-300 py-4">Loading top performers...</div>
+                      ) : (
+                        <div className="space-y-4">
+                          {performersData?.getWholesaleTopPerformers?.map((performer: any, index: number) => (
+                            <div 
+                              key={performer.id} 
+                              className={`flex items-center justify-between p-4 rounded-lg ${
+                                index < 3 ? '' : 'bg-gray-800/50'
+                              }`}
+                              style={index < 3 ? {
+                                background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.3) 0%, rgba(251, 191, 36, 0.15) 50%, rgba(251, 191, 36, 0.05) 100%)',
+                                border: '1px solid rgba(251, 191, 36, 0.4)',
+                                backdropFilter: 'blur(12px)'
+                              } : {}}
+                            >
+                              <div className="flex items-center space-x-4">
+                                <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${
+                                  index < 3 
+                                    ? 'bg-yellow-500/20 text-yellow-300' 
+                                    : 'bg-blue-500/20 text-blue-300'
+                                }`}>
+                                  {index < 3 ? (
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M10 2L13.09 8.26L20 9.27L15 14.14L16.18 21.02L10 17.77L3.82 21.02L5 14.14L0 9.27L6.91 8.26L10 2Z" />
+                                    </svg>
+                                  ) : (
+                                    index + 1
+                                  )}
+                                </div>
+                                <div>
+                                  <div className={`font-semibold ${index < 3 ? 'text-yellow-100' : 'text-white'}`}>
+                                    {performer.firstName} {performer.lastName}
+                                  </div>
+                                  <div className={`text-sm ${index < 3 ? 'text-yellow-200/80' : 'text-gray-300'}`}>
+                                    {performer.companyName}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className={`font-semibold ${index < 3 ? 'text-yellow-100' : 'text-white'}`}>
+                                  ${performer.totalRevenue.toLocaleString()}
+                                </div>
+                                <div className={`text-sm ${index < 3 ? 'text-yellow-200/80' : 'text-gray-300'}`}>
+                                  {performer.totalOrders} orders • ${performer.averageOrderValue.toFixed(2)} avg
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
                     </div>
                   </div>
-                )}
-
-                {/* Top Performers */}
-                <div
-                  className="p-6 rounded-xl"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                    backdropFilter: 'blur(12px)'
-                  }}
-                >
-                  <h3 className="text-lg font-semibold text-white mb-4">🏆 Top Performers</h3>
-                  
-                  {performersLoading ? (
-                    <div className="text-center text-gray-300 py-4">Loading top performers...</div>
-                  ) : (
-                    <div className="space-y-4">
-                      {performersData?.getWholesaleTopPerformers?.map((performer: any, index: number) => (
-                        <div key={performer.id} className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
-                          <div className="flex items-center space-x-4">
-                            <div className="flex items-center justify-center w-8 h-8 bg-blue-500/20 text-blue-300 rounded-full text-sm font-bold">
-                              {index + 1}
-                            </div>
-                            <div>
-                              <div className="font-semibold text-white">
-                                {performer.firstName} {performer.lastName}
-                              </div>
-                              <div className="text-sm text-gray-300">{performer.companyName}</div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-semibold text-white">
-                              ${performer.totalRevenue.toLocaleString()}
-                            </div>
-                            <div className="text-sm text-gray-300">
-                              {performer.totalOrders} orders • ${performer.averageOrderValue.toFixed(2)} avg
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
             )}

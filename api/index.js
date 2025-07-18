@@ -1181,6 +1181,13 @@ const typeDefs = gql`
     monthlyRevenue: Float!
     monthlyOrders: Int!
     growthRate: Float!
+    creditRateDistribution: [CreditRateDistribution!]!
+  }
+
+  type CreditRateDistribution {
+    creditRate: Float!
+    customerCount: Int!
+    percentage: Float!
   }
 
   type WholesalePerformer {
@@ -1192,7 +1199,7 @@ const typeDefs = gql`
     totalOrders: Int!
     totalRevenue: Float!
     averageOrderValue: Float!
-
+    creditRate: Float!
     lastOrderDate: String
     monthlyRevenue: Float!
   }

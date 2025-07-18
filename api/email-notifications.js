@@ -2155,19 +2155,10 @@ const getPickupCompletedEmailTemplate = (orderData) => {
             <p>We hope you love your custom stickers! Your support means everything to us.</p>
           </div>
 
-          <div style="text-align: center; margin: 30px 0;">
-            <h3>Love Your Stickers?</h3>
-            <p>We'd love to hear from you! Share your experience or show off your stickers:</p>
-            <div class="social-links">
-              <a href="https://stickershuttle.com/products">Order Again</a> |
-              <a href="mailto:orbit@stickershuttle.com">Contact Us</a>
-            </div>
-          </div>
-
           <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 20px 0;">
             <h4>✨ Need More Stickers?</h4>
             <p>Reorder your favorites or try something new! Use your order history to quickly reorder.</p>
-            <a href="https://stickershuttle.com/products" class="button">Browse Products</a>
+            <a href="https://stickershuttle.com/products" class="button">Start an Order</a>
           </div>
 
           <p>Questions or need support? Reply to this email or contact us at <a href="mailto:orbit@stickershuttle.com">orbit@stickershuttle.com</a></p>

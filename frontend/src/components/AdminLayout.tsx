@@ -628,173 +628,20 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
                   Shared Carts
                 </a>
 
-                {/* Tax Exemptions */}
-                <a
-                  href="/admin/tax-exemptions"
-                  className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
-                    router.asPath.startsWith('/admin/tax-exemptions')
-                      ? 'text-white bg-slate-500/15 border-l-3 border-slate-500'
-                      : 'text-gray-400 hover:text-white border-l-3 border-transparent'
-                  }`}
-                  onMouseEnter={(e) => {
-                    if (!router.asPath.startsWith('/admin/tax-exemptions')) {
-                      e.currentTarget.style.backgroundColor = 'rgba(100, 116, 139, 0.1)';
-                      e.currentTarget.style.color = '#94A3B8';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!router.asPath.startsWith('/admin/tax-exemptions')) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = '';
-                    }
-                  }}
-                >
-                  <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Tax Exemptions
-                </a>
 
-                {/* Divider */}
-                <div className="my-4 border-t border-gray-700"></div>
 
-                {/* Shipping */}
-                <div className="relative">
-                  <a
-                    href="#"
-                    className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all border-l-3 border-transparent"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setShowShippingDropdown(!showShippingDropdown);
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
-                      e.currentTarget.style.color = '#86EFAC';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = '';
-                    }}
-                  >
-                    <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                    </svg>
-                    Shipping
-                    <svg className={`w-4 h-4 ml-auto transition-transform ${showShippingDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </a>
 
-                  {/* Dropdown Menu */}
-                  {showShippingDropdown && (
-                    <div className="ml-8 mt-1">
-                      <a
-                        href="#"
-                        className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all"
-                        style={{
-                          backgroundColor: 'transparent'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
-                          e.currentTarget.style.color = '#86EFAC';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                          e.currentTarget.style.color = '';
-                        }}
-                      >
-                        <img
-                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750353068/easypost-icon-filled-256_q0cnuk.png"
-                          alt="EasyPost"
-                          className="w-5 h-5 mr-3 rounded-sm"
-                        />
-                        EasyPost
-                      </a>
-                    </div>
-                  )}
-                </div>
 
-                {/* Marketing */}
-                <div className="relative">
-                  <a
-                    href="#"
-                    className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all border-l-3 border-transparent"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setShowMarketingDropdown(!showMarketingDropdown);
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(236, 72, 153, 0.1)';
-                      e.currentTarget.style.color = '#F9A8D4';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = '';
-                    }}
-                  >
-                    <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-                    </svg>
-                    Marketing
-                    <svg className={`w-4 h-4 ml-auto transition-transform ${showMarketingDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </a>
 
-                  {/* Dropdown Menu */}
-                  {showMarketingDropdown && (
-                    <div className="ml-8 mt-1">
-                      <Link
-                        href="/admin/klaviyo"
-                        className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all"
-                        style={{
-                          backgroundColor: 'transparent'
-                        }}
-                        onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                          e.currentTarget.style.backgroundColor = 'rgba(236, 72, 153, 0.1)';
-                          e.currentTarget.style.color = '#F9A8D4';
-                        }}
-                        onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                          e.currentTarget.style.color = '';
-                        }}
-                      >
-                        <img
-                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750291437/e2672593-d403-4b51-b028-d913fd20cde2.png"
-                          alt="Klaviyo"
-                          className="w-5 h-5 mr-3"
-                        />
-                        Klaviyo
-                      </Link>
-                    </div>
-                  )}
-                </div>
 
-                {/* Settings */}
-                <a
-                  href="#"
-                  className="group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all border-l-3 border-transparent"
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(107, 114, 128, 0.1)';
-                    e.currentTarget.style.color = '#D1D5DB';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = '';
-                  }}
-                >
-                  <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  Settings
-                </a>
 
-                {/* Second Divider */}
-                <div className="my-4 border-t border-gray-700"></div>
+
+
+
+
 
                 {/* Providers Section */}
-                <div className="mb-2">
+                <div className="mb-2 mt-8">
                   <h3 className="text-xs uppercase tracking-wider text-gray-500 font-semibold px-3 mb-3">Quick Access</h3>
                 </div>
 
@@ -936,7 +783,14 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
 
           {/* Main Content */}
           <div className="flex-1 xl:ml-56 pb-32 xl:pb-0">
-            {children}
+            <div style={{
+              transform: 'scale(0.9)',
+              transformOrigin: 'top left',
+              width: '111.11%',
+              height: '111.11%'
+            }}>
+              {children}
+            </div>
           </div>
         </main>
 

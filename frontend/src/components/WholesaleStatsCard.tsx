@@ -31,7 +31,7 @@ const WholesaleStatsCard: React.FC<WholesaleStatsCardProps> = ({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-3">
           {icon && (
-            <div className="p-2 rounded-lg bg-blue-500/20 text-blue-300">
+            <div className="text-xl">
               {icon}
             </div>
           )}
