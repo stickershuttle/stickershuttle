@@ -3800,67 +3800,7 @@ export default function AdminOrders() {
                                           </button>
                                         )}
                                         
-                                        {/* Upload Proof Button for this specific item */}
-                                        <input
-                                          type="file"
-                                          id={`proof-upload-${item.id}`}
-                                          accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd,.pdf"
-                                          multiple
-                                          className="hidden"
-                                          aria-label={`Upload proof for Item #${idx + 1}: ${item.productName}`}
-                                          onChange={async (e) => {
-                                            const files = e.target.files ? Array.from(e.target.files) : [];
-                                            if (files.length > 0) {
-                                              console.log(`📦 Admin Orders: Processing ${files.length} files for item ${item.id}`);
-                                              
-                                              // Create a temporary ItemSpecificProofUpload component to handle the upload
-                                              const uploadComponent = document.createElement('div');
-                                              uploadComponent.style.display = 'none';
-                                              document.body.appendChild(uploadComponent);
-                                              
-                                              // We'll use the existing mutation that's already imported
-                                              try {
-                                                // Process all files
-                                                for (const file of files) {
-                                                  console.log('Uploading proof for item:', item.id, 'File:', file.name);
-                                                  // For now, just show an alert and refresh
-                                                  alert(`Uploading proof ${file.name} for Item #${idx + 1}: ${item.productName}`);
-                                                  // The actual upload logic would go here
-                                                  // We can implement this properly once the button UI is working
-                                                  
-                                                  // Add a small delay between uploads to prevent overwhelming the UI
-                                                  if (files.length > 1) {
-                                                    await new Promise(resolve => setTimeout(resolve, 500));
-                                                  }
-                                                }
-                                                refetch();
-                                              } catch (error) {
-                                                console.error('Upload error:', error);
-                                                alert('Failed to upload proofs. Please try again.');
-                                              } finally {
-                                                document.body.removeChild(uploadComponent);
-                                              }
-                                            }
-                                          }}
-                                        />
-                                        <button
-                                          onClick={() => {
-                                            const fileInput = document.getElementById(`proof-upload-${item.id}`) as HTMLInputElement;
-                                            fileInput?.click();
-                                          }}
-                                          className="inline-flex items-center px-2 py-1 text-xs font-medium rounded text-white transition-all cursor-pointer hover:scale-105 ml-0"
-                                          style={{
-                                            background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
-                                            backdropFilter: 'blur(25px) saturate(180%)',
-                                            border: '1px solid rgba(34, 197, 94, 0.4)'
-                                          }}
-                                          title={`Upload proof for Item #${idx + 1}: ${item.productName}`}
-                                        >
-                                          <svg className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                          </svg>
-                                          Upload Proof
-                                        </button>
+
                                       </div>
                                       <p className="text-sm text-gray-400 mt-1">SKU: {item.sku || 'N/A'}</p>
                                     </div>
@@ -3881,28 +3821,30 @@ export default function AdminOrders() {
                                         </span>
                                       </div>
                                     )}
-                                    {selections.material?.displayValue && (
-                                      <div className="flex flex-col">
-                                        <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Material</span>
-                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-green-300"
-                                          style={{ backgroundColor: 'rgba(145, 200, 72, 0.2)', border: '1px solid rgba(145, 200, 72, 0.3)' }}>
-                                          {selections.material.displayValue}
-                                        </span>
-                                      </div>
-                                    )}
                                     {(size.width && size.height) || size.displayValue ? (
                                       <div className="flex flex-col">
                                         <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Size</span>
-                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-orange-300"
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-orange-300 whitespace-nowrap"
                                           style={{ backgroundColor: 'rgba(251, 146, 60, 0.2)', border: '1px solid rgba(251, 146, 60, 0.3)' }}>
                                           {size.width && size.height ? `${size.width}" × ${size.height}"` : size.displayValue}
                                         </span>
                                       </div>
                                     ) : null}
+                                    {selections.material?.displayValue && (
+                                      <div className="flex flex-col">
+                                        <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                                          {item.productCategory === 'vinyl-banners' ? 'Finish Options' : 'Material'}
+                                        </span>
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-green-300 whitespace-nowrap"
+                                          style={{ backgroundColor: 'rgba(145, 200, 72, 0.2)', border: '1px solid rgba(145, 200, 72, 0.3)' }}>
+                                          {selections.material.displayValue}
+                                        </span>
+                                      </div>
+                                    )}
                                     {selections.whiteOption?.displayValue && (
                                       <div className="flex flex-col">
                                         <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">White Ink</span>
-                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-cyan-300"
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-cyan-300 whitespace-nowrap"
                                           style={{ backgroundColor: 'rgba(6, 182, 212, 0.2)', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
                                           {selections.whiteOption.displayValue}
                                         </span>
@@ -3911,7 +3853,7 @@ export default function AdminOrders() {
                                     {selections.kissOption?.displayValue && (
                                       <div className="flex flex-col">
                                         <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Cut Options</span>
-                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-pink-300"
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-pink-300 whitespace-nowrap"
                                           style={{ backgroundColor: 'rgba(236, 72, 153, 0.2)', border: '1px solid rgba(236, 72, 153, 0.3)' }}>
                                           {selections.kissOption.displayValue}
                                         </span>
@@ -4758,6 +4700,21 @@ export default function AdminOrders() {
                       </h3>
                       
                       <div className="space-y-3">
+                        {/* Order Items */}
+                        <div className="space-y-2 pb-3 border-b border-gray-700">
+                          {selectedOrder.items.map((item: any, index: number) => (
+                            <div key={index} className="flex justify-between text-sm">
+                              <div className="flex-1 pr-2">
+                                <span className="text-gray-300">{item.productName}</span>
+                                {item.quantity > 1 && (
+                                  <span className="text-gray-500 ml-2">× {item.quantity}</span>
+                                )}
+                              </div>
+                              <span className="text-white">{formatCurrency(item.totalPrice)}</span>
+                            </div>
+                          ))}
+                        </div>
+                        
                         {/* Subtotal */}
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-400">Subtotal</span>
@@ -4815,7 +4772,10 @@ export default function AdminOrders() {
                           
                           return (
                             <div className="flex justify-between text-sm pt-2 border-t border-gray-700">
-                              <span className="text-green-400">Credits Earned ({(earningRate * 100).toFixed(1)}%)</span>
+                              <span className="text-green-400 flex items-center gap-1">
+                                <i className="fas fa-coins"></i>
+                                Credits Earned ({(earningRate * 100).toFixed(1)}%)
+                              </span>
                               <span className="text-green-400">+{formatCurrency(creditsEarned)}</span>
                             </div>
                           );
@@ -4912,21 +4872,40 @@ export default function AdminOrders() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         Timeline
+                        {selectedOrder.orderStatus === 'Delivered' && selectedOrder.orderCreatedAt && (() => {
+                          const orderDate = new Date(selectedOrder.orderCreatedAt);
+                          const deliveryDate = new Date(); // Would need actual delivery date from tracking
+                          const timeDiff = deliveryDate.getTime() - orderDate.getTime();
+                          const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
+                          const hoursDiff = Math.floor((timeDiff % (1000 * 3600 * 24)) / (1000 * 3600));
+                          
+                          return (
+                            <span className="text-sm text-green-400 font-normal">
+                              ({daysDiff > 0 ? `${daysDiff}d ${hoursDiff}h` : `${hoursDiff}h`} total)
+                            </span>
+                          );
+                        })()}
                       </h3>
                       <div className="space-y-3">
                         <div className="flex items-start gap-3">
                           <div className="w-2 h-2 rounded-full bg-green-400 mt-1.5"></div>
                           <div className="flex-1">
-                            <p className="text-sm font-medium text-white">Order placed</p>
-                            <p className="text-xs text-gray-400">{formatDate(selectedOrder.orderCreatedAt)}</p>
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-medium text-white">Order placed</p>
+                              <p className="text-xs text-gray-500">{formatDate(selectedOrder.orderCreatedAt)}</p>
+                            </div>
+                            <p className="text-xs text-gray-400">Customer submitted order</p>
                           </div>
                         </div>
                         {selectedOrder.financialStatus === 'paid' && (
                           <div className="flex items-start gap-3">
                             <div className="w-2 h-2 rounded-full bg-green-400 mt-1.5"></div>
                             <div className="flex-1">
-                              <p className="text-sm font-medium text-white">Payment confirmed</p>
-                              <p className="text-xs text-gray-400">{formatDate(selectedOrder.orderCreatedAt)}</p>
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-medium text-white">Payment confirmed</p>
+                                <p className="text-xs text-gray-500">{formatDate(selectedOrder.orderCreatedAt)}</p>
+                              </div>
+                              <p className="text-xs text-gray-400">Payment processed successfully</p>
                             </div>
                           </div>
                         )}
@@ -5084,12 +5063,15 @@ export default function AdminOrders() {
                           <div className="flex items-start gap-3">
                             <div className="w-2 h-2 rounded-full bg-green-500 mt-1.5"></div>
                             <div className="flex-1">
-                              <p className="text-sm font-medium text-white flex items-center gap-2">
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                                Package delivered
-                              </p>
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-medium text-white flex items-center gap-2">
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  Package delivered
+                                </p>
+                                <p className="text-xs text-gray-500">{formatDate(new Date().toISOString())}</p>
+                              </div>
                               <p className="text-xs text-gray-400">Order completed successfully</p>
                               <p className="text-xs text-green-400">✅ Thank you for your business!</p>
                             </div>
