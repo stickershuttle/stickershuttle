@@ -1025,10 +1025,29 @@ export default function CartPage() {
 
   // Handle creating a shared cart
   const handleCreateSharedCart = async () => {
-    if (updatedCart.length === 0) {
+    // Use cart context directly to ensure we get the most up-to-date data including additional payments
+    const cartToShare = cart.length > 0 ? cart : updatedCart;
+    
+    if (cartToShare.length === 0) {
       console.error('❌ Cannot share empty cart');
       return;
     }
+
+    // Ensure we include any pricing updates for the shared cart
+    const cartWithUpdatedPricing = cartToShare.map(item => {
+      const pricing = calculateItemPricing(item, item.quantity, pricingData);
+      return {
+        ...item,
+        unitPrice: pricing.perSticker,
+        totalPrice: pricing.total
+      };
+    });
+
+    console.log('🔗 Creating shared cart with items:', cartWithUpdatedPricing.map(item => ({ 
+      name: item.product.name, 
+      totalPrice: item.totalPrice,
+      isAdditionalCost: item.product.name === 'Additional Cost' 
+    })));
 
     setIsCreatingSharedCart(true);
     
@@ -1036,7 +1055,7 @@ export default function CartPage() {
       await createSharedCart({
         variables: {
           input: {
-            cartData: JSON.stringify(updatedCart)
+            cartData: JSON.stringify(cartWithUpdatedPricing)
           }
         }
       });
