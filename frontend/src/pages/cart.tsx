@@ -2098,6 +2098,12 @@ export default function CartPage() {
                         <span>+${blindShipmentFee.toFixed(2)}</span>
                       </div>
                     )}
+                    {additionalPaymentTotal > 0 && (
+                      <div className="flex justify-between text-green-300">
+                        <span>Additional Payment</span>
+                        <span>+${additionalPaymentTotal.toFixed(2)}</span>
+                      </div>
+                    )}
                     <hr className="border-white/20 my-3" />
                     {/* Total Savings */}
                     {(reorderDiscount > 0 || discountAmount > 0 || creditToApply > 0 || wholesaleDiscount > 0) && (

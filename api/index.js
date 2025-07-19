@@ -1793,6 +1793,7 @@ const typeDefs = gql`
     trackingNumber: String
     trackingCompany: String
     trackingUrl: String
+    proof_status: String
   }
 
   input ShippingAddressInput {

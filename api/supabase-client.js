@@ -356,6 +356,9 @@ class SupabaseClient {
             if (statusUpdates.trackingUrl) {
                 dbStatusUpdates.tracking_url = statusUpdates.trackingUrl;
             }
+            if (statusUpdates.proof_status) {
+                dbStatusUpdates.proof_status = statusUpdates.proof_status;
+            }
 
             const { data, error } = await client
                 .from('orders_main')

@@ -131,6 +131,16 @@ const calculateItemPricing = (
     };
   }
   
+  // Check if this is an additional cost item - use fixed pricing
+  if (item.product.name === 'Additional Cost') {
+    return {
+      total: item.totalPrice,
+      perSticker: item.unitPrice,
+      discountPercentage: 0,
+      area: 1 // Default area for additional cost
+    };
+  }
+  
   // For vinyl banners, use the original pricing from the calculator - don't recalculate
   if (item.product.category === 'vinyl-banners') {
     return {
@@ -455,6 +465,10 @@ export default function SharedCartPage() {
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   
+  // Additional payment state
+  const [additionalPaymentAmount, setAdditionalPaymentAmount] = useState('');
+  const [selectedPercentage, setSelectedPercentage] = useState<number | null>(null);
+  
   // Loading and error states for shared cart
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -630,6 +644,11 @@ export default function SharedCartPage() {
   const updateCartItemCustomization = (itemId: string, updatedItem: any) => {
     // Read-only: no-op
   };
+  
+  // Add to cart function for additional payment items (local state only for shared carts)
+  const addToCart = (item: CartItem) => {
+    setUpdatedCart(prevCart => [...prevCart, item]);
+  };
 
   const setIsCreatingSharedCart = (value: boolean) => {
     // No sharing functionality for shared carts
@@ -641,8 +660,14 @@ export default function SharedCartPage() {
 
   // Add missing functions as stubs since shared carts are read-only
   const removeFromCart = (itemId: string) => {
-    // Read-only: Show message or redirect to actual cart
-    console.log('Cannot remove items from shared cart');
+    // Allow removing additional payment items, but not original shared cart items
+    const item = updatedCart.find(item => item.id === itemId);
+    if (item && item.product.name === 'Additional Cost') {
+      setUpdatedCart(prevCart => prevCart.filter(item => item.id !== itemId));
+    } else {
+      // Read-only: Show message or redirect to actual cart for original items
+      console.log('Cannot remove items from shared cart');
+    }
   };
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
@@ -947,6 +972,70 @@ export default function SharedCartPage() {
     updateCartItemCustomization(itemId, updatedItem);
   };
 
+  // Handle additional payment
+  const handleAdditionalPayment = (amount: number) => {
+    if (amount <= 0) return;
+    
+    // Remove existing additional cost item if any
+    const existingAdditionalCostIndex = updatedCart.findIndex(item => item.product.name === 'Additional Cost');
+    if (existingAdditionalCostIndex !== -1) {
+      removeFromCart(updatedCart[existingAdditionalCostIndex].id);
+    }
+    
+    // Create additional cost cart item
+    const additionalCostItem: CartItem = {
+      id: `additional-cost-${Date.now()}`,
+      product: {
+        id: 'additional-cost',
+        sku: 'SS-ADD-001',
+        name: 'Additional Cost',
+        category: 'vinyl-stickers',
+        basePrice: amount,
+        description: 'Additional payment added to order',
+        shortDescription: 'Additional payment',
+        images: [],
+        defaultImage: '',
+        features: [],
+        customizable: false,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      quantity: 1,
+      unitPrice: amount,
+      totalPrice: amount,
+      addedAt: new Date().toISOString(),
+      customization: {
+        productId: 'additional-cost',
+        selections: {},
+        totalPrice: amount,
+        customFiles: [],
+        notes: '',
+        isReorder: false,
+        isDeal: false
+      }
+    };
+    
+    addToCart(additionalCostItem);
+    
+    // Reset input
+    setAdditionalPaymentAmount('');
+    setSelectedPercentage(null);
+  };
+
+  const handlePercentageClick = (percentage: number) => {
+    setSelectedPercentage(percentage);
+    const amount = (safeSubtotal * percentage) / 100;
+    handleAdditionalPayment(amount);
+  };
+
+  const handleCustomAmountAdd = () => {
+    const amount = parseFloat(additionalPaymentAmount);
+    if (!isNaN(amount) && amount > 0) {
+      handleAdditionalPayment(amount);
+    }
+  };
+
   // Handle login
   const handleLogin = async () => {
     if (!loginData.email.trim() || !loginData.password.trim()) {
@@ -981,10 +1070,23 @@ export default function SharedCartPage() {
     }
   };
 
-  // Calculate cart totals
+  // Calculate cart totals - exclude additional cost items from subtotal
   const subtotal = updatedCart.reduce((sum, item) => {
+    // Skip additional cost items - they should be added after discounts
+    if (item.product.name === 'Additional Cost') {
+      return sum;
+    }
     const itemTotal = typeof item.totalPrice === 'number' ? item.totalPrice : 0;
     return sum + itemTotal;
+  }, 0);
+
+  // Calculate additional payment total separately
+  const additionalPaymentTotal = updatedCart.reduce((sum, item) => {
+    if (item.product.name === 'Additional Cost') {
+      const itemTotal = typeof item.totalPrice === 'number' ? item.totalPrice : 0;
+      return sum + itemTotal;
+    }
+    return sum;
   }, 0);
 
   // Check if cart contains reorder items and calculate discount only for reordered items
@@ -1022,7 +1124,7 @@ export default function SharedCartPage() {
   const wholesaleDiscount = isWholesale ? safeSubtotal * 0.15 : 0;
   
   const afterDiscounts = safeSubtotal - safeReorderDiscount - safeDiscountAmount - wholesaleDiscount;
-  const finalTotal = Math.max(0, afterDiscounts - safeCreditToApply + blindShipmentFee);
+  const finalTotal = Math.max(0, afterDiscounts - safeCreditToApply + blindShipmentFee + additionalPaymentTotal);
 
   // Calculate rush order breakdown
   const rushOrderBreakdown = updatedCart.reduce((acc, item) => {
@@ -2020,6 +2122,66 @@ export default function SharedCartPage() {
                    boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
                    backdropFilter: 'blur(12px)'
                  }}>
+                  
+                  {/* Additional Payment Section */}
+                  <div className="mb-6">
+                    <div className="p-4 rounded-lg"
+                         style={{
+                           background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(34, 197, 94, 0.15) 50%, rgba(34, 197, 94, 0.05) 100%)',
+                           border: '1px solid rgba(34, 197, 94, 0.4)',
+                           boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                           backdropFilter: 'blur(12px)'
+                         }}>
+                      <div className="mb-4">
+                        <h4 className="text-green-200 font-medium mb-2">Additional Payment</h4>
+                        <p className="text-xs text-green-200/80">Add extra amount to your order</p>
+                      </div>
+                      
+                      {/* Percentage Buttons */}
+                      <div className="flex gap-2 mb-4">
+                        {[10, 25, 50].map(percentage => (
+                          <button
+                            key={percentage}
+                            onClick={() => handlePercentageClick(percentage)}
+                            className="flex-1 py-2 text-sm font-medium rounded-lg border transition-all duration-200 hover:scale-105"
+                            style={{
+                              background: selectedPercentage === percentage ? 'rgba(34, 197, 94, 0.4)' : 'rgba(34, 197, 94, 0.2)',
+                              border: '1px solid rgba(34, 197, 94, 0.6)',
+                              color: '#BBF7D0'
+                            }}
+                          >
+                            {percentage}%
+                          </button>
+                        ))}
+                      </div>
+                      
+                      {/* Custom Amount Input */}
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          value={additionalPaymentAmount}
+                          onChange={(e) => setAdditionalPaymentAmount(e.target.value)}
+                          placeholder="Custom amount ($)"
+                          className="flex-1 px-3 py-2 text-sm rounded-lg border bg-black/20 text-white placeholder-gray-400 border-white/20 focus:border-green-400 focus:outline-none"
+                          min="0"
+                          step="0.01"
+                        />
+                        <button
+                          onClick={handleCustomAmountAdd}
+                          disabled={!additionalPaymentAmount || parseFloat(additionalPaymentAmount) <= 0}
+                          className="px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                          style={{
+                            background: 'rgba(34, 197, 94, 0.3)',
+                            border: '1px solid rgba(34, 197, 94, 0.6)',
+                            color: '#BBF7D0'
+                          }}
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
                   <h3 className="text-xl font-semibold text-white mb-6">Order Summary</h3>
                   <div className="space-y-3 mb-6">
                     <div className="flex justify-between text-gray-300">
@@ -2097,6 +2259,12 @@ export default function SharedCartPage() {
                       <div className="flex justify-between text-purple-300">
                         <span>Blind Shipment Fee</span>
                         <span>+${blindShipmentFee.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {additionalPaymentTotal > 0 && (
+                      <div className="flex justify-between text-green-300">
+                        <span>Additional Payment</span>
+                        <span>+${additionalPaymentTotal.toFixed(2)}</span>
                       </div>
                     )}
                     <hr className="border-white/20 my-3" />

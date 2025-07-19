@@ -297,10 +297,20 @@ class KlaviyoClient {
           type: 'event',
           attributes: {
             profile: {
-              email: email
+              data: {
+                type: 'profile',
+                attributes: {
+                  email: email
+                }
+              }
             },
             metric: {
-              name: eventName
+              data: {
+                type: 'metric',
+                attributes: {
+                  name: eventName
+                }
+              }
             },
             properties: {
               ...properties,

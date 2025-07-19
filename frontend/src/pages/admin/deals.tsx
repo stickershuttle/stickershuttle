@@ -103,9 +103,43 @@ export default function AdminDeals() {
 
   // Load deals from localStorage (in production, this would be from database)
   const loadDeals = () => {
-    const savedDeals = localStorage.getItem('sticker-shuttle-deals');
-    if (savedDeals) {
-      setDeals(JSON.parse(savedDeals));
+    try {
+      const savedDeals = localStorage.getItem('sticker-shuttle-deals');
+      if (savedDeals) {
+        const parsedDeals = JSON.parse(savedDeals);
+        
+        // Validate that each deal has proper structure and no corrupted data
+        const validDeals = parsedDeals.filter((deal: any) => {
+          return (
+            deal && 
+            typeof deal === 'object' &&
+            typeof deal.name === 'string' &&
+            typeof deal.headline === 'string' &&
+            Array.isArray(deal.pills) &&
+            deal.orderDetails &&
+            typeof deal.orderDetails.price === 'number' &&
+            // Ensure no XML/SVG content in the deal data
+            !deal.name.includes('<?xml') &&
+            !deal.headline.includes('<?xml') &&
+            !deal.pills.some((pill: any) => typeof pill === 'string' && pill.includes('<?xml'))
+          );
+        });
+        
+        if (validDeals.length !== parsedDeals.length) {
+          console.warn('Removed corrupted deals from localStorage');
+          // Save cleaned deals back to localStorage
+          localStorage.setItem('sticker-shuttle-deals', JSON.stringify(validDeals));
+        }
+        
+        setDeals(validDeals.length > 0 ? validDeals : [defaultDeal]);
+      } else {
+        setDeals([defaultDeal]);
+      }
+    } catch (error) {
+      console.error('Error loading deals, resetting to default:', error);
+      // Clear corrupted localStorage and reset to default
+      localStorage.removeItem('sticker-shuttle-deals');
+      setDeals([defaultDeal]);
     }
   };
 
@@ -236,20 +270,64 @@ export default function AdminDeals() {
     setFormData(defaultDeal);
   };
 
+  // Reset deals data (clears localStorage and resets to default)
+  const resetDealsData = () => {
+    if (confirm('This will clear all saved deals and reset to default. Are you sure?')) {
+      localStorage.removeItem('sticker-shuttle-deals');
+      setDeals([defaultDeal]);
+      setSelectedDeal(null);
+      setIsEditing(false);
+      setFormData(defaultDeal);
+      setIsModalOpen(false);
+      setModalDeal(null);
+      setSelectedDate('');
+      alert('Deals data has been reset successfully!');
+    }
+  };
+
   // Calendar handlers
   const handleDateClick = (date: string) => {
-    setSelectedDate(date);
+    // Validate the date string to ensure it's not corrupted
+    if (typeof date !== 'string' || date.includes('<?xml') || date.includes('<svg')) {
+      console.error('Corrupted date data detected, resetting modal');
+      setSelectedDate(new Date().toISOString().split('T')[0]); // Use today's date as fallback
+    } else {
+      setSelectedDate(date);
+    }
+    
     setModalDeal(null);
     setIsModalOpen(true);
   };
 
   const handleDealClick = (deal: Deal) => {
+    // Validate deal data to ensure it's not corrupted
+    if (!deal || 
+        typeof deal.name !== 'string' || 
+        typeof deal.headline !== 'string' ||
+        deal.name.includes('<?xml') ||
+        deal.headline.includes('<?xml') ||
+        (deal.pills && deal.pills.some((pill: string) => pill.includes('<?xml')))) {
+      console.error('Corrupted deal data detected, preventing modal open');
+      alert('Deal data is corrupted. Please refresh the page and try again.');
+      return;
+    }
+    
     setModalDeal(deal);
     setSelectedDate('');
     setIsModalOpen(true);
   };
 
   const handleModalSave = (deal: Deal) => {
+    // Additional validation before saving
+    if (!deal || 
+        typeof deal.name !== 'string' || 
+        typeof deal.headline !== 'string' ||
+        !deal.orderDetails ||
+        typeof deal.orderDetails.price !== 'number') {
+      alert('Invalid deal data. Please check all fields and try again.');
+      return;
+    }
+    
     if (modalDeal) {
       // Update existing deal
       const updatedDeals = deals.map(d => d.id === deal.id ? deal : d);
@@ -404,19 +482,34 @@ export default function AdminDeals() {
               )}
             </div>
             
-            <button
-              onClick={() => setShowCalendar(!showCalendar)}
-              className={`px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-semibold text-white text-sm transition-all duration-300 ${
-                showCalendar ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-600 hover:bg-gray-700'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span>{showCalendar ? 'Hide Calendar' : 'Show Calendar'}</span>
-              </div>
-            </button>
+            {/* Controls */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+              <button
+                onClick={() => setShowCalendar(!showCalendar)}
+                className={`px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-semibold text-white text-sm transition-all duration-300 ${
+                  showCalendar ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-600 hover:bg-gray-700'
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span>{showCalendar ? 'Hide Calendar' : 'Show Calendar'}</span>
+                </div>
+              </button>
+              
+              <button
+                onClick={resetDealsData}
+                className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-semibold text-white text-sm bg-red-600 hover:bg-red-700 transition-colors"
+              >
+                <div className="flex items-center space-x-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>Reset All Data</span>
+                </div>
+              </button>
+            </div>
           </div>
 
           {/* Deal Form */}
@@ -569,6 +662,12 @@ export default function AdminDeals() {
                   className="flex-1 sm:flex-none px-4 md:px-6 py-2.5 md:py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
                 >
                   Cancel
+                </button>
+                <button
+                  onClick={resetDealsData}
+                  className="flex-1 sm:flex-none px-4 md:px-6 py-2.5 md:py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  Reset Deals
                 </button>
               </div>
             </div>

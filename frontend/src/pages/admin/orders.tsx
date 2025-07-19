@@ -111,6 +111,7 @@ const UPDATE_ORDER_STATUS = gql`
       trackingNumber
       trackingCompany
       trackingUrl
+      proof_status
     }
   }
 `;
@@ -1323,7 +1324,7 @@ export default function AdminOrders() {
     }
     // Check the actual proof_status from the database
     if (order.proof_status === 'awaiting_approval') {
-      return 'Awaiting Approval';
+      return 'Proof Sent';
     }
     if (order.proof_status === 'approved') {
       // Check if label has been created
@@ -1356,7 +1357,7 @@ export default function AdminOrders() {
     switch (status) {
       case 'Building Proof':
         return 'bg-yellow-900 bg-opacity-40 text-yellow-300';
-      case 'Awaiting Approval':
+      case 'Proof Sent':
         return 'bg-orange-900 bg-opacity-40 text-orange-300';
       case 'Printing':
         return 'bg-green-900 bg-opacity-40 text-green-300';
@@ -1384,7 +1385,7 @@ export default function AdminOrders() {
     switch (status) {
       case 'Building Proof':
         return '#fcd34d'; // yellow-300
-      case 'Awaiting Approval':
+      case 'Proof Sent':
         return '#fdba74'; // orange-300
       case 'Printing':
         return '#86efac'; // green-300
@@ -2109,7 +2110,7 @@ export default function AdminOrders() {
                           : 'bg-transparent text-gray-400 border-gray-600'
                       }`}
                     >
-                      Awaiting
+                      Proof Sent
                     </button>
                     <button 
                       onClick={() => setFilterStatus('changes-requested')}
@@ -2247,7 +2248,7 @@ export default function AdminOrders() {
                           : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
                       }}
                     >
-                      Awaiting
+                      Proof Sent
                     </button>
                     <button
                       onClick={() => setFilterStatus('changes-requested')}
@@ -2358,7 +2359,7 @@ export default function AdminOrders() {
                                 style={{
                                   borderBottom: orderIndex < orders.length - 1 ? '1px solid rgba(255, 255, 255, 0.08)' : 'none',
                                   borderLeft: `4px solid ${getStatusBorderColor(getProofStatus(order))}`,
-                                  backgroundColor: isDeliveredOrder(getProofStatus(order)) ? 'rgba(0, 0, 0, 0.6)' : 'transparent'
+                                  backgroundColor: isDeliveredOrder(getProofStatus(order)) ? 'rgba(0, 0, 0, 0.7)' : 'transparent'
                                 }}
                               >
                                 {/* Design Image */}
@@ -2574,7 +2575,7 @@ export default function AdminOrders() {
                               style={{
                                 borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
                                 borderLeft: `4px solid ${getStatusBorderColor(getProofStatus(order))}`,
-                                backgroundColor: isDeliveredOrder(getProofStatus(order)) ? 'rgba(0, 0, 0, 0.25)' : 'transparent'
+                                backgroundColor: isDeliveredOrder(getProofStatus(order)) ? 'rgba(0, 0, 0, 0.3)' : 'transparent'
                               }}
                               onClick={() => selectOrder(order)}
                             >
@@ -5083,7 +5084,7 @@ export default function AdminOrders() {
                           <div className="flex items-start gap-3">
                             <div className="w-2 h-2 rounded-full bg-cyan-400 mt-1.5 animate-pulse"></div>
                             <div className="flex-1">
-                              <p className="text-sm font-medium text-white">Awaiting customer approval</p>
+                              <p className="text-sm font-medium text-white">Proof sent to customer</p>
                               <p className="text-xs text-gray-400">Customer is reviewing proofs</p>
                             </div>
                           </div>

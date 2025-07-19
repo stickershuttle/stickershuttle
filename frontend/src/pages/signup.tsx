@@ -131,7 +131,36 @@ export default function SignUp() {
       email: directEmail
     });
 
-    // Validation using direct form data
+    // Basic required field validation
+    if (!directFirstName.trim()) {
+      console.log('❌ First name required');
+      setError('First name is required');
+      setLoading(false);
+      return;
+    }
+
+    if (!directLastName.trim()) {
+      console.log('❌ Last name required');
+      setError('Last name is required');
+      setLoading(false);
+      return;
+    }
+
+    if (!directEmail.trim()) {
+      console.log('❌ Email required');
+      setError('Email address is required');
+      setLoading(false);
+      return;
+    }
+
+    if (!directCompanyName.trim()) {
+      console.log('❌ Company name required');
+      setError('Company name is required');
+      setLoading(false);
+      return;
+    }
+
+    // Password validation
     if (formData.password !== formData.confirmPassword) {
       console.log('❌ Password validation failed');
       setError('Passwords do not match');
@@ -192,14 +221,8 @@ export default function SignUp() {
       return;
     }
 
-    // Wholesale validation
+    // Wholesale validation (company name already validated above)
     if (formData.isWholesale) {
-      if (!formData.companyName.trim()) {
-        console.log('❌ Wholesale signup missing company name');
-        setError('Company name is required for wholesale accounts');
-        setLoading(false);
-        return;
-      }
       if (!formData.wholesaleMonthlyCustomers.trim()) {
         console.log('❌ Wholesale signup missing monthly customers info');
         setError('Please specify how many customers you work with monthly');
@@ -239,10 +262,11 @@ export default function SignUp() {
       const metadataToSend: any = {
         first_name: directFirstName,
         last_name: directLastName,
-        full_name: `${directFirstName} ${directLastName}`
+        full_name: `${directFirstName} ${directLastName}`,
+        company_name: directCompanyName
       };
       
-      // Only add phone number and company website for wholesale accounts
+      // Add phone number and company website for wholesale accounts
       if (formData.isWholesale) {
         metadataToSend.phone_number = directPhoneNumber;
         // Ensure website has protocol for storage
@@ -408,6 +432,7 @@ export default function SignUp() {
                 userId: data.user.id,
                 firstName: userFirstName,
                 lastName: userLastName,
+                companyName: formData.companyName,
                 phoneNumber: null, // Regular users don't provide phone number
                 companyWebsite: null // Regular users don't provide company website
               }
@@ -879,6 +904,23 @@ export default function SignUp() {
                 />
               </div>
 
+              {/* Company Name Field - Required for all users */}
+              <div>
+                <label htmlFor="companyName" className="block text-sm font-medium text-gray-300 mb-2">
+                  Company Name
+                </label>
+                <input
+                  type="text"
+                  id="companyName"
+                  name="companyName"
+                  value={formData.companyName}
+                  onChange={handleInputChange}
+                  className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                  placeholder="Your Company Name"
+                  required
+                />
+              </div>
+
 
 
               {/* Wholesale Questions (shown only when toggle is on) */}
@@ -1286,6 +1328,23 @@ export default function SignUp() {
                         onChange={handleInputChange}
                         className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
                         placeholder="john@example.com"
+                        required
+                      />
+                    </div>
+
+                    {/* Company Name Field - Required for all users */}
+                    <div>
+                      <label htmlFor="companyName-desktop" className="block text-sm font-medium text-gray-300 mb-2">
+                        Company Name
+                      </label>
+                      <input
+                        type="text"
+                        id="companyName-desktop"
+                        name="companyName"
+                        value={formData.companyName}
+                        onChange={handleInputChange}
+                        className="w-full px-6 md:px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                        placeholder="Your Company Name"
                         required
                       />
                     </div>

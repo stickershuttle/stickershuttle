@@ -57,7 +57,31 @@ const DealModal: React.FC<DealModalProps> = ({
 
   useEffect(() => {
     if (existingDeal) {
-      setFormData(existingDeal);
+      // Validate existing deal data before using it
+      if (typeof existingDeal.name === 'string' && 
+          typeof existingDeal.headline === 'string' &&
+          !existingDeal.name.includes('<?xml') &&
+          !existingDeal.headline.includes('<?xml')) {
+        setFormData(existingDeal);
+      } else {
+        console.error('Corrupted existing deal data, using defaults');
+        setFormData({
+          name: '',
+          headline: '',
+          buttonText: 'Order Now →',
+          pills: ['🏷️ Matte Vinyl Stickers', '📏 3" Max Width', '🚀 Ships Next Day'],
+          isActive: true,
+          orderDetails: {
+            material: 'Matte',
+            size: '3"',
+            quantity: 100,
+            price: 29
+          },
+          startDate: selectedDate || '',
+          endDate: selectedDate || '',
+          isScheduled: true
+        });
+      }
     } else if (selectedDate) {
       // Check if the selected date has any holidays
       const holidaysOnDate = getHolidaysForDate(selectedDate);
@@ -290,6 +314,42 @@ const DealModal: React.FC<DealModalProps> = ({
   };
 
   if (!isOpen) return null;
+
+  // Safety check: if any form data contains XML/SVG content, show error instead of corrupted modal
+  const hasCorruptedData = (
+    (formData.name && formData.name.includes('<?xml')) ||
+    (formData.headline && formData.headline.includes('<?xml')) ||
+    (formData.pills && formData.pills.some(pill => pill && pill.includes('<?xml')))
+  );
+
+  if (hasCorruptedData) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div
+          className="bg-gray-900 rounded-xl max-w-md w-full p-6"
+          style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+            backdropFilter: 'blur(12px)'
+          }}
+        >
+          <div className="text-center">
+            <h2 className="text-xl font-bold text-red-400 mb-4">Data Corruption Detected</h2>
+            <p className="text-gray-300 mb-6">
+              The deal data appears to be corrupted. Please close this modal and try the "Reset All Data" button to clear corrupted data.
+            </p>
+            <button
+              onClick={onClose}
+              className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+            >
+              Close Modal
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const holidaysInRange = getHolidaysInRange();
 

@@ -21,8 +21,8 @@ export const UPDATE_USER_PROFILE_NAMES = gql`
 
 // Create user profile (for new signups)
 export const CREATE_USER_PROFILE = gql`
-  mutation CreateUserProfile($userId: ID!, $firstName: String, $lastName: String, $phoneNumber: String, $companyWebsite: String) {
-    createUserProfile(userId: $userId, firstName: $firstName, lastName: $lastName, phoneNumber: $phoneNumber, companyWebsite: $companyWebsite) {
+  mutation CreateUserProfile($userId: ID!, $firstName: String, $lastName: String, $companyName: String, $phoneNumber: String, $companyWebsite: String) {
+    createUserProfile(userId: $userId, firstName: $firstName, lastName: $lastName, companyName: $companyName, phoneNumber: $phoneNumber, companyWebsite: $companyWebsite) {
       success
       message
       userProfile {
@@ -30,6 +30,7 @@ export const CREATE_USER_PROFILE = gql`
         userId
         firstName
         lastName
+        companyName
         createdAt
         updatedAt
       }
