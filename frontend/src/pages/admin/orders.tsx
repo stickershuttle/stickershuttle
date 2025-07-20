@@ -1542,6 +1542,449 @@ export default function AdminOrders() {
     }
   };
 
+  // Handle print receipt - Generate modern receipt and print directly
+  const handlePrintReceipt = (order: Order) => {
+    try {
+      // Generate modern-style receipt text
+      const receiptData = generateModernReceipt(order);
+      const receiptText = receiptData.receipt;
+      const itemsHTML = receiptData.itemsHTML;
+      
+      // Generate QR code URL for customer's order page
+      const orderNumber = order.orderNumber || order.id.split('-')[0].toUpperCase();
+      const orderUrl = `https://stickershuttle.com/account/order/${orderNumber}`;
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&format=png&bgcolor=FFFFFF&color=000000&qzone=1&data=${encodeURIComponent(orderUrl)}`;
+
+      // Preload images to ensure they're cached
+      const logoPreload = new Image();
+      const qrPreload = new Image();
+      logoPreload.src = 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591682/Black_Logo_grwgfd.svg';
+      qrPreload.src = qrCodeUrl;
+
+      // Create receipt HTML content
+      const receiptHTML = `
+        <div id="receipt-content" style="display: none;">
+          <div class="receipt-print-container">
+            <div class="logo-container">
+              <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591682/Black_Logo_grwgfd.svg" 
+                   alt="Sticker Shuttle Logo" 
+                   class="logo-img">
+              <div class="logo-text">STICKER SHUTTLE</div>
+            </div>
+            <div class="receipt-content">
+              <div class="receipt-header">
+                ${new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} • ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}
+              </div>
+              
+              <div class="order-box">
+                <div class="order-border">Order</div>
+                <div class="order-number">#${order.orderNumber || order.id.split('-')[0].toUpperCase()}</div>
+              </div>
+              
+              <div class="customer-info">
+                <div class="info-row">
+                  <span class="label">Customer Name</span>
+                  <span class="value">${`${order.customerFirstName || ''} ${order.customerLastName || ''}`.trim() || 'Customer'}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Customer Email</span>
+                  <span class="value">${order.customerEmail || 'N/A'}</span>
+                </div>
+                ${(order.shippingAddress?.address1 || order.shippingAddress?.line1) ? `
+                <div class="info-row">
+                  <span class="label">Address</span>
+                  <div class="address">
+                    <div>${order.shippingAddress.address1 || order.shippingAddress.line1}</div>
+                    ${(order.shippingAddress?.address2 || order.shippingAddress?.line2) ? `<div>${order.shippingAddress.address2 || order.shippingAddress.line2}</div>` : ''}
+                    <div>${order.shippingAddress.city || ''}, ${order.shippingAddress.state || order.shippingAddress.province || ''} ${order.shippingAddress.zip || order.shippingAddress.postal_code || ''}</div>
+                  </div>
+                </div>` : ''}
+              </div>
+              
+              <div class="separator">${'.'.repeat(48)}</div>
+              
+              <div class="items-section">${itemsHTML}</div>
+              
+              <div class="separator">${'.'.repeat(48)}</div>
+              
+              <div class="summary">
+                <div class="summary-row">
+                  <span>Amount</span>
+                  <span>${(order.subtotalPrice || order.totalPrice).toFixed(2)} USD</span>
+                </div>
+                ${order.totalTax && order.totalTax > 0 ? `
+                <div class="summary-row">
+                  <span>Tax</span>
+                  <span>${order.totalTax.toFixed(2)} USD</span>
+                </div>` : ''}
+                <div class="summary-row total-row">
+                  <span>Total</span>
+                  <span>${order.totalPrice.toFixed(2)} USD</span>
+                </div>
+              </div>
+              
+              ${order.trackingNumber ? `
+              <div class="separator">${'.'.repeat(48)}</div>
+              <div class="tracking-info">
+                <div>Tracking: ${order.trackingNumber}</div>
+                ${order.trackingCompany ? `<div>Carrier: ${order.trackingCompany}</div>` : ''}
+              </div>` : ''}
+            </div>
+            
+            <div class="qr-container">
+              <p class="qr-text">View order online:</p>
+              <img src="${qrCodeUrl}" alt="Order QR Code" class="qr-code" loading="eager" crossorigin="anonymous" onerror="this.style.display='none'">
+              <p class="qr-url">stickershuttle.com</p>
+            </div>
+          </div>
+        </div>
+      `;
+
+             // Create temporary print styles
+       const printStyles = `
+         <style id="receipt-print-styles">
+           @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+           @media print {
+             body * { visibility: hidden; }
+             #receipt-content, #receipt-content * { visibility: visible !important; }
+             #receipt-content {
+               position: absolute;
+               left: 0;
+               top: 0;
+               width: 100%;
+               display: block !important;
+             }
+             .qr-container, .qr-container *, .qr-code, .items-section, .items-section *, .product-name, .receipt-content, .receipt-content *, .customer-info, .order-box, .summary, .tracking-info, .separator, .item-row, .item-qty, .item-price, .item-specs, .item-spacer {
+               visibility: visible !important;
+               display: block !important;
+             }
+             .qr-code {
+               width: 80px !important;
+               height: 80px !important;
+               opacity: 1 !important;
+             }
+             .product-name {
+               display: block !important;
+             }
+             .info-row, .summary-row, .item-row {
+               display: flex !important;
+             }
+             .receipt-print-container {
+               font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+               font-size: 11px;
+               line-height: 1.4;
+               margin: 0 auto;
+               padding: 4px 12px 40px 12px;
+               width: 80mm;
+               max-width: 80mm;
+               background: white;
+               color: black;
+               font-weight: 400;
+               box-sizing: border-box;
+             }
+             .logo-container {
+               text-align: center;
+               margin-bottom: 15px;
+               padding: 6px 0;
+               border-bottom: 1px solid #eee;
+             }
+             .logo-img { 
+               display: block !important;
+               max-width: 120px;
+               height: auto;
+               margin: 0 auto;
+               -webkit-print-color-adjust: exact;
+               color-adjust: exact;
+               filter: brightness(0);
+             }
+             .logo-text { 
+               display: none;
+             }
+             .receipt-content {
+               font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+               font-size: 11px;
+               line-height: 1.4;
+               color: #333;
+               margin: 0;
+               padding: 0;
+             }
+             .receipt-header {
+               font-size: 10px;
+               color: #666;
+               margin-bottom: 12px;
+             }
+             .order-box {
+               text-align: center;
+               margin: 12px 0;
+               border: 1px solid #333;
+               padding: 8px;
+             }
+             .order-border {
+               font-size: 10px;
+               color: #666;
+               margin-bottom: 4px;
+             }
+             .order-number {
+               font-weight: 500;
+               color: #000;
+             }
+             .customer-info {
+               margin: 12px 0;
+             }
+             .info-row {
+               display: flex;
+               justify-content: space-between;
+               margin-bottom: 4px;
+               font-size: 11px;
+             }
+             .label {
+               font-weight: 600;
+               color: #333;
+             }
+             .value {
+               color: #000;
+               text-align: right;
+             }
+             .address {
+               text-align: right;
+               color: #000;
+             }
+             .separator {
+               margin: 12px 0;
+               color: #666;
+               font-family: monospace;
+               width: 100%;
+               text-align: left;
+               overflow: hidden;
+               font-size: 11px;
+               letter-spacing: 0.5px;
+             }
+             .product-name {
+               font-weight: 600;
+               color: #000;
+               margin: 0;
+               padding: 0;
+               font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+               font-size: 11px;
+               line-height: 1.4;
+             }
+             .items-section {
+               font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+               font-size: 11px;
+               line-height: 1.4;
+               margin: 0;
+               padding: 0;
+               color: #333;
+             }
+             .item-row {
+               display: flex;
+               justify-content: space-between;
+               margin: 2px 0 8px 0;
+               font-size: 11px;
+               color: #666;
+             }
+             .item-qty {
+               margin-left: 8px;
+             }
+             .item-price {
+               color: #000;
+               font-weight: 500;
+             }
+             .item-specs {
+               margin-left: 8px;
+               font-size: 10px;
+               color: #666;
+               margin-bottom: 4px;
+             }
+             .item-spacer {
+               height: 8px;
+             }
+             .summary {
+               margin: 12px 0;
+             }
+             .summary-row {
+               display: flex;
+               justify-content: space-between;
+               margin-bottom: 4px;
+               font-size: 11px;
+               color: #333;
+             }
+             .total-row {
+               font-weight: 600;
+               color: #000;
+               margin-top: 8px;
+             }
+             .tracking-info {
+               margin: 12px 0;
+               font-size: 11px;
+               color: #333;
+             }
+             .qr-container {
+               text-align: center;
+               margin-top: 20px;
+               padding: 10px 0 30px 0;
+               page-break-inside: avoid;
+             }
+             .qr-text {
+               font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+               font-size: 10px;
+               margin: 0 0 8px 0;
+               color: #666;
+               font-weight: 400;
+               visibility: visible !important;
+               display: block !important;
+             }
+             .qr-code {
+               display: block !important;
+               visibility: visible !important;
+               width: 80px;
+               height: 80px;
+               margin: 0 auto 8px auto;
+               -webkit-print-color-adjust: exact;
+               color-adjust: exact;
+               print-color-adjust: exact;
+               opacity: 1 !important;
+             }
+             .qr-url {
+               font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+               font-size: 9px;
+               margin: 0 0 30px 0;
+               color: #666;
+               font-weight: 400;
+               visibility: visible !important;
+               display: block !important;
+             }
+             @page {
+               size: 80mm auto;
+               margin: 2mm;
+             }
+           }
+         </style>
+       `;
+
+      // Add the receipt content to the page
+      document.head.insertAdjacentHTML('beforeend', printStyles);
+      document.body.insertAdjacentHTML('beforeend', receiptHTML);
+
+      // Wait for images to load before printing
+      const logoImg = document.querySelector('#receipt-content .logo-img') as HTMLImageElement;
+      const qrImg = document.querySelector('#receipt-content .qr-code') as HTMLImageElement;
+      
+      let loadedCount = 0;
+      const totalImages = 2;
+
+      const checkAndPrint = () => {
+        loadedCount++;
+        if (loadedCount >= totalImages) {
+          // Small delay to ensure rendering is complete
+          setTimeout(() => {
+            window.print();
+          }, 100);
+        }
+      };
+
+      const handleImageError = () => {
+        loadedCount++;
+        if (loadedCount >= totalImages) {
+          // Print even if some images failed to load
+          setTimeout(() => {
+            window.print();
+          }, 100);
+        }
+      };
+
+      // Set up image load handlers
+      if (logoImg) {
+        if (logoImg.complete) {
+          checkAndPrint();
+        } else {
+          logoImg.onload = checkAndPrint;
+          logoImg.onerror = handleImageError;
+        }
+      } else {
+        checkAndPrint();
+      }
+
+      if (qrImg) {
+        if (qrImg.complete) {
+          checkAndPrint();
+        } else {
+          qrImg.onload = checkAndPrint;
+          qrImg.onerror = handleImageError;
+        }
+      } else {
+        checkAndPrint();
+      }
+
+      // Failsafe timeout - print after 3 seconds regardless
+      setTimeout(() => {
+        if (loadedCount < totalImages) {
+          console.log('Images taking too long to load, printing anyway...');
+          window.print();
+        }
+      }, 3000);
+
+      // Clean up after printing
+      setTimeout(() => {
+        const receiptElement = document.getElementById('receipt-content');
+        const styleElement = document.getElementById('receipt-print-styles');
+        if (receiptElement) receiptElement.remove();
+        if (styleElement) styleElement.remove();
+      }, 5000);
+      
+    } catch (error) {
+      console.error('Error generating receipt:', error);
+      alert('Failed to generate receipt. Please try again.');
+    }
+  };
+
+    // Generate modern-style receipt items HTML
+  const generateModernReceipt = (order: Order): { receipt: string; itemsHTML: string } => {
+    // Build items section in HTML for better formatting - show each item individually
+    let itemsHTML = '';
+    order.items.forEach((item) => {
+      const productLine = `${item.productName}`;
+      const qtyPrice = `${item.quantity} × $${item.unitPrice.toFixed(2)}`;
+      const total = `$${item.totalPrice.toFixed(2)}`;
+      
+      itemsHTML += `<div class="product-name">${productLine}</div>`;
+      itemsHTML += `<div class="item-row"><span class="item-qty">${qtyPrice}</span><span class="item-price">${total}</span></div>`;
+      
+      // Add specifications if available
+      const selections = item.calculatorSelections || {};
+      const specs = [];
+      if (selections.size || selections.sizePreset) {
+        let size = '';
+        if (selections.size && typeof selections.size === 'string') {
+          size = selections.size;
+        } else if (selections.sizePreset) {
+          if (typeof selections.sizePreset === 'string') {
+            size = selections.sizePreset;
+          } else if (selections.sizePreset.label) {
+            size = selections.sizePreset.label;
+          } else if (selections.sizePreset.name) {
+            size = selections.sizePreset.name;
+          } else if (selections.sizePreset.value) {
+            size = selections.sizePreset.value;
+          }
+        }
+        if (size) {
+          specs.push(`Size: ${size}`);
+        }
+      }
+      if (selections.shape) {
+        specs.push(`Shape: ${selections.shape}`);
+      }
+      
+      if (specs.length > 0) {
+        itemsHTML += `<div class="item-specs">${specs.join(' • ')}</div>`;
+      }
+      itemsHTML += '<div class="item-spacer"></div>';
+    });
+
+    return { receipt: '', itemsHTML };
+  };
+
   // Handle opening shipping address edit modal
   const handleEditShippingAddress = (order: Order) => {
     setEditingShippingAddress(order);
@@ -3432,6 +3875,23 @@ export default function AdminOrders() {
 
                   {/* Action Buttons */}
                   <div className="flex items-center justify-center gap-3">
+                    
+                    {/* Print Receipt Button */}
+                    <button
+                      onClick={() => handlePrintReceipt(selectedOrder)}
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105 h-[34px]"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: '1px solid rgba(34, 197, 94, 0.4)',
+                        boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                      }}
+                    >
+                      <svg className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                      </svg>
+                      Print Receipt
+                    </button>
                     
                     {/* Tracking/Label Button */}
                     {selectedOrder.trackingNumber ? (
