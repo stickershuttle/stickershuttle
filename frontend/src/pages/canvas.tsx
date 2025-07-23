@@ -30,7 +30,13 @@ import {
   Undo,
   Redo
 } from 'lucide-react';
-import Layout from '../components/Layout';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { getSupabase } from '@/lib/supabase';
+import { useQuery } from '@apollo/client';
+import { GET_USER_CREDIT_BALANCE } from '@/lib/credit-mutations';
+import CartIndicator from '../components/CartIndicator';
+import SEOHead from '../components/SEOHead';
 
 interface CanvasElement {
   id: string;
@@ -50,6 +56,10 @@ interface CanvasElement {
   stickerMode?: boolean;
   stickerBorderWidth?: number;
   stickerBorderColor?: string;
+  smoothEdges?: boolean;
+  fillHoles?: boolean;
+  originalWidth?: number;
+  originalHeight?: number;
   // Text specific
   text?: string;
   fontSize?: number;
@@ -86,6 +96,15 @@ export default function CanvasPage() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0, elementX: 0, elementY: 0 });
   const [isResizing, setIsResizing] = useState(false);
   const [resizeHandle, setResizeHandle] = useState<string>('');
+  const router = useRouter();
+
+  // User and auth state
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [showProfileDropdown, setShowProfileDropdown] = useState<boolean>(false);
+  const [creditBalance, setCreditBalance] = useState<number>(0);
+  const [creditBalanceLoaded, setCreditBalanceLoaded] = useState<boolean>(false);
+  const [initialAuthCheck, setInitialAuthCheck] = useState<boolean>(false);
 
   const [canvasState, setCanvasState] = useState<CanvasState>({
     width: CANVAS_WIDTH,
@@ -100,13 +119,224 @@ export default function CanvasPage() {
 
   const [activeTool, setActiveTool] = useState<'select' | 'text' | 'rectangle' | 'circle' | 'image'>('select');
   const [hoveredElementId, setHoveredElementId] = useState<string | null>(null);
-  const [stickerMenuOpen, setStickerMenuOpen] = useState(false);
+  const [stickerMenuOpen, setStickerMenuOpen] = useState(true);
   const [stickerSettings, setStickerSettings] = useState({
     borderWidth: 6,
-    borderColor: '#ffffff'
+    borderColor: '#ffffff',
+    fillHoles: false
   });
+
+  // Keep loaded images in cache for better performance
+  const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
+
+  // Helper function to convert pixels to inches (96 DPI standard)
+  const pxToInches = (px: number) => (px / 96).toFixed(3);
+
+  
+
+
+
+  // Helper function to auto-crop image to remove transparent edges
+  const autoCropImage = useCallback((imageSrc: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        // Create a canvas to analyze the image
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(imageSrc);
+          return;
+        }
+
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        // Get image data
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        // Find bounds of non-transparent pixels
+        let minX = canvas.width;
+        let minY = canvas.height;
+        let maxX = 0;
+        let maxY = 0;
+
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            const alpha = data[(y * canvas.width + x) * 4 + 3];
+            if (alpha > 0) { // Non-transparent pixel
+              minX = Math.min(minX, x);
+              minY = Math.min(minY, y);
+              maxX = Math.max(maxX, x);
+              maxY = Math.max(maxY, y);
+            }
+          }
+        }
+
+        // Check if we found any non-transparent pixels
+        if (minX >= canvas.width || minY >= canvas.height) {
+          resolve(imageSrc); // No content found, return original
+          return;
+        }
+
+        // Calculate crop dimensions
+        const cropWidth = maxX - minX + 1;
+        const cropHeight = maxY - minY + 1;
+
+        // Create cropped canvas
+        const croppedCanvas = document.createElement('canvas');
+        const croppedCtx = croppedCanvas.getContext('2d');
+        if (!croppedCtx) {
+          resolve(imageSrc);
+          return;
+        }
+
+        croppedCanvas.width = cropWidth;
+        croppedCanvas.height = cropHeight;
+
+        // Draw cropped image
+        croppedCtx.drawImage(
+          img,
+          minX, minY, cropWidth, cropHeight,
+          0, 0, cropWidth, cropHeight
+        );
+
+        // Convert to data URL
+        resolve(croppedCanvas.toDataURL('image/png'));
+      };
+      img.onerror = () => resolve(imageSrc);
+      img.src = imageSrc;
+    });
+  }, []);
   const [aspectRatioLocked, setAspectRatioLocked] = useState(false);
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
+
+  // GraphQL query for credit balance
+  const { data: creditData, refetch: refetchCreditBalance } = useQuery(GET_USER_CREDIT_BALANCE, {
+    variables: { userId: user?.id },
+    skip: !user?.id,
+    onCompleted: (data) => {
+      if (data?.getUserCreditBalance) {
+        setCreditBalance(data.getUserCreditBalance.balance || 0);
+        setCreditBalanceLoaded(true);
+      }
+    },
+    onError: (error) => {
+      console.warn('Credit balance fetch failed (non-critical):', error);
+      setCreditBalance(0);
+      setCreditBalanceLoaded(true);
+    }
+  });
+
+  // Initialize user auth
+  useEffect(() => {
+    let isMounted = true;
+    let authSubscription: any = null;
+    
+    const initializeAuth = async () => {
+      if (typeof window === 'undefined') return;
+      
+      try {
+        const supabase = getSupabase();
+        
+        authSubscription = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
+          if (!isMounted) return;
+          
+          if (event === 'SIGNED_OUT') {
+            setUser(null);
+            setProfile(null);
+            setShowProfileDropdown(false);
+            setCreditBalance(0);
+            setCreditBalanceLoaded(false);
+            setInitialAuthCheck(true);
+            return;
+          }
+          
+          if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+            setUser(session.user);
+            setInitialAuthCheck(true);
+            
+            const cachedPhoto = localStorage.getItem('userProfilePhoto');
+            if (cachedPhoto) {
+              setProfile({ profile_photo_url: cachedPhoto });
+            }
+            return;
+          }
+        });
+
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          setInitialAuthCheck(true);
+          return;
+        }
+
+        if (session?.user && isMounted) {
+          setUser(session.user);
+          setInitialAuthCheck(true);
+          
+          const cachedPhoto = localStorage.getItem('userProfilePhoto');
+          if (cachedPhoto) {
+            setProfile({ profile_photo_url: cachedPhoto });
+          }
+        } else if (isMounted) {
+          setInitialAuthCheck(true);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        if (isMounted) {
+          setInitialAuthCheck(true);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    return () => {
+      isMounted = false;
+      if (authSubscription?.data?.subscription) {
+        authSubscription.data.subscription.unsubscribe();
+      }
+    };
+  }, []);
+
+  // Refetch credit balance when user changes
+  useEffect(() => {
+    if (user?.id && refetchCreditBalance) {
+      refetchCreditBalance();
+    }
+  }, [user?.id, refetchCreditBalance]);
+
+  const getUserDisplayName = () => {
+    if (user?.user_metadata?.first_name) {
+      return user.user_metadata.first_name;
+    }
+    if (user?.email) {
+      return user.email.split('@')[0];
+    }
+    return 'Astronaut';
+  };
+
+  const handleSignOut = async () => {
+    try {
+      const supabase = getSupabase();
+      await supabase.auth.signOut();
+      setUser(null);
+      setProfile(null);
+      setShowProfileDropdown(false);
+      setCreditBalance(0);
+      setCreditBalanceLoaded(false);
+      router.push('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  const showAccountDashboard = user && initialAuthCheck;
+  const showLoginSignupButtons = !showAccountDashboard && initialAuthCheck;
 
   // Initialize canvas
   useEffect(() => {
@@ -118,12 +348,24 @@ export default function CanvasPage() {
     
     ctxRef.current = ctx;
     
-    // Set canvas to fill available space
+    // Set canvas to fill available space with high-DPI support
     const updateCanvasSize = () => {
       const container = canvas.parentElement;
       if (container) {
-        canvas.width = container.clientWidth;
-        canvas.height = container.clientHeight;
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        const rect = container.getBoundingClientRect();
+        
+        // Set actual size in memory (scaled up for high-DPI)
+        canvas.width = rect.width * devicePixelRatio;
+        canvas.height = rect.height * devicePixelRatio;
+        
+        // Scale canvas back down using CSS
+        canvas.style.width = rect.width + 'px';
+        canvas.style.height = rect.height + 'px';
+        
+        // Scale the drawing context so everything draws at the correct size
+        ctx.scale(devicePixelRatio, devicePixelRatio);
+        
         renderCanvas();
       }
     };
@@ -142,9 +384,6 @@ export default function CanvasPage() {
   useEffect(() => {
     renderCanvas();
   }, [canvasState]);
-
-  // Keep loaded images in cache for better performance
-  const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
 
   const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -186,6 +425,7 @@ export default function CanvasPage() {
         case 'image':
           renderImageElement(ctx, element);
           break;
+
       }
 
       ctx.restore();
@@ -294,46 +534,63 @@ export default function CanvasPage() {
     
     // Draw image if it's loaded
     if (img.complete && img.naturalHeight !== 0) {
+      // Enable high-quality image rendering
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      
+            // Draw border if in sticker mode
       if (element.stickerMode) {
-        // Create sticker effect with white border
         const borderWidth = element.stickerBorderWidth || 6;
         const borderColor = element.stickerBorderColor || '#ffffff';
         
-        // Create temporary canvas for processing
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-        if (!tempCtx) return;
+        ctx.save();
         
-        tempCanvas.width = element.width + borderWidth * 2;
-        tempCanvas.height = element.height + borderWidth * 2;
+        // Create smooth border using multiple shadow layers - much more efficient
+        ctx.shadowColor = borderColor;
+        ctx.shadowBlur = 0; // No blur for hard edges
         
-        // Draw the border effect by drawing the image multiple times with slight offsets
-        tempCtx.globalCompositeOperation = 'source-over';
-        tempCtx.fillStyle = borderColor;
+        // Create border by drawing the image multiple times with offsets - always smooth
+        const steps = 16; // Always use smooth borders
         
-        // Create border by drawing image with offsets in all directions
-        for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
-          const offsetX = Math.cos(angle) * borderWidth + borderWidth;
-          const offsetY = Math.sin(angle) * borderWidth + borderWidth;
-          tempCtx.drawImage(img, offsetX, offsetY, element.width, element.height);
+        for (let i = 0; i < steps; i++) {
+          const angle = (i / steps) * Math.PI * 2;
+          ctx.shadowOffsetX = Math.cos(angle) * borderWidth;
+          ctx.shadowOffsetY = Math.sin(angle) * borderWidth;
+          ctx.drawImage(img, 0, 0, element.width, element.height);
         }
         
-        // Use composite operation to create the border effect
-        tempCtx.globalCompositeOperation = 'source-atop';
-        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        // Fill holes if requested - draw solid background within image bounds
+        if (element.fillHoles) {
+          ctx.shadowColor = 'transparent';
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          ctx.globalCompositeOperation = 'destination-over';
+          
+          // Create a temporary canvas to get the image bounds
+          const tempCanvas = document.createElement('canvas');
+          const tempCtx = tempCanvas.getContext('2d');
+          if (tempCtx) {
+            tempCanvas.width = element.width;
+            tempCanvas.height = element.height;
+            tempCtx.drawImage(img, 0, 0, element.width, element.height);
+            
+            // Fill the entire bounding box with border color
+            ctx.fillStyle = borderColor;
+            ctx.fillRect(0, 0, element.width, element.height);
+          }
+          
+          ctx.globalCompositeOperation = 'source-over';
+        }
         
-        // Draw original image on top
-        tempCtx.globalCompositeOperation = 'source-over';
-        tempCtx.drawImage(img, borderWidth, borderWidth, element.width, element.height);
-        
-        // Draw the final result
-        ctx.drawImage(tempCanvas, -borderWidth, -borderWidth);
-      } else {
-        // Draw normal image
-        ctx.drawImage(img, 0, 0, element.width, element.height);
+        ctx.restore();
       }
+      
+      // Draw the main image on top
+      ctx.drawImage(img, 0, 0, element.width, element.height);
     }
   };
+
+
 
   const getElementBounds = (element: CanvasElement) => {
     if (element.type === 'text' && element.text) {
@@ -354,6 +611,7 @@ export default function CanvasPage() {
       };
     }
     
+    // For images and other elements, use exact dimensions
     return {
       x: element.x,
       y: element.y,
@@ -364,26 +622,33 @@ export default function CanvasPage() {
 
   const renderSelectionOutline = (ctx: CanvasRenderingContext2D, element: CanvasElement) => {
     ctx.save();
-    ctx.resetTransform();
     
-    const bounds = getElementBounds(element);
+    // Don't reset transform - use the same coordinate system as the rendered content
+    // Calculate actual visual bounds including any effects like sticker borders
+    let x = element.x;
+    let y = element.y;
+    let width = element.width;
+    let height = element.height;
+    
+    // Images now have their borders as separate elements, so no adjustment needed
     
     ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 5]);
-    ctx.strokeRect(bounds.x - 2, bounds.y - 2, bounds.width + 4, bounds.height + 4);
+    ctx.lineWidth = 2 / (window.devicePixelRatio || 1); // Adjust line width for DPI scaling
+    ctx.setLineDash([5 / (window.devicePixelRatio || 1), 5 / (window.devicePixelRatio || 1)]);
+    ctx.strokeRect(x - 2, y - 2, width + 4, height + 4);
     
     // Render resize handles
+    const handleSize = 8 / (window.devicePixelRatio || 1); // Adjust handle size for DPI scaling
     const handles = [
-      { x: bounds.x - 4, y: bounds.y - 4 }, // top-left
-      { x: bounds.x + bounds.width - 4, y: bounds.y - 4 }, // top-right
-      { x: bounds.x - 4, y: bounds.y + bounds.height - 4 }, // bottom-left
-      { x: bounds.x + bounds.width - 4, y: bounds.y + bounds.height - 4 }, // bottom-right
+      { x: x - handleSize/2, y: y - handleSize/2 }, // top-left
+      { x: x + width - handleSize/2, y: y - handleSize/2 }, // top-right
+      { x: x - handleSize/2, y: y + height - handleSize/2 }, // bottom-left
+      { x: x + width - handleSize/2, y: y + height - handleSize/2 }, // bottom-right
     ];
     
     ctx.fillStyle = '#3b82f6';
     handles.forEach(handle => {
-      ctx.fillRect(handle.x, handle.y, 8, 8);
+      ctx.fillRect(handle.x, handle.y, handleSize, handleSize);
     });
     
     ctx.restore();
@@ -419,47 +684,90 @@ export default function CanvasPage() {
     return newElement.id;
   }, [canvasState.elements.length]);
 
-  // Handle file upload
+  // Handle file upload - optimized for highest quality
   const handleImageUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Validate file size (25MB limit)
+    if (file.size > 25 * 1024 * 1024) {
+      alert('File size must be less than 25MB');
+      event.target.value = '';
+      return;
+    }
+
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const src = e.target?.result as string;
       
-      // Create image to get dimensions
+      // Auto-crop the image to remove transparent edges
+      const croppedSrc = await autoCropImage(src);
+      
+      // Create image to get dimensions - preserve original quality
       const img = new Image();
       img.onload = () => {
         const aspectRatio = img.width / img.height;
-        let width = Math.min(300, img.width);
-        let height = width / aspectRatio;
+        
+        // Calculate optimal size for canvas display while preserving quality
+        // Use larger max size to maintain quality
+        const maxDisplaySize = 500; // Increased from 300 for better quality
+        let displayWidth = Math.min(maxDisplaySize, img.width);
+        let displayHeight = displayWidth / aspectRatio;
         
         // If height is too large, scale by height instead
-        if (height > 300) {
-          height = 300;
-          width = height * aspectRatio;
+        if (displayHeight > maxDisplaySize) {
+          displayHeight = maxDisplaySize;
+          displayWidth = displayHeight * aspectRatio;
         }
 
-        // Center the image on canvas
+        // Center the image on canvas (account for high-DPI scaling and potential borders)
         const canvas = canvasRef.current;
-        const centerX = canvas ? (canvas.width / 2) - (width / 2) : 100;
-        const centerY = canvas ? (canvas.height / 2) - (height / 2) : 100;
+        let centerX = 100;
+        let centerY = 100;
+        
+        if (canvas) {
+          // Get the actual display dimensions (not the scaled canvas dimensions)
+          const rect = canvas.getBoundingClientRect();
+          const displayWidthCanvas = rect.width;
+          const displayHeightCanvas = rect.height;
+          
+          // Reserve space for potential sticker borders (max 20px on each side)
+          const borderReserve = 40; // 20px on each side
+          const availableWidth = displayWidthCanvas - borderReserve;
+          const availableHeight = displayHeightCanvas - borderReserve;
+          
+          centerX = (availableWidth / 2) - (displayWidth / 2) + (borderReserve / 2);
+          centerY = (availableHeight / 2) - (displayHeight / 2) + (borderReserve / 2);
+          
+          // Ensure minimum margins
+          centerX = Math.max(centerX, borderReserve / 2);
+          centerY = Math.max(centerY, borderReserve / 2);
+        }
 
         addElement('image', {
-          src,
-          width,
-          height,
+          src: croppedSrc, // Use auto-cropped image for tighter bounds
+          width: displayWidth,
+          height: displayHeight,
           name: file.name,
           x: centerX,
           y: centerY,
           stickerMode: false,
           stickerBorderWidth: 6,
-          stickerBorderColor: '#ffffff'
+          stickerBorderColor: '#ffffff',
+          smoothEdges: true,
+          fillHoles: false,
+          // Store original dimensions for quality reference
+          originalWidth: img.width,
+          originalHeight: img.height
         });
       };
-      img.src = src;
+      
+      // Set crossOrigin to preserve quality
+      img.crossOrigin = 'anonymous';
+      img.src = croppedSrc;
     };
+    
+    // Use readAsDataURL to preserve original quality
     reader.readAsDataURL(file);
     
     // Reset input
@@ -516,6 +824,25 @@ export default function CanvasPage() {
              y >= element.y && y <= element.y + textHeight;
     }
     
+    // For images, check if image is loaded and use its actual visual bounds
+    if (element.type === 'image' && element.src) {
+      const img = imageCache.current.get(element.src);
+      if (img && img.complete && img.naturalHeight !== 0) {
+        return x >= element.x && x <= element.x + element.width && 
+               y >= element.y && y <= element.y + element.height;
+      }
+    }
+    
+    // For border elements, use the vector path for precise hit detection
+    if (element.type === 'border' && element.vectorPath) {
+      const canvas = canvasRef.current;
+      const ctx = ctxRef.current;
+      if (canvas && ctx) {
+        // Use canvas hit detection with the vector path
+        return ctx.isPointInPath(element.vectorPath, x, y);
+      }
+    }
+    
     // For other elements, use full bounds
     return x >= element.x && x <= element.x + element.width && 
            y >= element.y && y <= element.y + element.height;
@@ -527,8 +854,11 @@ export default function CanvasPage() {
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    // Account for high-DPI scaling
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (event.clientX - rect.left) * scaleX / (window.devicePixelRatio || 1);
+    const y = (event.clientY - rect.top) * scaleY / (window.devicePixelRatio || 1);
 
     // Check if clicking on an element (reverse order to check top elements first)
     const sortedElements = [...canvasState.elements].sort((a, b) => b.zIndex - a.zIndex);
@@ -557,8 +887,11 @@ export default function CanvasPage() {
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    // Account for high-DPI scaling
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (event.clientX - rect.left) * scaleX / (window.devicePixelRatio || 1);
+    const y = (event.clientY - rect.top) * scaleY / (window.devicePixelRatio || 1);
 
     if (isDragging && canvasState.selectedElementId) {
       // Handle dragging
@@ -636,35 +969,37 @@ export default function CanvasPage() {
     }));
   }, []);
 
-  // Stickerfy function - adds border to all images with current settings
+  // Stickerfy function - applies border settings to all images
   const stickerifyDesign = useCallback(() => {
     setCanvasState(prev => ({
       ...prev,
-      elements: prev.elements.map(element =>
+      elements: prev.elements.map(element => 
         element.type === 'image' 
-          ? { 
-              ...element, 
+          ? {
+              ...element,
               stickerMode: true,
               stickerBorderWidth: stickerSettings.borderWidth,
-              stickerBorderColor: stickerSettings.borderColor
+              stickerBorderColor: stickerSettings.borderColor,
+              fillHoles: stickerSettings.fillHoles
             }
           : element
       )
     }));
-    setStickerMenuOpen(false);
+    // Keep menu open for further adjustments
   }, [stickerSettings]);
 
-  // Turn into Sticker function - adds 10px white border to all images
+  // Turn into Sticker function - applies 6px white border to all images
   const turnIntoSticker = useCallback(() => {
     setCanvasState(prev => ({
       ...prev,
       elements: prev.elements.map(element =>
-        element.type === 'image' 
-          ? { 
-              ...element, 
+        element.type === 'image'
+          ? {
+              ...element,
               stickerMode: true,
-              stickerBorderWidth: 10,
-              stickerBorderColor: '#ffffff'
+              stickerBorderWidth: 6,
+              stickerBorderColor: '#ffffff',
+              fillHoles: false
             }
           : element
       )
@@ -693,59 +1028,253 @@ export default function CanvasPage() {
   const selectedElement = canvasState.elements.find(el => el.id === canvasState.selectedElementId);
 
   return (
-    <Layout
-      title="Canvas Editor - Design Platform | Sticker Shuttle"
-      description="Professional canvas editor for creating custom designs. Add images, text, shapes and export your creations."
-    >
-      <div className="h-screen flex flex-col" style={{ backgroundColor: '#030140' }}>
-        {/* Top Toolbar */}
-        <div className="w-full px-4 py-2 flex items-center justify-between" style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          backdropFilter: 'blur(12px)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-          marginTop: '64px' // Account for header
-        }}>
-          <div className="flex items-center gap-2">
-            <button
-              className="px-3 py-1.5 rounded-lg text-white text-xs transition-colors hover:bg-white/10 flex items-center gap-2"
-              title="Undo"
-            >
-              <Undo className="w-4 h-4" />
-              Undo
-            </button>
-            <button
-              className="px-3 py-1.5 rounded-lg text-white text-xs transition-colors hover:bg-white/10 flex items-center gap-2"
-              title="Redo"
-            >
-              <Redo className="w-4 h-4" />
-              Redo
-            </button>
-            <div className="w-px h-4 bg-white/20 mx-2"></div>
-            <button
-              className="px-3 py-1.5 rounded-lg text-white text-xs transition-colors hover:bg-white/10 flex items-center gap-2"
-              title="Zoom In"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            <button
-              className="px-3 py-1.5 rounded-lg text-white text-xs transition-colors hover:bg-white/10 flex items-center gap-2"
-              title="Zoom Out"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <button
-              className="px-3 py-1.5 rounded-lg text-white text-xs transition-colors hover:bg-white/10 flex items-center gap-2"
-              title="Reset View"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Reset
-            </button>
+    <>
+      <SEOHead 
+        title="Canvas Editor - Design Platform | Sticker Shuttle"
+        description="Professional canvas editor for creating custom designs. Add images, text, shapes and export your creations."
+      />
+      
+      <div className="min-h-screen text-white" style={{ backgroundColor: '#030140', fontFamily: 'Inter, sans-serif' }}>
+        {/* Custom Header for Canvas Page */}
+        <header className="w-full fixed top-0 z-50" style={{ backgroundColor: '#030140' }}>
+          <div className="w-full py-3 px-6">
+            <div className="flex items-center justify-between relative">
+              {/* Left Side - Logo + Tools */}
+              <div className="flex items-center gap-4">
+                {/* Logo */}
+                <Link href="/">
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
+                    alt="Sticker Shuttle Logo" 
+                    className="h-10 w-auto object-contain cursor-pointer"
+                  />
+                </Link>
+                
+                <div className="w-px h-6 bg-white/20"></div>
+                
+                {/* Tools */}
+                <div className="flex items-center gap-2">
+                  <button
+                    className="px-3 py-1.5 rounded-lg text-white text-xs transition-colors hover:bg-white/10 flex items-center gap-2"
+                    title="Undo"
+                  >
+                    <Undo className="w-4 h-4" />
+                    Undo
+                  </button>
+                  <button
+                    className="px-3 py-1.5 rounded-lg text-white text-xs transition-colors hover:bg-white/10 flex items-center gap-2"
+                    title="Redo"
+                  >
+                    <Redo className="w-4 h-4" />
+                    Redo
+                  </button>
+                  <div className="w-px h-4 bg-white/20 mx-2"></div>
+                  <button
+                    className="px-3 py-1.5 rounded-lg text-white text-xs transition-colors hover:bg-white/10 flex items-center gap-2"
+                    title="Zoom In"
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </button>
+                  <button
+                    className="px-3 py-1.5 rounded-lg text-white text-xs transition-colors hover:bg-white/10 flex items-center gap-2"
+                    title="Zoom Out"
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                  </button>
+                  <button
+                    className="px-3 py-1.5 rounded-lg text-white text-xs transition-colors hover:bg-white/10 flex items-center gap-2"
+                    title="Reset View"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Side - User Elements */}
+              <div className="flex items-center gap-3">
+                {/* Deals Button */}
+                <Link 
+                  href="/deals"
+                  className="px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.3) 0%, rgba(251, 191, 36, 0.15) 50%, rgba(251, 191, 36, 0.05) 100%)',
+                    border: '1px solid rgba(251, 191, 36, 0.4)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)'
+                  }}
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#fbbf24' }}>
+                    <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinejoin="round" strokeLinecap="round" />
+                  </svg>
+                  Deals
+                </Link>
+
+                {/* Store Credit Balance - Show if logged in */}
+                {showAccountDashboard && (
+                  <Link 
+                    href="/account/dashboard?view=financial"
+                    className="px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.15) 50%, rgba(255, 215, 0, 0.05) 100%)',
+                      border: '1px solid rgba(255, 215, 0, 0.4)',
+                      boxShadow: '0 8px 32px rgba(255, 215, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+                      backdropFilter: 'blur(12px)',
+                      minHeight: '40px'
+                    }}
+                  >
+                    <i className="fas fa-coins text-yellow-300"></i>
+                    {creditBalanceLoaded ? (
+                      <span className="text-yellow-200 leading-5">${creditBalance.toFixed(2)}</span>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <div 
+                          className="bg-yellow-300/30 rounded animate-pulse leading-5"
+                          style={{ width: '12px', height: '20px' }}
+                        ></div>
+                        <div 
+                          className="bg-yellow-300/30 rounded animate-pulse leading-5"
+                          style={{ width: '28px', height: '20px' }}
+                        ></div>
+                      </div>
+                    )}
+                  </Link>
+                )}
+
+                {/* Authentication - Show Profile Dropdown or Login/Signup */}
+                {showAccountDashboard ? (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                      className="flex items-center gap-2 font-medium text-white transition-all duration-200 transform hover:scale-105"
+                      style={{ background: 'transparent', border: 'none' }}
+                      onBlur={() => setTimeout(() => setShowProfileDropdown(false), 200)}
+                    >
+                      {/* Profile Picture */}
+                      <div className="w-10 h-10 aspect-square rounded-full overflow-hidden border border-white/15 transition-all duration-200 hover:border-white/40 hover:brightness-75">
+                        {profile?.profile_photo_url ? (
+                          <img 
+                            src={profile.profile_photo_url} 
+                            alt="Profile" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full aspect-square bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-base font-bold rounded-full">
+                            {getUserDisplayName().charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Dropdown Arrow */}
+                      <svg 
+                        className={`w-4 h-4 transition-transform duration-200 ${showProfileDropdown ? 'rotate-180' : ''}`} 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {/* Profile Dropdown */}
+                    {showProfileDropdown && (
+                      <div 
+                        className="absolute top-full right-0 mt-2 w-64 rounded-xl shadow-2xl z-50"
+                        style={{
+                          backgroundColor: 'rgba(3, 1, 64, 0.95)',
+                          backdropFilter: 'blur(20px)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)'
+                        }}
+                      >
+                        <div className="p-4">
+                          {/* Profile Header */}
+                          <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/10">
+                            <div className="w-12 h-12 aspect-square rounded-full overflow-hidden">
+                              {profile?.profile_photo_url ? (
+                                <img 
+                                  src={profile.profile_photo_url} 
+                                  alt="Profile" 
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full aspect-square bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-lg font-bold rounded-full">
+                                  {getUserDisplayName().charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <h3 className="text-white font-semibold">{getUserDisplayName()}</h3>
+                              <p className="text-gray-300 text-sm">{user?.email}</p>
+                            </div>
+                          </div>
+
+                          {/* Menu Items */}
+                          <div className="space-y-2">
+                            <Link 
+                              href="/account/dashboard"
+                              className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                              onClick={() => setShowProfileDropdown(false)}
+                            >
+                              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#8b5cf6' }}>
+                                <rect x="3" y="3" width="8" height="5" rx="2"/>
+                                <rect x="13" y="3" width="8" height="11" rx="2"/>
+                                <rect x="3" y="10" width="8" height="11" rx="2"/>
+                                <rect x="13" y="16" width="8" height="5" rx="2"/>
+                              </svg>
+                              <span>Dashboard</span>
+                            </Link>
+
+                            <button 
+                              onClick={handleSignOut}
+                              className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white text-left"
+                            >
+                              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#ef4444' }}>
+                                <path d="M16 17l-4-4V8.83c0-1.11-.9-2-2-2s-2 .89-2 2V13l-4 4v1.17c0 1.11.9 2 2 2h8c1.1 0 2-.89 2-2V17z"/>
+                              </svg>
+                              <span>Sign Out</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  showLoginSignupButtons && (
+                    <div className="flex items-center gap-3">
+                      <Link 
+                        href="/signup"
+                        className="px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 text-white"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                          backdropFilter: 'blur(25px) saturate(180%)',
+                          border: '1px solid rgba(59, 130, 246, 0.4)',
+                          boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                        }}
+                      >
+                        Signup
+                      </Link>
+                      
+                      <Link 
+                        href="/login"
+                        className="text-white transition-all duration-200 transform hover:scale-105"
+                      >
+                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                      </Link>
+                    </div>
+                  )
+                )}
+
+                {/* Cart */}
+                <CartIndicator />
+              </div>
+            </div>
           </div>
-          
-          <div className="flex items-center gap-2">
-            <span className="text-white/60 text-xs">Canvas Editor v1.0</span>
-          </div>
-        </div>
+        </header>
+
+        {/* Main Content - Moved up */}
+        <div className="pt-16 h-screen flex flex-col" style={{ backgroundColor: '#030140' }}>
 
         {/* Sticker Settings Menu */}
         {stickerMenuOpen && (
@@ -761,6 +1290,20 @@ export default function CanvasPage() {
               backdropFilter: 'blur(12px)'
             }}
           >
+            {/* Header with Close Button */}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white font-semibold text-sm">Custom Border Settings</h3>
+              <button
+                onClick={() => setStickerMenuOpen(false)}
+                className="w-6 h-6 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                title="Close border settings"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
             {/* Top Button Menu */}
             <div className="flex gap-2 mb-4">
               <button
@@ -787,61 +1330,181 @@ export default function CanvasPage() {
                 }}
               >
                 <span className="text-[10px] font-bold bg-purple-600 rounded-full w-4 h-4 flex items-center justify-center">S</span>
-                10px Sticker
+                6px Sticker
               </button>
             </div>
-
-            <h3 className="text-white font-semibold mb-4 text-sm">Custom Border Settings</h3>
             
             <div className="space-y-4">
               <div>
                 <label className="block text-white text-xs mb-2">
-                  Border Width: {stickerSettings.borderWidth}px
+                  Border Width: {stickerSettings.borderWidth}px ({pxToInches(stickerSettings.borderWidth)}")
                 </label>
-                <input
-                  type="range"
-                  min="1"
-                  max="20"
-                  value={stickerSettings.borderWidth}
-                  onChange={(e) => setStickerSettings(prev => ({ 
-                    ...prev, 
-                    borderWidth: parseInt(e.target.value) 
-                  }))}
-                  className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
-                  style={{
-                    background: 'linear-gradient(to right, #22c55e, #16a34a)'
-                  }}
-                  title={`Border Width: ${stickerSettings.borderWidth}px`}
-                />
-              </div>
-
-              <div>
-                <label className="block text-white text-xs mb-2">Border Color</label>
-                <div className="flex items-center gap-2">
+                <div className="relative">
                   <input
-                    type="color"
-                    value={stickerSettings.borderColor}
-                    onChange={(e) => setStickerSettings(prev => ({ 
-                      ...prev, 
-                      borderColor: e.target.value 
-                    }))}
-                    className="w-8 h-8 rounded border-0 cursor-pointer"
-                    title={`Border Color: ${stickerSettings.borderColor}`}
+                    type="range"
+                    min="5"
+                    max="20"
+                    value={stickerSettings.borderWidth}
+                    onChange={(e) => {
+                      const newWidth = parseInt(e.target.value);
+                      setStickerSettings(prev => ({ 
+                        ...prev, 
+                        borderWidth: newWidth
+                      }));
+                      // Update all image elements with sticker mode in real-time
+                      setCanvasState(prev => ({
+                        ...prev,
+                        elements: prev.elements.map(element =>
+                          element.type === 'image' && element.stickerMode
+                            ? { ...element, stickerBorderWidth: newWidth }
+                            : element
+                        )
+                      }));
+                    }}
+                    className="w-full h-2 rounded-lg appearance-none cursor-pointer border-width-slider"
+                    style={{
+                      background: `linear-gradient(to right, 
+                        rgba(34, 197, 94, 0.6) 0%, 
+                        rgba(34, 197, 94, 0.4) ${((stickerSettings.borderWidth - 5) / 15) * 100}%, 
+                        rgba(255, 255, 255, 0.15) ${((stickerSettings.borderWidth - 5) / 15) * 100}%, 
+                        rgba(255, 255, 255, 0.1) 100%)`,
+                      outline: 'none',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'none',
+                    }}
+                    title={`Border Width: ${stickerSettings.borderWidth}px (${pxToInches(stickerSettings.borderWidth)}")`}
                   />
-                  <span className="text-gray-300 text-xs flex-1">
-                    {stickerSettings.borderColor.toUpperCase()}
-                  </span>
+                  <style>
+                    {`
+                      .border-width-slider::-webkit-slider-thumb {
+                        appearance: none;
+                        width: 18px;
+                        height: 18px;
+                        border-radius: 50%;
+                        background: linear-gradient(135deg, rgba(34, 197, 94, 0.9) 0%, rgba(34, 197, 94, 1) 100%);
+                        cursor: pointer;
+                        border: 2px solid rgba(255, 255, 255, 0.4);
+                        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(34, 197, 94, 0.3);
+                      }
+                      .border-width-slider::-moz-range-thumb {
+                        width: 18px;
+                        height: 18px;
+                        border-radius: 50%;
+                        background: linear-gradient(135deg, rgba(34, 197, 94, 0.9) 0%, rgba(34, 197, 94, 1) 100%);
+                        cursor: pointer;
+                        border: 2px solid rgba(255, 255, 255, 0.4);
+                        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+                      }
+                      .border-width-slider::-webkit-slider-track {
+                        height: 6px;
+                        border-radius: 3px;
+                      }
+                      .border-width-slider::-moz-range-track {
+                        height: 6px;
+                        border-radius: 3px;
+                        border: none;
+                      }
+                    `}
+                  </style>
                 </div>
               </div>
 
-              <div className="pt-2">
-                <button
-                  onClick={() => setStickerMenuOpen(false)}
-                  className="w-full px-3 py-1.5 rounded-lg text-gray-300 text-xs transition-colors hover:text-white hover:bg-white/10"
-                >
-                  Close
-                </button>
+              <div>
+                <label className="block text-white text-xs mb-2">Border Color (CMYK)</label>
+                <div className="grid grid-cols-4 gap-2 mb-2">
+                  {/* CMYK Color Presets */}
+                  {[
+                    { name: 'White', color: '#FFFFFF', cmyk: 'C:0 M:0 Y:0 K:0' },
+                    { name: 'Black', color: '#000000', cmyk: 'C:0 M:0 Y:0 K:100' },
+                    { name: 'Cyan', color: '#00FFFF', cmyk: 'C:100 M:0 Y:0 K:0' },
+                    { name: 'Magenta', color: '#FF00FF', cmyk: 'C:0 M:100 Y:0 K:0' },
+                    { name: 'Yellow', color: '#FFFF00', cmyk: 'C:0 M:0 Y:100 K:0' },
+                    { name: 'Red', color: '#FF0000', cmyk: 'C:0 M:100 Y:100 K:0' },
+                    { name: 'Green', color: '#00FF00', cmyk: 'C:100 M:0 Y:100 K:0' },
+                    { name: 'Blue', color: '#0000FF', cmyk: 'C:100 M:100 Y:0 K:0' }
+                  ].map((preset) => (
+                    <button
+                      key={preset.color}
+                      onClick={() => {
+                        setStickerSettings(prev => ({ 
+                          ...prev, 
+                          borderColor: preset.color
+                        }));
+                        // Update all image elements with sticker mode in real-time
+                        setCanvasState(prev => ({
+                          ...prev,
+                          elements: prev.elements.map(element =>
+                            element.type === 'image' && element.stickerMode
+                              ? { ...element, stickerBorderColor: preset.color }
+                              : element
+                          )
+                        }));
+                      }}
+                      className={`w-8 h-8 rounded border-2 transition-all ${
+                        stickerSettings.borderColor === preset.color 
+                          ? 'border-blue-400 scale-110' 
+                          : 'border-white/30 hover:border-white/60'
+                      }`}
+                      style={{ backgroundColor: preset.color }}
+                      title={`${preset.name} - ${preset.cmyk}`}
+                    />
+                  ))}
+                </div>
+                <div className="text-gray-300 text-xs text-center">
+                  {(() => {
+                    const colorMap = {
+                      '#FFFFFF': 'White - C:0 M:0 Y:0 K:0',
+                      '#000000': 'Black - C:0 M:0 Y:0 K:100',
+                      '#00FFFF': 'Cyan - C:100 M:0 Y:0 K:0',
+                      '#FF00FF': 'Magenta - C:0 M:100 Y:0 K:0',
+                      '#FFFF00': 'Yellow - C:0 M:0 Y:100 K:0',
+                      '#FF0000': 'Red - C:0 M:100 Y:100 K:0',
+                      '#00FF00': 'Green - C:100 M:0 Y:100 K:0',
+                      '#0000FF': 'Blue - C:100 M:100 Y:0 K:0'
+                    };
+                    return colorMap[stickerSettings.borderColor.toUpperCase()] || 'Custom Color';
+                  })()}
+                </div>
               </div>
+
+              {/* Fill Holes Toggle */}
+              <div>
+                <div className="flex items-center justify-between gap-3 p-2 rounded-lg"
+                     style={{
+                       background: 'rgba(255, 255, 255, 0.05)',
+                       border: '1px solid rgba(255, 255, 255, 0.1)'
+                     }}>
+                  <label className="text-white text-xs font-medium flex-1">Fill Holes</label>
+                  <button
+                    onClick={() => {
+                      const newFillHoles = !stickerSettings.fillHoles;
+                      setStickerSettings(prev => ({ 
+                        ...prev, 
+                        fillHoles: newFillHoles
+                      }));
+                      // Update all image elements with sticker mode in real-time
+                      setCanvasState(prev => ({
+                        ...prev,
+                        elements: prev.elements.map(element =>
+                          element.type === 'image' && element.stickerMode
+                            ? { ...element, fillHoles: newFillHoles }
+                            : element
+                        )
+                      }));
+                    }}
+                    className={`w-10 h-5 rounded-full transition-colors ${
+                      stickerSettings.fillHoles ? 'bg-blue-500' : 'bg-gray-600'
+                    }`}
+                    title={stickerSettings.fillHoles ? "Disable hole filling" : "Enable hole filling"}
+                  >
+                    <div className={`w-3 h-3 bg-white rounded-full transition-transform ${
+                      stickerSettings.fillHoles ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+              </div>
+
+
             </div>
           </div>
         )}
@@ -853,6 +1516,7 @@ export default function CanvasPage() {
             background: 'rgba(255, 255, 255, 0.05)',
             backdropFilter: 'blur(12px)',
             borderRight: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
             overflow: 'visible'
           }}>
             {/* Export Button */}
@@ -885,11 +1549,26 @@ export default function CanvasPage() {
                   border: `1px solid rgba(34, 197, 94, ${stickerMenuOpen ? '0.6' : '0.4'})`,
                   boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                 }}
-                title="Sticker Border Settings"
+                title={stickerMenuOpen ? "Close border settings" : "Open border settings"}
               >
-                <div className="relative">
-                  <Brush className="w-5 h-5" />
-                  <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-white rounded-full"></div>
+                <div className="relative flex items-center justify-center">
+                  {/* Arched border icon */}
+                  <svg className="w-6 h-4" viewBox="0 0 24 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path 
+                      d="M3 12 C3 6, 9 3, 12 3 C15 3, 21 6, 21 12" 
+                      stroke="currentColor" 
+                      strokeWidth="2.5" 
+                      fill="none"
+                      strokeLinecap="round"
+                    />
+                    <path 
+                      d="M5 10 C5 7, 8 5, 12 5 C16 5, 19 7, 19 10" 
+                      stroke="currentColor" 
+                      strokeWidth="1.8" 
+                      fill="none"
+                      strokeLinecap="round"
+                    />
+                  </svg>
                 </div>
               </button>
 
@@ -919,45 +1598,7 @@ export default function CanvasPage() {
                 <Type className="w-6 h-6" />
               </button>
 
-              <button
-                onClick={() => addShape('rectangle')}
-                className="w-12 h-12 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-                title="Add Rectangle"
-              >
-                <Square className="w-6 h-6" />
-              </button>
 
-              <button
-                onClick={() => addShape('circle')}
-                className="w-12 h-12 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-                title="Add Circle"
-              >
-                <Circle className="w-6 h-6" />
-              </button>
-
-              <button
-                onClick={() => addShape('triangle')}
-                className="w-12 h-12 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-                title="Add Triangle"
-              >
-                <Triangle className="w-6 h-6" />
-              </button>
-
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-12 h-12 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-                title="Upload Image"
-              >
-                <ImageIcon className="w-6 h-6" />
-              </button>
-              
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
             </div>
           </div>
 
@@ -973,10 +1614,52 @@ export default function CanvasPage() {
                 cursor: hoveredElementId ? 'pointer' : 'default'
               }}
             />
+            
+            {/* Centered Upload Area - Show when no images exist */}
+            {canvasState.elements.filter(el => el.type === 'image').length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="pointer-events-auto">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,.ai,.svg,.eps,.png,.jpg,.jpeg,.psd,.pdf"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    aria-label="Upload artwork file"
+                  />
+                  
+                  <div 
+                    className="border-2 border-dashed border-white/30 rounded-xl p-12 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md"
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      backdropFilter: 'blur(12px)',
+                      minWidth: '400px'
+                    }}
+                  >
+                    <div className="mb-6">
+                      <div className="mb-4 flex justify-center">
+                        <img 
+                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751341811/StickerShuttleFileIcon4_gkhsu5.png" 
+                          alt="Upload file" 
+                          className="w-24 h-24 object-contain"
+                        />
+                      </div>
+                      <p className="text-white font-medium text-xl mb-3">Click to upload your image</p>
+                      <p className="text-white/80 text-base">
+                        All formats supported • Max file size: 25MB
+                        <br />
+                        Supports: PNG, JPG, SVG, AI, PSD, PDF, EPS
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right Properties Panel */}
-          <div className="w-80 p-6 space-y-6 overflow-y-auto" style={{
+          <div className="w-96 p-6 space-y-6 overflow-y-auto" style={{
             background: 'rgba(255, 255, 255, 0.05)',
             backdropFilter: 'blur(12px)',
             borderLeft: '1px solid rgba(255, 255, 255, 0.1)'
@@ -1006,6 +1689,16 @@ export default function CanvasPage() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 flex-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateElement(element.id, { visible: !element.visible });
+                          }}
+                          className="p-1 text-gray-400 hover:text-white"
+                          title={element.visible ? "Hide" : "Show"}
+                        >
+                          {element.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                        </button>
                         {editingLayerId === element.id ? (
                           <input
                             type="text"
@@ -1053,16 +1746,6 @@ export default function CanvasPage() {
                           title="Rename layer"
                         >
                           <Edit3 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateElement(element.id, { visible: !element.visible });
-                          }}
-                          className="p-1 text-gray-400 hover:text-white"
-                          title={element.visible ? "Hide" : "Show"}
-                        >
-                          {element.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                         </button>
                         <button
                           onClick={(e) => {
@@ -1121,74 +1804,151 @@ export default function CanvasPage() {
                           className="w-full px-2 py-1 text-sm bg-gray-700 text-white border border-gray-600 rounded"
                         />
                       </div>
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <label className="block text-gray-300 text-xs">Size</label>
-                          <button
-                            onClick={() => setAspectRatioLocked(!aspectRatioLocked)}
-                            className={`p-1 rounded text-xs transition-colors ${
-                              aspectRatioLocked 
-                                ? 'text-blue-400 bg-blue-500/20' 
-                                : 'text-gray-400 hover:text-white hover:bg-white/10'
-                            }`}
-                            title={aspectRatioLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
-                          >
-                            {aspectRatioLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-                          </button>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <input
-                              type="number"
-                              value={Math.round(selectedElement.width)}
-                              onChange={(e) => {
-                                const newWidth = parseInt(e.target.value) || 1;
-                                if (aspectRatioLocked) {
-                                  const aspectRatio = selectedElement.height / selectedElement.width;
-                                  const newHeight = newWidth * aspectRatio;
-                                  setCanvasState(prev => ({
-                                    ...prev,
-                                    elements: prev.elements.map(el => 
-                                      el.id === selectedElement.id 
-                                        ? { ...el, width: newWidth, height: newHeight }
-                                        : el
-                                    )
-                                  }));
-                                } else {
-                                  updateElement(selectedElement.id, { width: newWidth });
-                                }
-                              }}
-                              className="w-full px-2 py-1 text-sm bg-gray-700 text-white border border-gray-600 rounded"
-                              placeholder="W"
-                              title="Width"
-                            />
-                          </div>
-                          <div>
-                            <input
-                              type="number"
-                              value={Math.round(selectedElement.height)}
-                              onChange={(e) => {
-                                const newHeight = parseInt(e.target.value) || 1;
-                                if (aspectRatioLocked) {
+                    </div>
+                    
+                    {/* Size in Pixels and Inches */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-gray-300 text-xs">Size</label>
+                        <button
+                          onClick={() => setAspectRatioLocked(!aspectRatioLocked)}
+                          className={`p-1 rounded text-xs transition-colors ${
+                            aspectRatioLocked 
+                              ? 'text-blue-400 bg-blue-500/20' 
+                              : 'text-gray-400 hover:text-white hover:bg-white/10'
+                          }`}
+                          title={aspectRatioLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+                        >
+                          {aspectRatioLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                        </button>
+                      </div>
+                      
+                                             {/* Size Display */}
+                       <div className="mb-2 p-2 rounded" style={{ background: 'rgba(255, 255, 255, 0.05)' }}>
+                         <div className="text-white text-xs">
+                           {selectedElement.type === 'image' && selectedElement.stickerMode ? (
+                             <>
+                               {/* Show both image size and total sticker size with border */}
+                               <div className="flex justify-between">
+                                 <span>Image:</span>
+                                 <span>{Math.round(selectedElement.width)} × {Math.round(selectedElement.height)}px</span>
+                               </div>
+                               <div className="flex justify-between mt-1">
+                                 <span>Sticker:</span>
+                                 <span>{Math.round(selectedElement.width + (selectedElement.stickerBorderWidth || 6) * 2)} × {Math.round(selectedElement.height + (selectedElement.stickerBorderWidth || 6) * 2)}px</span>
+                               </div>
+                               <div className="flex justify-between mt-1 pt-1 border-t border-white/10">
+                                 <span className="font-medium">Total Size:</span>
+                                 <span className="font-medium">{pxToInches(selectedElement.width + (selectedElement.stickerBorderWidth || 6) * 2)}" × {pxToInches(selectedElement.height + (selectedElement.stickerBorderWidth || 6) * 2)}"</span>
+                               </div>
+                             </>
+                           ) : (
+                             <>
+                               {/* Regular size display for non-sticker elements */}
+                               <div className="flex justify-between">
+                                 <span>Pixels:</span>
+                                 <span>{Math.round(selectedElement.width)} × {Math.round(selectedElement.height)}px</span>
+                               </div>
+                               <div className="flex justify-between mt-1">
+                                 <span>Inches:</span>
+                                 <span>{pxToInches(selectedElement.width)}" × {pxToInches(selectedElement.height)}"</span>
+                               </div>
+                             </>
+                           )}
+                         </div>
+                       </div>
+                      
+                      {/* Size Presets */}
+                      {selectedElement.type === 'image' && (
+                        <div className="mb-2">
+                          <label className="block text-gray-300 text-xs mb-2">Quick Size Presets</label>
+                          <div className="flex gap-1">
+                            {[
+                              { label: '2"', inches: 2 },
+                              { label: '3"', inches: 3 },
+                              { label: '4"', inches: 4 }
+                            ].map((preset) => (
+                              <button
+                                key={preset.inches}
+                                onClick={() => {
+                                  const newSize = preset.inches * 96; // Convert inches to pixels (96 DPI)
                                   const aspectRatio = selectedElement.width / selectedElement.height;
-                                  const newWidth = newHeight * aspectRatio;
-                                  setCanvasState(prev => ({
-                                    ...prev,
-                                    elements: prev.elements.map(el => 
-                                      el.id === selectedElement.id 
-                                        ? { ...el, width: newWidth, height: newHeight }
-                                        : el
-                                    )
-                                  }));
-                                } else {
-                                  updateElement(selectedElement.id, { height: newHeight });
-                                }
-                              }}
-                              className="w-full px-2 py-1 text-sm bg-gray-700 text-white border border-gray-600 rounded"
-                              placeholder="H"
-                              title="Height"
-                            />
+                                  
+                                  if (aspectRatio >= 1) {
+                                    // Landscape or square - set width to preset size
+                                    const newWidth = newSize;
+                                    const newHeight = newSize / aspectRatio;
+                                    updateElement(selectedElement.id, { width: newWidth, height: newHeight });
+                                  } else {
+                                    // Portrait - set height to preset size
+                                    const newHeight = newSize;
+                                    const newWidth = newSize * aspectRatio;
+                                    updateElement(selectedElement.id, { width: newWidth, height: newHeight });
+                                  }
+                                }}
+                                className="flex-1 px-2 py-1 text-xs text-white rounded transition-colors hover:bg-blue-500/20 border border-gray-600"
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
                           </div>
+                        </div>
+                      )}
+                      
+                      {/* Manual Size Input */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <input
+                            type="number"
+                            value={Math.round(selectedElement.width)}
+                            onChange={(e) => {
+                              const newWidth = parseInt(e.target.value) || 1;
+                              if (aspectRatioLocked) {
+                                const aspectRatio = selectedElement.height / selectedElement.width;
+                                const newHeight = newWidth * aspectRatio;
+                                setCanvasState(prev => ({
+                                  ...prev,
+                                  elements: prev.elements.map(el => 
+                                    el.id === selectedElement.id 
+                                      ? { ...el, width: newWidth, height: newHeight }
+                                      : el
+                                  )
+                                }));
+                              } else {
+                                updateElement(selectedElement.id, { width: newWidth });
+                              }
+                            }}
+                            className="w-full px-2 py-1 text-sm bg-gray-700 text-white border border-gray-600 rounded"
+                            placeholder="W"
+                            title="Width"
+                          />
+                        </div>
+                        <span className="text-gray-400 text-sm font-medium">×</span>
+                        <div className="flex-1">
+                          <input
+                            type="number"
+                            value={Math.round(selectedElement.height)}
+                            onChange={(e) => {
+                              const newHeight = parseInt(e.target.value) || 1;
+                              if (aspectRatioLocked) {
+                                const aspectRatio = selectedElement.width / selectedElement.height;
+                                const newWidth = newHeight * aspectRatio;
+                                setCanvasState(prev => ({
+                                  ...prev,
+                                  elements: prev.elements.map(el => 
+                                    el.id === selectedElement.id 
+                                      ? { ...el, width: newWidth, height: newHeight }
+                                      : el
+                                  )
+                                }));
+                              } else {
+                                updateElement(selectedElement.id, { height: newHeight });
+                              }
+                            }}
+                            className="w-full px-2 py-1 text-sm bg-gray-700 text-white border border-gray-600 rounded"
+                            placeholder="H"
+                            title="Height"
+                          />
                         </div>
                       </div>
                     </div>
@@ -1242,44 +2002,75 @@ export default function CanvasPage() {
                   )}
 
                   {/* Image Properties */}
-                  {selectedElement.type === 'image' && (
+                  {selectedElement.type === 'image' && selectedElement.stickerMode && (
                     <div className="space-y-3">
                       <div>
-                        <label className="flex items-center gap-3 cursor-pointer">
+                        <label className="block text-white text-sm mb-1">
+                          Border Width: {selectedElement.stickerBorderWidth || 6}px ({pxToInches(selectedElement.stickerBorderWidth || 6)}")
+                        </label>
+                        <input
+                          type="number"
+                          min="5"
+                          max="20"
+                          value={selectedElement.stickerBorderWidth || 6}
+                          onChange={(e) => updateElement(selectedElement.id, { stickerBorderWidth: Math.max(5, parseInt(e.target.value) || 6) })}
+                          className="w-full px-3 py-2 text-sm bg-gray-700 text-white border border-gray-600 rounded"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-white text-sm mb-1">Border Color (CMYK)</label>
+                        <div className="grid grid-cols-4 gap-2 mb-2">
+                          {[
+                            { name: 'White', color: '#FFFFFF', cmyk: 'C:0 M:0 Y:0 K:0' },
+                            { name: 'Black', color: '#000000', cmyk: 'C:0 M:0 Y:0 K:100' },
+                            { name: 'Cyan', color: '#00FFFF', cmyk: 'C:100 M:0 Y:0 K:0' },
+                            { name: 'Magenta', color: '#FF00FF', cmyk: 'C:0 M:100 Y:0 K:0' },
+                            { name: 'Yellow', color: '#FFFF00', cmyk: 'C:0 M:0 Y:100 K:0' },
+                            { name: 'Red', color: '#FF0000', cmyk: 'C:0 M:100 Y:100 K:0' },
+                            { name: 'Green', color: '#00FF00', cmyk: 'C:100 M:0 Y:100 K:0' },
+                            { name: 'Blue', color: '#0000FF', cmyk: 'C:100 M:100 Y:0 K:0' }
+                          ].map((preset) => (
+                            <button
+                              key={preset.color}
+                              onClick={() => updateElement(selectedElement.id, { stickerBorderColor: preset.color })}
+                              className={`w-8 h-8 rounded border-2 transition-all ${
+                                (selectedElement.stickerBorderColor || '#ffffff') === preset.color 
+                                  ? 'border-blue-400 scale-110' 
+                                  : 'border-white/30 hover:border-white/60'
+                              }`}
+                              style={{ backgroundColor: preset.color }}
+                              title={`${preset.name} - ${preset.cmyk}`}
+                            />
+                          ))}
+                        </div>
+                        <div className="text-gray-300 text-xs text-center">
+                          {(() => {
+                            const colorMap = {
+                              '#FFFFFF': 'White - C:0 M:0 Y:0 K:0',
+                              '#000000': 'Black - C:0 M:0 Y:0 K:100',
+                              '#00FFFF': 'Cyan - C:100 M:0 Y:0 K:0',
+                              '#FF00FF': 'Magenta - C:0 M:100 Y:0 K:0',
+                              '#FFFF00': 'Yellow - C:0 M:0 Y:100 K:0',
+                              '#FF0000': 'Red - C:0 M:100 Y:100 K:0',
+                              '#00FF00': 'Green - C:100 M:0 Y:100 K:0',
+                              '#0000FF': 'Blue - C:100 M:100 Y:0 K:0'
+                            };
+                            const currentColor = (selectedElement.stickerBorderColor || '#ffffff').toUpperCase();
+                            return colorMap[currentColor] || 'Custom Color';
+                          })()}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
-                            checked={selectedElement.stickerMode || false}
-                            onChange={(e) => updateElement(selectedElement.id, { stickerMode: e.target.checked })}
+                            checked={selectedElement.fillHoles || false}
+                            onChange={(e) => updateElement(selectedElement.id, { fillHoles: e.target.checked })}
                             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                           />
-                          <span className="text-white text-sm">Sticker Mode</span>
+                          <span className="text-white text-sm">Fill Holes</span>
                         </label>
                       </div>
-                      
-                      {selectedElement.stickerMode && (
-                        <>
-                          <div>
-                            <label className="block text-white text-sm mb-1">Border Width</label>
-                            <input
-                              type="number"
-                              min="1"
-                              max="20"
-                              value={selectedElement.stickerBorderWidth || 6}
-                              onChange={(e) => updateElement(selectedElement.id, { stickerBorderWidth: parseInt(e.target.value) || 6 })}
-                              className="w-full px-3 py-2 text-sm bg-gray-700 text-white border border-gray-600 rounded"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-white text-sm mb-1">Border Color</label>
-                            <input
-                              type="color"
-                              value={selectedElement.stickerBorderColor || '#ffffff'}
-                              onChange={(e) => updateElement(selectedElement.id, { stickerBorderColor: e.target.value })}
-                              className="w-full h-10 border border-gray-600 rounded cursor-pointer"
-                            />
-                          </div>
-                        </>
-                      )}
                     </div>
                   )}
 
@@ -1320,8 +2111,9 @@ export default function CanvasPage() {
               </div>
             )}
           </div>
+          </div>
         </div>
       </div>
-    </Layout>
+    </>
   );
 }

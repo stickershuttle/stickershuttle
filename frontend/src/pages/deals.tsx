@@ -671,10 +671,7 @@ export default function Deals() {
       <section className="py-8">
           <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           <div className="text-center mb-8">
-            <div className="inline-block px-4 py-2 rounded-full text-sm font-medium bg-orange-500/20 text-orange-300 border border-orange-500/30 mb-4">
-              🔥 Limited Time Offers
-                </div>
-            <h1 className="text-4xl md:text-6xl font-bold text-white flex items-center justify-center gap-3" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif' }}>
+            <h1 className="text-4xl md:text-6xl font-bold text-white flex items-center justify-center gap-3 deals-title-underline" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif' }}>
               Active Deals
             </h1>
                 </div>
@@ -902,7 +899,25 @@ export default function Deals() {
             opacity: 1;
             transform: translateY(0);
           }
-          }
+        }
+
+        /* Hand-drawn Underline for Active Deals Title - Matching "not" style */
+        .deals-title-underline {
+          position: relative;
+          display: inline-block;
+        }
+        
+        .deals-title-underline::after {
+          content: '';
+          position: absolute;
+          bottom: -4px;
+          left: 0;
+          right: 0;
+          height: 4px;
+          background: #fbbf24;
+          transform: rotate(1deg);
+          border-radius: 9999px;
+        }
         `}</style>
     </Layout>
   );
