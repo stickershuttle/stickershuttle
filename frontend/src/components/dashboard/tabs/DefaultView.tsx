@@ -84,7 +84,93 @@ const DefaultView: React.FC<DefaultViewProps> = ({
 
   // Helper function to check if an order contains deal items
   const isOrderFromDeal = (order: any) => {
-    return order.items?.some((item: any) => item.calculatorSelections?.isDeal === true);
+    // First check: Search the entire order JSON for deal indicators
+    const orderStr = JSON.stringify(order).toLowerCase();
+    const hasDealsInJson = orderStr.includes('isDeal":true') || 
+                          orderStr.includes('dealPrice') || 
+                          orderStr.includes('"deal') ||
+                          orderStr.includes('deal-');
+    
+    // Second check: Look for specific deal patterns in order number/id
+    const dealPatterns = [
+      order.orderNumber?.includes('100 '),  // 100 sticker deals
+      order.orderNumber?.includes('chrome'), // Chrome deals  
+      order.orderNumber?.includes('holographic'), // Holographic deals
+      (order.id || '').includes('deal-'), // Deal IDs from deals page
+    ];
+    
+    const hasDealsInOrderInfo = dealPatterns.some(pattern => pattern === true);
+    
+    // Third check: Item-level detection
+    const hasDealItems = order.items?.some((item: any) => {
+      // Get full item data from various possible locations
+      const fullOrderData = order._fullOrderData;
+      const fullItemFromOrder = fullOrderData?.items?.find((fullItem: any) => fullItem.id === item.id);
+      const fullItemData = item._fullItemData || fullItemFromOrder;
+      
+      // Parse calculatorSelections if it's a string (common from database)
+      const parseCalculatorSelections = (selections: any) => {
+        if (typeof selections === 'string') {
+          try {
+            return JSON.parse(selections);
+          } catch (e) {
+            return {};
+          }
+        }
+        return selections || {};
+      };
+      
+      // Check all possible locations for isDeal flag, parsing JSON strings
+      const isDealSources = [
+        // Direct calculator selections
+        parseCalculatorSelections(item.calculatorSelections)?.isDeal,
+        parseCalculatorSelections(item.calculator_selections)?.isDeal,
+        
+        // Full item data calculator selections
+        parseCalculatorSelections(fullItemData?.calculatorSelections)?.isDeal,
+        parseCalculatorSelections(fullItemData?.calculator_selections)?.isDeal,
+        
+        // Full order item data calculator selections
+        parseCalculatorSelections(fullItemFromOrder?.calculatorSelections)?.isDeal,
+        parseCalculatorSelections(fullItemFromOrder?.calculator_selections)?.isDeal,
+        
+        // Customization objects
+        item.customization?.isDeal,
+        fullItemData?.customization?.isDeal,
+        fullItemFromOrder?.customization?.isDeal,
+        
+        // Also check if the item name contains deal indicators
+        (item.name || item.productName || '').toLowerCase().includes('deal'),
+        (fullItemData?.productName || '').toLowerCase().includes('deal'),
+        
+        // Check for deal price field
+        !!parseCalculatorSelections(item.calculatorSelections)?.dealPrice,
+        !!parseCalculatorSelections(fullItemData?.calculatorSelections)?.dealPrice,
+        !!parseCalculatorSelections(fullItemFromOrder?.calculatorSelections)?.dealPrice,
+        
+        // Check item JSON for deal indicators
+        JSON.stringify(item).toLowerCase().includes('isdeal'),
+        JSON.stringify(fullItemData || {}).toLowerCase().includes('isdeal'),
+        JSON.stringify(fullItemFromOrder || {}).toLowerCase().includes('isdeal')
+      ];
+      
+      return isDealSources.some(source => source === true);
+    });
+    
+    const isDeal = hasDealsInJson || hasDealsInOrderInfo || hasDealItems;
+    
+    // Debug logging for all detection methods
+    console.log('🎯 COMPREHENSIVE DEAL DETECTION:', { 
+      orderId: order.id, 
+      orderNumber: order.orderNumber,
+      hasDealsInJson,
+      hasDealsInOrderInfo,
+      hasDealItems,
+      finalResult: isDeal,
+      orderJsonSnippet: JSON.stringify(order).substring(0, 200) + '...'
+    });
+    
+    return isDeal;
   };
 
   // Default view content is rendered here
@@ -522,110 +608,7 @@ const DefaultView: React.FC<DefaultViewProps> = ({
         </div>
       </div>
 
-      {/* Quick Reorder - PRIORITY 2 (Only show when there are active orders) */}
-      {(() => {
-        const lastDeliveredOrder = orders.filter(order => order.status === 'Delivered')[0];
-        const hasActiveOrders = orders.filter(order => order.status !== 'Delivered' && order.status !== 'Cancelled').length > 0;
-        return lastDeliveredOrder && hasActiveOrders ? (
-          <div 
-            className="rounded-2xl overflow-hidden mb-6"
-            style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-              backdropFilter: 'blur(12px)'
-            }}
-          >
-            <div className="px-6 py-4 border-b border-white/10">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" style={{ color: '#fbbf24' }}>
-                    <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-                  </svg>
-                  Quick Reorder
-                </h2>
-                <div className="text-xs font-bold px-3 py-1 rounded-full"
-                     style={{
-                       background: 'linear-gradient(135deg, #ffd713, #ffed4e)',
-                       color: '#030140'
-                     }}>
-                  10% OFF
-                </div>
-              </div>
-            </div>
-            <div className="p-6">
-              <div className="rounded-lg p-4"
-                   style={{
-                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                     border: '1px solid rgba(255, 255, 255, 0.1)'
-                   }}>
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-white mb-2">Your Last Order - Mission {getOrderDisplayNumber(lastDeliveredOrder)}</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {lastDeliveredOrder.items.map((item: any) => (
-                        <div key={item.id} className="flex items-center gap-3">
-                          <img 
-                            src={item.image} 
-                            alt={item.name}
-                            className="w-12 h-12 rounded-lg object-cover bg-white/10 border border-white/10"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-white text-sm truncate">{item.name}</p>
-                            <p className="text-xs text-gray-300">Qty: {item.quantity} • ${item.price}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-3 flex items-center gap-4">
-                      <p className="text-sm text-gray-300">
-                        Original: <span className="line-through">${lastDeliveredOrder.total}</span>
-                      </p>
-                      <p className="text-sm font-bold text-white">
-                        With 10% off: <span style={{ color: '#ffd713' }}>${(lastDeliveredOrder.total * 0.9).toFixed(2)}</span>
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => handleReorder(lastDeliveredOrder.id)}
-                      disabled={reorderingId === lastDeliveredOrder.id || isOrderFromDeal(lastDeliveredOrder)}
-                      className="px-6 py-3 rounded-lg font-bold transition-all duration-200 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[140px]"
-                      style={{
-                        backgroundColor: reorderingId === lastDeliveredOrder.id || isOrderFromDeal(lastDeliveredOrder) ? '#666' : '#ffd713',
-                        color: '#030140',
-                        boxShadow: reorderingId === lastDeliveredOrder.id || isOrderFromDeal(lastDeliveredOrder) ? 'none' : '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
-                        border: 'solid',
-                        borderWidth: '0.03125rem',
-                        borderColor: reorderingId === lastDeliveredOrder.id || isOrderFromDeal(lastDeliveredOrder) ? '#666' : '#e6c211'
-                      }}
-                    >
-                      {reorderingId === lastDeliveredOrder.id ? (
-                        <>
-                          <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Adding...
-                        </>
-                      ) : (
-                        <>
-                          🔄 Reorder Now
-                        </>
-                      )}
-                    </button>
-                    {isOrderFromDeal(lastDeliveredOrder) ? (
-                      <p className="text-xs text-gray-500 text-center">Re-order Disabled for Deals</p>
-                    ) : (
-                      <p className="text-xs text-gray-400 text-center">Save 10% • Same Great Quality</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null;
-      })()}
+
 
       {/* Active Orders - Excel-Style Table */}
       {orders.filter(order => order.status !== 'Delivered' && order.status !== 'Cancelled').length > 0 ? (
@@ -744,7 +727,7 @@ const DefaultView: React.FC<DefaultViewProps> = ({
 
                             return Object.values(groupedItems).map((groupedItem: any, index: number) => (
                               <div key={index} className="text-sm text-white">
-                                {groupedItem.totalQuantity} {groupedItem.name}
+                                {groupedItem.name}
                               </div>
                             ));
                           })()}
@@ -806,11 +789,8 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                               <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
                             </svg>
-                            Reorder
+                            {isOrderFromDeal(order) ? 'Reorder (Disabled on Deals)' : 'Reorder'}
                           </button>
-                          {isOrderFromDeal(order) && (
-                            <p className="text-xs text-gray-500 text-center mt-1">Re-order Disabled for Deals</p>
-                          )}
                           {isOrderShippedWithTracking(order) && (
                             <button
                               onClick={() => handleTrackOrder(order)}
@@ -907,11 +887,8 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                                 color: 'white'
                               }}
                             >
-                              Reorder
+                              {isOrderFromDeal(order) ? 'Reorder (Disabled on Deals)' : 'Reorder'}
                             </button>
-                            {isOrderFromDeal(order) && (
-                              <p className="text-xs text-gray-500 text-center mt-1">Re-order Disabled for Deals</p>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -1320,7 +1297,7 @@ const DefaultView: React.FC<DefaultViewProps> = ({
 
                             return Object.values(groupedItems).map((groupedItem: any, index: number) => (
                               <div key={index} className="text-sm text-white">
-                                {groupedItem.totalQuantity} {groupedItem.name}
+                                {groupedItem.name}
                               </div>
                             ));
                           })()}
@@ -1382,11 +1359,8 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                               <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
                             </svg>
-                            Reorder
+                            {isOrderFromDeal(order) ? 'Reorder (Disabled on Deals)' : 'Reorder'}
                           </button>
-                          {isOrderFromDeal(order) && (
-                            <p className="text-xs text-gray-500 text-center mt-1">Re-order Disabled for Deals</p>
-                          )}
                           {isOrderShippedWithTracking(order) && (
                             <button
                               onClick={() => handleTrackOrder(order)}
@@ -1483,11 +1457,8 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                                 color: 'white'
                               }}
                             >
-                              Reorder
+                              {isOrderFromDeal(order) ? 'Reorder (Disabled on Deals)' : 'Reorder'}
                             </button>
-                            {isOrderFromDeal(order) && (
-                              <p className="text-xs text-gray-500 text-center mt-1">Re-order Disabled for Deals</p>
-                            )}
                           </div>
                         </div>
                       </div>

@@ -69,7 +69,26 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
 }) => {
   // Helper function to check if an order contains deal items
   const isOrderFromDeal = (order: any) => {
-    return order.items?.some((item: any) => item.calculatorSelections?.isDeal === true);
+    // First check: Search the entire order JSON for deal indicators
+    const orderStr = JSON.stringify(order).toLowerCase();
+    const hasDealsInJson = orderStr.includes('isDeal":true') || 
+                          orderStr.includes('dealPrice') || 
+                          orderStr.includes('"deal') ||
+                          orderStr.includes('deal-');
+    
+    // Second check: Look for specific deal patterns in order number/id
+    const dealPatterns = [
+      order.orderNumber?.includes('100 '),  // 100 sticker deals
+      order.orderNumber?.includes('chrome'), // Chrome deals  
+      order.orderNumber?.includes('holographic'), // Holographic deals
+      (order.id || '').includes('deal-'), // Deal IDs from deals page
+    ];
+    
+    const hasDealsInOrderInfo = dealPatterns.some(pattern => pattern === true);
+    
+    const isDeal = hasDealsInJson || hasDealsInOrderInfo;
+    
+    return isDeal;
   };
 
   // Initialize invoice generator
@@ -194,36 +213,28 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
           >
             📦 Track Order
           </button>
-          {!isOrderFromDeal(selectedOrderForInvoice) ? (
-            <button
-              onClick={() => handleReorder(selectedOrderForInvoice.id)}
-              className="px-4 py-2 rounded-lg font-medium transition-all duration-200"
-              style={{
-                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                backdropFilter: 'blur(25px) saturate(180%)',
-                border: '1px solid rgba(59, 130, 246, 0.4)',
-                boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
-                color: 'white'
-              }}
-            >
-              🔄 Re-order
-            </button>
-          ) : (
-            <div className="flex flex-col items-start">
-              <button
-                disabled
-                className="px-4 py-2 rounded-lg font-medium cursor-not-allowed"
-                style={{
-                  background: 'rgba(107, 114, 128, 0.5)',
-                  color: 'rgba(156, 163, 175, 0.8)',
-                  border: '1px solid rgba(107, 114, 128, 0.3)',
-                }}
-              >
-                🔄 Re-order
-              </button>
-              <span className="text-xs text-gray-400 mt-1">Re-order Disabled for Deals</span>
-        </div>
-          )}
+          <button
+            onClick={() => handleReorder(selectedOrderForInvoice.id)}
+            disabled={isOrderFromDeal(selectedOrderForInvoice)}
+            className="px-4 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: isOrderFromDeal(selectedOrderForInvoice) 
+                ? 'rgba(107, 114, 128, 0.5)'
+                : 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+              backdropFilter: 'blur(25px) saturate(180%)',
+              border: isOrderFromDeal(selectedOrderForInvoice) 
+                ? '1px solid rgba(107, 114, 128, 0.3)'
+                : '1px solid rgba(59, 130, 246, 0.4)',
+              boxShadow: isOrderFromDeal(selectedOrderForInvoice) 
+                ? 'none'
+                : 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+              color: isOrderFromDeal(selectedOrderForInvoice) 
+                ? 'rgba(156, 163, 175, 0.8)'
+                : 'white'
+            }}
+          >
+            🔄 {isOrderFromDeal(selectedOrderForInvoice) ? 'Reorder (Disabled on Deals)' : 'Re-order'}
+          </button>
           <button
             onClick={() => generatePrintPDF()}
             className="px-4 py-2 rounded-lg font-medium transition-all duration-200"

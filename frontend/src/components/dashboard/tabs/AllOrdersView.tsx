@@ -72,7 +72,26 @@ const AllOrdersView: React.FC<AllOrdersViewProps> = ({
 
   // Helper function to check if an order contains deal items
   const isOrderFromDeal = (order: any) => {
-    return order.items?.some((item: any) => item.calculatorSelections?.isDeal === true);
+    // First check: Search the entire order JSON for deal indicators
+    const orderStr = JSON.stringify(order).toLowerCase();
+    const hasDealsInJson = orderStr.includes('isDeal":true') || 
+                          orderStr.includes('dealPrice') || 
+                          orderStr.includes('"deal') ||
+                          orderStr.includes('deal-');
+    
+    // Second check: Look for specific deal patterns in order number/id
+    const dealPatterns = [
+      order.orderNumber?.includes('100 '),  // 100 sticker deals
+      order.orderNumber?.includes('chrome'), // Chrome deals  
+      order.orderNumber?.includes('holographic'), // Holographic deals
+      (order.id || '').includes('deal-'), // Deal IDs from deals page
+    ];
+    
+    const hasDealsInOrderInfo = dealPatterns.some(pattern => pattern === true);
+    
+    const isDeal = hasDealsInJson || hasDealsInOrderInfo;
+    
+    return isDeal;
   };
 
   return (
@@ -334,11 +353,8 @@ const AllOrdersView: React.FC<AllOrdersViewProps> = ({
                             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                               <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
                             </svg>
-                            Reorder
+                            {isOrderFromDeal(order) ? 'Reorder (Disabled on Deals)' : 'Reorder'}
                           </button>
-                          {isOrderFromDeal(order) && (
-                            <p className="text-xs text-gray-500 text-center mt-1">Re-order Disabled for Deals</p>
-                          )}
                         </div>
                       
                       {order.status === 'Proof Review Needed' && (

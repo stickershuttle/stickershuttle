@@ -6,7 +6,8 @@ export type ProductCategory =
   | 'glitter-stickers' 
   | 'clear-stickers'    // Added
   | 'sticker-sheets'    // Added
-  | 'vinyl-banners';
+  | 'vinyl-banners'
+  | 'deals';            // Added for preset deals
 
 // Size definitions for products
 export interface ProductSize {
@@ -203,7 +204,8 @@ export const generateSKU = (category: ProductCategory, variant: string): string 
     'glitter-stickers': 'GS',
     'clear-stickers': 'CLS',
     'sticker-sheets': 'SS',
-    'vinyl-banners': 'VB'
+    'vinyl-banners': 'VB',
+    'deals': 'DL'
   }[category];
   
   return `SS-${categoryAbbrev}-${variant.toUpperCase()}`;

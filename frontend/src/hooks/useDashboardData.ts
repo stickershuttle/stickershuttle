@@ -145,6 +145,34 @@ export const useDashboardData = () => {
         .map(order => {
           console.log('🔍 RAW ORDER DATA:', JSON.stringify(order, null, 2));
           
+          // Debug: Check for isDeal flag in raw order data
+          if (order.items) {
+            order.items.forEach((item: any, index: number) => {
+              let parsedSelections = null;
+              try {
+                parsedSelections = typeof item.calculatorSelections === 'string' ? 
+                  JSON.parse(item.calculatorSelections || '{}') : item.calculatorSelections;
+              } catch (e) {
+                parsedSelections = item.calculatorSelections;
+              }
+              
+              console.log(`🎯 RAW ITEM ${index} DEAL CHECK:`, {
+                itemId: item.id,
+                productName: item.productName,
+                calculatorSelections: item.calculatorSelections,
+                calculatorSelectionsType: typeof item.calculatorSelections,
+                calculatorSelectionsParsed: parsedSelections,
+                hasIsDeal: parsedSelections?.isDeal,
+                hasDealPrice: parsedSelections?.dealPrice,
+                // Check all possible fields for deal indicators
+                allItemFields: Object.keys(item),
+                searchForDeal: JSON.stringify(item).toLowerCase().includes('deal'),
+                searchForIsDeal: JSON.stringify(item).includes('isDeal'),
+                rawItemStr: JSON.stringify(item).substring(0, 500) + '...'
+              });
+            });
+          }
+          
           // Calculate order total - try different field names and calculate from items if needed
           let orderTotal = order.totalPrice || order.total_price || 0;
           

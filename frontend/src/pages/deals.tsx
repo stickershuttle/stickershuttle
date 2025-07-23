@@ -1,589 +1,524 @@
 import Layout from "@/components/Layout";
 import Link from "next/link";
-import { useState, useCallback, useEffect } from "react";
-import { uploadToCloudinary, validateFile, CloudinaryUploadResult, UploadProgress } from "@/utils/cloudinary";
+import { useState, useEffect } from "react";
 import { useCart } from "@/components/CartContext";
 import { useRouter } from "next/router";
+import { PRESET_DEALS, DealProduct, getAllActiveDeals } from "@/data/deals/preset-deals";
+import { uploadToCloudinary, validateFile, CloudinaryUploadResult, UploadProgress } from "@/utils/cloudinary";
 
-interface Deal {
-  id: string;
-  name: string;
-  headline: string;
-  buttonText: string;
-  pills: string[];
-  isActive: boolean;
-  orderDetails: {
-    material: string;
-    size: string;
-    quantity: number;
-    price: number;
+// ImagePreview component for handling different file types
+const ImagePreview = ({ fileUrl, fileName, format }: { 
+  fileUrl: string; 
+  fileName: string; 
+  format: string; 
+}) => {
+  const [imageError, setImageError] = useState(false);
+  
+  const extension = format.toLowerCase();
+  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension);
+  const isDesignFile = ['ai', 'eps', 'psd', 'pdf'].includes(extension);
+  
+  // Helper function to get converted image URL for design files
+  const getConvertedImageUrl = (url: string, format: string) => {
+    if (!url.includes('cloudinary.com')) return url;
+    
+    // For AI, PSD, EPS, PDF files, convert to PNG with specific dimensions
+    if (['ai', 'psd', 'eps', 'pdf'].includes(format.toLowerCase())) {
+      // Insert conversion parameters before the version and filename
+      return url.replace(
+        /\/v\d+\//,
+        '/c_fit,h_200,w_200,f_png/v1737598800/'
+      );
+    }
+    
+    return url;
   };
-}
+
+  const handleImageError = () => {
+    setImageError(true);
+  };
+
+  // Try to show image preview for regular images and converted design files
+  if ((isImage || isDesignFile) && !imageError) {
+    return (
+      <img 
+        src={isDesignFile ? getConvertedImageUrl(fileUrl, format) : fileUrl}
+        alt="Uploaded artwork preview"
+        className="image-preview object-contain max-h-full"
+        onError={handleImageError}
+      />
+    );
+  }
+
+  // Fallback to file type icon
+  const getFileTypeIcon = (format: string): string | null => {
+    const lowerFormat = format.toLowerCase();
+    
+    if (lowerFormat === 'ai') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751503976/Adobe_Illustrator_.AI_File_Icon_v3wshr.png';
+    }
+    if (lowerFormat === 'psd') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751504068/PSD_file_icon.svg_sbi8dh.png';
+    }
+    if (lowerFormat === 'eps') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751504098/9034333_ykhb8f.png';
+    }
+    if (lowerFormat === 'pdf') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751504123/PDF_file_icon.svg_uovjbk.png';
+    }
+    
+    return null;
+  };
+
+  const iconUrl = getFileTypeIcon(format);
+  
+  return iconUrl ? (
+    <img 
+      src={iconUrl} 
+      alt={`${format.toUpperCase()} file`}
+      className="max-w-16 max-h-16 object-contain opacity-80"
+    />
+  ) : (
+    <div className="text-green-400 text-4xl opacity-50">📎</div>
+  );
+};
 
 export default function Deals() {
-  const [showUpload, setShowUpload] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState<CloudinaryUploadResult | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadLater, setUploadLater] = useState(false);
-  const [activeDeal, setActiveDeal] = useState<Deal | null>(null);
-  const [defaultDeal, setDefaultDeal] = useState<Deal | null>(null);
+  const [deals, setDeals] = useState<DealProduct[]>(PRESET_DEALS);
+  const [uploadStates, setUploadStates] = useState<{[key: string]: {
+    file: CloudinaryUploadResult | null;
+    isUploading: boolean;
+    progress: UploadProgress | null;
+    error: string | null;
+    showPreview: boolean;
+  }}>({});
+  
+  const [shapeSelections, setShapeSelections] = useState<{[key: string]: string}>({});
+  const [successMessages, setSuccessMessages] = useState<{[key: string]: boolean}>({});
+  const [cartCounts, setCartCounts] = useState<{[key: string]: number}>({});
+  const [quantities, setQuantities] = useState<{[key: string]: number}>({});
+  
   const { addToCart } = useCart();
   const router = useRouter();
 
-  // Get file type icon based on format
-  const getFileTypeIcon = (format: string) => {
-    const icons: { [key: string]: string } = {
-      'ai': 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751422400/ai-icon_hbqxvs.png',
-      'psd': 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751422400/psd-icon_hbqxvs.png',
-      'svg': 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751422400/svg-icon_hbqxvs.png',
-      'eps': 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751422400/eps-icon_hbqxvs.png',
-      'pdf': 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751422400/pdf-icon_hbqxvs.png'
-    };
-    return icons[format.toLowerCase()] || null;
-  };
-
-  // Load active deal from localStorage
-  const loadDealsFromStorage = useCallback(() => {
+  // Load deals from localStorage or use preset deals
+  const loadDeals = () => {
     try {
-      const savedDeals = localStorage.getItem('sticker-shuttle-deals');
-      
+      const savedDeals = localStorage.getItem('sticker-shuttle-admin-deals');
       if (savedDeals) {
-        const deals = JSON.parse(savedDeals);
-        const active = deals.find((deal: Deal) => deal.isActive);
-        
-        // Set the first deal as default (fallback)
-        if (deals.length > 0) {
-          setDefaultDeal(deals[0]);
-        }
-        
-        if (active) {
-          setActiveDeal(active);
-        } else {
-          const fallbackDeal = deals.length > 0 ? deals[0] : null;
-          setActiveDeal(fallbackDeal);
-        }
+        const parsedDeals = JSON.parse(savedDeals);
+        setDeals(parsedDeals);
       } else {
-        // Create a default deal if none exists
-        const defaultDealData = {
-          id: 'default-deal-fallback',
-          name: '100 Stickers Deal',
-          headline: '100 custom\nstickers for $39',
-          buttonText: 'Order Now →',
-          pills: [
-            '🏷️ Matte Vinyl Stickers',
-            '📏 3" Max Width', 
-            '🚀 Ships Next Day',
-            '👽 Not a conspiracy theory, just great deals.'
-          ],
-          isActive: true,
-          orderDetails: {
-            material: 'Matte',
-            size: '3"',
-            quantity: 100,
-            price: 39
-          },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        
-        setActiveDeal(defaultDealData);
-        setDefaultDeal(defaultDealData);
+        setDeals(PRESET_DEALS);
       }
     } catch (error) {
       console.error('Error loading deals:', error);
-      setActiveDeal(null);
-      setDefaultDeal(null);
+      setDeals(PRESET_DEALS);
     }
+  };
+
+  // Load deals on component mount and listen for admin updates
+  useEffect(() => {
+    loadDeals();
+
+    // Listen for deals updates from admin panel
+    const handleDealsUpdated = (event: any) => {
+      if (event.detail && event.detail.deals) {
+        setDeals(event.detail.deals);
+      } else {
+        loadDeals(); // Fallback to loading from localStorage
+      }
+    };
+
+    window.addEventListener('deals-updated', handleDealsUpdated);
+
+    // Cleanup listener on unmount
+    return () => {
+      window.removeEventListener('deals-updated', handleDealsUpdated);
+    };
   }, []);
 
-  useEffect(() => {
-    // Initial load
-    loadDealsFromStorage();
+  const activeDeals = deals.filter(deal => deal.isActive);
 
-    // Listen for localStorage changes (when deals are updated from admin panel)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'sticker-shuttle-deals') {
-        loadDealsFromStorage();
-      }
+
+
+  // Get or initialize upload state for a deal
+  const getUploadState = (dealId: string) => {
+    return uploadStates[dealId] || {
+      file: null,
+      isUploading: false,
+      progress: null,
+      error: null,
+      showPreview: false
     };
+  };
 
-    // Listen for window focus (when user switches back to deals page)
-    const handleFocus = () => {
-      loadDealsFromStorage();
-    };
+  // Get or initialize shape selection for a deal
+  const getShapeSelection = (dealId: string): string => {
+    return shapeSelections[dealId] || 'custom-shape';
+  };
 
-    // Listen for visibility changes (when page becomes visible again)
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        loadDealsFromStorage();
-      }
-    };
 
-    // Listen for custom deals update event
-    const handleDealsUpdate = () => {
-      loadDealsFromStorage();
-    };
+  
+  // Update shape selection for a specific deal
+  const updateShapeSelection = (dealId: string, shape: string) => {
+    setShapeSelections(prev => ({
+      ...prev,
+      [dealId]: shape
+    }));
+  };
 
-    // Poll for changes every 10 seconds as a fallback (reduced frequency)
-    const interval = setInterval(() => {
-      loadDealsFromStorage();
-    }, 10000);
+  // Get quantity for a deal (default to 1)
+  const getQuantity = (dealId: string): number => {
+    return quantities[dealId] || 1;
+  };
 
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('deals-updated', handleDealsUpdate);
+  // Update quantity for a specific deal
+  const updateQuantity = (dealId: string, quantity: number) => {
+    setQuantities(prev => ({
+      ...prev,
+      [dealId]: Math.max(1, quantity) // Ensure minimum quantity of 1
+    }));
+  };
 
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('deals-updated', handleDealsUpdate);
-      clearInterval(interval);
-    };
-  }, [loadDealsFromStorage]);
+  // Get file type icon based on format (matching calculators)
+  const getFileTypeIcon = (format: string): string | null => {
+    const lowerFormat = format.toLowerCase();
+    
+    if (lowerFormat === 'ai') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751503976/Adobe_Illustrator_.AI_File_Icon_v3wshr.png';
+    }
+    if (lowerFormat === 'psd') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751504068/PSD_file_icon.svg_sbi8dh.png';
+    }
+    if (lowerFormat === 'eps') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751504098/9034333_ykhb8f.png';
+    }
+    if (lowerFormat === 'pdf') {
+      return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751504123/PDF_file_icon.svg_uovjbk.png';
+    }
+    
+    return null;
+  };
 
-  const handleFileUpload = async (file: File) => {
+  // Update upload state for a specific deal
+  const updateUploadState = (dealId: string, updates: any) => {
+    setUploadStates(prev => ({
+      ...prev,
+      [dealId]: { ...getUploadState(dealId), ...updates }
+    }));
+  };
+
+
+
+  const handleFileUpload = async (dealId: string, file: File) => {
     const validation = validateFile(file);
     if (!validation.valid) {
-      setUploadError(validation.error || 'Invalid file');
+      updateUploadState(dealId, { error: validation.error || 'Invalid file', showPreview: false });
       return;
     }
 
-    setIsUploading(true);
-    setUploadError(null);
-    setUploadProgress(null);
+    updateUploadState(dealId, { 
+      isUploading: true, 
+      error: null, 
+      progress: null,
+      showPreview: false
+    });
 
     try {
-      const currentDeal = activeDeal || defaultDeal;
-      const dealPrice = currentDeal?.orderDetails.price || 29;
-      const dealQuantity = currentDeal?.orderDetails.quantity || 100;
+      const deal = deals.find(d => d.id === dealId);
+      if (!deal) return;
       
       const result = await uploadToCloudinary(
         file,
         {
           selectedCut: "Custom Shape",
-          selectedMaterial: currentDeal?.orderDetails.material || "Matte",
-          selectedSize: `${currentDeal?.orderDetails.size || "3\"" } Max Width`,
-          selectedQuantity: dealQuantity.toString(),
-          totalPrice: `$${dealPrice.toFixed(2)}`,
-          costPerSticker: `$${(dealPrice / dealQuantity).toFixed(2)}/ea.`
+          selectedMaterial: deal.name.includes('Chrome') ? 'Chrome' : deal.name.includes('Holographic') ? 'Holographic' : 'Matte',
+          selectedSize: `${deal.dealSize} Max Width`,
+          selectedQuantity: deal.dealQuantity.toString(),
+          totalPrice: `$${deal.dealPrice.toFixed(2)}`,
+          costPerSticker: `$${(deal.dealPrice / deal.dealQuantity).toFixed(2)}/ea.`
         },
-        (progress) => setUploadProgress(progress),
+        (progress) => updateUploadState(dealId, { progress }),
         'deals-orders'
       );
 
-      setUploadedFile(result);
-      console.log('✅ File uploaded successfully:', result);
+      // Keep uploading animation while preview loads
+      updateUploadState(dealId, { 
+        file: result, 
+        progress: null,
+        isUploading: true,
+        showPreview: false // Don't show preview yet
+      });
+
+      // Wait for preview to fully load before showing it
+      setTimeout(() => {
+        updateUploadState(dealId, { 
+          isUploading: false,
+          showPreview: true,
+          file: result
+        });
+      }, 1200);
     } catch (error) {
-      console.error('💥 Upload failed:', error);
-      setUploadError(error instanceof Error ? error.message : 'Upload failed');
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(null);
+      updateUploadState(dealId, { 
+        error: error instanceof Error ? error.message : 'Upload failed',
+        isUploading: false,
+        progress: null,
+        showPreview: false
+      });
     }
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      handleFileUpload(file);
-    }
-  };
-
-  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const file = event.dataTransfer.files[0];
-    if (file) {
-      handleFileUpload(file);
-    }
-  };
-
-  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-  };
-
-  const removeUploadedFile = () => {
-    setUploadedFile(null);
-    setUploadError(null);
-  };
-
-  const handleAddToCart = () => {
-    const currentDeal = activeDeal || defaultDeal;
-    const dealDetails = currentDeal?.orderDetails || {
-      material: 'Matte',
-      size: '3"',
-      quantity: 100,
-      price: 29
+  const handleAddToCart = (deal: DealProduct) => {
+    const uploadState = getUploadState(deal.id);
+    const selectedShape = getShapeSelection(deal.id);
+    const selectedQuantity = getQuantity(deal.id);
+    
+    const shapeDisplayNames = {
+      'custom-shape': 'Custom Shape',
+      'circle': 'Circle',
+      'square': 'Square', 
+      'rectangle': 'Rectangle',
+      'oval': 'Oval'
     };
 
-    const product = {
-      id: currentDeal ? `deals-${currentDeal.id}` : "deals-vinyl-stickers-100",
-      sku: currentDeal ? `SS-VS-${currentDeal.id.toUpperCase()}` : "SS-VS-DEAL100",
-      name: currentDeal?.name || "100 Custom Stickers - Special Deal",
-      description: currentDeal ? `${currentDeal.name} - ${currentDeal.headline.replace('\n', ' ')}` : `Limited time deal: 100 custom vinyl stickers for just $${dealDetails.price}`,
-      shortDescription: currentDeal?.name || "100 Custom Stickers Deal",
-      category: "vinyl-stickers" as const,
-      basePrice: dealDetails.price / dealDetails.quantity,
-      pricingModel: "flat-rate" as const,
-      images: [uploadedFile?.secure_url || "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591677/Alien_USA_Map_y6wkf4.png"],
-      defaultImage: uploadedFile?.secure_url || "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591677/Alien_USA_Map_y6wkf4.png",
-      features: currentDeal ? currentDeal.pills.map(pill => pill.replace(/[^\w\s]/g, '').trim()) : ["Matte Vinyl", "3\" Max Width", "Ships Next Day", "Custom Shape"],
-      customizable: true,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      calculatorConfig: {
-        showPreview: true,
-        allowFileUpload: true,
-        requireProof: false,
-        hasCustomSize: false
-      }
-    };
-
-    const customization = {
-      productId: product.id,
+    // Add multiple cart items based on selected quantity
+    for (let i = 0; i < selectedQuantity; i++) {
+      const cartItem = {
+        id: `deal-${deal.id}-${Date.now()}-${i}`,
+        product: deal,
+        customization: {
+          productId: deal.id,
       selections: {
         cut: {
           type: "shape" as const,
-          value: "custom-shape",
-          displayValue: "Custom Shape",
+            value: selectedShape,
+            displayValue: shapeDisplayNames[selectedShape as keyof typeof shapeDisplayNames] || 'Custom Shape',
           priceImpact: 0
         },
         material: {
           type: "finish" as const,
-          value: dealDetails.material.toLowerCase(),
-          displayValue: dealDetails.material,
+              value: deal.name.includes('Chrome') ? 'chrome' : deal.name.includes('Holographic') ? 'holographic' : 'matte',
+              displayValue: deal.name.includes('Chrome') ? 'Chrome' : deal.name.includes('Holographic') ? 'Holographic' : 'Matte',
           priceImpact: 0
         },
         size: {
           type: "size-preset" as const,
-          value: dealDetails.size.replace(/['"]/g, ''),
-          displayValue: `${dealDetails.size} Max Width`,
+              value: deal.dealSize.replace(/['"]/g, ''),
+              displayValue: `${deal.dealSize} Max Width`,
           priceImpact: 0
         },
         quantity: {
           type: "quantity" as const,
-          value: dealDetails.quantity,
-          displayValue: dealDetails.quantity.toString(),
+              value: deal.dealQuantity,
+              displayValue: deal.dealQuantity.toString(),
           priceImpact: 0
         }
       },
-      totalPrice: dealDetails.price,
-      customFiles: uploadedFile ? [uploadedFile.secure_url] : undefined,
-      notes: uploadLater ? "Artwork to be uploaded later" : undefined,
+          totalPrice: deal.dealPrice,
+          customFiles: uploadState.file ? [uploadState.file.secure_url] : undefined,
       isDeal: true,
-      dealPrice: dealDetails.price
-    };
-
-    const cartItem = {
-      id: `deals-${dealDetails.quantity}-stickers-${Date.now()}`,
-      product: product,
-      customization: customization,
-      quantity: dealDetails.quantity,
-      unitPrice: dealDetails.price / dealDetails.quantity,
-      totalPrice: dealDetails.price,
+          dealPrice: deal.dealPrice
+        },
+        quantity: deal.dealQuantity,
+        unitPrice: deal.dealPrice / deal.dealQuantity,
+        totalPrice: deal.dealPrice,
       addedAt: new Date().toISOString()
     };
 
     addToCart(cartItem);
-    router.push('/cart');
+    }
+    
+    // Update cart count for this deal
+    setCartCounts(prev => ({
+      ...prev,
+      [deal.id]: (prev[deal.id] || 0) + selectedQuantity
+    }));
+    
+    // Show success message
+    setSuccessMessages(prev => ({ ...prev, [deal.id]: true }));
+    
+    // Reset upload state so they can add more
+    updateUploadState(deal.id, { 
+      file: null, 
+      error: null, 
+      isUploading: false,
+      progress: null 
+    });
+    
+    // Reset shape selection to default
+    setShapeSelections(prev => ({ ...prev, [deal.id]: 'custom-shape' }));
+    
+    // Reset quantity to 1
+    setQuantities(prev => ({ ...prev, [deal.id]: 1 }));
+    
+    // Hide success message after 3 seconds
+    setTimeout(() => {
+      setSuccessMessages(prev => ({ ...prev, [deal.id]: false }));
+    }, 3000);
   };
 
-  return (
-    <Layout title={(activeDeal || defaultDeal) ? `${(activeDeal || defaultDeal)!.headline.replace('\n', ' ')} - Sticker Shuttle Deals` : "100 Custom Stickers for $29 - Sticker Shuttle Deals"}>
-        {/* Hero Section */}
-        <section className="py-4 -mt-4 md:mt-0">
-          <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
-            <div 
-              className="relative rounded-xl overflow-hidden pt-1 md:pt-1 pb-0"
-              style={{
-                backgroundImage: 'url("https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591677/Alien_USA_Map_y6wkf4.png")',
-                backgroundSize: '150%',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat'
-              }}
-            >
-              <div className="text-center relative z-10" style={{ 
-                  backdropFilter: 'blur(6px)', 
-                  backgroundColor: 'rgba(3, 1, 64, 0.15)',
-                  borderRadius: '24px',
-                  padding: '2rem'
-                }}>
-                {/* Background Grid */}
-                <div className="absolute inset-0 pointer-events-none -z-10">
-                  <div 
-                    className="w-full h-full opacity-20"
-                    style={{
-                      backgroundImage: `
-                        linear-gradient(rgba(255, 255, 255, 0.3) 1px, transparent 1px),
-                        linear-gradient(90deg, rgba(255, 255, 255, 0.3) 1px, transparent 1px)
-                      `,
-                      backgroundSize: '30px 30px',
-                      maskImage: `
-                        radial-gradient(ellipse 70% 60% at center, 
-                          rgba(0,0,0,1) 0%, 
-                          rgba(0,0,0,0.6) 50%, 
-                          rgba(0,0,0,0) 100%
-                        )
-                      `,
-                      WebkitMaskImage: `
-                        radial-gradient(ellipse 70% 60% at center, 
-                          rgba(0,0,0,1) 0%, 
-                          rgba(0,0,0,0.6) 50%, 
-                          rgba(0,0,0,0) 100%
-                        )
-                      `
-                    }}
-                  ></div>
-                </div>
-                
-                {!showUpload ? (
-                  // Original promotional content
-                  <>
-                    <p className="text-lg text-orange-400 mb-4 mt-1 font-bold" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
-                      🔥 Limited Time Deal
-                    </p>
-                    
-
-                    
-                    <h1 className="text-5xl sm:text-6xl md:text-7xl mb-4 md:mb-8 leading-none relative" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
-                      {(activeDeal || defaultDeal) ? (
-                        (activeDeal || defaultDeal)!.headline.split('\n').map((line, index) => (
-                          <span key={index} className="block">{line}</span>
-                        ))
-                      ) : (
-                        <>
-                          <span className="block">100 custom</span>
-                          <span className="block">stickers for <span className="whitespace-nowrap">$29</span></span>
-                        </>
-                      )}
-                    </h1>
-                    <div className="flex flex-wrap justify-center gap-3 mb-6 md:mb-10">
-                      {(activeDeal || defaultDeal) ? (
-                        (activeDeal || defaultDeal)!.pills.map((pill, index) => {
-                          // Determine pill color based on content
-                          let bgColor = 'rgba(255, 255, 255, 0.05)';
-                          let borderColor = 'rgba(255, 255, 255, 0.1)';
-                          let textColor = '#d1d5db';
-                          
-                          if (pill.includes('Matte') || pill.includes('Material')) {
-                            bgColor = 'rgba(168, 242, 106, 0.2)';
-                            borderColor = 'rgba(168, 242, 106, 0.4)';
-                            textColor = 'rgb(168, 242, 106)';
-                          } else if (pill.includes('Size') || pill.includes('"')) {
-                            bgColor = 'rgba(59, 130, 246, 0.2)';
-                            borderColor = 'rgba(59, 130, 246, 0.4)';
-                            textColor = 'rgb(59, 130, 246)';
-                          } else if (pill.includes('Ship') || pill.includes('Fast')) {
-                            bgColor = 'rgba(255, 215, 19, 0.2)';
-                            borderColor = 'rgba(255, 215, 19, 0.4)';
-                            textColor = 'rgb(255, 215, 19)';
-                          }
+  const DealCard = ({ deal }: { deal: DealProduct }) => {
+    const uploadState = getUploadState(deal.id);
                           
                           return (
                             <div 
-                              key={index}
-                              className="inline-flex items-center px-6 md:px-4 py-2 rounded-full text-sm font-medium"
+        className="rounded-xl p-6 h-full flex flex-col relative"
                               style={{
-                                backgroundColor: bgColor,
-                                border: `1px solid ${borderColor}`,
-                                color: textColor,
-                                backdropFilter: 'blur(15px)'
-                              }}
-                            >
-                              {pill}
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <>
-                          <div 
-                            className="inline-flex items-center px-6 md:px-4 py-2 rounded-full text-sm font-medium"
-                            style={{
-                              backgroundColor: 'rgba(168, 242, 106, 0.2)',
-                              border: '1px solid rgba(168, 242, 106, 0.4)',
-                              color: 'rgb(168, 242, 106)',
-                              backdropFilter: 'blur(15px)'
-                            }}
-                          >
-                            🏷️ Matte Vinyl Stickers
-                          </div>
-                          <div 
-                            className="inline-flex items-center px-6 md:px-4 py-2 rounded-full text-sm font-medium"
-                            style={{
-                              backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                              border: '1px solid rgba(59, 130, 246, 0.4)',
-                              color: 'rgb(59, 130, 246)',
-                              backdropFilter: 'blur(15px)'
-                            }}
-                          >
-                            📏 3" Max Width
-                          </div>
-                          <div 
-                            className="inline-flex items-center px-6 md:px-4 py-2 rounded-full text-sm font-medium"
-                            style={{
-                              backgroundColor: 'rgba(255, 215, 19, 0.2)',
-                              border: '1px solid rgba(255, 215, 19, 0.4)',
-                              color: 'rgb(255, 215, 19)',
-                              backdropFilter: 'blur(15px)'
-                            }}
-                          >
-                            🚀 Ships Next Day
-                          </div>
-                          <div 
-                            className="inline-flex items-center px-6 md:px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap"
-                            style={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                              backdropFilter: 'blur(15px)',
+          background: 'rgba(255, 255, 255, 0.05)',
                               border: '1px solid rgba(255, 255, 255, 0.1)',
-                              color: '#d1d5db'
+          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+          backdropFilter: 'blur(12px)'
                             }}
                           >
-                            👽 Not a conspiracy theory, just great deals.
+                        {/* Cart Count Indicator - Top Left */}
+        {cartCounts[deal.id] > 0 && (
+          <div className="absolute -top-2 -left-2 px-3 py-1 rounded-full text-sm font-bold bg-gradient-to-r from-green-500 to-green-400 text-white shadow-lg z-10">
+            {cartCounts[deal.id]} in cart
+                            </div>
+        )}
+
+                        {/* Save Pill - Top Right */}
+        {deal.savings && (
+          <div className="absolute -top-2 -right-2 px-3 py-1 rounded-full text-sm font-medium holographic-save-container z-10">
+            <span className="holographic-save-text">Save ${deal.savings}</span>
                           </div>
-                        </>
-                      )}
+        )}
+        {/* Deal Image */}
+        <div className="mb-4 flex justify-center">
+          <img 
+            src={deal.defaultImage} 
+            alt={deal.name}
+            className="w-24 h-24 object-contain"
+          />
+                          </div>
+
+        {/* Deal Info */}
+        <div className="text-center mb-4 flex-grow">
+          <h3 className="text-xl font-bold text-white mb-2" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>{deal.name}</h3>
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span 
+              className={`text-4xl font-bold ${
+                deal.name.includes('Holographic') ? 'holographic-price-text' : 
+                deal.name.includes('Chrome') ? 'chrome-price-text' : 
+                'text-green-400 glow-price-text'
+              }`}
+              style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}
+            >
+              ${deal.dealPrice}
+            </span>
+            {deal.originalPrice && (
+              <span className="text-lg text-gray-400 line-through glow-original-price" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>${deal.originalPrice}</span>
+            )}
+                          </div>
+          <p className="text-gray-300 text-sm">{deal.shortDescription}</p>
+                          </div>
+
+        {/* Shape Selection Dropdown */}
+        <div className="mb-4">
+          <div className="relative">
+            <select
+              value={getShapeSelection(deal.id)}
+              onChange={(e) => updateShapeSelection(deal.id, e.target.value)}
+              className="w-full p-3 rounded-lg text-white text-sm font-medium appearance-none cursor-pointer pr-10 shape-dropdown"
+              aria-label="Select sticker shape"
+                            style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                backdropFilter: 'blur(12px)',
+                outline: 'none'
+              }}
+            >
+              <option value="custom-shape">Custom Shape</option>
+              <option value="circle">Circle</option>
+              <option value="square">Square</option>
+              <option value="rectangle">Rectangle</option>
+              <option value="oval">Oval</option>
+            </select>
+            <svg 
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/60 pointer-events-none" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+                          </div>
                     </div>
 
-                    <div className="flex flex-col items-center gap-4 mb-4">
-                      <button 
-                        onClick={() => setShowUpload(true)}
-                        className="primaryButton px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-105 rounded-lg"
-                        style={{
-                          transform: 'scale(1.1)'
-                        }}
-                      >
-                        {(activeDeal || defaultDeal)?.buttonText || 'Order Now →'}
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  // File upload area
-                  <div className="min-h-[600px] flex flex-col justify-center">
-                    <h2 className="text-3xl md:text-4xl font-bold mb-8 text-white" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif' }}>
-                      Upload Your Artwork
-                    </h2>
-                    
-                    {/* Hidden file input */}
+        {/* Upload Section */}
+        <div className="mb-4">
                     <input
-                      id="file-input"
+            id={`file-input-${deal.id}`}
                       type="file"
                       accept=".ai,.svg,.eps,.png,.jpg,.jpeg,.psd"
-                      onChange={handleFileSelect}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFileUpload(deal.id, file);
+            }}
                       className="hidden"
                       aria-label="Upload artwork file"
                     />
 
-                    {/* File Upload Area */}
-                    <div className="max-w-lg mx-auto w-full mb-8">
-                      {!uploadedFile ? (
+          {uploadState.isUploading ? (
                         <div 
-                          className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative"
-                          onDrop={handleDrop}
-                          onDragOver={handleDragOver}
-                          onClick={() => document.getElementById('file-input')?.click()}
+              className="border-2 border-dashed border-purple-400/50 rounded-xl p-6 text-center backdrop-blur-md relative"
                         >
-                          {isUploading ? (
                             <div className="mb-4">
-                              <div className="text-4xl mb-3">⏳</div>
+                              <div className="mb-4 flex justify-center">
+                                <div className="upload-spinner"></div>
+                              </div>
                               <p className="text-white font-medium text-base mb-2">Uploading...</p>
-                              {uploadProgress && (
-                                <div className="w-full bg-white/20 rounded-full h-2 mb-2">
+                  {uploadState.progress && (
+                                <div className="w-full bg-white/20 rounded-full h-3 mb-2 overflow-hidden">
                                   <div 
-                                    className="bg-purple-400 h-2 rounded-full transition-all duration-300"
-                                    style={{ width: `${uploadProgress.percentage}%` }}
-                                  ></div>
+                                    className="bg-gradient-to-r from-purple-400 to-blue-400 h-full rounded-full transition-all duration-300 relative"
+                        style={{ width: `${uploadState.progress.percentage}%` }}
+                                  >
+                                    <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                                  </div>
                                 </div>
                               )}
-                              {uploadProgress && (
-                                <p className="text-white/80 text-sm">{uploadProgress.percentage}% complete</p>
+                  {uploadState.progress && (
+                    <p className="text-white/80 text-sm font-medium">{uploadState.progress.percentage}% complete</p>
                               )}
                             </div>
-                          ) : (
-                            <div className="mb-4">
-                              <div className="mb-3 flex justify-center -ml-4">
-                                <img 
-                                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751341811/StickerShuttleFileIcon4_gkhsu5.png" 
-                                  alt="Upload file" 
-                                  className="w-20 h-20 object-contain"
-                                />
                               </div>
-                              <p className="text-white font-medium text-base mb-2 hidden md:block">Drag or click to upload your file</p>
-                              <p className="text-white font-medium text-base mb-2 md:hidden">Tap to add file</p>
-                              <p className="text-white/80 text-sm">All formats supported. Max file size: 25MB <span className="hidden sm:inline">|</span> 1 file per order</p>
-                            </div>
+          ) : uploadState.showPreview && uploadState.file ? (
+                        <div className="border border-green-400/50 rounded-xl p-4 bg-green-500/10 backdrop-blur-md">
+              {/* Fixed Image Preview Section */}
+              <div className="mb-4 h-32 flex items-center justify-center">
+                {uploadState.file.secure_url ? (
+                  <ImagePreview 
+                    fileUrl={uploadState.file.secure_url}
+                    fileName={uploadState.file.original_filename}
+                    format={uploadState.file.format}
+                  />
+                ) : (
+                  <div className="text-green-400 text-4xl opacity-50">📎</div>
                           )}
                         </div>
-                      ) : (
-                        <div className="border border-green-400/50 rounded-xl p-4 bg-green-500/10 backdrop-blur-md">
-                          <div className="flex items-center justify-between min-w-0">
+
+              <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3 min-w-0 flex-1">
-                              <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative z-10">
-                                <img
-                                  src={uploadedFile.secure_url}
-                                  alt={uploadedFile.original_filename}
-                                  className="w-full h-full object-cover rounded-lg relative z-10"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = 'none';
-                                    target.nextElementSibling!.classList.remove('hidden');
-                                  }}
-                                />
-                                <div className="hidden w-full h-full flex items-center justify-center text-white/60 text-xl relative z-10">
-                                  📄
-                                </div>
+                  <div className="text-green-400 text-xl">
+                    {uploadState.file.format === 'png' || uploadState.file.format === 'jpg' || uploadState.file.format === 'jpeg' ? '🖼️' : '📎'}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="text-green-200 font-medium break-words text-left">{uploadedFile.original_filename}</p>
-                                
-                                {/* File Information - matching calculator format */}
-                                <div className="space-y-2 mt-2">
-                                  <div className="flex flex-wrap items-center gap-3 text-green-300/80 text-sm">
-                                    <span className="flex items-center gap-1">
-                                      <span className="text-green-400">📏</span>
-                                      {(uploadedFile.bytes / 1024 / 1024).toFixed(2)} MB
-                                    </span>
-                                    <span className="flex items-center gap-1">
-                                      <span className="text-green-400">🎨</span>
-                                      {uploadedFile.format.toUpperCase()}
-                                    </span>
-                                    {uploadedFile.width && uploadedFile.height && (
-                                      <span className="flex items-center gap-1">
-                                        <span className="text-green-400">📐</span>
-                                        {uploadedFile.width}x{uploadedFile.height}px
-                                      </span>
-                                    )}
-                                  </div>
-                                  
-                                  {/* File Type Icon */}
-                                  {getFileTypeIcon(uploadedFile.format) && (
-                                    <div className="flex items-center gap-2">
-                                      <img 
-                                        src={getFileTypeIcon(uploadedFile.format)!} 
-                                        alt={`${uploadedFile.format.toUpperCase()} file`}
-                                        className="w-6 h-6 object-contain opacity-80"
-                                      />
-                                      <span className="text-xs text-green-300/60">
-                                        Professional design file detected
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
+                    <p className="text-green-200 font-medium break-words text-sm">{uploadState.file.original_filename}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
                               <button
-                                onClick={() => document.getElementById('file-input')?.click()}
+                    onClick={() => document.getElementById(`file-input-${deal.id}`)?.click()}
                                 className="text-blue-300 hover:text-blue-200 p-2 hover:bg-blue-500/20 rounded-lg transition-colors cursor-pointer"
                                 title="Replace file"
                               >
                                 🔄
                               </button>
                               <button
-                                onClick={removeUploadedFile}
+                    onClick={() => updateUploadState(deal.id, { file: null, error: null, showPreview: false })}
                                 className="text-red-300 hover:text-red-200 p-2 hover:bg-red-500/20 rounded-lg transition-colors cursor-pointer"
                                 title="Remove file"
                               >
@@ -591,553 +526,382 @@ export default function Deals() {
                               </button>
                             </div>
                           </div>
-                          {/* Upload Success Message - matching calculator format */}
-                          <div className="mt-2 flex items-center gap-2 text-green-300 text-sm">
+              
+              {/* File Details */}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-3 text-green-300/80 text-xs">
+                                    <span className="flex items-center gap-1">
+                                      <span className="text-green-400">📏</span>
+                    {(uploadState.file.bytes / 1024 / 1024).toFixed(2)} MB
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <span className="text-green-400">🎨</span>
+                    {uploadState.file.format.toUpperCase()}
+                                    </span>
+                  {uploadState.file.width && uploadState.file.height && (
+                                      <span className="flex items-center gap-1">
+                                        <span className="text-green-400">📐</span>
+                      {uploadState.file.width}x{uploadState.file.height}px
+                                      </span>
+                                    )}
+                                  </div>
+                                  
+                                  {/* File Type Icon */}
+                {getFileTypeIcon(uploadState.file.format) && (
+                  <div className="flex items-center gap-2 mb-2">
+                                      <img 
+                      src={getFileTypeIcon(uploadState.file.format)!} 
+                      alt={`${uploadState.file.format.toUpperCase()} file`}
+                                        className="w-6 h-6 object-contain opacity-80"
+                                      />
+                                      <span className="text-xs text-green-300/60">
+                                        Professional design file detected
+                                      </span>
+                                    </div>
+                                  )}
+
+                {/* Upload Success Message */}
+                <div className="flex items-center gap-2 text-green-300 text-xs">
                             <span className="text-green-400">✅</span>
                             <span>File uploaded successfully!</span>
+                                </div>
+                              </div>
+                            </div>
+          ) : (
+            <div 
+              className="border-2 border-dashed border-white/20 rounded-xl p-6 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative"
+              onClick={() => document.getElementById(`file-input-${deal.id}`)?.click()}
+            >
+                            <div className="mb-4">
+                              <div className="mb-3 flex justify-center -ml-4">
+                                <img 
+                                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751341811/StickerShuttleFileIcon4_gkhsu5.png" 
+                                  alt="Upload file" 
+                      className="w-16 h-16 object-contain"
+                                />
+                            </div>
+                  <p className="text-white font-medium text-sm mb-2 hidden md:block">Click to upload your file</p>
+                  <p className="text-white font-medium text-sm mb-2 md:hidden">Tap to upload file</p>
+                  <p className="text-white/80 text-xs">All formats supported. Max file size: 25MB</p>
                           </div>
                         </div>
                       )}
 
-                      {uploadError && (
+          {uploadState.error && (
                         <div className="mt-3 p-3 bg-red-500/20 border border-red-400/50 rounded-lg">
                           <p className="text-red-200 text-sm flex items-center gap-2">
                             <span>⚠️</span>
-                            {uploadError}
+                {uploadState.error}
                           </p>
-                        </div>
-                      )}
-                      
-                      {!uploadedFile && (
-                        <div className="mt-4 flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
-                             style={{
-                               background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
-                               border: '1px solid rgba(147, 51, 234, 0.4)',
-                               backdropFilter: 'blur(12px)'
-                             }}>
-                          <button
-                            onClick={() => setUploadLater(!uploadLater)}
-                            disabled={!!uploadedFile}
-                            title={uploadLater ? "Disable upload later" : "Enable upload later"}
-                            className={`w-12 h-6 rounded-full transition-colors ${
-                              uploadLater ? 'bg-purple-500' : 'bg-white/20'
-                            } ${uploadedFile ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          >
-                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                              uploadLater ? 'translate-x-7' : 'translate-x-1'
-                            }`} />
-                          </button>
-                          <label className={`text-sm font-medium ${uploadedFile ? 'text-white/50' : 'text-purple-200'}`}>
-                            Upload Artwork Later
-                          </label>
-                        </div>
-                      )}
-                      {uploadLater && !uploadedFile && (
-                        <div className="mt-2 text-white/80 text-sm italic flex items-center">
-                          <span role="img" aria-label="caution" className="mr-1">
-                            ⚠️
-                          </span>
-                          Note: Please try to have your artwork submitted within 48hrs of placing an order.
                         </div>
                       )}
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex flex-col sm:flex-row gap-8 items-center justify-center">
+        {/* Add to Cart Button with Quantity Controls */}
+        <div className="relative">
+                          <button
+            onClick={() => handleAddToCart(deal)}
+            disabled={!uploadState.file}
+            className={`w-full py-3 rounded-lg font-bold text-sm transition-all relative ${
+              uploadState.file
+                ? 'text-yellow-100 hover:text-white hover:scale-[1.01] cursor-pointer'
+                : 'text-gray-500 cursor-not-allowed opacity-50'
+            }`}
+            style={
+              uploadState.file ? {
+                background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.6) 0%, rgba(255, 215, 0, 0.4) 25%, rgba(250, 204, 21, 0.25) 50%, rgba(255, 193, 7, 0.15) 75%, rgba(250, 204, 21, 0.1) 100%)',
+                backdropFilter: 'blur(25px) saturate(200%)',
+                border: '1px solid rgba(255, 215, 0, 0.5)',
+                boxShadow: 'rgba(250, 204, 21, 0.25) 0px 4px 20px, rgba(255, 255, 255, 0.3) 0px 1px 0px inset'
+              } : {
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.2)'
+              }
+            }
+          >
+            Add to Cart - ${(deal.dealPrice * getQuantity(deal.id)).toFixed(2)}
+                          </button>
+          
+          {/* Quantity Controls - Only show when file is uploaded */}
+          {uploadState.file && (
+            <>
+              {/* Minus Button */}
+              {getQuantity(deal.id) > 1 && (
                       <button
-                        onClick={() => setShowUpload(false)}
-                        className="px-6 py-3 border border-white/30 text-white hover:bg-white/10 rounded-lg transition-colors backdrop-blur-md"
-                      >
-                        ← Back to Deal
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    updateQuantity(deal.id, getQuantity(deal.id) - 1);
+                  }}
+                  className="absolute left-2 top-1/2 transform -translate-y-1/2 w-8 h-8 text-white text-lg flex items-center justify-center cursor-pointer"
+                >
+                  -
                       </button>
-                      {(uploadedFile || uploadLater) && (
+              )}
+              
+              {/* Plus Button */}
                         <button 
-                          onClick={handleAddToCart}
-                          className="primaryButton px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-105 rounded-lg"
-                          style={{
-                            transform: 'scale(1.1)'
-                          }}
-                        >
-                          Add to Cart - $${activeDeal?.orderDetails.price || 29} →
+                onClick={(e) => {
+                  e.stopPropagation();
+                  updateQuantity(deal.id, getQuantity(deal.id) + 1);
+                }}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 text-white text-lg flex items-center justify-center cursor-pointer"
+              >
+                +
                         </button>
-                      )}
+            </>
+          )}
+        </div>
+                          
+        {/* Success Message */}
+        {successMessages[deal.id] && (
+          <div className="mt-3 p-3 bg-green-500/20 border border-green-400/50 rounded-lg animate-fadeIn">
+            <div className="flex items-center gap-2 text-green-300 text-sm font-medium">
+              <span className="text-green-400">🎉</span>
+              <span>Added to cart! Upload another file to add more.</span>
                     </div>
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-        </section>
+    );
+  };
 
-        {/* Reviews Section */}
-        <section className="py-12">
+  return (
+    <Layout title="Special Deals - Premium Sticker Packages | Sticker Shuttle">
+      {/* Hero Section */}
+      <section className="py-8">
           <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
-            <h2 className="text-3xl font-bold text-center text-white mb-8">What customers say</h2>
-            
-            {/* Desktop Reviews Grid */}
-            <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Review 1 */}
-              <div 
-                className="rounded-xl p-6 flex flex-col"
-                style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                }}
-              >
-                <div className="flex items-center mb-4">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601651/unnamed_1_100x100_crop_center_ozo8lq.webp" 
-                    alt="Certified Garbage Rat"
-                    className="w-12 h-12 rounded-full mr-3"
-                  />
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
-                    alt="Google"
-                    className="w-8 h-8 ml-auto"
-                  />
+          <div className="text-center mb-8">
+            <div className="inline-block px-4 py-2 rounded-full text-sm font-medium bg-orange-500/20 text-orange-300 border border-orange-500/30 mb-4">
+              🔥 Limited Time Offers
                 </div>
-                <h3 className="text-white font-semibold mb-1">Certified Garbage Rat</h3>
-                <p className="text-gray-400 text-sm mb-3">Matte Stickers & Vinyl Banners</p>
-                <div className="flex mb-4">
-                  <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
-                </div>
-                <p className="text-gray-300 text-sm leading-relaxed flex-grow">
-                  We got one of our designs custom made into stickers and they definitely did not disappoint! We had previously been using another website but the speed and quality of sticker shuttle is far better than our stickers before. I would highly recommend!
-                </p>
-              </div>
-
-              {/* Review 2 */}
-              <div 
-                className="rounded-xl p-6 flex flex-col"
-                style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                }}
-              >
-                <div className="flex items-center mb-4">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601649/download_1_100x100_crop_center_z69tdh.avif" 
-                    alt="Panda Reaper"
-                    className="w-12 h-12 rounded-full mr-3"
-                  />
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
-                    alt="Google"
-                    className="w-8 h-8 ml-auto"
-                  />
-                </div>
-                <h3 className="text-white font-semibold mb-1">Panda Reaper</h3>
-                <p className="text-gray-400 text-sm mb-3">Matte Vinyl Stickers</p>
-                <div className="flex mb-4">
-                  <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
-                </div>
-                <p className="text-gray-300 text-sm leading-relaxed flex-grow">
-                  Everything was perfect. The sticker themselves is a great quality, and no blurriness on the design. Will be sticking with this company for future stickers!
-                </p>
-              </div>
-
-              {/* Review 3 */}
-              <div 
-                className="rounded-xl p-6 flex flex-col"
-                style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                }}
-              >
-                <div className="flex items-center mb-4">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601646/unnamed_14467655-4d00-451c-bca6-b5be86af2814_100x100_crop_center_cmftk1.webp" 
-                    alt="Anita J"
-                    className="w-12 h-12 rounded-full mr-3"
-                  />
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
-                    alt="Google"
-                    className="w-8 h-8 ml-auto"
-                  />
-                </div>
-                <h3 className="text-white font-semibold mb-1">Anita J</h3>
-                <p className="text-gray-400 text-sm mb-3">Matte Vinyl Stickers</p>
-                <div className="flex mb-4">
-                  <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
-                </div>
-                <p className="text-gray-300 text-sm leading-relaxed flex-grow">
-                  Absolutely loved the quality and thickness of the stickers but what really made me excited was the ability to speak to the owner directly who provides amazing customer service and truly delivers on the timelines posted. Would recommend to anyone looking!
-                </p>
-              </div>
-
-              {/* Review 4 */}
-              <div 
-                className="rounded-xl p-6 flex flex-col"
-                style={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                }}
-              >
-                <div className="flex items-center mb-4">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601644/111_100x100_crop_center_ubs7st.avif" 
-                    alt="Rach Plants"
-                    className="w-12 h-12 rounded-full mr-3"
-                  />
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
-                    alt="Google"
-                    className="w-8 h-8 ml-auto"
-                  />
-                </div>
-                <h3 className="text-white font-semibold mb-1">Rach Plants</h3>
-                <p className="text-gray-400 text-sm mb-3">Matte Stickers& Vinyl Banners</p>
-                <div className="flex mb-4">
-                  <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
-                </div>
-                <p className="text-gray-300 text-sm leading-relaxed flex-grow">
-                  Incredible! They were able to not only make my business logo into great quality stickers, they also made my own photos into stickers!! I recommend them to everyone looking for custom stickers! Beautiful work, quality, attention to detail, communication! 10/10!
-                </p>
-              </div>
-            </div>
-
-            {/* Mobile Swipeable Reviews */}
-            <div className="md:hidden overflow-x-auto pb-4 relative">
-              
-              <div className="flex space-x-4 w-max" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', paddingLeft: 'calc(2.5vw + 1rem)', paddingRight: '50vw' }}>
-                {/* Last review (positioned before first for endless scroll effect) */}
-                <div 
-                  className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
-                  style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                  }}
-                >
-                  <div className="flex items-center mb-4">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601644/111_100x100_crop_center_ubs7st.avif" 
-                      alt="Rach Plants"
-                      className="w-12 h-12 rounded-full mr-3"
-                    />
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
-                      alt="Google"
-                      className="w-8 h-8 ml-auto"
-                    />
-                  </div>
-                  <h3 className="text-white font-semibold mb-1">Rach Plants</h3>
-                  <p className="text-gray-400 text-sm mb-3">Matte Stickers& Vinyl Banners</p>
-                  <div className="flex mb-4">
-                    <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
-                  </div>
-                  <p className="text-gray-300 text-sm leading-relaxed flex-grow">
-                    Incredible! They were able to not only make my business logo into great quality stickers, they also made my own photos into stickers!! I recommend them to everyone looking for custom stickers! Beautiful work, quality, attention to detail, communication! 10/10!
-                  </p>
-                </div>
-
-                {/* First review - Now centered */}
-                <div 
-                  className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
-                  style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                  }}
-                >
-                  <div className="flex items-center mb-4">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601651/unnamed_1_100x100_crop_center_ozo8lq.webp" 
-                      alt="Certified Garbage Rat"
-                      className="w-12 h-12 rounded-full mr-3"
-                    />
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
-                      alt="Google"
-                      className="w-8 h-8 ml-auto"
-                    />
-                  </div>
-                  <h3 className="text-white font-semibold mb-1">Certified Garbage Rat</h3>
-                  <p className="text-gray-400 text-sm mb-3">Matte Stickers & Vinyl Banners</p>
-                  <div className="flex mb-4">
-                    <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
-                  </div>
-                  <p className="text-gray-300 text-sm leading-relaxed flex-grow">
-                    We got one of our designs custom made into stickers and they definitely did not disappoint! We had previously been using another website but the speed and quality of sticker shuttle is far better than our stickers before. I would highly recommend!
-                  </p>
-                </div>
-
-                {/* Second review */}
-                <div 
-                  className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
-                  style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                  }}
-                >
-                  <div className="flex items-center mb-4">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601649/download_1_100x100_crop_center_z69tdh.avif" 
-                      alt="Panda Reaper"
-                      className="w-12 h-12 rounded-full mr-3"
-                    />
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
-                      alt="Google"
-                      className="w-8 h-8 ml-auto"
-                    />
-                  </div>
-                  <h3 className="text-white font-semibold mb-1">Panda Reaper</h3>
-                  <p className="text-gray-400 text-sm mb-3">Matte Vinyl Stickers</p>
-                  <div className="flex mb-4">
-                    <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
-                  </div>
-                  <p className="text-gray-300 text-sm leading-relaxed flex-grow">
-                    Everything was perfect. The sticker themselves is a great quality, and no blurriness on the design. Will be sticking with this company for future stickers!
-                  </p>
-                </div>
-
-                {/* Third review */}
-                <div 
-                  className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
-                  style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                  }}
-                >
-                  <div className="flex items-center mb-4">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601646/unnamed_14467655-4d00-451c-bca6-b5be86af2814_100x100_crop_center_cmftk1.webp" 
-                      alt="Anita J"
-                      className="w-12 h-12 rounded-full mr-3"
-                    />
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
-                      alt="Google"
-                      className="w-8 h-8 ml-auto"
-                    />
-                  </div>
-                  <h3 className="text-white font-semibold mb-1">Anita J</h3>
-                  <p className="text-gray-400 text-sm mb-3">Matte Vinyl Stickers</p>
-                  <div className="flex mb-4">
-                    <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
-                  </div>
-                  <p className="text-gray-300 text-sm leading-relaxed flex-grow">
-                    Absolutely loved the quality and thickness of the stickers but what really made me excited was the ability to speak to the owner directly who provides amazing customer service and truly delivers on the timelines posted. Would recommend to anyone looking!
-                  </p>
-                </div>
-
-                {/* Fourth review */}
-                <div 
-                  className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
-                  style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                  }}
-                >
-                  <div className="flex items-center mb-4">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601644/111_100x100_crop_center_ubs7st.avif" 
-                      alt="Rach Plants"
-                      className="w-12 h-12 rounded-full mr-3"
-                    />
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
-                      alt="Google"
-                      className="w-8 h-8 ml-auto"
-                    />
-                  </div>
-                  <h3 className="text-white font-semibold mb-1">Rach Plants</h3>
-                  <p className="text-gray-400 text-sm mb-3">Matte Stickers& Vinyl Banners</p>
-                  <div className="flex mb-4">
-                    <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
-                  </div>
-                  <p className="text-gray-300 text-sm leading-relaxed flex-grow">
-                    Incredible! They were able to not only make my business logo into great quality stickers, they also made my own photos into stickers!! I recommend them to everyone looking for custom stickers! Beautiful work, quality, attention to detail, communication! 10/10!
-                  </p>
-                </div>
-
-                {/* Duplicate first review for seamless loop */}
-                <div 
-                  className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
-                  style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                  }}
-                >
-                  <div className="flex items-center mb-4">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601651/unnamed_1_100x100_crop_center_ozo8lq.webp" 
-                      alt="Certified Garbage Rat"
-                      className="w-12 h-12 rounded-full mr-3"
-                    />
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
-                      alt="Google"
-                      className="w-8 h-8 ml-auto"
-                    />
-                  </div>
-                  <h3 className="text-white font-semibold mb-1">Certified Garbage Rat</h3>
-                  <p className="text-gray-400 text-sm mb-3">Matte Stickers & Vinyl Banners</p>
-                  <div className="flex mb-4">
-                    <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
-                  </div>
-                  <p className="text-gray-300 text-sm leading-relaxed flex-grow">
-                    We got one of our designs custom made into stickers and they definitely did not disappoint! We had previously been using another website but the speed and quality of sticker shuttle is far better than our stickers before. I would highly recommend!
-                  </p>
-                </div>
-
-                {/* Duplicate second review for seamless loop */}
-                <div 
-                  className="flex-shrink-0 w-72 rounded-xl p-6 flex flex-col"
-                  style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.2)'
-                  }}
-                >
-                  <div className="flex items-center mb-4">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601649/download_1_100x100_crop_center_z69tdh.avif" 
-                      alt="Panda Reaper"
-                      className="w-12 h-12 rounded-full mr-3"
-                    />
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
-                      alt="Google"
-                      className="w-8 h-8 ml-auto"
-                    />
-                  </div>
-                  <h3 className="text-white font-semibold mb-1">Panda Reaper</h3>
-                  <p className="text-gray-400 text-sm mb-3">Matte Vinyl Stickers</p>
-                  <div className="flex mb-4">
-                    <span className="text-yellow-400">⭐⭐⭐⭐⭐</span>
-                  </div>
-                  <p className="text-gray-300 text-sm leading-relaxed flex-grow">
-                    Everything was perfect. The sticker themselves is a great quality, and no blurriness on the design. Will be sticking with this company for future stickers!
-                  </p>
+            <h1 className="text-4xl md:text-6xl font-bold text-white flex items-center justify-center gap-3" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif' }}>
+              Active Deals
+            </h1>
                 </div>
               </div>
-            </div>
-          </div>
         </section>
 
-        {/* Brands Section - Moved above footer */}
-        <section className="pt-7 pb-4">
+      {/* Deals Grid */}
+      <section className="pb-8">
           <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
-            <div className="flex justify-center mb-6">
-              <div 
-                className="px-6 py-2 rounded-full text-center text-lg text-gray-300"
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)'
-                }}
-              >
-                Brands we print for:
-              </div>
-            </div>
-            <div className="relative overflow-hidden">
-              <div 
-                className="flex gap-6 animate-scroll"
-                style={{
-                  animation: 'scroll 35s linear infinite',
-                  width: 'max-content'
-                }}
-              >
-                {/* First set of brands */}
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593661/StickerShuttle_Brands_AndHealth_bawirz.png" alt="AndHealth" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593675/Wahl-Icon-Web_tq0jqm.webp" alt="Wahl" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593600/Amazon-Go_by2gkb.png" alt="Amazon" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593604/ChickFilA-Icon-Web_anobg1.png" alt="Chick-fil-A" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_Nike_gmedyb.png" alt="Nike" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593671/StickerShuttle_Brands_XFinity_nz2obt.png" alt="Xfinity" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_SSPR_ewqax7.png" alt="SSPR" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593662/StickerShuttle_Brands_CGR_ryewlb.png" alt="CGR" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_WF_vrafue.png" alt="WF" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593666/StickerShuttle_Brands_UnoMas_ntorew.png" alt="UnoMas" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593610/LT-Icon_llqxai.png" alt="LT" className="h-20 w-auto" />
-                
-                {/* Duplicate set for seamless loop */}
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593661/StickerShuttle_Brands_AndHealth_bawirz.png" alt="AndHealth" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593675/Wahl-Icon-Web_tq0jqm.webp" alt="Wahl" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593600/Amazon-Go_by2gkb.png" alt="Amazon" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593604/ChickFilA-Icon-Web_anobg1.png" alt="Chick-fil-A" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_Nike_gmedyb.png" alt="Nike" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593671/StickerShuttle_Brands_XFinity_nz2obt.png" alt="Xfinity" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_SSPR_ewqax7.png" alt="SSPR" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593662/StickerShuttle_Brands_CGR_ryewlb.png" alt="CGR" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_WF_vrafue.png" alt="WF" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593666/StickerShuttle_Brands_UnoMas_ntorew.png" alt="UnoMas" className="h-20 w-auto" />
-                <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593610/LT-Icon_llqxai.png" alt="LT" className="h-20 w-auto" />
-              </div>
-              
-              {/* Fade effects */}
-              <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-[#030140] to-transparent pointer-events-none"></div>
-              <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-[#030140] to-transparent pointer-events-none"></div>
-            </div>
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {activeDeals.map((deal) => (
+              <DealCard key={deal.id} deal={deal} />
+            ))}
+                </div>
+                </div>
         </section>
 
-        {/* Styles */}
-        <style jsx>{`
-          @keyframes scroll {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-50%); }
-          }
 
-          .headerButton {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(10px);
-          }
 
-          .headerButton:hover {
-            background: rgba(255, 255, 255, 0.2);
-            border-color: rgba(255, 255, 255, 0.3);
-          }
+      {/* Need Custom Configuration? */}
+      <section className="pb-8">
+          <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
+              <div 
+            className="rounded-xl p-6 text-center"
+                  style={{ 
+              background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+              backdropFilter: 'blur(12px)'
+            }}
+          >
+            <h3 className="text-2xl font-bold text-white mb-4">Need Custom Configuration?</h3>
+            <p className="text-gray-300 mb-6">
+              Want different sizes, quantities, or materials? Check out our full product catalog for complete customization options.
+            </p>
+            <Link href="/products">
+              <button 
+                className="px-8 py-3 rounded-lg font-bold transition-all hover:scale-105"
+                  style={{ 
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(180%)',
+                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                  boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                }}
+              >
+                Browse All Products
+              </button>
+            </Link>
+                  </div>
+                  </div>
+        </section>
 
-          .logo-hover {
-            transition: transform 0.3s ease;
-          }
+      {/* Holographic Save Pill Styles */}
+      <style jsx global>{`
+        .holographic-save-container {
+          border: 1px solid rgba(255, 255, 255, 0.3) !important;
+          backdrop-filter: blur(35px) !important;
+          -webkit-backdrop-filter: blur(35px) !important;
+          box-shadow: 0 0 20px rgba(255, 255, 255, 0.3), 
+                      inset 0 0 20px rgba(255, 255, 255, 0.1) !important;
+          font-weight: normal !important;
+          background: rgba(255, 255, 255, 0.1) !important;
+        }
 
-          .logo-hover:hover {
-            transform: scale(1.05);
-          }
+        .holographic-save-text {
+          background: linear-gradient(45deg, 
+            #ff0080, #ff8000, #ffff00, #80ff00, 
+            #00ff80, #0080ff, #8000ff, #ff0080) !important;
+          background-size: 400% 400% !important;
+          animation: holographic-shift-deals 3s ease-in-out infinite !important;
+          color: transparent !important;
+          background-clip: text !important;
+          -webkit-background-clip: text !important;
+          -webkit-text-fill-color: transparent !important;
+        }
 
-          /* Hero Animation Keyframes */
-          @keyframes float {
-            0%, 100% { transform: translateY(0px) rotate(12deg); }
-            50% { transform: translateY(-20px) rotate(12deg); }
-          }
-          
-          @keyframes sway {
-            0%, 100% { transform: translateX(0px) rotate(6deg); }
-            50% { transform: translateX(15px) rotate(-6deg); }
-          }
-          
-          @keyframes drift {
-            0% { transform: translateX(0px) translateY(0px); }
-            25% { transform: translateX(20px) translateY(-10px); }
-            50% { transform: translateX(0px) translateY(-20px); }
-            75% { transform: translateX(-20px) translateY(-10px); }
-            100% { transform: translateX(0px) translateY(0px); }
-          }
-          
-          @keyframes bob {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-          }
+                @keyframes holographic-shift-deals {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
 
-          /* Hide scrollbar on mobile reviews and product types */
-          .md\\:hidden.overflow-x-auto::-webkit-scrollbar {
-            display: none;
+        /* Price Glow Effects */
+        .glow-price-text {
+          text-shadow: 0 0 10px rgba(124, 232, 105, 0.5), 
+                       0 0 20px rgba(124, 232, 105, 0.3), 
+                       0 0 30px rgba(124, 232, 105, 0.2) !important;
+        }
+
+        .glow-original-price {
+          text-shadow: 0 0 5px rgba(156, 163, 175, 0.3) !important;
+        }
+
+        /* Holographic Price Effect */
+        .holographic-price-text {
+          background: linear-gradient(45deg, 
+            #ff0080, #ff4000, #ff8000, #ffff00, #80ff00, 
+            #00ff80, #00ffff, #0080ff, #8000ff, #ff0080, 
+            #ff0080, #ff4000, #ff8000, #ffff00, #80ff00) !important;
+          background-size: 400% 400% !important;
+          -webkit-animation: holographic-shift-price 2s linear infinite !important;
+          animation: holographic-shift-price 2s linear infinite !important;
+          color: transparent !important;
+          background-clip: text !important;
+          -webkit-background-clip: text !important;
+          -webkit-text-fill-color: transparent !important;
+          text-shadow: 0 0 10px rgba(255, 255, 255, 0.3) !important;
+        }
+
+        @-webkit-keyframes holographic-shift-price {
+          0% { background-position: 0% 0%; }
+          25% { background-position: 100% 0%; }
+          50% { background-position: 100% 100%; }
+          75% { background-position: 0% 100%; }
+          100% { background-position: 0% 0%; }
+        }
+
+        @keyframes holographic-shift-price {
+          0% { background-position: 0% 0%; }
+          25% { background-position: 100% 0%; }
+          50% { background-position: 100% 100%; }
+          75% { background-position: 0% 100%; }
+          100% { background-position: 0% 0%; }
+        }
+
+        /* Chrome Price Effect */
+        .chrome-price-text {
+          background: linear-gradient(45deg, 
+            #c0c0c0, #ffffff, #e8e8e8, #d4d4d4, 
+            #ffffff, #c0c0c0, #a8a8a8, #ffffff) !important;
+          background-size: 400% 400% !important;
+          animation: chrome-shift-price 3s ease-in-out infinite !important;
+          color: transparent !important;
+          background-clip: text !important;
+          -webkit-background-clip: text !important;
+          -webkit-text-fill-color: transparent !important;
+          text-shadow: 0 0 10px rgba(192, 192, 192, 0.5), 
+                       0 0 20px rgba(255, 255, 255, 0.3) !important;
+        }
+
+                @keyframes chrome-shift-price {
+          0% { background-position: 0% 50%; }
+          25% { background-position: 100% 25%; }
+          50% { background-position: 0% 75%; }
+          75% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+
+        /* Shape Dropdown Styles */
+        .shape-dropdown:focus {
+          outline: none !important;
+          border: 1px solid rgba(255, 255, 255, 0.2) !important;
+          box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset !important;
+        }
+
+        .shape-dropdown option {
+          background: rgba(30, 30, 40, 0.95) !important;
+          color: white !important;
+          padding: 8px !important;
+        }
+
+        .shape-dropdown option:hover {
+          background: rgba(59, 130, 246, 0.8) !important;
+          color: white !important;
+        }
+
+        .shape-dropdown option:checked,
+        .shape-dropdown option:selected {
+          background: rgba(59, 130, 246, 0.9) !important;
+          color: white !important;
+        }
+
+        /* Upload Spinner Animation */
+        .upload-spinner {
+          width: 48px;
+          height: 48px;
+          border: 4px solid rgba(255, 255, 255, 0.1);
+          border-left: 4px solid rgba(147, 51, 234, 0.8);
+          border-radius: 50%;
+          animation: upload-spin 1s linear infinite;
+          backdrop-filter: blur(8px);
+          box-shadow: 0 0 20px rgba(147, 51, 234, 0.3), 
+                      inset 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+
+        @keyframes upload-spin {
+          0% { 
+            transform: rotate(0deg); 
+            border-left-color: rgba(147, 51, 234, 0.8);
+          }
+          25% { 
+            border-left-color: rgba(59, 130, 246, 0.8);
+          }
+          50% { 
+            transform: rotate(180deg); 
+            border-left-color: rgba(16, 185, 129, 0.8);
+          }
+          75% { 
+            border-left-color: rgba(139, 92, 246, 0.8);
+          }
+          100% { 
+            transform: rotate(360deg); 
+            border-left-color: rgba(147, 51, 234, 0.8);
+          }
+        }
+
+                /* Image Preview Styles */
+        .image-preview {
+          max-width: 120px;
+          max-height: 120px;
+          border-radius: 8px;
+        }
+
+        /* Success Message Animation */
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
           }
         `}</style>
     </Layout>

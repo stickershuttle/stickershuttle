@@ -21,7 +21,28 @@ const DesignVaultView: React.FC<DesignVaultViewProps> = ({
   // Helper function to check if an order contains deal items
   const isOrderFromDeal = (orderId: string) => {
     const order = orders.find(o => o.id === orderId);
-    return order?.items?.some((item: any) => item.calculatorSelections?.isDeal === true);
+    if (!order) return false;
+    
+    // First check: Search the entire order JSON for deal indicators
+    const orderStr = JSON.stringify(order).toLowerCase();
+    const hasDealsInJson = orderStr.includes('isDeal":true') || 
+                          orderStr.includes('dealPrice') || 
+                          orderStr.includes('"deal') ||
+                          orderStr.includes('deal-');
+    
+    // Second check: Look for specific deal patterns in order number/id
+    const dealPatterns = [
+      order.orderNumber?.includes('100 '),  // 100 sticker deals
+      order.orderNumber?.includes('chrome'), // Chrome deals  
+      order.orderNumber?.includes('holographic'), // Holographic deals
+      (order.id || '').includes('deal-'), // Deal IDs from deals page
+    ];
+    
+    const hasDealsInOrderInfo = dealPatterns.some(pattern => pattern === true);
+    
+    const isDeal = hasDealsInJson || hasDealsInOrderInfo;
+    
+    return isDeal;
   };
 
   // Extract all unique designs from orders
@@ -130,7 +151,7 @@ const DesignVaultView: React.FC<DesignVaultViewProps> = ({
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
                       </svg>
-                      Re-order Disabled for Deals
+                      Reorder (Disabled on Deals)
                     </>
                   ) : (
                     <>

@@ -2,73 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from '@/components/AdminLayout';
 import { getSupabase } from '../../lib/supabase';
-import DealCalendar from '../../components/DealCalendar';
-import DealModal from '../../components/DealModal';
+import { PRESET_DEALS, DealProduct, getAllActiveDeals } from '@/data/deals/preset-deals';
 
-// Admin emails - same as in orders.tsx
+// Admin emails
 const ADMIN_EMAILS = ['justin@stickershuttle.com'];
-
-interface Deal {
-  id: string;
-  name: string;
-  headline: string;
-  buttonText: string;
-  pills: string[];
-  isActive: boolean;
-  orderDetails: {
-    material: string;
-    size: string;
-    quantity: number;
-    price: number;
-  };
-  // New scheduling fields
-  startDate?: string;
-  endDate?: string;
-  isScheduled?: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Default deal data
-const defaultDeal: Deal = {
-  id: 'default-100-stickers',
-  name: '100 Stickers Deal',
-  headline: '100 custom\nstickers for $29',
-  buttonText: 'Order Now →',
-  pills: [
-    '🏷️ Matte Vinyl Stickers',
-    '📏 3" Max Width',
-    '🚀 Ships Next Day',
-    '👽 Not a conspiracy theory, just great deals.'
-  ],
-  isActive: true,
-  orderDetails: {
-    material: 'Matte',
-    size: '3"',
-    quantity: 100,
-    price: 29
-  },
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString()
-};
 
 export default function AdminDeals() {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [deals, setDeals] = useState<Deal[]>([defaultDeal]);
-  const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
+  const [deals, setDeals] = useState<DealProduct[]>(PRESET_DEALS);
   const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Calendar and modal state
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalDeal, setModalDeal] = useState<Deal | null>(null);
-
-  // Form state
-  const [formData, setFormData] = useState<Deal>(defaultDeal);
+  const [editingDeal, setEditingDeal] = useState<DealProduct | null>(null);
+  const [editFormData, setEditFormData] = useState<Partial<DealProduct>>({});
 
   // Check if user is admin
   useEffect(() => {
@@ -82,7 +28,6 @@ export default function AdminDeals() {
           return;
         }
 
-        // Check if user email is in admin list
         if (!ADMIN_EMAILS.includes(session.user.email || '')) {
           router.push('/account/dashboard');
           return;
@@ -99,141 +44,121 @@ export default function AdminDeals() {
     }
 
     checkAdmin();
-  }, []); // Remove router dependency to prevent loops
+  }, []);
 
-  // Load deals from localStorage (in production, this would be from database)
+  // Load deals from localStorage or use preset deals
   const loadDeals = () => {
     try {
-      const savedDeals = localStorage.getItem('sticker-shuttle-deals');
+      const savedDeals = localStorage.getItem('sticker-shuttle-admin-deals');
       if (savedDeals) {
         const parsedDeals = JSON.parse(savedDeals);
-        
-        // Validate that each deal has proper structure and no corrupted data
-        const validDeals = parsedDeals.filter((deal: any) => {
-          return (
-            deal && 
-            typeof deal === 'object' &&
-            typeof deal.name === 'string' &&
-            typeof deal.headline === 'string' &&
-            Array.isArray(deal.pills) &&
-            deal.orderDetails &&
-            typeof deal.orderDetails.price === 'number' &&
-            // Ensure no XML/SVG content in the deal data
-            !deal.name.includes('<?xml') &&
-            !deal.headline.includes('<?xml') &&
-            !deal.pills.some((pill: any) => typeof pill === 'string' && pill.includes('<?xml'))
-          );
-        });
-        
-        if (validDeals.length !== parsedDeals.length) {
-          console.warn('Removed corrupted deals from localStorage');
-          // Save cleaned deals back to localStorage
-          localStorage.setItem('sticker-shuttle-deals', JSON.stringify(validDeals));
-        }
-        
-        setDeals(validDeals.length > 0 ? validDeals : [defaultDeal]);
+        setDeals(parsedDeals);
       } else {
-        setDeals([defaultDeal]);
+        setDeals(PRESET_DEALS);
       }
     } catch (error) {
-      console.error('Error loading deals, resetting to default:', error);
-      // Clear corrupted localStorage and reset to default
-      localStorage.removeItem('sticker-shuttle-deals');
-      setDeals([defaultDeal]);
+      console.error('Error loading deals:', error);
+      setDeals(PRESET_DEALS);
     }
   };
 
-  // Save deals to localStorage (in production, this would save to database)
-  const saveDeals = (updatedDeals: Deal[]) => {
-    localStorage.setItem('sticker-shuttle-deals', JSON.stringify(updatedDeals));
+  // Save deals to localStorage and update frontend
+  const saveDeals = (updatedDeals: DealProduct[]) => {
+    localStorage.setItem('sticker-shuttle-admin-deals', JSON.stringify(updatedDeals));
     setDeals(updatedDeals);
     
-    // Dispatch custom event to notify deals page of changes
-    window.dispatchEvent(new CustomEvent('deals-updated'));
+    // Dispatch event to notify frontend deals page
+    window.dispatchEvent(new CustomEvent('deals-updated', { 
+      detail: { deals: updatedDeals } 
+    }));
   };
 
-  // Handle form changes
-  const handleInputChange = (field: string, value: any) => {
-    if (field.includes('.')) {
-      const [parent, child] = field.split('.');
-      setFormData({
-        ...formData,
-        [parent]: {
-          ...(formData as any)[parent],
-          [child]: value
-        }
-      });
-    } else {
-      setFormData({
-        ...formData,
-        [field]: value
-      });
-    }
-  };
-
-  // Handle pill changes
-  const handlePillChange = (index: number, value: string) => {
-    const newPills = [...formData.pills];
-    newPills[index] = value;
-    setFormData({
-      ...formData,
-      pills: newPills
+  // Start editing a deal
+  const startEditing = (deal: DealProduct) => {
+    setEditingDeal(deal);
+    setEditFormData({
+      name: deal.name,
+      shortDescription: deal.shortDescription,
+      dealPrice: deal.dealPrice,
+      dealQuantity: deal.dealQuantity,
+      dealSize: deal.dealSize,
+      originalPrice: deal.originalPrice,
+      savings: deal.savings,
+      isActive: deal.isActive,
+      defaultImage: deal.defaultImage
     });
+    setIsEditing(true);
   };
 
-  // Add new pill
-  const addPill = () => {
-    setFormData({
-      ...formData,
-      pills: [...formData.pills, '']
-    });
+  // Save edited deal
+  const saveEditedDeal = () => {
+    if (!editingDeal || !editFormData) return;
+
+    const updatedDeal: DealProduct = {
+      ...editingDeal,
+      ...editFormData,
+      updatedAt: new Date().toISOString()
+    };
+
+    const updatedDeals = deals.map(deal => 
+      deal.id === editingDeal.id ? updatedDeal : deal
+    );
+
+    saveDeals(updatedDeals);
+    cancelEditing();
   };
 
-  // Remove pill
-  const removePill = (index: number) => {
-    const newPills = formData.pills.filter((_, i) => i !== index);
-    setFormData({
-      ...formData,
-      pills: newPills
-    });
+  // Cancel editing
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setEditingDeal(null);
+    setEditFormData({});
   };
 
-  // Save deal
-  const saveDeal = async () => {
-    setIsSaving(true);
-    
-    try {
-      const updatedDeal = {
-        ...formData,
-        updatedAt: new Date().toISOString()
-      };
+  // Toggle deal active status
+  const toggleDealActive = (dealId: string) => {
+    const updatedDeals = deals.map(deal => 
+      deal.id === dealId ? { ...deal, isActive: !deal.isActive } : deal
+    );
+    saveDeals(updatedDeals);
+  };
 
-      if (isEditing && selectedDeal) {
-        // Update existing deal
-        const updatedDeals = deals.map(deal => 
-          deal.id === selectedDeal.id ? updatedDeal : deal
-        );
-        saveDeals(updatedDeals);
-      } else {
-        // Create new deal
-        const newDeal = {
-          ...updatedDeal,
-          id: `deal-${Date.now()}`,
-          createdAt: new Date().toISOString()
-        };
-        saveDeals([...deals, newDeal]);
+  // Create new deal
+  const createNewDeal = () => {
+    const newDeal: DealProduct = {
+      id: `deal-${Date.now()}`,
+      sku: `DEAL-${Date.now()}`,
+      name: 'New Deal',
+      description: 'New deal description',
+      shortDescription: 'New deal',
+      category: 'deals',
+      basePrice: 0.29,
+      dealPrice: 29,
+      dealQuantity: 100,
+      dealSize: '3"',
+      originalPrice: 88,
+      savings: 59,
+      pricingModel: 'flat-rate',
+      images: ['https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png'],
+      defaultImage: 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png',
+      features: ['Custom Shapes', 'Premium Quality'],
+      customizable: true,
+      minQuantity: 1,
+      maxQuantity: 1000,
+      isActive: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      calculatorConfig: {
+        showPreview: true,
+        allowFileUpload: true,
+        requireProof: false,
+        hasCustomSize: false
       }
+    };
 
-      // Reset form
-      setSelectedDeal(null);
-      setIsEditing(false);
-      setFormData(defaultDeal);
-    } catch (error) {
-      console.error('Error saving deal:', error);
-      alert('Failed to save deal');
-    } finally {
-      setIsSaving(false);
-    }
+    const updatedDeals = [...deals, newDeal];
+    saveDeals(updatedDeals);
+    startEditing(newDeal);
   };
 
   // Delete deal
@@ -244,107 +169,18 @@ export default function AdminDeals() {
     }
   };
 
-  // Toggle deal active status
-  const toggleDealStatus = (dealId: string) => {
-    const updatedDeals = deals.map(deal => {
-      if (deal.id === dealId) {
-        return { ...deal, isActive: !deal.isActive };
-      }
-      // Deactivate other deals (only one active at a time)
-      return { ...deal, isActive: false };
-    });
-    saveDeals(updatedDeals);
-  };
-
-  // Edit deal
-  const editDeal = (deal: Deal) => {
-    setSelectedDeal(deal);
-    setFormData(deal);
-    setIsEditing(true);
-  };
-
-  // Cancel editing
-  const cancelEdit = () => {
-    setSelectedDeal(null);
-    setIsEditing(false);
-    setFormData(defaultDeal);
-  };
-
-  // Reset deals data (clears localStorage and resets to default)
-  const resetDealsData = () => {
-    if (confirm('This will clear all saved deals and reset to default. Are you sure?')) {
-      localStorage.removeItem('sticker-shuttle-deals');
-      setDeals([defaultDeal]);
-      setSelectedDeal(null);
-      setIsEditing(false);
-      setFormData(defaultDeal);
-      setIsModalOpen(false);
-      setModalDeal(null);
-      setSelectedDate('');
-      alert('Deals data has been reset successfully!');
-    }
-  };
-
-  // Calendar handlers
-  const handleDateClick = (date: string) => {
-    // Validate the date string to ensure it's not corrupted
-    if (typeof date !== 'string' || date.includes('<?xml') || date.includes('<svg')) {
-      console.error('Corrupted date data detected, resetting modal');
-      setSelectedDate(new Date().toISOString().split('T')[0]); // Use today's date as fallback
-    } else {
-      setSelectedDate(date);
-    }
-    
-    setModalDeal(null);
-    setIsModalOpen(true);
-  };
-
-  const handleDealClick = (deal: Deal) => {
-    // Validate deal data to ensure it's not corrupted
-    if (!deal || 
-        typeof deal.name !== 'string' || 
-        typeof deal.headline !== 'string' ||
-        deal.name.includes('<?xml') ||
-        deal.headline.includes('<?xml') ||
-        (deal.pills && deal.pills.some((pill: string) => pill.includes('<?xml')))) {
-      console.error('Corrupted deal data detected, preventing modal open');
-      alert('Deal data is corrupted. Please refresh the page and try again.');
-      return;
-    }
-    
-    setModalDeal(deal);
-    setSelectedDate('');
-    setIsModalOpen(true);
-  };
-
-  const handleModalSave = (deal: Deal) => {
-    // Additional validation before saving
-    if (!deal || 
-        typeof deal.name !== 'string' || 
-        typeof deal.headline !== 'string' ||
-        !deal.orderDetails ||
-        typeof deal.orderDetails.price !== 'number') {
-      alert('Invalid deal data. Please check all fields and try again.');
-      return;
-    }
-    
-    if (modalDeal) {
-      // Update existing deal
-      const updatedDeals = deals.map(d => d.id === deal.id ? deal : d);
-      saveDeals(updatedDeals);
-    } else {
-      // Create new deal
-      saveDeals([...deals, deal]);
-    }
-    setIsModalOpen(false);
-    setModalDeal(null);
-    setSelectedDate('');
+  // Handle form field changes
+  const handleFieldChange = (field: keyof DealProduct, value: any) => {
+    setEditFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   if (loading) {
     return (
       <AdminLayout title="Deals Management - Admin">
-                      <div className="flex-1 pl-2 pr-8 py-6"> {/* Reduced left padding, keep right padding */}
+        <div className="flex-1 pl-2 pr-8 py-6">
           <div className="flex items-center justify-center h-64">
             <div className="text-gray-400">Loading...</div>
           </div>
@@ -357,494 +193,463 @@ export default function AdminDeals() {
     return null;
   }
 
-  // Calculate deal stats
-  const activeDeals = deals.filter(d => d.isActive);
-  const avgDealPrice = deals.length > 0 
-    ? deals.reduce((sum, d) => sum + d.orderDetails.price, 0) / deals.length 
-    : 0;
-  const lowestPrice = deals.length > 0 
-    ? Math.min(...deals.map(d => d.orderDetails.price))
-    : 0;
-  const highestPrice = deals.length > 0 
-    ? Math.max(...deals.map(d => d.orderDetails.price))
-    : 0;
+  const DealCard = ({ deal }: { deal: DealProduct }) => {
+    const isCurrentlyEditing = editingDeal?.id === deal.id;
+    
+    return (
+      <div 
+        className="rounded-xl p-6 h-full flex flex-col relative"
+        style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+          backdropFilter: 'blur(12px)'
+        }}
+      >
+        {/* Status Badge - Top Left */}
+        <div className="absolute -top-2 -left-2 z-10">
+          <button
+            onClick={() => toggleDealActive(deal.id)}
+            className={`px-3 py-1 rounded-full text-sm font-bold shadow-lg ${
+              deal.isActive
+                ? 'bg-gradient-to-r from-green-500 to-green-400 text-white'
+                : 'bg-gradient-to-r from-gray-500 to-gray-400 text-white'
+            }`}
+          >
+            {deal.isActive ? 'Active' : 'Inactive'}
+          </button>
+        </div>
 
-  // Simulated order data for deals (in production, this would come from actual order data)
-  const dealOrdersCount = deals.length > 0 ? Math.floor(Math.random() * 150) + 50 : 0;
-  const mostPopularDeal = deals.length > 0 ? deals[Math.floor(Math.random() * deals.length)] : null;
+        {/* Save Pill - Top Right */}
+        {deal.savings && (
+          <div className="absolute -top-2 -right-2 px-3 py-1 rounded-full text-sm font-medium holographic-save-container z-10">
+            <span className="holographic-save-text">Save ${deal.savings}</span>
+          </div>
+        )}
+
+        {/* Deal Image */}
+        <div className="mb-4 flex justify-center">
+          <img 
+            src={deal.defaultImage} 
+            alt={deal.name}
+            className="w-24 h-24 object-contain"
+          />
+        </div>
+
+        {/* Deal Info - Editable */}
+        <div className="text-center mb-4 flex-grow">
+          {isCurrentlyEditing ? (
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={editFormData.name || ''}
+                onChange={(e) => handleFieldChange('name', e.target.value)}
+                className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-lg font-bold text-center focus:outline-none focus:border-purple-500"
+                placeholder="Deal Name"
+              />
+              <textarea
+                value={editFormData.shortDescription || ''}
+                onChange={(e) => handleFieldChange('shortDescription', e.target.value)}
+                className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-sm text-center focus:outline-none focus:border-purple-500 resize-none"
+                rows={2}
+                placeholder="Short Description"
+              />
+              <div className="flex items-center gap-2 justify-center">
+                <input
+                  type="number"
+                  value={editFormData.dealPrice || ''}
+                  onChange={(e) => handleFieldChange('dealPrice', parseFloat(e.target.value) || 0)}
+                  className="w-20 px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-2xl font-bold text-center focus:outline-none focus:border-purple-500"
+                  placeholder="0"
+                  step="0.01"
+                />
+                {editFormData.originalPrice && (
+                  <input
+                    type="number"
+                    value={editFormData.originalPrice || ''}
+                    onChange={(e) => handleFieldChange('originalPrice', parseFloat(e.target.value) || 0)}
+                    className="w-16 px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-gray-400 text-lg text-center focus:outline-none focus:border-purple-500"
+                    placeholder="0"
+                    step="0.01"
+                  />
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              <h3 className="text-xl font-bold text-white mb-2" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
+                {deal.name}
+              </h3>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span 
+                  className={`text-4xl font-bold ${
+                    deal.name.includes('Holographic') ? 'holographic-price-text' : 
+                    deal.name.includes('Chrome') ? 'chrome-price-text' : 
+                    'text-green-400 glow-price-text'
+                  }`}
+                  style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}
+                >
+                  ${deal.dealPrice}
+                </span>
+                {deal.originalPrice && (
+                  <span className="text-lg text-gray-400 line-through glow-original-price" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
+                    ${deal.originalPrice}
+                  </span>
+                )}
+              </div>
+              <p className="text-gray-300 text-sm">{deal.shortDescription}</p>
+            </>
+          )}
+        </div>
+
+        {/* Deal Details - Editable */}
+        {isCurrentlyEditing && (
+          <div className="mb-4 space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Quantity</label>
+                <input
+                  type="number"
+                  value={editFormData.dealQuantity || ''}
+                  onChange={(e) => handleFieldChange('dealQuantity', parseInt(e.target.value) || 0)}
+                  className="w-full px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-sm text-center focus:outline-none focus:border-purple-500"
+                  placeholder="100"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Size</label>
+                <input
+                  type="text"
+                  value={editFormData.dealSize || ''}
+                  onChange={(e) => handleFieldChange('dealSize', e.target.value)}
+                  className="w-full px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-sm text-center focus:outline-none focus:border-purple-500"
+                  placeholder='3"'
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Savings ($)</label>
+              <input
+                type="number"
+                value={editFormData.savings || ''}
+                onChange={(e) => handleFieldChange('savings', parseFloat(e.target.value) || 0)}
+                className="w-full px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-sm text-center focus:outline-none focus:border-purple-500"
+                placeholder="59"
+                step="0.01"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Image URL</label>
+              <input
+                type="url"
+                value={editFormData.defaultImage || ''}
+                onChange={(e) => handleFieldChange('defaultImage', e.target.value)}
+                className="w-full px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-xs focus:outline-none focus:border-purple-500"
+                placeholder="https://..."
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="space-y-2">
+          {isCurrentlyEditing ? (
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={saveEditedDeal}
+                className="py-2 rounded-lg font-bold text-sm text-white"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(180%)',
+                  border: '1px solid rgba(34, 197, 94, 0.4)',
+                  boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                }}
+              >
+                Save
+              </button>
+              <button
+                onClick={cancelEditing}
+                className="py-2 rounded-lg font-bold text-sm text-white"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(180%)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => startEditing(deal)}
+                className="py-2 rounded-lg font-bold text-sm text-white"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(180%)',
+                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                  boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                }}
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => deleteDeal(deal.id)}
+                className="py-2 rounded-lg font-bold text-sm text-white"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(180%)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <AdminLayout title="Deals Management - Admin">
-      <style jsx global>{`
-        .glass-container {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-          backdrop-filter: blur(12px);
-          border-radius: 16px;
-        }
-        
-        @media (max-width: 768px) {
-          .mobile-deal-card {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset;
-            backdrop-filter: blur(12px);
-          }
-          
-          .mobile-deal-card:active {
-            transform: scale(0.98);
-          }
-        }
-      `}</style>
       <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#030140' }}>
-                  <div className="flex-1 pl-2 pr-4 sm:pr-6 xl:pr-8 py-6"> {/* Reduced left padding, keep right padding */}
+        <div className="flex-1 pl-2 pr-4 sm:pr-6 xl:pr-8 py-6">
+          {/* Header Section */}
+          <section className="py-8">
+            <div className="w-full mx-auto px-4">
+              <div className="text-center mb-8">
+                <div className="inline-block px-4 py-2 rounded-full text-sm font-medium bg-orange-500/20 text-orange-300 border border-orange-500/30 mb-4">
+                  🛠️ Admin Management
+                </div>
+                <h1 className="text-4xl md:text-6xl font-bold text-white flex items-center justify-center gap-3" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif' }}>
+                  Manage Deals
+                </h1>
+                <p className="text-gray-400 mt-4">
+                  Edit deals that appear on the frontend deals page. Changes are reflected immediately.
+                </p>
+              </div>
+            </div>
+          </section>
+
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6 xl:mb-8">
-            <div className="glass-container rounded-xl p-4 xl:p-6">
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+            <div 
+              className="rounded-xl p-6"
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                backdropFilter: 'blur(12px)'
+              }}
+            >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-400 text-xs xl:text-sm">Total Orders</span>
-                <svg className="w-4 h-4 xl:w-5 xl:h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
-              </div>
-              <div className="text-xl xl:text-2xl font-bold text-white">{dealOrdersCount}</div>
-              <div className="text-xs text-gray-500 mt-1">
-                deals purchased
-              </div>
-            </div>
-
-            <div className="glass-container rounded-xl p-4 xl:p-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-400 text-xs xl:text-sm">Most Popular</span>
-                <svg className="w-4 h-4 xl:w-5 xl:h-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                </svg>
-              </div>
-              <div className="text-base xl:text-lg font-bold text-white truncate">
-                {mostPopularDeal?.name || 'N/A'}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">
-                {mostPopularDeal ? `$${mostPopularDeal.orderDetails.price}` : 'No deals yet'}
-              </div>
-            </div>
-
-            <div className="glass-container rounded-xl p-4 xl:p-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-400 text-xs xl:text-sm">Price Range</span>
-                <svg className="w-4 h-4 xl:w-5 xl:h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                </svg>
-              </div>
-              <div className="text-base xl:text-lg font-bold text-white">
-                ${lowestPrice} - ${highestPrice}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">
-                min to max
-              </div>
-            </div>
-
-            <div className="glass-container rounded-xl p-4 xl:p-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-400 text-xs xl:text-sm">Total Deals</span>
-                <svg className="w-4 h-4 xl:w-5 xl:h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <span className="text-gray-400 text-sm">Total Deals</span>
+                <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                 </svg>
               </div>
-              <div className="text-xl xl:text-2xl font-bold text-white">{deals.length}</div>
-              <div className="text-xs text-gray-500 mt-1">
-                created
+              <div className="text-2xl font-bold text-white">{deals.length}</div>
+            </div>
+
+            <div 
+              className="rounded-xl p-6"
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                backdropFilter: 'blur(12px)'
+              }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-400 text-sm">Active Deals</span>
+                <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="text-2xl font-bold text-white">{deals.filter(d => d.isActive).length}</div>
+            </div>
+
+            <div 
+              className="rounded-xl p-6"
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                backdropFilter: 'blur(12px)'
+              }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-400 text-sm">Avg Price</span>
+                <svg className="w-5 h-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+              </div>
+              <div className="text-2xl font-bold text-white">
+                ${deals.length > 0 ? (deals.reduce((sum, d) => sum + d.dealPrice, 0) / deals.length).toFixed(0) : '0'}
+              </div>
+            </div>
+
+            <div 
+              className="rounded-xl p-6"
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                backdropFilter: 'blur(12px)'
+              }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-400 text-sm">Total Savings</span>
+                <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+              </div>
+              <div className="text-2xl font-bold text-white">
+                ${deals.reduce((sum, d) => sum + (d.savings || 0), 0)}
               </div>
             </div>
           </div>
 
-          {/* Header with Create Button */}
-          <div className="mb-6 flex justify-between items-center">
-            <div className="flex space-x-4">
-              {!isEditing && (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-semibold text-white text-sm transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                    backdropFilter: 'blur(25px) saturate(180%)',
-                    border: '1px solid rgba(59, 130, 246, 0.4)',
-                    boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                  }}
-                >
-                  <div className="flex items-center space-x-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    <span>Create New Deal</span>
-                  </div>
-                </button>
-              )}
-            </div>
-            
-            {/* Controls */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-8">
-              <button
-                onClick={() => setShowCalendar(!showCalendar)}
-                className={`px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-semibold text-white text-sm transition-all duration-300 ${
-                  showCalendar ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-600 hover:bg-gray-700'
-                }`}
-              >
-                <div className="flex items-center space-x-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <span>{showCalendar ? 'Hide Calendar' : 'Show Calendar'}</span>
-                </div>
-              </button>
-              
-              <button
-                onClick={resetDealsData}
-                className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-semibold text-white text-sm bg-red-600 hover:bg-red-700 transition-colors"
-              >
-                <div className="flex items-center space-x-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <span>Reset All Data</span>
-                </div>
-              </button>
-            </div>
+          {/* Create New Deal Button */}
+          <div className="mb-8 text-center">
+            <button
+              onClick={createNewDeal}
+              className="px-8 py-3 rounded-lg font-bold text-white transition-all hover:scale-105"
+              style={{
+                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                backdropFilter: 'blur(25px) saturate(180%)',
+                border: '1px solid rgba(34, 197, 94, 0.4)',
+                boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+              }}
+            >
+              + Create New Deal
+            </button>
           </div>
 
-          {/* Deal Form */}
-          {isEditing && (
-            <div className="glass-container p-4 md:p-6 mb-8">
-              <h2 className="text-lg md:text-xl font-semibold text-white mb-4 md:mb-6">
-                {selectedDeal ? 'Edit Deal' : 'Create New Deal'}
-              </h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                {/* Basic Info */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">Deal Name</label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => handleInputChange('name', e.target.value)}
-                      className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                      placeholder="e.g., 100 Stickers Deal"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">Headline (supports line breaks)</label>
-                    <textarea
-                      value={formData.headline}
-                      onChange={(e) => handleInputChange('headline', e.target.value)}
-                      className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                      rows={3}
-                      placeholder="100 custom&#10;stickers for $29"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">Button Text</label>
-                    <input
-                      type="text"
-                      value={formData.buttonText}
-                      onChange={(e) => handleInputChange('buttonText', e.target.value)}
-                      className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                      placeholder="e.g., Order Now →"
-                    />
-                  </div>
-                </div>
-
-                {/* Order Details */}
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="deal-material" className="block text-sm font-medium text-gray-400 mb-2">Material</label>
-                    <select
-                      id="deal-material"
-                      value={formData.orderDetails.material}
-                      onChange={(e) => handleInputChange('orderDetails.material', e.target.value)}
-                      className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                      aria-label="Select material type"
-                    >
-                      <option value="Matte">Matte</option>
-                      <option value="Glossy">Glossy</option>
-                      <option value="Holographic">Holographic</option>
-                      <option value="Chrome">Chrome</option>
-                      <option value="Glitter">Glitter</option>
-                      <option value="Clear">Clear</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">Size</label>
-                    <input
-                      type="text"
-                      value={formData.orderDetails.size}
-                      onChange={(e) => handleInputChange('orderDetails.size', e.target.value)}
-                      className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                      placeholder='e.g., 3"'
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="deal-quantity" className="block text-sm font-medium text-gray-400 mb-2">Quantity</label>
-                      <input
-                        id="deal-quantity"
-                        type="number"
-                        value={formData.orderDetails.quantity}
-                        onChange={(e) => handleInputChange('orderDetails.quantity', parseInt(e.target.value))}
-                        className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                        min="1"
-                        aria-label="Deal quantity"
-                      />
-                    </div>
-
-                    <div>
-                      <label htmlFor="deal-price" className="block text-sm font-medium text-gray-400 mb-2">Price ($)</label>
-                      <input
-                        id="deal-price"
-                        type="number"
-                        value={formData.orderDetails.price}
-                        onChange={(e) => handleInputChange('orderDetails.price', parseFloat(e.target.value))}
-                        className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                        min="0"
-                        step="0.01"
-                        aria-label="Deal price in dollars"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pills/Badges */}
-              <div className="mt-6">
-                <label className="block text-sm font-medium text-gray-400 mb-2">Pills/Badges</label>
-                <div className="space-y-2">
-                  {formData.pills.map((pill, index) => (
-                    <div key={index} className="flex gap-2">
-                      <input
-                        type="text"
-                        value={pill}
-                        onChange={(e) => handlePillChange(index, e.target.value)}
-                        className="flex-1 px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                        placeholder="e.g., 🏷️ Matte Vinyl Stickers"
-                      />
-                      <button
-                        onClick={() => removePill(index)}
-                        className="px-3 md:px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition-colors text-sm"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <button
-                  onClick={addPill}
-                  className="mt-3 px-4 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 rounded-lg transition-colors text-sm"
-                >
-                  + Add Pill
-                </button>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                <button
-                  onClick={saveDeal}
-                  disabled={isSaving}
-                  className="flex-1 sm:flex-none px-4 md:px-6 py-2.5 md:py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-                >
-                  {isSaving ? 'Saving...' : 'Save Deal'}
-                </button>
-                <button
-                  onClick={cancelEdit}
-                  className="flex-1 sm:flex-none px-4 md:px-6 py-2.5 md:py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={resetDealsData}
-                  className="flex-1 sm:flex-none px-4 md:px-6 py-2.5 md:py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
-                >
-                  Reset Deals
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Deal Calendar */}
-          {showCalendar && (
-            <div className="mb-8">
-              <DealCalendar
-                deals={deals}
-                onDateClick={handleDateClick}
-                onDealClick={handleDealClick}
-                selectedDate={selectedDate}
-              />
-            </div>
-          )}
-
-          {/* Existing Deals */}
-          <div className="glass-container overflow-hidden">
-            <div className="px-4 md:px-6 py-4 border-b border-gray-700">
-              <h2 className="text-base md:text-lg font-semibold text-white">Existing Deals</h2>
-            </div>
-            
-            {/* Mobile/Tablet Deal List */}
-            <div className="xl:hidden">
-              <div className="space-y-3 p-4">
+          {/* Deals Grid */}
+          <section className="pb-8">
+            <div className="w-full mx-auto px-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {deals.map((deal) => (
-                  <div
-                    key={deal.id}
-                    className="mobile-deal-card rounded-xl p-4 transition-all duration-200"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-base font-semibold text-white">{deal.name}</h3>
-                        <p className="text-sm text-gray-400 mt-1">{deal.headline.split('\n')[0]}</p>
-                      </div>
-                      <button
-                        onClick={() => toggleDealStatus(deal.id)}
-                        className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                          deal.isActive
-                            ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30'
-                            : 'bg-gray-600/20 text-gray-400 hover:bg-gray-600/30'
-                        }`}
-                      >
-                        {deal.isActive ? 'Active' : 'Inactive'}
-                      </button>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
-                      <div>
-                        <span className="text-gray-500 text-xs">Details</span>
-                        <p className="text-white">{deal.orderDetails.quantity} × {deal.orderDetails.material}</p>
-                      </div>
-                      <div>
-                        <span className="text-gray-500 text-xs">Price</span>
-                        <p className="text-white font-semibold">${deal.orderDetails.price}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => editDeal(deal)}
-                        className="flex-1 px-3 py-2 rounded-lg text-sm font-medium text-purple-300 bg-purple-900/20 border border-purple-500/30 hover:bg-purple-900/30 transition-colors"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => deleteDeal(deal.id)}
-                        className="flex-1 px-3 py-2 rounded-lg text-sm font-medium text-red-300 bg-red-900/20 border border-red-500/30 hover:bg-red-900/30 transition-colors"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+                  <DealCard key={deal.id} deal={deal} />
                 ))}
               </div>
-
-              {deals.length === 0 && (
-                <div className="text-center py-12">
-                  <p className="text-gray-400">No deals created yet</p>
-                </div>
-              )}
             </div>
+          </section>
 
-            {/* Desktop Table */}
-            <div className="hidden xl:block overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-700">
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      Deal Name
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      Details
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      Price
-                    </th>
-                    <th className="px-6 py-4 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700">
-                  {deals.map((deal) => (
-                    <tr key={deal.id} className="hover:bg-gray-800/50 transition-colors">
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => toggleDealStatus(deal.id)}
-                          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                            deal.isActive
-                              ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30'
-                              : 'bg-gray-600/20 text-gray-400 hover:bg-gray-600/30'
-                          }`}
-                        >
-                          {deal.isActive ? 'Active' : 'Inactive'}
-                        </button>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-white">{deal.name}</div>
-                        <div className="text-xs text-gray-400">{deal.headline.split('\n')[0]}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-300">
-                          {deal.orderDetails.quantity} × {deal.orderDetails.material} {deal.orderDetails.size}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-white">${deal.orderDetails.price}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => editDeal(deal)}
-                            className="text-purple-400 hover:text-purple-300 text-sm font-medium"
-                          >
-                            Edit
-                          </button>
-                          <span className="text-gray-600">|</span>
-                          <button
-                            onClick={() => deleteDeal(deal.id)}
-                            className="text-red-400 hover:text-red-300 text-sm font-medium"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {deals.length === 0 && (
-                <div className="text-center py-12">
-                  <p className="text-gray-400">No deals created yet</p>
+          {/* Instructions */}
+          <section className="pb-8">
+            <div className="w-full mx-auto px-4">
+              <div 
+                className="rounded-xl p-6 text-center"
+                style={{ 
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                  backdropFilter: 'blur(12px)'
+                }}
+              >
+                <h3 className="text-2xl font-bold text-white mb-4">Admin Instructions</h3>
+                <div className="text-gray-300 space-y-2">
+                  <p>• Click "Edit" on any deal card to modify its details</p>
+                  <p>• Toggle the Active/Inactive status to control visibility on the frontend</p>
+                  <p>• Create new deals using the "Create New Deal" button</p>
+                  <p>• Changes are automatically saved and reflected on the frontend deals page</p>
                 </div>
-              )}
+              </div>
             </div>
-          </div>
-
-          {/* Deal Modal */}
-          <DealModal
-            isOpen={isModalOpen}
-            onClose={() => {
-              setIsModalOpen(false);
-              setModalDeal(null);
-              setSelectedDate('');
-            }}
-            onSave={handleModalSave}
-            selectedDate={selectedDate}
-            existingDeal={modalDeal}
-          />
+          </section>
         </div>
       </div>
+
+      {/* Matching Styles from Frontend */}
+      <style jsx global>{`
+        .holographic-save-container {
+          border: 1px solid rgba(255, 255, 255, 0.3) !important;
+          backdrop-filter: blur(35px) !important;
+          -webkit-backdrop-filter: blur(35px) !important;
+          box-shadow: 0 0 20px rgba(255, 255, 255, 0.3), 
+                      inset 0 0 20px rgba(255, 255, 255, 0.1) !important;
+          font-weight: normal !important;
+          background: rgba(255, 255, 255, 0.1) !important;
+        }
+
+        .holographic-save-text {
+          background: linear-gradient(45deg, 
+            #ff0080, #ff8000, #ffff00, #80ff00, 
+            #00ff80, #0080ff, #8000ff, #ff0080) !important;
+          background-size: 400% 400% !important;
+          animation: holographic-shift-deals 3s ease-in-out infinite !important;
+          color: transparent !important;
+          background-clip: text !important;
+          -webkit-background-clip: text !important;
+          -webkit-text-fill-color: transparent !important;
+        }
+
+        @keyframes holographic-shift-deals {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+
+        .glow-price-text {
+          text-shadow: 0 0 10px rgba(124, 232, 105, 0.5), 
+                       0 0 20px rgba(124, 232, 105, 0.3), 
+                       0 0 30px rgba(124, 232, 105, 0.2) !important;
+        }
+
+        .glow-original-price {
+          text-shadow: 0 0 5px rgba(156, 163, 175, 0.3) !important;
+        }
+
+        .holographic-price-text {
+          background: linear-gradient(45deg, 
+            #ff0080, #ff4000, #ff8000, #ffff00, #80ff00, 
+            #00ff80, #00ffff, #0080ff, #8000ff, #ff0080, 
+            #ff0080, #ff4000, #ff8000, #ffff00, #80ff00) !important;
+          background-size: 400% 400% !important;
+          -webkit-animation: holographic-shift-price 2s linear infinite !important;
+          animation: holographic-shift-price 2s linear infinite !important;
+          color: transparent !important;
+          background-clip: text !important;
+          -webkit-background-clip: text !important;
+          -webkit-text-fill-color: transparent !important;
+          text-shadow: 0 0 10px rgba(255, 255, 255, 0.3) !important;
+        }
+
+        @keyframes holographic-shift-price {
+          0% { background-position: 0% 0%; }
+          25% { background-position: 100% 0%; }
+          50% { background-position: 100% 100%; }
+          75% { background-position: 0% 100%; }
+          100% { background-position: 0% 0%; }
+        }
+
+        .chrome-price-text {
+          background: linear-gradient(45deg, 
+            #c0c0c0, #ffffff, #e8e8e8, #d4d4d4, 
+            #ffffff, #c0c0c0, #a8a8a8, #ffffff) !important;
+          background-size: 400% 400% !important;
+          animation: chrome-shift-price 3s ease-in-out infinite !important;
+          color: transparent !important;
+          background-clip: text !important;
+          -webkit-background-clip: text !important;
+          -webkit-text-fill-color: transparent !important;
+          text-shadow: 0 0 10px rgba(192, 192, 192, 0.5), 
+                       0 0 20px rgba(255, 255, 255, 0.3) !important;
+        }
+
+        @keyframes chrome-shift-price {
+          0% { background-position: 0% 50%; }
+          25% { background-position: 100% 25%; }
+          50% { background-position: 0% 75%; }
+          75% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+      `}</style>
     </AdminLayout>
   );
 } 
