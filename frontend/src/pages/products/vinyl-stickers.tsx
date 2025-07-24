@@ -27,6 +27,21 @@ export default function VinylStickers() {
         setRealPricingData(data);
         setPricingError(null); // Clear any previous errors
         console.log('✅ Successfully loaded real pricing data:', data);
+        
+        // Track Facebook Pixel ViewContent event for product page
+        if (typeof window !== 'undefined' && window.fbq) {
+          try {
+            window.fbq('track', 'ViewContent', {
+              content_ids: ['vinyl-stickers'],
+              content_name: 'Vinyl Stickers',
+              content_category: 'Stickers',
+              content_type: 'product'
+            });
+            console.log('📊 Facebook Pixel: ViewContent tracked for Vinyl Stickers');
+          } catch (fbError) {
+            console.error('📊 Facebook Pixel ViewContent tracking error:', fbError);
+          }
+        }
       } catch (error) {
         console.error('❌ Failed to load real pricing data:', error);
         setPricingError(error instanceof Error ? error.message : 'Failed to load real pricing data from CSV files');

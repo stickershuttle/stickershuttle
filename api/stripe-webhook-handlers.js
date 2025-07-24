@@ -792,6 +792,18 @@ async function handleCheckoutSessionCompleted(session) {
             previousStatus
           );
           
+          // Track Facebook Pixel Purchase event server-side
+          try {
+            const fbPixelId = process.env.NEXT_PUBLIC_FB_PIXEL_ID;
+            if (fbPixelId && updatedOrder.customer_email) {
+              // Server-side Facebook Pixel tracking using Conversions API would go here
+              // For now, we'll rely on client-side tracking in the order completion hook
+              console.log('📊 Facebook Pixel Purchase event would be tracked server-side here');
+            }
+          } catch (fbPixelError) {
+            console.error('📊 Facebook Pixel server-side tracking error:', fbPixelError);
+          }
+          
           console.log('📊 Server analytics tracking completed');
         }
       } catch (analyticsError) {

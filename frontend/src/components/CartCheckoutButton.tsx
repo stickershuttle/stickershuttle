@@ -162,6 +162,32 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
         user_type: user ? 'registered' : 'guest'
       });
 
+      // Track Facebook Pixel InitiateCheckout event
+      if (typeof window !== 'undefined' && window.fbq) {
+        try {
+          const contentIds = cartItems.map(item => item.product?.id || item.id || 'custom');
+          const contents = cartItems.map(item => ({
+            id: item.product?.id || item.id || 'custom',
+            quantity: item.quantity || 1,
+            item_price: item.unitPrice || item.price || 0
+          }));
+
+          window.fbq('track', 'InitiateCheckout', {
+            content_ids: contentIds,
+            contents: contents,
+            currency: 'USD',
+            num_items: cartItems.length,
+            value: cartTotal
+          });
+          console.log('📊 Facebook Pixel: InitiateCheckout tracked', {
+            num_items: cartItems.length,
+            value: cartTotal
+          });
+        } catch (fbError) {
+          console.error('📊 Facebook Pixel InitiateCheckout tracking error:', fbError);
+        }
+      }
+
       // Check if user is logged in or we have guest data
       if (!user && !guestCheckoutData && !guestEmail) {
         setShowGuestEmailModal(true);

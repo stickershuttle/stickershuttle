@@ -101,6 +101,37 @@ export const useOrderCompletion = () => {
                 // Track order completion
                 trackOrderCompleted(newPaidOrder, currentUser.current);
 
+                // Track Facebook Pixel Purchase event
+                if (typeof window !== 'undefined' && window.fbq) {
+                  try {
+                    const orderValue = parseFloat(newPaidOrder.totalPrice || newPaidOrder.total_price || 0);
+                    const orderItems = newPaidOrder.lineItems || newPaidOrder.items || [];
+                    
+                    const contentIds = orderItems.map(item => item.product_id || item.id || 'custom');
+                    const contents = orderItems.map(item => ({
+                      id: item.product_id || item.id || 'custom',
+                      quantity: parseInt(item.quantity || 1),
+                      item_price: parseFloat(item.price || item.unitPrice || 0)
+                    }));
+
+                    window.fbq('track', 'Purchase', {
+                      content_ids: contentIds,
+                      contents: contents,
+                      content_type: 'product',
+                      currency: 'USD',
+                      value: orderValue,
+                      num_items: orderItems.length
+                    });
+                    console.log('📊 Facebook Pixel: Purchase tracked', {
+                      order_number: newPaidOrder.orderNumber,
+                      value: orderValue,
+                      num_items: orderItems.length
+                    });
+                  } catch (fbError) {
+                    console.error('📊 Facebook Pixel Purchase tracking error:', fbError);
+                  }
+                }
+
                 // Calculate customer metrics for LTV and repeat purchase tracking
                 const customerEmail = newPaidOrder.customerEmail || currentUser.current?.email;
                 if (customerEmail) {

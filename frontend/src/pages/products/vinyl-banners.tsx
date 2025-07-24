@@ -11,6 +11,21 @@ export default function VinylBanners() {
 
   useEffect(() => {
     checkUser();
+    
+    // Track Facebook Pixel ViewContent event for product page
+    if (typeof window !== 'undefined' && window.fbq) {
+      try {
+        window.fbq('track', 'ViewContent', {
+          content_ids: ['vinyl-banners'],
+          content_name: 'Vinyl Banners',
+          content_category: 'Banners',
+          content_type: 'product'
+        });
+        console.log('📊 Facebook Pixel: ViewContent tracked for Vinyl Banners');
+      } catch (fbError) {
+        console.error('📊 Facebook Pixel ViewContent tracking error:', fbError);
+      }
+    }
   }, []);
 
   const checkUser = async () => {

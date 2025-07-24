@@ -22,6 +22,21 @@ export default function StickerSheets() {
         const data = await loadRealPricingData();
         setRealPricingData(data);
         console.log('Loaded real pricing data:', data);
+        
+        // Track Facebook Pixel ViewContent event for product page
+        if (typeof window !== 'undefined' && window.fbq) {
+          try {
+            window.fbq('track', 'ViewContent', {
+              content_ids: ['sticker-sheets'],
+              content_name: 'Sticker Sheets',
+              content_category: 'Stickers',
+              content_type: 'product'
+            });
+            console.log('📊 Facebook Pixel: ViewContent tracked for Sticker Sheets');
+          } catch (fbError) {
+            console.error('📊 Facebook Pixel ViewContent tracking error:', fbError);
+          }
+        }
       } catch (error) {
         console.error('Failed to load real pricing data:', error);
         setPricingError('Failed to load real pricing data from CSV files');

@@ -118,6 +118,32 @@ export const useStripeCheckout = () => {
         throw new Error('Stripe failed to load');
       }
 
+      // Track Facebook Pixel AddPaymentInfo event before redirecting to Stripe
+      if (typeof window !== 'undefined' && window.fbq) {
+        try {
+          const contentIds = cartItems.map(item => item.product?.id || item.id || 'custom');
+          const contents = cartItems.map(item => ({
+            id: item.product?.id || item.id || 'custom',
+            quantity: item.quantity || 1,
+            item_price: safeParseFloat(item.unitPrice || item.price, 0)
+          }));
+          const cartTotal = cartItems.reduce((sum, item) => sum + safeParseFloat(item.totalPrice || item.price, 0), 0);
+
+          window.fbq('track', 'AddPaymentInfo', {
+            content_ids: contentIds,
+            contents: contents,
+            currency: 'USD',
+            value: cartTotal
+          });
+          console.log('📊 Facebook Pixel: AddPaymentInfo tracked', {
+            value: cartTotal,
+            sessionId: result.sessionId
+          });
+        } catch (fbError) {
+          console.error('📊 Facebook Pixel AddPaymentInfo tracking error:', fbError);
+        }
+      }
+
       // Step 4: Redirect to Stripe Checkout
       const { error: stripeError } = await stripe.redirectToCheckout({
         sessionId: result.sessionId

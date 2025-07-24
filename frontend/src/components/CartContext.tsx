@@ -190,6 +190,30 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   const addToCart = useCallback((item: CartItem) => {
     setCart((prev) => [...prev, item]);
+    
+    // Track Facebook Pixel AddToCart event
+    if (typeof window !== 'undefined' && window.fbq) {
+      try {
+        window.fbq('track', 'AddToCart', {
+          content_ids: [item.product?.id || item.id || 'custom'],
+          content_name: item.product?.name || item.name || 'Custom Stickers',
+          content_type: 'product',
+          contents: [{
+            id: item.product?.id || item.id || 'custom',
+            quantity: item.quantity || 1,
+            item_price: item.unitPrice || item.price || 0
+          }],
+          currency: 'USD',
+          value: item.totalPrice || item.price || 0
+        });
+        console.log('📊 Facebook Pixel: AddToCart tracked', {
+          content_name: item.product?.name || item.name || 'Custom Stickers',
+          value: item.totalPrice || item.price || 0
+        });
+      } catch (error) {
+        console.error('📊 Facebook Pixel AddToCart tracking error:', error);
+      }
+    }
   }, []);
 
   const removeFromCart = useCallback((id: string) => {
