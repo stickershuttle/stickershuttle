@@ -1,6 +1,6 @@
 import { NextPage } from 'next';
 import Head from 'next/head';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
 import Layout from '../components/Layout';
 import { SUBSCRIBE_TO_KLAVIYO, GET_KLAVIYO_SUBSCRIPTION_STATUS } from '../lib/klaviyo-mutations';
@@ -21,6 +21,9 @@ const Giveaway: NextPage = () => {
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  
+  // Ref for scrolling to success message
+  const successMessageRef = useRef<HTMLDivElement>(null);
 
   // Klaviyo subscription mutation
   const [subscribeToKlaviyo] = useMutation(SUBSCRIBE_TO_KLAVIYO);
@@ -77,8 +80,13 @@ const Giveaway: NextPage = () => {
           name: '',
           email: ''
         });
-        // Increment entry count on successful submission
-        // setEntryCount(prev => prev + 1); // This line is removed
+        // Scroll to success message
+        setTimeout(() => {
+          successMessageRef.current?.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+        }, 100);
       } else {
         setSubmitStatus('error');
         setErrorMessage(data.subscribeToKlaviyo.message || 'Failed to enter giveaway');
@@ -181,12 +189,68 @@ const Giveaway: NextPage = () => {
 
               {/* Success Message */}
               {submitStatus === 'success' && (
-                <div className="mb-6 p-6 rounded-xl bg-green-500/20 border border-green-500/40 text-center">
+                <div 
+                  ref={successMessageRef}
+                  className="mb-6 p-6 rounded-xl bg-green-500/20 border border-green-500/40 text-center"
+                >
                   <div className="text-4xl mb-3">🎉</div>
                   <h3 className="text-xl font-bold text-green-300 mb-2">You're Entered!</h3>
-                  <p className="text-green-300">
-                    Thank you for entering the giveaway! We'll announce the winner soon and contact you if you win.
+                  <p className="text-green-300 mb-4">
+                    Thank you for entering the giveaway!
                   </p>
+                  
+                  {/* Coupon Code Section */}
+                  <div 
+                    className="p-4 rounded-lg mb-4"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      backdropFilter: 'blur(8px)'
+                    }}
+                  >
+                    <p className="text-green-200 text-sm mb-2">🎁 Get 15% off your order now!</p>
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="flex items-center bg-black/30 rounded-lg px-4 py-2">
+                        <span className="text-white font-mono text-lg font-bold">GIVEAWAY</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText('GIVEAWAY');
+                          // Optional: Add a temporary "Copied!" state
+                          const btn = document.activeElement as HTMLButtonElement;
+                          const originalText = btn.textContent;
+                          btn.textContent = 'Copied!';
+                          setTimeout(() => {
+                            btn.textContent = originalText;
+                          }, 2000);
+                        }}
+                        className="px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                          backdropFilter: 'blur(25px) saturate(180%)',
+                          border: '1px solid rgba(59, 130, 246, 0.4)',
+                          boxShadow: 'rgba(59, 130, 246, 0.3) 0px 4px 16px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                        }}
+                      >
+                        Copy Code
+                      </button>
+                    </div>
+                    <p className="text-green-200 text-xs mt-2">Use this code at checkout for 15% off!</p>
+                  </div>
+                  
+                                     <a 
+                     href="/products/vinyl-stickers"
+                     className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium transition-all duration-300 hover:scale-105 text-white"
+                     style={{
+                       background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                       backdropFilter: 'blur(25px) saturate(180%)',
+                       border: '1px solid rgba(59, 130, 246, 0.4)',
+                       boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                       width: '100%'
+                     }}
+                   >
+                     Get started →
+                   </a>
                 </div>
               )}
 
