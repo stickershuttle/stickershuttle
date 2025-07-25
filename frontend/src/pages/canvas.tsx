@@ -37,6 +37,15 @@ import { useQuery } from '@apollo/client';
 import { GET_USER_CREDIT_BALANCE } from '@/lib/credit-mutations';
 import CartIndicator from '../components/CartIndicator';
 import SEOHead from '../components/SEOHead';
+import { useCart } from '@/components/CartContext';
+import { generateCartItemId } from '@/types/product';
+import { 
+  BasePriceRow, 
+  QuantityDiscountRow, 
+  calculateRealPrice, 
+  PRESET_SIZES,
+  calculateSquareInches 
+} from "@/utils/real-pricing"
 
 interface CanvasElement {
   id: string;
@@ -97,6 +106,7 @@ export default function CanvasPage() {
   const [isResizing, setIsResizing] = useState(false);
   const [resizeHandle, setResizeHandle] = useState<string>('');
   const router = useRouter();
+  const { addToCart, isRushOrder } = useCart();
 
   // User and auth state
   const [user, setUser] = useState<any>(null);
@@ -119,12 +129,23 @@ export default function CanvasPage() {
 
   const [activeTool, setActiveTool] = useState<'select' | 'text' | 'rectangle' | 'circle' | 'image'>('select');
   const [hoveredElementId, setHoveredElementId] = useState<string | null>(null);
-  const [stickerMenuOpen, setStickerMenuOpen] = useState(true);
+  const [stickerMenuOpen, setStickerMenuOpen] = useState(false);
   const [stickerSettings, setStickerSettings] = useState({
     borderWidth: 6,
     borderColor: '#ffffff',
     fillHoles: false
   });
+
+  // Calculator states
+  const [selectedCut, setSelectedCut] = useState("Custom Shape");
+  const [selectedMaterial, setSelectedMaterial] = useState("Matte");
+  const [selectedSize, setSelectedSize] = useState('Medium (3")');
+  const [customWidth, setCustomWidth] = useState("");
+  const [customHeight, setCustomHeight] = useState("");
+  const [selectedQuantity, setSelectedQuantity] = useState("100");
+  const [customQuantity, setCustomQuantity] = useState("");
+  const [sendProof, setSendProof] = useState(true);
+  const [selectedStickerType, setSelectedStickerType] = useState("vinyl");
 
   // Keep loaded images in cache for better performance
   const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
@@ -132,9 +153,72 @@ export default function CanvasPage() {
   // Helper function to convert pixels to inches (96 DPI standard)
   const pxToInches = (px: number) => (px / 96).toFixed(3);
 
-  
+  // Calculate area based on size
+  const calculateArea = (size: string, customW = "", customH = "") => {
+    if (!size || typeof size !== 'string') {
+      return PRESET_SIZES?.medium?.sqInches || 9;
+    }
+    
+    if (size === "Custom size") {
+      const w = Number.parseFloat(customW) || 0
+      const h = Number.parseFloat(customH) || 0
+      return calculateSquareInches(w, h)
+    }
+    
+    if (size.includes('Small')) return PRESET_SIZES?.small?.sqInches || 4
+    if (size.includes('Medium')) return PRESET_SIZES?.medium?.sqInches || 9
+    if (size.includes('Large') && !size.includes('X-Large')) return PRESET_SIZES?.large?.sqInches || 16
+    if (size.includes('X-Large')) return PRESET_SIZES?.xlarge?.sqInches || 25
+    
+    return 9; // Default
+  }
 
+  // Calculate price for canvas artwork
+  const calculateCanvasPrice = (qty: number, area: number, rushOrder: boolean) => {
+    const basePrice = 1.36
+    const baseArea = 9
+    const scaledBasePrice = basePrice * (area / baseArea)
+    
+    const discountMap: { [key: number]: number } = {
+      50: 1.0,
+      100: 0.647,
+      200: 0.463,
+      300: 0.39,
+      500: 0.324,
+      750: 0.24,
+      1000: 0.19,
+      2500: 0.213,
+    }
 
+    let applicableQuantity = 50;
+    const quantityTiers = [50, 100, 200, 300, 500, 750, 1000, 2500];
+    
+    for (const tier of quantityTiers) {
+      if (qty >= tier) {
+        applicableQuantity = tier;
+      } else {
+        break;
+      }
+    }
+
+    const discountMultiplier = discountMap[applicableQuantity] || 1.0
+    let pricePerSticker = scaledBasePrice * discountMultiplier
+    let totalPrice = pricePerSticker * qty
+
+    if (rushOrder) {
+      totalPrice *= 1.4
+      pricePerSticker *= 1.4
+    }
+
+    return { total: totalPrice, perSticker: pricePerSticker }
+  }
+
+  // Export canvas as image for cart
+  const exportCanvasAsDataURL = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    return canvas.toDataURL('image/png');
+  }, []);
 
   // Helper function to auto-crop image to remove transparent edges
   const autoCropImage = useCallback((imageSrc: string): Promise<string> => {
@@ -833,15 +917,7 @@ export default function CanvasPage() {
       }
     }
     
-    // For border elements, use the vector path for precise hit detection
-    if (element.type === 'border' && element.vectorPath) {
-      const canvas = canvasRef.current;
-      const ctx = ctxRef.current;
-      if (canvas && ctx) {
-        // Use canvas hit detection with the vector path
-        return ctx.isPointInPath(element.vectorPath, x, y);
-      }
-    }
+    // Additional hit detection logic can be added here for future element types
     
     // For other elements, use full bounds
     return x >= element.x && x <= element.x + element.width && 
@@ -1043,11 +1119,14 @@ export default function CanvasPage() {
               <div className="flex items-center gap-4">
                 {/* Logo */}
                 <Link href="/">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
-                    alt="Sticker Shuttle Logo" 
-                    className="h-10 w-auto object-contain cursor-pointer"
-                  />
+                  <div className="flex items-center gap-3">
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
+                      alt="Sticker Shuttle Logo" 
+                      className="h-10 w-auto object-contain cursor-pointer"
+                    />
+                    
+                  </div>
                 </Link>
                 
                 <div className="w-px h-6 bg-white/20"></div>
@@ -1452,7 +1531,7 @@ export default function CanvasPage() {
                 </div>
                 <div className="text-gray-300 text-xs text-center">
                   {(() => {
-                    const colorMap = {
+                    const colorMap: Record<string, string> = {
                       '#FFFFFF': 'White - C:0 M:0 Y:0 K:0',
                       '#000000': 'Black - C:0 M:0 Y:0 K:100',
                       '#00FFFF': 'Cyan - C:100 M:0 Y:0 K:0',
@@ -1511,36 +1590,36 @@ export default function CanvasPage() {
         
         {/* Main Editor - Full Height */}
         <div className="flex-1 flex">
-          {/* Left Toolbar */}
-          <div className="w-16 p-2 space-y-2 flex flex-col relative" style={{
+          {/* Left Sidebar - Layers and Properties */}
+          <div className="w-80 p-4 space-y-4 overflow-y-auto" style={{
             background: 'rgba(255, 255, 255, 0.05)',
             backdropFilter: 'blur(12px)',
             borderRight: '1px solid rgba(255, 255, 255, 0.1)',
-            boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-            overflow: 'visible'
+            boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
           }}>
-            {/* Export Button */}
-            <button
-              onClick={exportCanvas}
-              disabled={canvasState.elements.length === 0}
-              className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mb-2"
-              style={{
-                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                backdropFilter: 'blur(25px) saturate(180%)',
-                border: '1px solid rgba(59, 130, 246, 0.4)',
-                boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-              }}
-              title="Export PNG"
-            >
-              <Download className="w-5 h-5" />
-            </button>
+            {/* Top Action Buttons */}
+            <div className="grid grid-cols-4 gap-2 mb-6">
+              {/* Export Button */}
+              <button
+                onClick={exportCanvas}
+                disabled={canvasState.elements.length === 0}
+                className="h-12 rounded-lg flex items-center justify-center text-white font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(180%)',
+                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                  boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                }}
+                title="Export PNG"
+              >
+                <Download className="w-5 h-5" />
+              </button>
 
-            {/* Stickerfy Button */}
-            <div className="relative">
+              {/* Puzzle Piece Button */}
               <button
                 onClick={() => setStickerMenuOpen(!stickerMenuOpen)}
                 disabled={!canvasState.elements.some(el => el.type === 'image')}
-                className={`sticker-button w-12 h-12 rounded-lg flex items-center justify-center text-white font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mb-2 ${
+                className={`sticker-button h-12 rounded-lg flex items-center justify-center text-white font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
                   stickerMenuOpen ? 'scale-105' : ''
                 }`}
                 style={{
@@ -1552,57 +1631,408 @@ export default function CanvasPage() {
                 title={stickerMenuOpen ? "Close border settings" : "Open border settings"}
               >
                 <div className="relative flex items-center justify-center">
-                  {/* Arched border icon */}
-                  <svg className="w-6 h-4" viewBox="0 0 24 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path 
-                      d="M3 12 C3 6, 9 3, 12 3 C15 3, 21 6, 21 12" 
-                      stroke="currentColor" 
-                      strokeWidth="2.5" 
-                      fill="none"
-                      strokeLinecap="round"
-                    />
-                    <path 
-                      d="M5 10 C5 7, 8 5, 12 5 C16 5, 19 7, 19 10" 
-                      stroke="currentColor" 
-                      strokeWidth="1.8" 
-                      fill="none"
-                      strokeLinecap="round"
-                    />
+                  <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z"/>
                   </svg>
+                  <div className="absolute text-[8px] font-bold text-white">px</div>
                 </div>
               </button>
 
-
-            </div>
-
-
-            {/* Tool Buttons */}
-            <div className="space-y-2">
+              {/* Select Tool Button */}
               <button
                 onClick={() => setActiveTool('select')}
-                className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
+                className={`h-12 rounded-lg flex items-center justify-center transition-colors ${
                   activeTool === 'select' ? 'bg-blue-500/30 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-white/10'
                 }`}
                 title="Select"
               >
-                <Move className="w-6 h-6" />
+                <Move className="w-5 h-5" />
               </button>
 
+              {/* Text Tool Button */}
               <button
                 onClick={addText}
-                className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors ${
+                className={`h-12 rounded-lg flex items-center justify-center transition-colors ${
                   activeTool === 'text' ? 'bg-blue-500/30 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-white/10'
                 }`}
                 title="Add Text"
               >
-                <Type className="w-6 h-6" />
+                <Type className="w-5 h-5" />
               </button>
-
-
             </div>
+
+            {/* Layers Panel */}
+            <div className="p-4 rounded-xl" style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+              backdropFilter: 'blur(12px)'
+            }}>
+              <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                <Layers className="w-5 h-5" />
+                Layers ({canvasState.elements.length})
+              </h3>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {canvasState.elements.map((element) => (
+                  <div
+                    key={element.id}
+                    className={`p-3 rounded-lg border transition-all cursor-pointer ${
+                      canvasState.selectedElementId === element.id
+                        ? 'border-blue-400 bg-blue-500/20'
+                        : 'border-gray-600 bg-gray-800/30 hover:bg-gray-700/30'
+                    }`}
+                    onClick={() => setCanvasState(prev => ({ ...prev, selectedElementId: element.id }))}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 flex-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateElement(element.id, { visible: !element.visible });
+                          }}
+                          className="p-1 text-gray-400 hover:text-white"
+                          title={element.visible ? "Hide" : "Show"}
+                        >
+                          {element.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                        </button>
+                        <span className="text-white text-sm font-medium flex-1">
+                          {element.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteElement(element.id);
+                          }}
+                          className="p-1 text-red-400 hover:text-red-300"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {canvasState.elements.length === 0 && (
+                  <div className="text-gray-400 text-center py-8 text-sm">
+                    No elements yet. Add some content to get started!
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Properties Panel */}
+            {(() => {
+              const selectedElement = canvasState.elements.find(el => el.id === canvasState.selectedElementId);
+              return selectedElement && (
+                <div className="p-4 rounded-xl" style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                  backdropFilter: 'blur(12px)'
+                }}>
+                  <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                    <Settings className="w-5 h-5" />
+                    Properties
+                  </h3>
+                  <div className="space-y-4">
+                    {/* Position & Size */}
+                    <div className="space-y-2">
+                      <label className="block text-white text-sm font-medium">Position & Size</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-gray-300 text-xs">X</label>
+                          <input
+                            type="number"
+                            value={Math.round(selectedElement.x)}
+                            onChange={(e) => updateElement(selectedElement.id, { x: parseInt(e.target.value) || 0 })}
+                            className="w-full px-2 py-1 text-sm bg-gray-700 text-white border border-gray-600 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-300 text-xs">Y</label>
+                          <input
+                            type="number"
+                            value={Math.round(selectedElement.y)}
+                            onChange={(e) => updateElement(selectedElement.id, { y: parseInt(e.target.value) || 0 })}
+                            className="w-full px-2 py-1 text-sm bg-gray-700 text-white border border-gray-600 rounded"
+                          />
+                        </div>
+                      </div>
+                      
+                      {/* Size Display */}
+                      <div className="mb-2 p-2 rounded" style={{ background: 'rgba(255, 255, 255, 0.05)' }}>
+                        <div className="text-white text-xs">
+                          {selectedElement.type === 'image' && selectedElement.stickerMode ? (
+                            <>
+                              {/* Show both image size and total sticker size with border */}
+                              <div className="flex justify-between">
+                                <span>Image:</span>
+                                <span>{Math.round(selectedElement.width)} × {Math.round(selectedElement.height)}px</span>
+                              </div>
+                              <div className="flex justify-between mt-1">
+                                <span>Sticker:</span>
+                                <span>{Math.round(selectedElement.width + (selectedElement.stickerBorderWidth || 6) * 2)} × {Math.round(selectedElement.height + (selectedElement.stickerBorderWidth || 6) * 2)}px</span>
+                              </div>
+                              <div className="flex justify-between mt-1 pt-1 border-t border-white/10">
+                                <span className="font-medium">Total Size:</span>
+                                <span className="font-medium">{pxToInches(selectedElement.width + (selectedElement.stickerBorderWidth || 6) * 2)}" × {pxToInches(selectedElement.height + (selectedElement.stickerBorderWidth || 6) * 2)}"</span>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              {/* Regular size display for non-sticker elements */}
+                              <div className="flex justify-between">
+                                <span>Pixels:</span>
+                                <span>{Math.round(selectedElement.width)} × {Math.round(selectedElement.height)}px</span>
+                              </div>
+                              <div className="flex justify-between mt-1">
+                                <span>Inches:</span>
+                                <span>{pxToInches(selectedElement.width)}" × {pxToInches(selectedElement.height)}"</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Size Presets */}
+                      {selectedElement.type === 'image' && (
+                        <div className="mb-2">
+                          <label className="block text-gray-300 text-xs mb-2">Quick Size Presets</label>
+                          <div className="flex gap-1">
+                            {[
+                              { label: '2"', inches: 2 },
+                              { label: '3"', inches: 3 },
+                              { label: '4"', inches: 4 }
+                            ].map((preset) => (
+                              <button
+                                key={preset.inches}
+                                onClick={() => {
+                                  const newSize = preset.inches * 96; // Convert inches to pixels (96 DPI)
+                                  const aspectRatio = selectedElement.width / selectedElement.height;
+                                  
+                                  if (aspectRatio >= 1) {
+                                    // Landscape or square - set width to preset size
+                                    const newWidth = newSize;
+                                    const newHeight = newSize / aspectRatio;
+                                    updateElement(selectedElement.id, { width: newWidth, height: newHeight });
+                                  } else {
+                                    // Portrait - set height to preset size
+                                    const newHeight = newSize;
+                                    const newWidth = newSize * aspectRatio;
+                                    updateElement(selectedElement.id, { width: newWidth, height: newHeight });
+                                  }
+                                }}
+                                className="flex-1 px-2 py-1 text-xs text-white rounded transition-colors hover:bg-blue-500/20 border border-gray-600"
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Manual Size Input */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <input
+                            type="number"
+                            value={Math.round(selectedElement.width)}
+                            onChange={(e) => {
+                              const newWidth = parseInt(e.target.value) || 1;
+                              updateElement(selectedElement.id, { width: newWidth });
+                            }}
+                            className="w-full px-2 py-1 text-sm bg-gray-700 text-white border border-gray-600 rounded"
+                            placeholder="W"
+                            title="Width"
+                          />
+                        </div>
+                        <span className="text-gray-400 text-sm font-medium">×</span>
+                        <div className="flex-1">
+                          <input
+                            type="number"
+                            value={Math.round(selectedElement.height)}
+                            onChange={(e) => {
+                              const newHeight = parseInt(e.target.value) || 1;
+                              updateElement(selectedElement.id, { height: newHeight });
+                            }}
+                            className="w-full px-2 py-1 text-sm bg-gray-700 text-white border border-gray-600 rounded"
+                            placeholder="H"
+                            title="Height"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Opacity */}
+                    <div>
+                      <label className="block text-white text-sm mb-2">Opacity: {Math.round(selectedElement.opacity * 100)}%</label>
+                                             <input
+                         type="range"
+                         min="0"
+                         max="1"
+                         step="0.01"
+                         value={selectedElement.opacity}
+                         onChange={(e) => updateElement(selectedElement.id, { opacity: parseFloat(e.target.value) })}
+                         className="w-full"
+                         title="Adjust element opacity"
+                       />
+                    </div>
+
+                    {/* Text Properties */}
+                    {selectedElement.type === 'text' && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-white text-sm mb-1">Text</label>
+                                                     <textarea
+                             value={selectedElement.text || ''}
+                             onChange={(e) => updateElement(selectedElement.id, { text: e.target.value })}
+                             className="w-full px-3 py-2 text-sm bg-gray-700 text-white border border-gray-600 rounded resize-none"
+                             rows={3}
+                             title="Edit text content"
+                           />
+                         </div>
+                         <div>
+                           <label className="block text-white text-sm mb-1">Font Size</label>
+                           <input
+                             type="number"
+                             value={selectedElement.fontSize || 24}
+                             onChange={(e) => updateElement(selectedElement.id, { fontSize: parseInt(e.target.value) || 24 })}
+                             className="w-full px-3 py-2 text-sm bg-gray-700 text-white border border-gray-600 rounded"
+                             title="Set font size in pixels"
+                           />
+                         </div>
+                         <div>
+                           <label className="block text-white text-sm mb-1">Text Color</label>
+                           <input
+                             type="color"
+                             value={selectedElement.textColor || '#000000'}
+                             onChange={(e) => updateElement(selectedElement.id, { textColor: e.target.value })}
+                             className="w-full h-10 border border-gray-600 rounded cursor-pointer"
+                             title="Choose text color"
+                           />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Image Properties */}
+                    {selectedElement.type === 'image' && selectedElement.stickerMode && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-white text-sm mb-1">
+                            Border Width: {selectedElement.stickerBorderWidth || 6}px ({pxToInches(selectedElement.stickerBorderWidth || 6)}")
+                          </label>
+                                                     <input
+                             type="number"
+                             min="5"
+                             max="20"
+                             value={selectedElement.stickerBorderWidth || 6}
+                             onChange={(e) => updateElement(selectedElement.id, { stickerBorderWidth: Math.max(5, parseInt(e.target.value) || 6) })}
+                             className="w-full px-3 py-2 text-sm bg-gray-700 text-white border border-gray-600 rounded"
+                             title="Set border width in pixels"
+                           />
+                        </div>
+                        <div>
+                          <label className="block text-white text-sm mb-1">Border Color (CMYK)</label>
+                          <div className="grid grid-cols-4 gap-2 mb-2">
+                            {[
+                              { name: 'White', color: '#FFFFFF', cmyk: 'C:0 M:0 Y:0 K:0' },
+                              { name: 'Black', color: '#000000', cmyk: 'C:0 M:0 Y:0 K:100' },
+                              { name: 'Cyan', color: '#00FFFF', cmyk: 'C:100 M:0 Y:0 K:0' },
+                              { name: 'Magenta', color: '#FF00FF', cmyk: 'C:0 M:100 Y:0 K:0' },
+                              { name: 'Yellow', color: '#FFFF00', cmyk: 'C:0 M:0 Y:100 K:0' },
+                              { name: 'Red', color: '#FF0000', cmyk: 'C:0 M:100 Y:100 K:0' },
+                              { name: 'Green', color: '#00FF00', cmyk: 'C:100 M:0 Y:100 K:0' },
+                              { name: 'Blue', color: '#0000FF', cmyk: 'C:100 M:100 Y:0 K:0' }
+                            ].map((preset) => (
+                              <button
+                                key={preset.color}
+                                onClick={() => updateElement(selectedElement.id, { stickerBorderColor: preset.color })}
+                                className={`w-8 h-8 rounded border-2 transition-all ${
+                                  (selectedElement.stickerBorderColor || '#ffffff') === preset.color 
+                                    ? 'border-blue-400 scale-110' 
+                                    : 'border-white/30 hover:border-white/60'
+                                }`}
+                                style={{ backgroundColor: preset.color }}
+                                title={`${preset.name} - ${preset.cmyk}`}
+                              />
+                            ))}
+                          </div>
+                          <div className="text-gray-300 text-xs text-center">
+                            {(() => {
+                              const currentColor = (selectedElement.stickerBorderColor || '#ffffff').toUpperCase();
+                              const colorMap: Record<string, string> = {
+                                '#FFFFFF': 'White - C:0 M:0 Y:0 K:0',
+                                '#000000': 'Black - C:0 M:0 Y:0 K:100',
+                                '#00FFFF': 'Cyan - C:100 M:0 Y:0 K:0',
+                                '#FF00FF': 'Magenta - C:0 M:100 Y:0 K:0',
+                                '#FFFF00': 'Yellow - C:0 M:0 Y:100 K:0',
+                                '#FF0000': 'Red - C:0 M:100 Y:100 K:0',
+                                '#00FF00': 'Green - C:100 M:0 Y:100 K:0',
+                                '#0000FF': 'Blue - C:100 M:100 Y:0 K:0'
+                              };
+                              return colorMap[currentColor] || 'Custom Color';
+                            })()}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedElement.fillHoles || false}
+                              onChange={(e) => updateElement(selectedElement.id, { fillHoles: e.target.checked })}
+                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-white text-sm">Fill Holes</span>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Shape Properties */}
+                    {selectedElement.type === 'shape' && (
+                      <div className="space-y-3">
+                                                 <div>
+                           <label className="block text-white text-sm mb-1">Fill Color</label>
+                           <input
+                             type="color"
+                             value={selectedElement.fillColor || '#3b82f6'}
+                             onChange={(e) => updateElement(selectedElement.id, { fillColor: e.target.value })}
+                             className="w-full h-10 border border-gray-600 rounded cursor-pointer"
+                             title="Choose shape fill color"
+                           />
+                         </div>
+                         <div>
+                           <label className="block text-white text-sm mb-1">Stroke Color</label>
+                           <input
+                             type="color"
+                             value={selectedElement.strokeColor || '#1e40af'}
+                             onChange={(e) => updateElement(selectedElement.id, { strokeColor: e.target.value })}
+                             className="w-full h-10 border border-gray-600 rounded cursor-pointer"
+                             title="Choose shape stroke color"
+                           />
+                         </div>
+                         <div>
+                           <label className="block text-white text-sm mb-1">Stroke Width</label>
+                           <input
+                             type="number"
+                             min="0"
+                             value={selectedElement.strokeWidth || 0}
+                             onChange={(e) => updateElement(selectedElement.id, { strokeWidth: parseInt(e.target.value) || 0 })}
+                             className="w-full px-3 py-2 text-sm bg-gray-700 text-white border border-gray-600 rounded"
+                             title="Set stroke width in pixels"
+                           />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
-          {/* Canvas Area - Full Size */}
+          {/* Canvas Area - Center */}
           <div className="flex-1 relative overflow-hidden">
             <canvas
               ref={canvasRef}
@@ -1658,458 +2088,418 @@ export default function CanvasPage() {
             )}
           </div>
 
-          {/* Right Properties Panel */}
-          <div className="w-96 p-6 space-y-6 overflow-y-auto" style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            backdropFilter: 'blur(12px)',
-            borderLeft: '1px solid rgba(255, 255, 255, 0.1)'
-          }}>
-            
-            {/* Layers Panel */}
-            <div className="p-4 rounded-xl" style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-              backdropFilter: 'blur(12px)'
-            }}>
-              <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                <Layers className="w-5 h-5" />
-                Layers ({canvasState.elements.length})
-              </h3>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {canvasState.elements.map((element) => (
-                  <div
-                    key={element.id}
-                    className={`p-3 rounded-lg border transition-all cursor-pointer ${
-                      canvasState.selectedElementId === element.id
-                        ? 'border-blue-400 bg-blue-500/20'
-                        : 'border-gray-600 bg-gray-800/30 hover:bg-gray-700/30'
-                    }`}
-                    onClick={() => setCanvasState(prev => ({ ...prev, selectedElementId: element.id }))}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 flex-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateElement(element.id, { visible: !element.visible });
-                          }}
-                          className="p-1 text-gray-400 hover:text-white"
-                          title={element.visible ? "Hide" : "Show"}
-                        >
-                          {element.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                        </button>
-                        {editingLayerId === element.id ? (
-                          <input
-                            type="text"
-                            value={element.name}
-                            onChange={(e) => {
-                              setCanvasState(prev => ({
-                                ...prev,
-                                elements: prev.elements.map(el => 
-                                  el.id === element.id 
-                                    ? { ...el, name: e.target.value }
-                                    : el
-                                )
-                              }));
-                            }}
-                            onBlur={() => setEditingLayerId(null)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') setEditingLayerId(null);
-                              e.stopPropagation();
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="bg-white/20 text-white px-2 py-1 rounded text-sm flex-1"
-                            autoFocus
-                            title="Layer name"
-                          />
-                        ) : (
-                          <span 
-                            className="text-white text-sm font-medium flex-1 cursor-text"
-                            onDoubleClick={(e) => {
-                              e.stopPropagation();
-                              setEditingLayerId(element.id);
-                            }}
-                            title="Double-click to rename"
-                          >
-                            {element.name}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingLayerId(element.id);
-                          }}
-                          className="p-1 text-gray-400 hover:text-white"
-                          title="Rename layer"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteElement(element.id);
-                          }}
-                          className="p-1 text-red-400 hover:text-red-300"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {canvasState.elements.length === 0 && (
-                  <div className="text-gray-400 text-center py-8 text-sm">
-                    No elements yet. Add some content to get started!
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Properties Panel */}
-            {selectedElement && (
-              <div className="p-4 rounded-xl" style={{
+          {/* Right Floating Calculator */}
+          <div className="w-[440px] p-4 relative">
+            <div className="sticky top-4 space-y-4">
+              {/* Floating Vinyl Sticker Calculator */}
+              <div className="rounded-xl p-6" style={{
                 background: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
                 boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
                 backdropFilter: 'blur(12px)'
               }}>
-                <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                  <Settings className="w-5 h-5" />
-                  Properties
-                </h3>
+                                <div className="mb-6">
+                  <div className="mb-4">
+                    <button
+                      onClick={() => {
+                        const stickerTypes = ["vinyl", "holographic", "glitter", "chrome", "clear"];
+                        const currentIndex = stickerTypes.indexOf(selectedStickerType);
+                        const nextIndex = (currentIndex + 1) % stickerTypes.length;
+                        setSelectedStickerType(stickerTypes[nextIndex]);
+                      }}
+                      className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
+                      title="Click to change sticker type"
+                    >
+                      {(() => {
+                        const stickerTypes = {
+                          vinyl: {
+                            name: "Vinyl Stickers",
+                            icon: "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png"
+                          },
+                          holographic: {
+                            name: "Holographic Stickers", 
+                            icon: "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png"
+                          },
+                          glitter: {
+                            name: "Glitter Stickers",
+                            icon: "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png"
+                          },
+                          chrome: {
+                            name: "Chrome Stickers",
+                            icon: "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png"
+                          },
+                          clear: {
+                            name: "Clear Stickers",
+                            icon: "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749849590/StickerShuttle_ClearIcon_zxjnqc.svg"
+                          }
+                        };
+                        const currentType = stickerTypes[selectedStickerType as keyof typeof stickerTypes];
+                        return (
+                          <>
+                            <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center">
+                              <img 
+                                src={currentType.icon} 
+                                alt={currentType.name}
+                                className="w-full h-full object-contain"
+                              />
+                            </div>
+                            <h3 className="text-white font-semibold">{currentType.name} Calculator</h3>
+                            <svg className="w-4 h-4 text-white ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </>
+                        );
+                      })()}
+                    </button>
+                  </div>
+                </div>
+                
                 <div className="space-y-4">
-                  {/* Position & Size */}
-                  <div className="space-y-2">
-                    <label className="block text-white text-sm font-medium">Position & Size</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-gray-300 text-xs">X</label>
-                        <input
-                          type="number"
-                          value={Math.round(selectedElement.x)}
-                          onChange={(e) => updateElement(selectedElement.id, { x: parseInt(e.target.value) || 0 })}
-                          className="w-full px-2 py-1 text-sm bg-gray-700 text-white border border-gray-600 rounded"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-300 text-xs">Y</label>
-                        <input
-                          type="number"
-                          value={Math.round(selectedElement.y)}
-                          onChange={(e) => updateElement(selectedElement.id, { y: parseInt(e.target.value) || 0 })}
-                          className="w-full px-2 py-1 text-sm bg-gray-700 text-white border border-gray-600 rounded"
-                        />
-                      </div>
-                    </div>
-                    
-                    {/* Size in Pixels and Inches */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-gray-300 text-xs">Size</label>
-                        <button
-                          onClick={() => setAspectRatioLocked(!aspectRatioLocked)}
-                          className={`p-1 rounded text-xs transition-colors ${
-                            aspectRatioLocked 
-                              ? 'text-blue-400 bg-blue-500/20' 
-                              : 'text-gray-400 hover:text-white hover:bg-white/10'
-                          }`}
-                          title={aspectRatioLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
-                        >
-                          {aspectRatioLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-                        </button>
-                      </div>
-                      
-                                             {/* Size Display */}
-                       <div className="mb-2 p-2 rounded" style={{ background: 'rgba(255, 255, 255, 0.05)' }}>
-                         <div className="text-white text-xs">
-                           {selectedElement.type === 'image' && selectedElement.stickerMode ? (
-                             <>
-                               {/* Show both image size and total sticker size with border */}
-                               <div className="flex justify-between">
-                                 <span>Image:</span>
-                                 <span>{Math.round(selectedElement.width)} × {Math.round(selectedElement.height)}px</span>
-                               </div>
-                               <div className="flex justify-between mt-1">
-                                 <span>Sticker:</span>
-                                 <span>{Math.round(selectedElement.width + (selectedElement.stickerBorderWidth || 6) * 2)} × {Math.round(selectedElement.height + (selectedElement.stickerBorderWidth || 6) * 2)}px</span>
-                               </div>
-                               <div className="flex justify-between mt-1 pt-1 border-t border-white/10">
-                                 <span className="font-medium">Total Size:</span>
-                                 <span className="font-medium">{pxToInches(selectedElement.width + (selectedElement.stickerBorderWidth || 6) * 2)}" × {pxToInches(selectedElement.height + (selectedElement.stickerBorderWidth || 6) * 2)}"</span>
-                               </div>
-                             </>
-                           ) : (
-                             <>
-                               {/* Regular size display for non-sticker elements */}
-                               <div className="flex justify-between">
-                                 <span>Pixels:</span>
-                                 <span>{Math.round(selectedElement.width)} × {Math.round(selectedElement.height)}px</span>
-                               </div>
-                               <div className="flex justify-between mt-1">
-                                 <span>Inches:</span>
-                                 <span>{pxToInches(selectedElement.width)}" × {pxToInches(selectedElement.height)}"</span>
-                               </div>
-                             </>
-                           )}
-                         </div>
-                       </div>
-                      
-                      {/* Size Presets */}
-                      {selectedElement.type === 'image' && (
-                        <div className="mb-2">
-                          <label className="block text-gray-300 text-xs mb-2">Quick Size Presets</label>
-                          <div className="flex gap-1">
-                            {[
-                              { label: '2"', inches: 2 },
-                              { label: '3"', inches: 3 },
-                              { label: '4"', inches: 4 }
-                            ].map((preset) => (
-                              <button
-                                key={preset.inches}
-                                onClick={() => {
-                                  const newSize = preset.inches * 96; // Convert inches to pixels (96 DPI)
-                                  const aspectRatio = selectedElement.width / selectedElement.height;
-                                  
-                                  if (aspectRatio >= 1) {
-                                    // Landscape or square - set width to preset size
-                                    const newWidth = newSize;
-                                    const newHeight = newSize / aspectRatio;
-                                    updateElement(selectedElement.id, { width: newWidth, height: newHeight });
-                                  } else {
-                                    // Portrait - set height to preset size
-                                    const newHeight = newSize;
-                                    const newWidth = newSize * aspectRatio;
-                                    updateElement(selectedElement.id, { width: newWidth, height: newHeight });
-                                  }
-                                }}
-                                className="flex-1 px-2 py-1 text-xs text-white rounded transition-colors hover:bg-blue-500/20 border border-gray-600"
-                              >
-                                {preset.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Manual Size Input */}
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <input
-                            type="number"
-                            value={Math.round(selectedElement.width)}
-                            onChange={(e) => {
-                              const newWidth = parseInt(e.target.value) || 1;
-                              if (aspectRatioLocked) {
-                                const aspectRatio = selectedElement.height / selectedElement.width;
-                                const newHeight = newWidth * aspectRatio;
-                                setCanvasState(prev => ({
-                                  ...prev,
-                                  elements: prev.elements.map(el => 
-                                    el.id === selectedElement.id 
-                                      ? { ...el, width: newWidth, height: newHeight }
-                                      : el
-                                  )
-                                }));
-                              } else {
-                                updateElement(selectedElement.id, { width: newWidth });
-                              }
-                            }}
-                            className="w-full px-2 py-1 text-sm bg-gray-700 text-white border border-gray-600 rounded"
-                            placeholder="W"
-                            title="Width"
-                          />
-                        </div>
-                        <span className="text-gray-400 text-sm font-medium">×</span>
-                        <div className="flex-1">
-                          <input
-                            type="number"
-                            value={Math.round(selectedElement.height)}
-                            onChange={(e) => {
-                              const newHeight = parseInt(e.target.value) || 1;
-                              if (aspectRatioLocked) {
-                                const aspectRatio = selectedElement.width / selectedElement.height;
-                                const newWidth = newHeight * aspectRatio;
-                                setCanvasState(prev => ({
-                                  ...prev,
-                                  elements: prev.elements.map(el => 
-                                    el.id === selectedElement.id 
-                                      ? { ...el, width: newWidth, height: newHeight }
-                                      : el
-                                  )
-                                }));
-                              } else {
-                                updateElement(selectedElement.id, { height: newHeight });
-                              }
-                            }}
-                            className="w-full px-2 py-1 text-sm bg-gray-700 text-white border border-gray-600 rounded"
-                            placeholder="H"
-                            title="Height"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Opacity */}
+                  {/* Shape Dropdown */}
                   <div>
-                    <label className="block text-white text-sm mb-2">Opacity: {Math.round(selectedElement.opacity * 100)}%</label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      value={selectedElement.opacity}
-                      onChange={(e) => updateElement(selectedElement.id, { opacity: parseFloat(e.target.value) })}
-                      className="w-full"
-                    />
+                    <label className="block text-white text-sm font-medium mb-2">Shape</label>
+                                                              <select
+                       value={selectedCut}
+                       onChange={(e) => setSelectedCut(e.target.value)}
+                       className="w-full px-3 py-2 rounded-lg text-white border border-white/20 focus:outline-none focus:border-purple-400 transition-colors"
+                       style={{
+                         background: 'rgba(255, 255, 255, 0.1)',
+                         backdropFilter: 'blur(12px)',
+                         color: 'white'
+                       }}
+                       title="Select shape for your stickers"
+                     >
+                       <option value="Custom Shape" className="bg-gray-800 text-white">Custom Shape</option>
+                       <option value="Circle" className="bg-gray-800 text-white">Circle</option>
+                       <option value="Oval" className="bg-gray-800 text-white">Oval</option>
+                       <option value="Rectangle" className="bg-gray-800 text-white">Rectangle</option>
+                       <option value="Square" className="bg-gray-800 text-white">Square</option>
+                     </select>
                   </div>
 
-                  {/* Text Properties */}
-                  {selectedElement.type === 'text' && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-white text-sm mb-1">Text</label>
-                        <textarea
-                          value={selectedElement.text || ''}
-                          onChange={(e) => updateElement(selectedElement.id, { text: e.target.value })}
-                          className="w-full px-3 py-2 text-sm bg-gray-700 text-white border border-gray-600 rounded resize-none"
-                          rows={3}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-white text-sm mb-1">Font Size</label>
-                        <input
-                          type="number"
-                          value={selectedElement.fontSize || 24}
-                          onChange={(e) => updateElement(selectedElement.id, { fontSize: parseInt(e.target.value) || 24 })}
-                          className="w-full px-3 py-2 text-sm bg-gray-700 text-white border border-gray-600 rounded"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-white text-sm mb-1">Text Color</label>
-                        <input
-                          type="color"
-                          value={selectedElement.textColor || '#000000'}
-                          onChange={(e) => updateElement(selectedElement.id, { textColor: e.target.value })}
-                          className="w-full h-10 border border-gray-600 rounded cursor-pointer"
-                        />
-                      </div>
-                    </div>
-                  )}
+                  {/* Material Dropdown */}
+                  <div>
+                    <label className="block text-white text-sm font-medium mb-2">Material</label>
+                                         <select
+                       value={selectedMaterial}
+                       onChange={(e) => setSelectedMaterial(e.target.value)}
+                       className="w-full px-3 py-2 rounded-lg text-white border border-white/20 focus:outline-none focus:border-purple-400 transition-colors"
+                       style={{
+                         background: 'rgba(255, 255, 255, 0.1)',
+                         backdropFilter: 'blur(12px)',
+                         color: 'white'
+                       }}
+                       title="Select material finish for your stickers"
+                     >
+                       <option value="Matte" className="bg-gray-800 text-white">Matte</option>
+                       <option value="Gloss" className="bg-gray-800 text-white">Gloss</option>
+                       <option value="Shimmer Gloss" className="bg-gray-800 text-white">Shimmer Gloss</option>
+                     </select>
+                   </div>
 
-                  {/* Image Properties */}
-                  {selectedElement.type === 'image' && selectedElement.stickerMode && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-white text-sm mb-1">
-                          Border Width: {selectedElement.stickerBorderWidth || 6}px ({pxToInches(selectedElement.stickerBorderWidth || 6)}")
-                        </label>
+                   {/* Size Selection */}
+                   <div>
+                     <label className="block text-white text-sm font-medium mb-2">Size</label>
+                                           <select
+                        value={selectedSize}
+                        onChange={(e) => setSelectedSize(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg text-white border border-white/20 focus:outline-none focus:border-purple-400 transition-colors"
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          backdropFilter: 'blur(12px)',
+                          color: 'white'
+                        }}
+                        title="Select size for your stickers"
+                      >
+                        <option value='Small (2")' className="bg-gray-800 text-white">Small (2")</option>
+                        <option value='Medium (3")' className="bg-gray-800 text-white">Medium (3")</option>
+                        <option value='Large (4")' className="bg-gray-800 text-white">Large (4")</option>
+                        <option value='X-Large (5")' className="bg-gray-800 text-white">X-Large (5")</option>
+                        <option value="Custom size" className="bg-gray-800 text-white">Custom size</option>
+                      </select>
+                    
+                    {selectedSize === "Custom size" && (
+                      <div className="mt-2 flex gap-2">
                         <input
                           type="number"
-                          min="5"
-                          max="20"
-                          value={selectedElement.stickerBorderWidth || 6}
-                          onChange={(e) => updateElement(selectedElement.id, { stickerBorderWidth: Math.max(5, parseInt(e.target.value) || 6) })}
-                          className="w-full px-3 py-2 text-sm bg-gray-700 text-white border border-gray-600 rounded"
+                          placeholder="Width"
+                          value={customWidth}
+                          onChange={(e) => setCustomWidth(e.target.value)}
+                          className="flex-1 px-3 py-2 rounded-lg text-white border border-white/20 focus:outline-none focus:border-purple-400"
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            backdropFilter: 'blur(12px)'
+                          }}
+                        />
+                        <input
+                          type="number"
+                          placeholder="Height"
+                          value={customHeight}
+                          onChange={(e) => setCustomHeight(e.target.value)}
+                          className="flex-1 px-3 py-2 rounded-lg text-white border border-white/20 focus:outline-none focus:border-purple-400"
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            backdropFilter: 'blur(12px)'
+                          }}
                         />
                       </div>
-                      <div>
-                        <label className="block text-white text-sm mb-1">Border Color (CMYK)</label>
-                        <div className="grid grid-cols-4 gap-2 mb-2">
-                          {[
-                            { name: 'White', color: '#FFFFFF', cmyk: 'C:0 M:0 Y:0 K:0' },
-                            { name: 'Black', color: '#000000', cmyk: 'C:0 M:0 Y:0 K:100' },
-                            { name: 'Cyan', color: '#00FFFF', cmyk: 'C:100 M:0 Y:0 K:0' },
-                            { name: 'Magenta', color: '#FF00FF', cmyk: 'C:0 M:100 Y:0 K:0' },
-                            { name: 'Yellow', color: '#FFFF00', cmyk: 'C:0 M:0 Y:100 K:0' },
-                            { name: 'Red', color: '#FF0000', cmyk: 'C:0 M:100 Y:100 K:0' },
-                            { name: 'Green', color: '#00FF00', cmyk: 'C:100 M:0 Y:100 K:0' },
-                            { name: 'Blue', color: '#0000FF', cmyk: 'C:100 M:100 Y:0 K:0' }
-                          ].map((preset) => (
-                            <button
-                              key={preset.color}
-                              onClick={() => updateElement(selectedElement.id, { stickerBorderColor: preset.color })}
-                              className={`w-8 h-8 rounded border-2 transition-all ${
-                                (selectedElement.stickerBorderColor || '#ffffff') === preset.color 
-                                  ? 'border-blue-400 scale-110' 
-                                  : 'border-white/30 hover:border-white/60'
-                              }`}
-                              style={{ backgroundColor: preset.color }}
-                              title={`${preset.name} - ${preset.cmyk}`}
-                            />
-                          ))}
-                        </div>
-                        <div className="text-gray-300 text-xs text-center">
-                          {(() => {
-                            const colorMap = {
-                              '#FFFFFF': 'White - C:0 M:0 Y:0 K:0',
-                              '#000000': 'Black - C:0 M:0 Y:0 K:100',
-                              '#00FFFF': 'Cyan - C:100 M:0 Y:0 K:0',
-                              '#FF00FF': 'Magenta - C:0 M:100 Y:0 K:0',
-                              '#FFFF00': 'Yellow - C:0 M:0 Y:100 K:0',
-                              '#FF0000': 'Red - C:0 M:100 Y:100 K:0',
-                              '#00FF00': 'Green - C:100 M:0 Y:100 K:0',
-                              '#0000FF': 'Blue - C:100 M:100 Y:0 K:0'
-                            };
-                            const currentColor = (selectedElement.stickerBorderColor || '#ffffff').toUpperCase();
-                            return colorMap[currentColor] || 'Custom Color';
-                          })()}
-                        </div>
-                      </div>
-                      <div>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedElement.fillHoles || false}
-                            onChange={(e) => updateElement(selectedElement.id, { fillHoles: e.target.checked })}
-                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                          />
-                          <span className="text-white text-sm">Fill Holes</span>
-                        </label>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
-                  {/* Shape Properties */}
-                  {selectedElement.type === 'shape' && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-white text-sm mb-1">Fill Color</label>
-                        <input
-                          type="color"
-                          value={selectedElement.fillColor || '#3b82f6'}
-                          onChange={(e) => updateElement(selectedElement.id, { fillColor: e.target.value })}
-                          className="w-full h-10 border border-gray-600 rounded cursor-pointer"
-                        />
+                                     {/* Quantity Selection */}
+                   <div>
+                     <label className="block text-white text-sm font-medium mb-3">Select a quantity</label>
+                     <div className="space-y-2">
+                       {["50", "100", "200", "300", "500", "1,000", "2,500", "Custom"].map((amount) => {
+                         const numericAmount = Number.parseInt(amount.replace(",", ""))
+                         const area = calculateArea(selectedSize, customWidth, customHeight)
+                         const isSelected = (selectedQuantity === numericAmount.toString()) || (selectedQuantity === "Custom" && amount === "Custom")
+                         const isGoldTier = numericAmount >= 1000 && amount !== "Custom"
+
+                         // Get pricing for current size
+                         let pricePerEach = ""
+                         let totalPrice = ""
+                         let percentOff = ""
+
+                         if (area > 0 && amount !== "Custom") {
+                           const currentPricing = calculateCanvasPrice(numericAmount, area, false)
+                           const { total, perSticker } = currentPricing
+                           
+                           totalPrice = `$${total.toFixed(2)}`
+                           pricePerEach = `$${perSticker.toFixed(2)}/ea.`
+                           
+                           // Calculate discount percentage (simplified)
+                           if (numericAmount > 50) {
+                             const basePrice = calculateCanvasPrice(50, area, false).perSticker
+                             const discount = ((basePrice - perSticker) / basePrice) * 100
+                             if (discount > 0.5) {
+                               percentOff = `${Math.round(discount)}% off`
+                             }
+                           }
+                         }
+
+                         return (
+                           <div key={amount} className="relative">
+                             <button
+                               onClick={() => {
+                                 const quantityValue = amount === "Custom" ? "Custom" : numericAmount.toString()
+                                 setSelectedQuantity(quantityValue)
+                                 if (amount !== "Custom") {
+                                   setCustomQuantity("")
+                                 }
+                               }}
+                               className={`w-full text-left px-3 py-2 rounded-lg flex items-center justify-between transition-all border backdrop-blur-md text-sm ${
+                                 isSelected
+                                   ? isGoldTier
+                                     ? "bg-gradient-to-r from-yellow-500/30 via-amber-400/30 to-yellow-600/30 text-yellow-100 font-medium border-yellow-400/60"
+                                     : "bg-green-500/20 text-green-200 font-medium border-green-400/50"
+                                   : "hover:bg-white/10 border-white/20 text-white/80"
+                               }`}
+                             >
+                               <div className="flex items-center gap-2">
+                                 <span className="font-medium">{amount}</span>
+                                 {isGoldTier && <span className="text-yellow-400">👑</span>}
+                               </div>
+
+                               <div className="flex items-center gap-2">
+                                 {totalPrice && amount !== "Custom" && (
+                                   <span className="px-2 py-1 text-xs font-medium rounded border text-green-200"
+                                         style={{
+                                           background: 'rgba(34, 197, 94, 0.2)',
+                                           border: '1px solid rgba(34, 197, 94, 0.4)'
+                                         }}>
+                                     {totalPrice}
+                                   </span>
+                                 )}
+                                 {pricePerEach && amount !== "Custom" && (
+                                   <span className="px-2 py-1 text-xs font-medium rounded border text-purple-200"
+                                         style={{
+                                           background: 'rgba(147, 51, 234, 0.2)',
+                                           border: '1px solid rgba(147, 51, 234, 0.4)'
+                                         }}>
+                                     {pricePerEach}
+                                   </span>
+                                 )}
+                                 {percentOff && (
+                                   <span className="text-xs font-medium text-green-300">
+                                     {percentOff}
+                                   </span>
+                                 )}
+                               </div>
+                             </button>
+                           </div>
+                         )
+                       })}
+                     </div>
+                     
+                     {selectedQuantity === "Custom" && (
+                       <div className="mt-3">
+                         <input
+                           type="number"
+                           placeholder="Enter custom quantity (min 15)"
+                           value={customQuantity}
+                           onChange={(e) => setCustomQuantity(e.target.value)}
+                           className="w-full px-3 py-2 rounded-lg text-white border border-white/20 focus:outline-none focus:border-yellow-400"
+                           style={{
+                             background: 'rgba(255, 255, 255, 0.1)',
+                             backdropFilter: 'blur(12px)',
+                             color: 'white'
+                           }}
+                         />
+                         {customQuantity && Number.parseInt(customQuantity) < 15 && (
+                           <div className="text-red-400 text-xs mt-1">
+                             15 is the minimum order quantity
+                           </div>
+                         )}
+                       </div>
+                     )}
+                   </div>
+
+                  {/* Proof Option */}
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="sendProof"
+                      checked={sendProof}
+                      onChange={(e) => setSendProof(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <label htmlFor="sendProof" className="text-white text-sm">
+                      Send FREE Proof
+                    </label>
+                  </div>
+
+                  {/* Pricing Display */}
+                  {(() => {
+                    const area = calculateArea(selectedSize, customWidth, customHeight);
+                    const quantity = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity);
+                    
+                    if (area > 0 && quantity >= 15) {
+                      const { total, perSticker } = calculateCanvasPrice(quantity, area, isRushOrder);
+                      
+                      return (
+                        <div className="mt-6 p-4 rounded-lg" style={{
+                          background: 'rgba(34, 197, 94, 0.1)',
+                          border: '1px solid rgba(34, 197, 94, 0.3)'
+                        }}>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-white font-medium">Total:</span>
+                            <span className="text-green-300 font-bold text-lg">${total.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-white/80">Per sticker:</span>
+                            <span className="text-green-300">${perSticker.toFixed(2)}</span>
+                          </div>
+                          {isRushOrder && (
+                            <div className="text-xs text-orange-300 mt-2">
+                              *Rush order fee applied (+40%)
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <div className="mt-6 p-4 rounded-lg text-center" style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                      }}>
+                        <span className="text-white/60 text-sm">Configure options to see pricing</span>
                       </div>
-                      <div>
-                        <label className="block text-white text-sm mb-1">Stroke Color</label>
-                        <input
-                          type="color"
-                          value={selectedElement.strokeColor || '#1e40af'}
-                          onChange={(e) => updateElement(selectedElement.id, { strokeColor: e.target.value })}
-                          className="w-full h-10 border border-gray-600 rounded cursor-pointer"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-white text-sm mb-1">Stroke Width</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={selectedElement.strokeWidth || 0}
-                          onChange={(e) => updateElement(selectedElement.id, { strokeWidth: parseInt(e.target.value) || 0 })}
-                          className="w-full px-3 py-2 text-sm bg-gray-700 text-white border border-gray-600 rounded"
-                        />
-                      </div>
+                    );
+                  })()}
+
+                  {/* Add to Cart Button */}
+                                     <button
+                     onClick={() => {
+                       const area = calculateArea(selectedSize, customWidth, customHeight);
+                       const quantity = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity);
+                       
+                       if (area > 0 && quantity >= 15 && canvasState.elements.length > 0) {
+                         const { total, perSticker } = calculateCanvasPrice(quantity, area, isRushOrder);
+                         const canvasImage = exportCanvasAsDataURL();
+                         
+                         if (canvasImage) {
+                           const cartItem = {
+                             id: generateCartItemId(),
+                             product: {
+                               id: "vinyl-stickers",
+                               sku: "SS-VS-CANVAS",
+                               name: "Canvas Design - Vinyl Stickers",
+                               category: "vinyl-stickers" as const,
+                               description: "Custom vinyl stickers created from canvas design",
+                               shortDescription: "Canvas design vinyl stickers",
+                               basePrice: perSticker,
+                               pricingModel: "per-unit" as const,
+                               images: [],
+                               defaultImage: "",
+                               features: [],
+                               attributes: [],
+                               customizable: true,
+                               isActive: true,
+                               createdAt: new Date().toISOString(),
+                               updatedAt: new Date().toISOString(),
+                             },
+                             customization: {
+                               productId: "vinyl-stickers",
+                               selections: {
+                                 cut: { type: "shape" as const, value: selectedCut, displayValue: selectedCut, priceImpact: 0 },
+                                 material: { type: "finish" as const, value: selectedMaterial, displayValue: selectedMaterial, priceImpact: 0 },
+                                 size: { 
+                                   type: "size-preset" as const, 
+                                   value: selectedSize === "Custom size" ? `${customWidth}"x${customHeight}"` : selectedSize,
+                                   displayValue: selectedSize === "Custom size" ? `${customWidth}"x${customHeight}"` : selectedSize,
+                                   priceImpact: 0 
+                                 },
+                                 proof: { type: "finish" as const, value: sendProof, displayValue: sendProof ? "Send Proof" : "No Proof", priceImpact: 0 },
+                                 rush: { type: "finish" as const, value: isRushOrder, displayValue: isRushOrder ? "Rush Order" : "Standard", priceImpact: isRushOrder ? total * 0.4 : 0 },
+                               },
+                               totalPrice: total,
+                               customFiles: [canvasImage],
+                               notes: "Canvas design created in design editor",
+                               additionalInfo: {
+                                 uploadLater: false
+                               }
+                             },
+                             quantity: quantity,
+                             unitPrice: perSticker,
+                             totalPrice: total,
+                             addedAt: new Date().toISOString()
+                           };
+                           
+                           addToCart(cartItem);
+                           router.push('/cart');
+                         }
+                       }
+                     }}
+                     disabled={(() => {
+                       const area = calculateArea(selectedSize, customWidth, customHeight);
+                       const quantity = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity);
+                       return !(area > 0 && quantity >= 15 && canvasState.elements.length > 0);
+                     })()}
+                     className="w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                     style={{
+                       background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                       backdropFilter: 'blur(25px) saturate(180%)',
+                       border: '1px solid rgba(59, 130, 246, 0.4)',
+                       boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                       color: 'white'
+                     }}
+                   >
+                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                     </svg>
+                     Add to Cart
+                   </button>
+                  
+                  {canvasState.elements.length === 0 && (
+                    <div className="text-center text-white/60 text-xs mt-2">
+                      Add elements to your canvas to enable ordering
                     </div>
                   )}
                 </div>
               </div>
-            )}
+            </div>
           </div>
           </div>
         </div>
