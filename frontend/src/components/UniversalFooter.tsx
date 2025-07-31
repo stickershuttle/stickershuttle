@@ -124,7 +124,11 @@ export default function UniversalFooter() {
                 </li>
                 <li>
                   <Link href="/store-credit" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center text-sm">
-                    <span className="mr-2">🪙</span>
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                      alt="Credits" 
+                      className="w-4 h-4 object-contain mr-2"
+                    />
                     How to Earn Points
                   </Link>
                 </li>

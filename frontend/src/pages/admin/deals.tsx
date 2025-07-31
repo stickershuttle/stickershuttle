@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from '@/components/AdminLayout';
 import { getSupabase } from '../../lib/supabase';
@@ -6,6 +6,247 @@ import { PRESET_DEALS, DealProduct, getAllActiveDeals } from '@/data/deals/prese
 
 // Admin emails
 const ADMIN_EMAILS = ['justin@stickershuttle.com'];
+
+// DealCard component outside main component to prevent recreation on every render
+const DealCard = React.memo(({ 
+  deal, 
+  isCurrentlyEditing, 
+  editFormData, 
+  onFieldChange, 
+  onToggleActive, 
+  onStartEdit, 
+  onSaveEdit, 
+  onCancelEdit, 
+  onDelete 
+}: {
+  deal: DealProduct;
+  isCurrentlyEditing: boolean;
+  editFormData: Partial<DealProduct>;
+  onFieldChange: (field: keyof DealProduct, value: any) => void;
+  onToggleActive: (dealId: string) => void;
+  onStartEdit: (deal: DealProduct) => void;
+  onSaveEdit: () => void;
+  onCancelEdit: () => void;
+  onDelete: (dealId: string) => void;
+}) => {
+  return (
+    <div 
+      className="rounded-xl p-6 h-full flex flex-col relative"
+      style={{
+        background: 'rgba(255, 255, 255, 0.05)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+        backdropFilter: 'blur(12px)'
+      }}
+    >
+      {/* Status Badge - Top Left */}
+      <div className="absolute -top-2 -left-2 z-10">
+        <button
+          onClick={() => onToggleActive(deal.id)}
+          className={`px-3 py-1 rounded-full text-sm font-bold shadow-lg ${
+            deal.isActive
+              ? 'bg-gradient-to-r from-green-500 to-green-400 text-white'
+              : 'bg-gradient-to-r from-gray-500 to-gray-400 text-white'
+          }`}
+        >
+          {deal.isActive ? 'Active' : 'Inactive'}
+        </button>
+      </div>
+
+      {/* Save Pill - Top Right */}
+      {deal.savings && (
+        <div className="absolute -top-2 -right-2 px-3 py-1 rounded-full text-sm font-medium holographic-save-container z-10">
+          <span className="holographic-save-text">Save ${deal.savings}</span>
+        </div>
+      )}
+
+      {/* Deal Image */}
+      <div className="mb-4 flex justify-center">
+        <img 
+          src={deal.defaultImage} 
+          alt={deal.name}
+          className="w-24 h-24 object-contain"
+        />
+      </div>
+
+      {/* Deal Info - Editable */}
+      <div className="text-center mb-4 flex-grow">
+        {isCurrentlyEditing ? (
+          <div className="space-y-3">
+            <input
+              type="text"
+              value={editFormData.name || ''}
+              onChange={(e) => onFieldChange('name', e.target.value)}
+              className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-lg font-bold text-center focus:outline-none focus:border-purple-500"
+              placeholder="Deal Name"
+            />
+            <textarea
+              value={editFormData.shortDescription || ''}
+              onChange={(e) => onFieldChange('shortDescription', e.target.value)}
+              className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-sm text-center focus:outline-none focus:border-purple-500 resize-none"
+              rows={2}
+              placeholder="Short Description"
+            />
+            <div className="flex items-center gap-2 justify-center">
+              <input
+                type="number"
+                value={editFormData.dealPrice || ''}
+                onChange={(e) => onFieldChange('dealPrice', parseFloat(e.target.value) || 0)}
+                className="w-20 px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-2xl font-bold text-center focus:outline-none focus:border-purple-500"
+                placeholder="0"
+                step="0.01"
+              />
+              {editFormData.originalPrice && (
+                <input
+                  type="number"
+                  value={editFormData.originalPrice || ''}
+                  onChange={(e) => onFieldChange('originalPrice', parseFloat(e.target.value) || 0)}
+                  className="w-16 px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-gray-400 text-lg text-center focus:outline-none focus:border-purple-500"
+                  placeholder="0"
+                  step="0.01"
+                />
+              )}
+            </div>
+          </div>
+        ) : (
+          <>
+            <h3 className="text-xl font-bold text-white mb-2" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
+              {deal.name}
+            </h3>
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <span 
+                className={`text-4xl font-bold ${
+                  deal.name.includes('Holographic') ? 'holographic-price-text' : 
+                  deal.name.includes('Chrome') ? 'chrome-price-text' : 
+                  'text-green-400 glow-price-text'
+                }`}
+                style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}
+              >
+                ${deal.dealPrice}
+              </span>
+              {deal.originalPrice && (
+                <span className="text-lg text-gray-400 line-through glow-original-price" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
+                  ${deal.originalPrice}
+                </span>
+              )}
+            </div>
+            <p className="text-gray-300 text-sm">{deal.shortDescription}</p>
+          </>
+        )}
+      </div>
+
+      {/* Deal Details - Editable */}
+      {isCurrentlyEditing && (
+        <div className="mb-4 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Quantity</label>
+              <input
+                type="number"
+                value={editFormData.dealQuantity || ''}
+                onChange={(e) => onFieldChange('dealQuantity', parseInt(e.target.value) || 0)}
+                className="w-full px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-sm text-center focus:outline-none focus:border-purple-500"
+                placeholder="100"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Size</label>
+              <input
+                type="text"
+                value={editFormData.dealSize || ''}
+                onChange={(e) => onFieldChange('dealSize', e.target.value)}
+                className="w-full px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-sm text-center focus:outline-none focus:border-purple-500"
+                placeholder='3"'
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Savings ($)</label>
+            <input
+              type="number"
+              value={editFormData.savings || ''}
+              onChange={(e) => onFieldChange('savings', parseFloat(e.target.value) || 0)}
+              className="w-full px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-sm text-center focus:outline-none focus:border-purple-500"
+              placeholder="59"
+              step="0.01"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Image URL</label>
+            <input
+              type="url"
+              value={editFormData.defaultImage || ''}
+              onChange={(e) => onFieldChange('defaultImage', e.target.value)}
+              className="w-full px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-xs focus:outline-none focus:border-purple-500"
+              placeholder="https://..."
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="space-y-2">
+        {isCurrentlyEditing ? (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={onSaveEdit}
+              className="py-2 rounded-lg font-bold text-sm text-white"
+              style={{
+                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                backdropFilter: 'blur(25px) saturate(180%)',
+                border: '1px solid rgba(34, 197, 94, 0.4)',
+                boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+              }}
+            >
+              Save
+            </button>
+            <button
+              onClick={onCancelEdit}
+              className="py-2 rounded-lg font-bold text-sm text-white"
+              style={{
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
+                backdropFilter: 'blur(25px) saturate(180%)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => onStartEdit(deal)}
+              className="py-2 rounded-lg font-bold text-sm text-white"
+              style={{
+                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                backdropFilter: 'blur(25px) saturate(180%)',
+                border: '1px solid rgba(59, 130, 246, 0.4)',
+                boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+              }}
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => onDelete(deal.id)}
+              className="py-2 rounded-lg font-bold text-sm text-white"
+              style={{
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
+                backdropFilter: 'blur(25px) saturate(180%)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+DealCard.displayName = 'DealCard';
 
 export default function AdminDeals() {
   const router = useRouter();
@@ -73,55 +314,7 @@ export default function AdminDeals() {
     }));
   };
 
-  // Start editing a deal
-  const startEditing = (deal: DealProduct) => {
-    setEditingDeal(deal);
-    setEditFormData({
-      name: deal.name,
-      shortDescription: deal.shortDescription,
-      dealPrice: deal.dealPrice,
-      dealQuantity: deal.dealQuantity,
-      dealSize: deal.dealSize,
-      originalPrice: deal.originalPrice,
-      savings: deal.savings,
-      isActive: deal.isActive,
-      defaultImage: deal.defaultImage
-    });
-    setIsEditing(true);
-  };
 
-  // Save edited deal
-  const saveEditedDeal = () => {
-    if (!editingDeal || !editFormData) return;
-
-    const updatedDeal: DealProduct = {
-      ...editingDeal,
-      ...editFormData,
-      updatedAt: new Date().toISOString()
-    };
-
-    const updatedDeals = deals.map(deal => 
-      deal.id === editingDeal.id ? updatedDeal : deal
-    );
-
-    saveDeals(updatedDeals);
-    cancelEditing();
-  };
-
-  // Cancel editing
-  const cancelEditing = () => {
-    setIsEditing(false);
-    setEditingDeal(null);
-    setEditFormData({});
-  };
-
-  // Toggle deal active status
-  const toggleDealActive = (dealId: string) => {
-    const updatedDeals = deals.map(deal => 
-      deal.id === dealId ? { ...deal, isActive: !deal.isActive } : deal
-    );
-    saveDeals(updatedDeals);
-  };
 
   // Create new deal
   const createNewDeal = () => {
@@ -158,24 +351,70 @@ export default function AdminDeals() {
 
     const updatedDeals = [...deals, newDeal];
     saveDeals(updatedDeals);
-    startEditing(newDeal);
-  };
-
-  // Delete deal
-  const deleteDeal = (dealId: string) => {
-    if (confirm('Are you sure you want to delete this deal?')) {
-      const updatedDeals = deals.filter(deal => deal.id !== dealId);
-      saveDeals(updatedDeals);
-    }
+    handleStartEdit(newDeal);
   };
 
   // Handle form field changes
-  const handleFieldChange = (field: keyof DealProduct, value: any) => {
+  const handleFieldChange = useCallback((field: keyof DealProduct, value: any) => {
     setEditFormData(prev => ({
       ...prev,
       [field]: value
     }));
-  };
+  }, []);
+
+  // Memoized callback handlers
+  const handleToggleActive = useCallback((dealId: string) => {
+    const updatedDeals = deals.map(deal => 
+      deal.id === dealId ? { ...deal, isActive: !deal.isActive } : deal
+    );
+    saveDeals(updatedDeals);
+  }, [deals]);
+
+  const handleStartEdit = useCallback((deal: DealProduct) => {
+    setEditingDeal(deal);
+    setEditFormData({
+      name: deal.name,
+      shortDescription: deal.shortDescription,
+      dealPrice: deal.dealPrice,
+      dealQuantity: deal.dealQuantity,
+      dealSize: deal.dealSize,
+      originalPrice: deal.originalPrice,
+      savings: deal.savings,
+      isActive: deal.isActive,
+      defaultImage: deal.defaultImage
+    });
+    setIsEditing(true);
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setIsEditing(false);
+    setEditingDeal(null);
+    setEditFormData({});
+  }, []);
+
+  const handleSaveEdit = useCallback(() => {
+    if (!editingDeal || !editFormData) return;
+
+    const updatedDeal: DealProduct = {
+      ...editingDeal,
+      ...editFormData,
+      updatedAt: new Date().toISOString()
+    };
+
+    const updatedDeals = deals.map(deal => 
+      deal.id === editingDeal.id ? updatedDeal : deal
+    );
+
+    saveDeals(updatedDeals);
+    handleCancelEdit();
+  }, [editingDeal, editFormData, deals, handleCancelEdit]);
+
+  const handleDeleteDeal = useCallback((dealId: string) => {
+    if (confirm('Are you sure you want to delete this deal?')) {
+      const updatedDeals = deals.filter(deal => deal.id !== dealId);
+      saveDeals(updatedDeals);
+    }
+  }, [deals]);
 
   if (loading) {
     return (
@@ -193,225 +432,7 @@ export default function AdminDeals() {
     return null;
   }
 
-  const DealCard = ({ deal }: { deal: DealProduct }) => {
-    const isCurrentlyEditing = editingDeal?.id === deal.id;
-    
-    return (
-      <div 
-        className="rounded-xl p-6 h-full flex flex-col relative"
-        style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-          backdropFilter: 'blur(12px)'
-        }}
-      >
-        {/* Status Badge - Top Left */}
-        <div className="absolute -top-2 -left-2 z-10">
-          <button
-            onClick={() => toggleDealActive(deal.id)}
-            className={`px-3 py-1 rounded-full text-sm font-bold shadow-lg ${
-              deal.isActive
-                ? 'bg-gradient-to-r from-green-500 to-green-400 text-white'
-                : 'bg-gradient-to-r from-gray-500 to-gray-400 text-white'
-            }`}
-          >
-            {deal.isActive ? 'Active' : 'Inactive'}
-          </button>
-        </div>
 
-        {/* Save Pill - Top Right */}
-        {deal.savings && (
-          <div className="absolute -top-2 -right-2 px-3 py-1 rounded-full text-sm font-medium holographic-save-container z-10">
-            <span className="holographic-save-text">Save ${deal.savings}</span>
-          </div>
-        )}
-
-        {/* Deal Image */}
-        <div className="mb-4 flex justify-center">
-          <img 
-            src={deal.defaultImage} 
-            alt={deal.name}
-            className="w-24 h-24 object-contain"
-          />
-        </div>
-
-        {/* Deal Info - Editable */}
-        <div className="text-center mb-4 flex-grow">
-          {isCurrentlyEditing ? (
-            <div className="space-y-3">
-              <input
-                type="text"
-                value={editFormData.name || ''}
-                onChange={(e) => handleFieldChange('name', e.target.value)}
-                className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-lg font-bold text-center focus:outline-none focus:border-purple-500"
-                placeholder="Deal Name"
-              />
-              <textarea
-                value={editFormData.shortDescription || ''}
-                onChange={(e) => handleFieldChange('shortDescription', e.target.value)}
-                className="w-full px-3 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-sm text-center focus:outline-none focus:border-purple-500 resize-none"
-                rows={2}
-                placeholder="Short Description"
-              />
-              <div className="flex items-center gap-2 justify-center">
-                <input
-                  type="number"
-                  value={editFormData.dealPrice || ''}
-                  onChange={(e) => handleFieldChange('dealPrice', parseFloat(e.target.value) || 0)}
-                  className="w-20 px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-2xl font-bold text-center focus:outline-none focus:border-purple-500"
-                  placeholder="0"
-                  step="0.01"
-                />
-                {editFormData.originalPrice && (
-                  <input
-                    type="number"
-                    value={editFormData.originalPrice || ''}
-                    onChange={(e) => handleFieldChange('originalPrice', parseFloat(e.target.value) || 0)}
-                    className="w-16 px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-gray-400 text-lg text-center focus:outline-none focus:border-purple-500"
-                    placeholder="0"
-                    step="0.01"
-                  />
-                )}
-              </div>
-            </div>
-          ) : (
-            <>
-              <h3 className="text-xl font-bold text-white mb-2" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
-                {deal.name}
-              </h3>
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <span 
-                  className={`text-4xl font-bold ${
-                    deal.name.includes('Holographic') ? 'holographic-price-text' : 
-                    deal.name.includes('Chrome') ? 'chrome-price-text' : 
-                    'text-green-400 glow-price-text'
-                  }`}
-                  style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}
-                >
-                  ${deal.dealPrice}
-                </span>
-                {deal.originalPrice && (
-                  <span className="text-lg text-gray-400 line-through glow-original-price" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
-                    ${deal.originalPrice}
-                  </span>
-                )}
-              </div>
-              <p className="text-gray-300 text-sm">{deal.shortDescription}</p>
-            </>
-          )}
-        </div>
-
-        {/* Deal Details - Editable */}
-        {isCurrentlyEditing && (
-          <div className="mb-4 space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">Quantity</label>
-                <input
-                  type="number"
-                  value={editFormData.dealQuantity || ''}
-                  onChange={(e) => handleFieldChange('dealQuantity', parseInt(e.target.value) || 0)}
-                  className="w-full px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-sm text-center focus:outline-none focus:border-purple-500"
-                  placeholder="100"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">Size</label>
-                <input
-                  type="text"
-                  value={editFormData.dealSize || ''}
-                  onChange={(e) => handleFieldChange('dealSize', e.target.value)}
-                  className="w-full px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-sm text-center focus:outline-none focus:border-purple-500"
-                  placeholder='3"'
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Savings ($)</label>
-              <input
-                type="number"
-                value={editFormData.savings || ''}
-                onChange={(e) => handleFieldChange('savings', parseFloat(e.target.value) || 0)}
-                className="w-full px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-sm text-center focus:outline-none focus:border-purple-500"
-                placeholder="59"
-                step="0.01"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Image URL</label>
-              <input
-                type="url"
-                value={editFormData.defaultImage || ''}
-                onChange={(e) => handleFieldChange('defaultImage', e.target.value)}
-                className="w-full px-2 py-1 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-xs focus:outline-none focus:border-purple-500"
-                placeholder="https://..."
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="space-y-2">
-          {isCurrentlyEditing ? (
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={saveEditedDeal}
-                className="py-2 rounded-lg font-bold text-sm text-white"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
-                  backdropFilter: 'blur(25px) saturate(180%)',
-                  border: '1px solid rgba(34, 197, 94, 0.4)',
-                  boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                }}
-              >
-                Save
-              </button>
-              <button
-                onClick={cancelEditing}
-                className="py-2 rounded-lg font-bold text-sm text-white"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
-                  backdropFilter: 'blur(25px) saturate(180%)',
-                  border: '1px solid rgba(239, 68, 68, 0.4)',
-                  boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => startEditing(deal)}
-                className="py-2 rounded-lg font-bold text-sm text-white"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                  backdropFilter: 'blur(25px) saturate(180%)',
-                  border: '1px solid rgba(59, 130, 246, 0.4)',
-                  boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                }}
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => deleteDeal(deal.id)}
-                className="py-2 rounded-lg font-bold text-sm text-white"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
-                  backdropFilter: 'blur(25px) saturate(180%)',
-                  border: '1px solid rgba(239, 68, 68, 0.4)',
-                  boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                }}
-              >
-                Delete
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <AdminLayout title="Deals Management - Admin">
@@ -534,7 +555,18 @@ export default function AdminDeals() {
             <div className="w-full mx-auto px-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {deals.map((deal) => (
-                  <DealCard key={deal.id} deal={deal} />
+                  <DealCard 
+                    key={deal.id} 
+                    deal={deal}
+                    isCurrentlyEditing={editingDeal?.id === deal.id}
+                    editFormData={editFormData}
+                    onFieldChange={handleFieldChange}
+                    onToggleActive={handleToggleActive}
+                    onStartEdit={handleStartEdit}
+                    onSaveEdit={handleSaveEdit}
+                    onCancelEdit={handleCancelEdit}
+                    onDelete={handleDeleteDeal}
+                  />
                 ))}
               </div>
             </div>

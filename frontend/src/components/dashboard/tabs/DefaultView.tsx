@@ -380,7 +380,11 @@ const DefaultView: React.FC<DefaultViewProps> = ({
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">{creditBalance >= 100 ? '🚨' : <i className="fas fa-coins text-yellow-400"></i>}</span>
+                <span className="text-2xl">{creditBalance >= 100 ? '🚨' : <img 
+                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                  alt="Credits" 
+                  className="w-6 h-6 object-contain inline-block"
+                />}</span>
                 <div>
                   <h3 className="text-lg font-bold text-white">
                     ${creditBalance.toFixed(2)} Store Credit

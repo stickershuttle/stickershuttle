@@ -76,11 +76,15 @@ export default function StoreCredit() {
 
               <div className="relative z-10">
                 <div className="flex items-center justify-center gap-4 mb-6">
-                  <i className="fas fa-coins text-yellow-300 text-5xl"></i>
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                    alt="Credits" 
+                    className="w-12 h-12 object-contain"
+                  />
                   <h1 className="text-4xl md:text-6xl font-bold text-yellow-200">
                     Earn {creditRate}% Back{isWholesale && <span className="text-sm block mt-2">Wholesale Rate</span>}
                   </h1>
-                  <i className="fas fa-coins text-yellow-300 text-5xl"></i>
+
                 </div>
                 
                                   <div className="max-w-4xl mx-auto">

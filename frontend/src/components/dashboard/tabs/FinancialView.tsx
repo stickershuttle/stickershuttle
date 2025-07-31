@@ -127,7 +127,11 @@ const FinancialView: React.FC<FinancialViewProps> = ({
                borderRadius: '16px'
              }}>
           <h3 className="text-yellow-300 text-sm font-medium flex items-center justify-center gap-2">
-            <i className="fas fa-coins"></i>
+            <img 
+              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+              alt="Credits" 
+              className="w-4 h-4 object-contain"
+            />
             <span>Store Credit</span>
           </h3>
           <p className="text-white text-2xl font-bold">${creditBalance.toFixed(2)}</p>
@@ -473,7 +477,11 @@ const FinancialView: React.FC<FinancialViewProps> = ({
               boxShadow: pointsView === 'earned' ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset' : 'none'
             }}
           >
-          <i className="fas fa-coins text-yellow-400"></i>
+          <img 
+            src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+            alt="Credits" 
+            className="w-4 h-4 object-contain"
+          />
             <span className="text-xl font-bold">Points Earned</span>
           </button>
           
@@ -494,7 +502,11 @@ const FinancialView: React.FC<FinancialViewProps> = ({
               boxShadow: pointsView === 'spent' ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset' : 'none'
             }}
           >
-            <i className="fas fa-coins text-red-400"></i>
+            <img 
+              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+              alt="Credits" 
+              className="w-4 h-4 object-contain"
+            />
             <span className="text-xl font-bold">Points Spent</span>
           </button>
         </div>
@@ -574,7 +586,7 @@ const FinancialView: React.FC<FinancialViewProps> = ({
                    return (
                      <div 
                        key={credit.id} 
-                       className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                       className={`flex items-center justify-between px-6 py-3 rounded-lg transition-colors ${
                          pointsView === 'earned' 
                            ? 'bg-yellow-500/10 border border-yellow-500/20 hover:bg-yellow-500/15' 
                            : 'bg-red-500/10 border border-red-500/20 hover:bg-red-500/15'
@@ -584,13 +596,11 @@ const FinancialView: React.FC<FinancialViewProps> = ({
                        onClick={() => relatedOrder && handleViewOrderDetails && handleViewOrderDetails(relatedOrder)}
                      >
                        <div className="flex items-center gap-3">
-                         <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                           pointsView === 'earned' ? 'bg-yellow-400/20' : 'bg-red-400/20'
-                         }`}>
-                           <i className={`fas fa-coins text-sm ${
-                             pointsView === 'earned' ? 'text-yellow-400' : 'text-red-400'
-                           }`}></i>
-                         </div>
+                         <img 
+                           src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                           alt="Credits" 
+                           className="w-5 h-5 object-contain"
+                         />
                          <div>
                            <div className="flex items-center gap-2 mb-1">
                              <p className="text-white font-medium">
@@ -688,9 +698,11 @@ const FinancialView: React.FC<FinancialViewProps> = ({
         ) : (
         <div className="text-center py-12">
           <div className="mb-6">
-              <i className={`fas fa-coins text-6xl mb-4 ${
-                pointsView === 'earned' ? 'text-yellow-400/50' : 'text-red-400/50'
-              }`}></i>
+              <img 
+                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                alt="Credits" 
+                className="w-24 h-24 object-contain mx-auto mb-4 opacity-50"
+              />
               <h4 className="text-xl font-semibold text-white mb-2">
                 {pointsView === 'earned' ? 'Ready to Earn Points!' : 'No Points Spent Yet'}
               </h4>

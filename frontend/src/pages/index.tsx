@@ -164,14 +164,22 @@ export default function Home() {
                            backdropFilter: 'blur(12px)',
                            color: '#fbbf24'
                          }}>
-                      <i className="fas fa-coins"></i>
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                        alt="Credits" 
+                        className="w-4 h-4 object-contain"
+                      />
                       <span>Earn 5% back on every order</span>
                     </div>
                   </div>
                   
                   {/* Mobile text/icon */}
                   <div className="md:hidden flex items-center justify-center gap-2 text-xs" style={{ color: '#fbbf24' }}>
-                    <i className="fas fa-coins text-xs"></i>
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                      alt="Credits" 
+                      className="w-3 h-3 object-contain"
+                    />
                     <span>Earn 5% back on every order</span>
                   </div>
                 </div>
@@ -182,21 +190,27 @@ export default function Home() {
                   <span className="block md:block"> your stickers?</span>
                 </h1>
                 <p className="text-lg sm:text-xl mb-6 text-purple-100">
-                  <span className="block sm:inline md:block">See why brands like Amazon, Nike Football,</span>
-                  <span className="block sm:inline md:inline"> and thousands of others trust us with their business.</span>
+                  <span className="block sm:inline md:block">See why brands like Amazon, Nike Football, and thousands</span>
+                  <span className="block sm:inline md:inline">of others trust us with their business.</span>
                 </p>
                 <div className="flex flex-col items-center gap-4 mb-4">
                   <a 
                     href="/products"
                     className="primaryButton px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-[1.004] inline-block rounded-lg"
                   >
-                    Start Here →
+                    Start Here 🡒
                   </a>
                   <a 
                     href="/products/sample-packs" 
-                    className="text-white hover:text-purple-200 transition pb-7 md:pb-0"
+                    className="text-white hover:text-purple-200 transition pb-0 md:pb-0"
                   >
-                    Order Sample Pack →
+                    Order Sample Pack 🡒
+                  </a>
+                  <a 
+                    href="/deals" 
+                    className="text-white hover:text-purple-200 transition pb-8  md:pb-0 block md:hidden"
+                  >
+                   🔥 Deals 🡒
                   </a>
 
         </div>

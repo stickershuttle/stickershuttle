@@ -129,10 +129,10 @@ export default function CanvasPage() {
 
   const [activeTool, setActiveTool] = useState<'select' | 'text' | 'rectangle' | 'circle' | 'image'>('select');
   const [hoveredElementId, setHoveredElementId] = useState<string | null>(null);
-  const [stickerMenuOpen, setStickerMenuOpen] = useState(false);
+  const [aspectRatioLocked, setAspectRatioLocked] = useState<boolean>(true);
   const [stickerSettings, setStickerSettings] = useState({
-    borderWidth: 6,
-    borderColor: '#ffffff',
+    borderWidth: 12, // Changed default to 12px
+    borderColor: '#ffffff', 
     fillHoles: false
   });
 
@@ -152,6 +152,7 @@ export default function CanvasPage() {
 
   // Helper function to convert pixels to inches (96 DPI standard)
   const pxToInches = (px: number) => (px / 96).toFixed(3);
+  const inchesToPx = (inches: number) => Math.round(inches * 96);
 
   // Calculate area based on size
   const calculateArea = (size: string, customW = "", customH = "") => {
@@ -295,8 +296,6 @@ export default function CanvasPage() {
       img.src = imageSrc;
     });
   }, []);
-  const [aspectRatioLocked, setAspectRatioLocked] = useState(false);
-  const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
 
   // GraphQL query for credit balance
   const { data: creditData, refetch: refetchCreditBalance } = useQuery(GET_USER_CREDIT_BALANCE, {
@@ -792,16 +791,21 @@ export default function CanvasPage() {
       img.onload = () => {
         const aspectRatio = img.width / img.height;
         
-        // Calculate optimal size for canvas display while preserving quality
-        // Use larger max size to maintain quality
-        const maxDisplaySize = 500; // Increased from 300 for better quality
-        let displayWidth = Math.min(maxDisplaySize, img.width);
-        let displayHeight = displayWidth / aspectRatio;
+        // Automatically scale images to 3 inches (most common size)
+        const targetInches = 3;
+        const targetPixels = inchesToPx(targetInches); // 3 inches = 288 pixels
         
-        // If height is too large, scale by height instead
-        if (displayHeight > maxDisplaySize) {
-          displayHeight = maxDisplaySize;
-          displayWidth = displayHeight * aspectRatio;
+        // Calculate display size maintaining aspect ratio, with 3" as the target
+        let displayWidth, displayHeight;
+        
+        if (aspectRatio >= 1) {
+          // Landscape or square - set width to 3 inches
+          displayWidth = targetPixels;
+          displayHeight = targetPixels / aspectRatio;
+        } else {
+          // Portrait - set height to 3 inches
+          displayHeight = targetPixels;
+          displayWidth = targetPixels * aspectRatio;
         }
 
         // Center the image on canvas (account for high-DPI scaling and potential borders)
@@ -1011,21 +1015,6 @@ export default function CanvasPage() {
     setIsResizing(false);
   }, []);
 
-  // Close sticker menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (stickerMenuOpen) {
-        const target = event.target as HTMLElement;
-        if (!target.closest('.sticker-menu') && !target.closest('.sticker-button')) {
-          setStickerMenuOpen(false);
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [stickerMenuOpen]);
-
   // Update element property
   const updateElement = useCallback((elementId: string, updates: Partial<CanvasElement>) => {
     setCanvasState(prev => ({
@@ -1045,7 +1034,7 @@ export default function CanvasPage() {
     }));
   }, []);
 
-  // Stickerfy function - applies border settings to all images
+  // Modified Stickerfy function - applies 12px border to all images
   const stickerifyDesign = useCallback(() => {
     setCanvasState(prev => ({
       ...prev,
@@ -1054,15 +1043,14 @@ export default function CanvasPage() {
           ? {
               ...element,
               stickerMode: true,
-              stickerBorderWidth: stickerSettings.borderWidth,
-              stickerBorderColor: stickerSettings.borderColor,
-              fillHoles: stickerSettings.fillHoles
+              stickerBorderWidth: 12, // Changed to 12px default
+              stickerBorderColor: '#ffffff',
+              fillHoles: false
             }
           : element
       )
     }));
-    // Keep menu open for further adjustments
-  }, [stickerSettings]);
+  }, []);
 
   // Turn into Sticker function - applies 6px white border to all images
   const turnIntoSticker = useCallback(() => {
@@ -1202,7 +1190,11 @@ export default function CanvasPage() {
                       minHeight: '40px'
                     }}
                   >
-                    <i className="fas fa-coins text-yellow-300"></i>
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                      alt="Credits" 
+                      className="w-5 h-5 object-contain"
+                    />
                     {creditBalanceLoaded ? (
                       <span className="text-yellow-200 leading-5">${creditBalance.toFixed(2)}</span>
                     ) : (
@@ -1355,239 +1347,6 @@ export default function CanvasPage() {
         {/* Main Content - Moved up */}
         <div className="pt-16 h-screen flex flex-col" style={{ backgroundColor: '#030140' }}>
 
-        {/* Sticker Settings Menu */}
-        {stickerMenuOpen && (
-          <div 
-            className="sticker-menu fixed w-72 p-4 rounded-xl"
-            style={{
-              left: '120px',
-              top: '74px', // Move up by double - much closer to the top toolbar
-              zIndex: 999999,
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-              backdropFilter: 'blur(12px)'
-            }}
-          >
-            {/* Header with Close Button */}
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-white font-semibold text-sm">Custom Border Settings</h3>
-              <button
-                onClick={() => setStickerMenuOpen(false)}
-                className="w-6 h-6 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-                title="Close border settings"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Top Button Menu */}
-            <div className="flex gap-2 mb-4">
-              <button
-                onClick={stickerifyDesign}
-                className="flex-1 px-3 py-2 rounded-lg text-white text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.6) 0%, rgba(34, 197, 94, 0.4) 50%, rgba(34, 197, 94, 0.2) 100%)',
-                  backdropFilter: 'blur(25px) saturate(180%)',
-                  border: '1px solid rgba(34, 197, 94, 0.5)',
-                  boxShadow: 'rgba(34, 197, 94, 0.3) 0px 4px 16px'
-                }}
-              >
-                Apply Custom
-              </button>
-              
-              <button
-                onClick={turnIntoSticker}
-                className="flex-1 px-3 py-2 rounded-lg text-white text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center gap-1"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.6) 0%, rgba(147, 51, 234, 0.4) 50%, rgba(147, 51, 234, 0.2) 100%)',
-                  backdropFilter: 'blur(25px) saturate(180%)',
-                  border: '1px solid rgba(147, 51, 234, 0.5)',
-                  boxShadow: 'rgba(147, 51, 234, 0.3) 0px 4px 16px'
-                }}
-              >
-                <span className="text-[10px] font-bold bg-purple-600 rounded-full w-4 h-4 flex items-center justify-center">S</span>
-                6px Sticker
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-white text-xs mb-2">
-                  Border Width: {stickerSettings.borderWidth}px ({pxToInches(stickerSettings.borderWidth)}")
-                </label>
-                <div className="relative">
-                  <input
-                    type="range"
-                    min="5"
-                    max="20"
-                    value={stickerSettings.borderWidth}
-                    onChange={(e) => {
-                      const newWidth = parseInt(e.target.value);
-                      setStickerSettings(prev => ({ 
-                        ...prev, 
-                        borderWidth: newWidth
-                      }));
-                      // Update all image elements with sticker mode in real-time
-                      setCanvasState(prev => ({
-                        ...prev,
-                        elements: prev.elements.map(element =>
-                          element.type === 'image' && element.stickerMode
-                            ? { ...element, stickerBorderWidth: newWidth }
-                            : element
-                        )
-                      }));
-                    }}
-                    className="w-full h-2 rounded-lg appearance-none cursor-pointer border-width-slider"
-                    style={{
-                      background: `linear-gradient(to right, 
-                        rgba(34, 197, 94, 0.6) 0%, 
-                        rgba(34, 197, 94, 0.4) ${((stickerSettings.borderWidth - 5) / 15) * 100}%, 
-                        rgba(255, 255, 255, 0.15) ${((stickerSettings.borderWidth - 5) / 15) * 100}%, 
-                        rgba(255, 255, 255, 0.1) 100%)`,
-                      outline: 'none',
-                      WebkitAppearance: 'none',
-                      MozAppearance: 'none',
-                    }}
-                    title={`Border Width: ${stickerSettings.borderWidth}px (${pxToInches(stickerSettings.borderWidth)}")`}
-                  />
-                  <style>
-                    {`
-                      .border-width-slider::-webkit-slider-thumb {
-                        appearance: none;
-                        width: 18px;
-                        height: 18px;
-                        border-radius: 50%;
-                        background: linear-gradient(135deg, rgba(34, 197, 94, 0.9) 0%, rgba(34, 197, 94, 1) 100%);
-                        cursor: pointer;
-                        border: 2px solid rgba(255, 255, 255, 0.4);
-                        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(34, 197, 94, 0.3);
-                      }
-                      .border-width-slider::-moz-range-thumb {
-                        width: 18px;
-                        height: 18px;
-                        border-radius: 50%;
-                        background: linear-gradient(135deg, rgba(34, 197, 94, 0.9) 0%, rgba(34, 197, 94, 1) 100%);
-                        cursor: pointer;
-                        border: 2px solid rgba(255, 255, 255, 0.4);
-                        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-                      }
-                      .border-width-slider::-webkit-slider-track {
-                        height: 6px;
-                        border-radius: 3px;
-                      }
-                      .border-width-slider::-moz-range-track {
-                        height: 6px;
-                        border-radius: 3px;
-                        border: none;
-                      }
-                    `}
-                  </style>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-white text-xs mb-2">Border Color (CMYK)</label>
-                <div className="grid grid-cols-4 gap-2 mb-2">
-                  {/* CMYK Color Presets */}
-                  {[
-                    { name: 'White', color: '#FFFFFF', cmyk: 'C:0 M:0 Y:0 K:0' },
-                    { name: 'Black', color: '#000000', cmyk: 'C:0 M:0 Y:0 K:100' },
-                    { name: 'Cyan', color: '#00FFFF', cmyk: 'C:100 M:0 Y:0 K:0' },
-                    { name: 'Magenta', color: '#FF00FF', cmyk: 'C:0 M:100 Y:0 K:0' },
-                    { name: 'Yellow', color: '#FFFF00', cmyk: 'C:0 M:0 Y:100 K:0' },
-                    { name: 'Red', color: '#FF0000', cmyk: 'C:0 M:100 Y:100 K:0' },
-                    { name: 'Green', color: '#00FF00', cmyk: 'C:100 M:0 Y:100 K:0' },
-                    { name: 'Blue', color: '#0000FF', cmyk: 'C:100 M:100 Y:0 K:0' }
-                  ].map((preset) => (
-                    <button
-                      key={preset.color}
-                      onClick={() => {
-                        setStickerSettings(prev => ({ 
-                          ...prev, 
-                          borderColor: preset.color
-                        }));
-                        // Update all image elements with sticker mode in real-time
-                        setCanvasState(prev => ({
-                          ...prev,
-                          elements: prev.elements.map(element =>
-                            element.type === 'image' && element.stickerMode
-                              ? { ...element, stickerBorderColor: preset.color }
-                              : element
-                          )
-                        }));
-                      }}
-                      className={`w-8 h-8 rounded border-2 transition-all ${
-                        stickerSettings.borderColor === preset.color 
-                          ? 'border-blue-400 scale-110' 
-                          : 'border-white/30 hover:border-white/60'
-                      }`}
-                      style={{ backgroundColor: preset.color }}
-                      title={`${preset.name} - ${preset.cmyk}`}
-                    />
-                  ))}
-                </div>
-                <div className="text-gray-300 text-xs text-center">
-                  {(() => {
-                    const colorMap: Record<string, string> = {
-                      '#FFFFFF': 'White - C:0 M:0 Y:0 K:0',
-                      '#000000': 'Black - C:0 M:0 Y:0 K:100',
-                      '#00FFFF': 'Cyan - C:100 M:0 Y:0 K:0',
-                      '#FF00FF': 'Magenta - C:0 M:100 Y:0 K:0',
-                      '#FFFF00': 'Yellow - C:0 M:0 Y:100 K:0',
-                      '#FF0000': 'Red - C:0 M:100 Y:100 K:0',
-                      '#00FF00': 'Green - C:100 M:0 Y:100 K:0',
-                      '#0000FF': 'Blue - C:100 M:100 Y:0 K:0'
-                    };
-                    return colorMap[stickerSettings.borderColor.toUpperCase()] || 'Custom Color';
-                  })()}
-                </div>
-              </div>
-
-              {/* Fill Holes Toggle */}
-              <div>
-                <div className="flex items-center justify-between gap-3 p-2 rounded-lg"
-                     style={{
-                       background: 'rgba(255, 255, 255, 0.05)',
-                       border: '1px solid rgba(255, 255, 255, 0.1)'
-                     }}>
-                  <label className="text-white text-xs font-medium flex-1">Fill Holes</label>
-                  <button
-                    onClick={() => {
-                      const newFillHoles = !stickerSettings.fillHoles;
-                      setStickerSettings(prev => ({ 
-                        ...prev, 
-                        fillHoles: newFillHoles
-                      }));
-                      // Update all image elements with sticker mode in real-time
-                      setCanvasState(prev => ({
-                        ...prev,
-                        elements: prev.elements.map(element =>
-                          element.type === 'image' && element.stickerMode
-                            ? { ...element, fillHoles: newFillHoles }
-                            : element
-                        )
-                      }));
-                    }}
-                    className={`w-10 h-5 rounded-full transition-colors ${
-                      stickerSettings.fillHoles ? 'bg-blue-500' : 'bg-gray-600'
-                    }`}
-                    title={stickerSettings.fillHoles ? "Disable hole filling" : "Enable hole filling"}
-                  >
-                    <div className={`w-3 h-3 bg-white rounded-full transition-transform ${
-                      stickerSettings.fillHoles ? 'translate-x-6' : 'translate-x-1'
-                    }`} />
-                  </button>
-                </div>
-              </div>
-
-
-            </div>
-          </div>
-        )}
-        
         {/* Main Editor - Full Height */}
         <div className="flex-1 flex">
           {/* Left Sidebar - Layers and Properties */}
@@ -1598,67 +1357,66 @@ export default function CanvasPage() {
             boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
           }}>
             {/* Top Action Buttons */}
-            <div className="grid grid-cols-4 gap-2 mb-6">
-              {/* Export Button */}
+            <div className="space-y-2 mb-6">
+              {/* Full-width Stickerfy Button - Modified to auto-apply 12px border */}
               <button
-                onClick={exportCanvas}
-                disabled={canvasState.elements.length === 0}
-                className="h-12 rounded-lg flex items-center justify-center text-white font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                  backdropFilter: 'blur(25px) saturate(180%)',
-                  border: '1px solid rgba(59, 130, 246, 0.4)',
-                  boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                }}
-                title="Export PNG"
-              >
-                <Download className="w-5 h-5" />
-              </button>
-
-              {/* Puzzle Piece Button */}
-              <button
-                onClick={() => setStickerMenuOpen(!stickerMenuOpen)}
+                onClick={stickerifyDesign}
                 disabled={!canvasState.elements.some(el => el.type === 'image')}
-                className={`sticker-button h-12 rounded-lg flex items-center justify-center text-white font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
-                  stickerMenuOpen ? 'scale-105' : ''
-                }`}
+                className="sticker-button w-full h-12 rounded-lg flex items-center justify-center gap-2 text-white font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
                   backdropFilter: 'blur(25px) saturate(180%)',
-                  border: `1px solid rgba(34, 197, 94, ${stickerMenuOpen ? '0.6' : '0.4'})`,
+                  border: '1px solid rgba(34, 197, 94, 0.4)',
                   boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                 }}
-                title={stickerMenuOpen ? "Close border settings" : "Open border settings"}
+                title="Apply 12px white border to all images"
               >
-                <div className="relative flex items-center justify-center">
-                  <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z"/>
-                  </svg>
-                  <div className="absolute text-[8px] font-bold text-white">px</div>
-                </div>
+                <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z"/>
+                </svg>
+                <span className="font-semibold">Stickerfy</span>
               </button>
 
-              {/* Select Tool Button */}
-              <button
-                onClick={() => setActiveTool('select')}
-                className={`h-12 rounded-lg flex items-center justify-center transition-colors ${
-                  activeTool === 'select' ? 'bg-blue-500/30 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-white/10'
-                }`}
-                title="Select"
-              >
-                <Move className="w-5 h-5" />
-              </button>
+              {/* Secondary buttons in grid */}
+              <div className="grid grid-cols-3 gap-2">
+                {/* Export Button */}
+                <button
+                  onClick={exportCanvas}
+                  disabled={canvasState.elements.length === 0}
+                  className="h-12 rounded-lg flex items-center justify-center text-white font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                  }}
+                  title="Export PNG"
+                >
+                  <Download className="w-5 h-5" />
+                </button>
 
-              {/* Text Tool Button */}
-              <button
-                onClick={addText}
-                className={`h-12 rounded-lg flex items-center justify-center transition-colors ${
-                  activeTool === 'text' ? 'bg-blue-500/30 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-white/10'
-                }`}
-                title="Add Text"
-              >
-                <Type className="w-5 h-5" />
-              </button>
+                {/* Select Tool Button */}
+                <button
+                  onClick={() => setActiveTool('select')}
+                  className={`h-12 rounded-lg flex items-center justify-center transition-colors ${
+                    activeTool === 'select' ? 'bg-blue-500/30 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-white/10'
+                  }`}
+                  title="Select"
+                >
+                  <Move className="w-5 h-5" />
+                </button>
+
+                {/* Text Tool Button */}
+                <button
+                  onClick={addText}
+                  className={`h-12 rounded-lg flex items-center justify-center transition-colors ${
+                    activeTool === 'text' ? 'bg-blue-500/30 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-white/10'
+                  }`}
+                  title="Add Text"
+                >
+                  <Type className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Layers Panel */}
@@ -1726,42 +1484,22 @@ export default function CanvasPage() {
             {(() => {
               const selectedElement = canvasState.elements.find(el => el.id === canvasState.selectedElementId);
               return selectedElement && (
-                <div className="p-4 rounded-xl" style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                  backdropFilter: 'blur(12px)'
-                }}>
+                <div 
+                  className="p-4 rounded-xl" 
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                    backdropFilter: 'blur(12px)'
+                  }}
+                >
                   <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
                     <Settings className="w-5 h-5" />
                     Properties
                   </h3>
                   <div className="space-y-4">
                     {/* Position & Size */}
-                    <div className="space-y-2">
-                      <label className="block text-white text-sm font-medium">Position & Size</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-gray-300 text-xs">X</label>
-                          <input
-                            type="number"
-                            value={Math.round(selectedElement.x)}
-                            onChange={(e) => updateElement(selectedElement.id, { x: parseInt(e.target.value) || 0 })}
-                            className="w-full px-2 py-1 text-sm bg-gray-700 text-white border border-gray-600 rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-gray-300 text-xs">Y</label>
-                          <input
-                            type="number"
-                            value={Math.round(selectedElement.y)}
-                            onChange={(e) => updateElement(selectedElement.id, { y: parseInt(e.target.value) || 0 })}
-                            className="w-full px-2 py-1 text-sm bg-gray-700 text-white border border-gray-600 rounded"
-                          />
-                        </div>
-                      </div>
-                      
-                      {/* Size Display */}
+                    <div className="space-y-3">
                       <div className="mb-2 p-2 rounded" style={{ background: 'rgba(255, 255, 255, 0.05)' }}>
                         <div className="text-white text-xs">
                           {selectedElement.type === 'image' && selectedElement.stickerMode ? (
@@ -1769,115 +1507,100 @@ export default function CanvasPage() {
                               {/* Show both image size and total sticker size with border */}
                               <div className="flex justify-between">
                                 <span>Image:</span>
-                                <span>{Math.round(selectedElement.width)} × {Math.round(selectedElement.height)}px</span>
+                                <span>{pxToInches(selectedElement.width)}" × {pxToInches(selectedElement.height)}"</span>
                               </div>
                               <div className="flex justify-between mt-1">
                                 <span>Sticker:</span>
-                                <span>{Math.round(selectedElement.width + (selectedElement.stickerBorderWidth || 6) * 2)} × {Math.round(selectedElement.height + (selectedElement.stickerBorderWidth || 6) * 2)}px</span>
+                                <span>{pxToInches(selectedElement.width + (selectedElement.stickerBorderWidth || 12) * 2)}" × {pxToInches(selectedElement.height + (selectedElement.stickerBorderWidth || 12) * 2)}"</span>
                               </div>
                               <div className="flex justify-between mt-1 pt-1 border-t border-white/10">
                                 <span className="font-medium">Total Size:</span>
-                                <span className="font-medium">{pxToInches(selectedElement.width + (selectedElement.stickerBorderWidth || 6) * 2)}" × {pxToInches(selectedElement.height + (selectedElement.stickerBorderWidth || 6) * 2)}"</span>
+                                <span className="font-medium">{pxToInches(selectedElement.width + (selectedElement.stickerBorderWidth || 12) * 2)}" × {pxToInches(selectedElement.height + (selectedElement.stickerBorderWidth || 12) * 2)}"</span>
                               </div>
                             </>
                           ) : (
-                            <>
-                              {/* Regular size display for non-sticker elements */}
-                              <div className="flex justify-between">
-                                <span>Pixels:</span>
-                                <span>{Math.round(selectedElement.width)} × {Math.round(selectedElement.height)}px</span>
-                              </div>
-                              <div className="flex justify-between mt-1">
-                                <span>Inches:</span>
-                                <span>{pxToInches(selectedElement.width)}" × {pxToInches(selectedElement.height)}"</span>
-                              </div>
-                            </>
+                            <div className="flex justify-between">
+                              <span>Size:</span>
+                              <span>{pxToInches(selectedElement.width)}" × {pxToInches(selectedElement.height)}"</span>
+                            </div>
                           )}
                         </div>
                       </div>
                       
-                      {/* Size Presets */}
-                      {selectedElement.type === 'image' && (
-                        <div className="mb-2">
-                          <label className="block text-gray-300 text-xs mb-2">Quick Size Presets</label>
-                          <div className="flex gap-1">
-                            {[
-                              { label: '2"', inches: 2 },
-                              { label: '3"', inches: 3 },
-                              { label: '4"', inches: 4 }
-                            ].map((preset) => (
-                              <button
-                                key={preset.inches}
-                                onClick={() => {
-                                  const newSize = preset.inches * 96; // Convert inches to pixels (96 DPI)
+                      {/* Manual Size Input with Aspect Ratio Linking */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-white text-sm font-medium">Size (inches)</label>
+                          <button
+                            onClick={() => setAspectRatioLocked(!aspectRatioLocked)}
+                            className="p-1 rounded text-gray-400 hover:text-white transition-colors"
+                            title={aspectRatioLocked ? "Unlock aspect ratio" : "Lock aspect ratio"}
+                          >
+                            {aspectRatioLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <input
+                              type="number"
+                              step="0.125"
+                              min="0.1"
+                              value={parseFloat(pxToInches(selectedElement.width))}
+                              onChange={(e) => {
+                                const newInches = parseFloat(e.target.value) || 0.1;
+                                const newWidth = inchesToPx(newInches);
+                                
+                                if (aspectRatioLocked) {
+                                  // Maintain aspect ratio
                                   const aspectRatio = selectedElement.width / selectedElement.height;
-                                  
-                                  if (aspectRatio >= 1) {
-                                    // Landscape or square - set width to preset size
-                                    const newWidth = newSize;
-                                    const newHeight = newSize / aspectRatio;
-                                    updateElement(selectedElement.id, { width: newWidth, height: newHeight });
-                                  } else {
-                                    // Portrait - set height to preset size
-                                    const newHeight = newSize;
-                                    const newWidth = newSize * aspectRatio;
-                                    updateElement(selectedElement.id, { width: newWidth, height: newHeight });
-                                  }
-                                }}
-                                className="flex-1 px-2 py-1 text-xs text-white rounded transition-colors hover:bg-blue-500/20 border border-gray-600"
-                              >
-                                {preset.label}
-                              </button>
-                            ))}
+                                  const newHeight = newWidth / aspectRatio;
+                                  updateElement(selectedElement.id, { width: newWidth, height: newHeight });
+                                } else {
+                                  updateElement(selectedElement.id, { width: newWidth });
+                                }
+                              }}
+                              className="w-full px-3 py-2 text-sm text-white border border-gray-600 rounded"
+                              style={{
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                backdropFilter: 'blur(12px)'
+                              }}
+                              placeholder="W"
+                              title="Width in inches"
+                            />
+                            <div className="text-xs text-gray-400 text-center mt-1">W"</div>
+                          </div>
+                          <span className="text-gray-400 text-sm font-medium">×</span>
+                          <div className="flex-1">
+                            <input
+                              type="number"
+                              step="0.125"
+                              min="0.1"
+                              value={parseFloat(pxToInches(selectedElement.height))}
+                              onChange={(e) => {
+                                const newInches = parseFloat(e.target.value) || 0.1;
+                                const newHeight = inchesToPx(newInches);
+                                
+                                if (aspectRatioLocked) {
+                                  // Maintain aspect ratio
+                                  const aspectRatio = selectedElement.width / selectedElement.height;
+                                  const newWidth = newHeight * aspectRatio;
+                                  updateElement(selectedElement.id, { width: newWidth, height: newHeight });
+                                } else {
+                                  updateElement(selectedElement.id, { height: newHeight });
+                                }
+                              }}
+                              className="w-full px-3 py-2 text-sm text-white border border-gray-600 rounded"
+                              style={{
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                backdropFilter: 'blur(12px)'
+                              }}
+                              placeholder="H"
+                              title="Height in inches"
+                            />
+                            <div className="text-xs text-gray-400 text-center mt-1">H"</div>
                           </div>
                         </div>
-                      )}
-                      
-                      {/* Manual Size Input */}
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <input
-                            type="number"
-                            value={Math.round(selectedElement.width)}
-                            onChange={(e) => {
-                              const newWidth = parseInt(e.target.value) || 1;
-                              updateElement(selectedElement.id, { width: newWidth });
-                            }}
-                            className="w-full px-2 py-1 text-sm bg-gray-700 text-white border border-gray-600 rounded"
-                            placeholder="W"
-                            title="Width"
-                          />
-                        </div>
-                        <span className="text-gray-400 text-sm font-medium">×</span>
-                        <div className="flex-1">
-                          <input
-                            type="number"
-                            value={Math.round(selectedElement.height)}
-                            onChange={(e) => {
-                              const newHeight = parseInt(e.target.value) || 1;
-                              updateElement(selectedElement.id, { height: newHeight });
-                            }}
-                            className="w-full px-2 py-1 text-sm bg-gray-700 text-white border border-gray-600 rounded"
-                            placeholder="H"
-                            title="Height"
-                          />
-                        </div>
                       </div>
-                    </div>
-
-                    {/* Opacity */}
-                    <div>
-                      <label className="block text-white text-sm mb-2">Opacity: {Math.round(selectedElement.opacity * 100)}%</label>
-                                             <input
-                         type="range"
-                         min="0"
-                         max="1"
-                         step="0.01"
-                         value={selectedElement.opacity}
-                         onChange={(e) => updateElement(selectedElement.id, { opacity: parseFloat(e.target.value) })}
-                         className="w-full"
-                         title="Adjust element opacity"
-                       />
                     </div>
 
                     {/* Text Properties */}
@@ -1885,10 +1608,14 @@ export default function CanvasPage() {
                       <div className="space-y-3">
                         <div>
                           <label className="block text-white text-sm mb-1">Text</label>
-                                                     <textarea
+                          <textarea
                              value={selectedElement.text || ''}
                              onChange={(e) => updateElement(selectedElement.id, { text: e.target.value })}
-                             className="w-full px-3 py-2 text-sm bg-gray-700 text-white border border-gray-600 rounded resize-none"
+                             className="w-full px-3 py-2 text-sm text-white border border-gray-600 rounded resize-none"
+                             style={{
+                               background: 'rgba(255, 255, 255, 0.05)',
+                               backdropFilter: 'blur(12px)'
+                             }}
                              rows={3}
                              title="Edit text content"
                            />
@@ -1899,7 +1626,11 @@ export default function CanvasPage() {
                              type="number"
                              value={selectedElement.fontSize || 24}
                              onChange={(e) => updateElement(selectedElement.id, { fontSize: parseInt(e.target.value) || 24 })}
-                             className="w-full px-3 py-2 text-sm bg-gray-700 text-white border border-gray-600 rounded"
+                             className="w-full px-3 py-2 text-sm text-white border border-gray-600 rounded"
+                             style={{
+                               background: 'rgba(255, 255, 255, 0.05)',
+                               backdropFilter: 'blur(12px)'
+                             }}
                              title="Set font size in pixels"
                            />
                          </div>
@@ -1918,74 +1649,105 @@ export default function CanvasPage() {
 
                     {/* Image Properties */}
                     {selectedElement.type === 'image' && selectedElement.stickerMode && (
-                      <div className="space-y-3">
+                      <div className="space-y-4">
+                        {/* Border Width Slider */}
                         <div>
-                          <label className="block text-white text-sm mb-1">
-                            Border Width: {selectedElement.stickerBorderWidth || 6}px ({pxToInches(selectedElement.stickerBorderWidth || 6)}")
+                          <label className="block text-white text-sm mb-2">
+                            Border Width: {selectedElement.stickerBorderWidth || 12}px ({pxToInches(selectedElement.stickerBorderWidth || 12)}")
                           </label>
-                                                     <input
-                             type="number"
-                             min="5"
-                             max="20"
-                             value={selectedElement.stickerBorderWidth || 6}
-                             onChange={(e) => updateElement(selectedElement.id, { stickerBorderWidth: Math.max(5, parseInt(e.target.value) || 6) })}
-                             className="w-full px-3 py-2 text-sm bg-gray-700 text-white border border-gray-600 rounded"
-                             title="Set border width in pixels"
-                           />
-                        </div>
-                        <div>
-                          <label className="block text-white text-sm mb-1">Border Color (CMYK)</label>
-                          <div className="grid grid-cols-4 gap-2 mb-2">
-                            {[
-                              { name: 'White', color: '#FFFFFF', cmyk: 'C:0 M:0 Y:0 K:0' },
-                              { name: 'Black', color: '#000000', cmyk: 'C:0 M:0 Y:0 K:100' },
-                              { name: 'Cyan', color: '#00FFFF', cmyk: 'C:100 M:0 Y:0 K:0' },
-                              { name: 'Magenta', color: '#FF00FF', cmyk: 'C:0 M:100 Y:0 K:0' },
-                              { name: 'Yellow', color: '#FFFF00', cmyk: 'C:0 M:0 Y:100 K:0' },
-                              { name: 'Red', color: '#FF0000', cmyk: 'C:0 M:100 Y:100 K:0' },
-                              { name: 'Green', color: '#00FF00', cmyk: 'C:100 M:0 Y:100 K:0' },
-                              { name: 'Blue', color: '#0000FF', cmyk: 'C:100 M:100 Y:0 K:0' }
-                            ].map((preset) => (
-                              <button
-                                key={preset.color}
-                                onClick={() => updateElement(selectedElement.id, { stickerBorderColor: preset.color })}
-                                className={`w-8 h-8 rounded border-2 transition-all ${
-                                  (selectedElement.stickerBorderColor || '#ffffff') === preset.color 
-                                    ? 'border-blue-400 scale-110' 
-                                    : 'border-white/30 hover:border-white/60'
-                                }`}
-                                style={{ backgroundColor: preset.color }}
-                                title={`${preset.name} - ${preset.cmyk}`}
-                              />
-                            ))}
-                          </div>
-                          <div className="text-gray-300 text-xs text-center">
-                            {(() => {
-                              const currentColor = (selectedElement.stickerBorderColor || '#ffffff').toUpperCase();
-                              const colorMap: Record<string, string> = {
-                                '#FFFFFF': 'White - C:0 M:0 Y:0 K:0',
-                                '#000000': 'Black - C:0 M:0 Y:0 K:100',
-                                '#00FFFF': 'Cyan - C:100 M:0 Y:0 K:0',
-                                '#FF00FF': 'Magenta - C:0 M:100 Y:0 K:0',
-                                '#FFFF00': 'Yellow - C:0 M:0 Y:100 K:0',
-                                '#FF0000': 'Red - C:0 M:100 Y:100 K:0',
-                                '#00FF00': 'Green - C:100 M:0 Y:100 K:0',
-                                '#0000FF': 'Blue - C:100 M:100 Y:0 K:0'
-                              };
-                              return colorMap[currentColor] || 'Custom Color';
-                            })()}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="flex items-center gap-2 cursor-pointer">
+                          <div className="relative">
                             <input
-                              type="checkbox"
-                              checked={selectedElement.fillHoles || false}
-                              onChange={(e) => updateElement(selectedElement.id, { fillHoles: e.target.checked })}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                              type="range"
+                              min="5"
+                              max="25"
+                              value={selectedElement.stickerBorderWidth || 12}
+                              onChange={(e) => {
+                                const newWidth = parseInt(e.target.value);
+                                updateElement(selectedElement.id, { stickerBorderWidth: newWidth });
+                              }}
+                              className="w-full h-2 rounded-lg appearance-none cursor-pointer border-width-slider"
+                              style={{
+                                background: `linear-gradient(to right, 
+                                  rgba(34, 197, 94, 0.6) 0%, 
+                                  rgba(34, 197, 94, 0.4) ${(((selectedElement.stickerBorderWidth || 12) - 5) / 20) * 100}%, 
+                                  rgba(255, 255, 255, 0.15) ${(((selectedElement.stickerBorderWidth || 12) - 5) / 20) * 100}%, 
+                                  rgba(255, 255, 255, 0.1) 100%)`,
+                                outline: 'none',
+                                WebkitAppearance: 'none',
+                                MozAppearance: 'none',
+                              }}
+                              title={`Border Width: ${selectedElement.stickerBorderWidth || 12}px (${pxToInches(selectedElement.stickerBorderWidth || 12)}")`}
                             />
-                            <span className="text-white text-sm">Fill Holes</span>
-                          </label>
+                            <style jsx>{`
+                              .border-width-slider::-webkit-slider-thumb {
+                                appearance: none;
+                                width: 18px;
+                                height: 18px;
+                                border-radius: 50%;
+                                background: linear-gradient(135deg, rgba(34, 197, 94, 0.9) 0%, rgba(34, 197, 94, 1) 100%);
+                                cursor: pointer;
+                                border: 2px solid rgba(255, 255, 255, 0.4);
+                                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(34, 197, 94, 0.3);
+                              }
+                              .border-width-slider::-moz-range-thumb {
+                                width: 18px;
+                                height: 18px;
+                                border-radius: 50%;
+                                background: linear-gradient(135deg, rgba(34, 197, 94, 0.9) 0%, rgba(34, 197, 94, 1) 100%);
+                                cursor: pointer;
+                                border: 2px solid rgba(255, 255, 255, 0.4);
+                                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+                              }
+                              .border-width-slider::-webkit-slider-track {
+                                height: 8px;
+                                border-radius: 4px;
+                              }
+                              .border-width-slider::-moz-range-track {
+                                height: 8px;
+                                border-radius: 4px;
+                                border: none;
+                              }
+                            `}</style>
+                          </div>
+                        </div>
+
+                        {/* Border Color - Custom Hex Input */}
+                        <div>
+                          <label className="block text-white text-sm mb-2">Border Color</label>
+                          <div className="space-y-2">
+                            <input
+                              type="color"
+                              value={selectedElement.stickerBorderColor || '#ffffff'}
+                              onChange={(e) => updateElement(selectedElement.id, { stickerBorderColor: e.target.value })}
+                              className="w-full h-12 border border-gray-600 rounded cursor-pointer"
+                              style={{
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                backdropFilter: 'blur(12px)'
+                              }}
+                              title="Choose border color"
+                            />
+                            <input
+                              type="text"
+                              value={selectedElement.stickerBorderColor || '#ffffff'}
+                              onChange={(e) => {
+                                const hexValue = e.target.value;
+                                // Simple hex validation
+                                if (/^#[0-9A-F]{6}$/i.test(hexValue) || hexValue === '') {
+                                  updateElement(selectedElement.id, { stickerBorderColor: hexValue || '#ffffff' });
+                                }
+                              }}
+                              className="w-full px-3 py-2 text-sm text-white border border-gray-600 rounded font-mono"
+                              style={{
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                backdropFilter: 'blur(12px)'
+                              }}
+                              placeholder="#ffffff"
+                              title="Enter hex color code"
+                            />
+                            <div className="text-gray-400 text-xs">
+                              Enter custom hex color (e.g., #ffffff for white)
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1993,13 +1755,17 @@ export default function CanvasPage() {
                     {/* Shape Properties */}
                     {selectedElement.type === 'shape' && (
                       <div className="space-y-3">
-                                                 <div>
+                        <div>
                            <label className="block text-white text-sm mb-1">Fill Color</label>
                            <input
                              type="color"
                              value={selectedElement.fillColor || '#3b82f6'}
                              onChange={(e) => updateElement(selectedElement.id, { fillColor: e.target.value })}
                              className="w-full h-10 border border-gray-600 rounded cursor-pointer"
+                             style={{
+                               background: 'rgba(255, 255, 255, 0.05)',
+                               backdropFilter: 'blur(12px)'
+                             }}
                              title="Choose shape fill color"
                            />
                          </div>
@@ -2010,6 +1776,10 @@ export default function CanvasPage() {
                              value={selectedElement.strokeColor || '#1e40af'}
                              onChange={(e) => updateElement(selectedElement.id, { strokeColor: e.target.value })}
                              className="w-full h-10 border border-gray-600 rounded cursor-pointer"
+                             style={{
+                               background: 'rgba(255, 255, 255, 0.05)',
+                               backdropFilter: 'blur(12px)'
+                             }}
                              title="Choose shape stroke color"
                            />
                          </div>
@@ -2020,7 +1790,11 @@ export default function CanvasPage() {
                              min="0"
                              value={selectedElement.strokeWidth || 0}
                              onChange={(e) => updateElement(selectedElement.id, { strokeWidth: parseInt(e.target.value) || 0 })}
-                             className="w-full px-3 py-2 text-sm bg-gray-700 text-white border border-gray-600 rounded"
+                             className="w-full px-3 py-2 text-sm text-white border border-gray-600 rounded"
+                             style={{
+                               background: 'rgba(255, 255, 255, 0.05)',
+                               backdropFilter: 'blur(12px)'
+                             }}
                              title="Set stroke width in pixels"
                            />
                         </div>
@@ -2059,12 +1833,13 @@ export default function CanvasPage() {
                   />
                   
                   <div 
-                    className="border-2 border-dashed border-white/30 rounded-xl p-12 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md"
+                    className="border-2 border-dashed border-white/30 rounded-xl p-16 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md"
                     onClick={() => fileInputRef.current?.click()}
                     style={{
                       background: 'rgba(255, 255, 255, 0.05)',
                       backdropFilter: 'blur(12px)',
-                      minWidth: '400px'
+                      minWidth: '500px',
+                      minHeight: '300px'
                     }}
                   >
                     <div className="mb-6">
@@ -2089,7 +1864,7 @@ export default function CanvasPage() {
           </div>
 
           {/* Right Floating Calculator */}
-          <div className="w-[440px] p-4 relative">
+          <div className="w-[360px] p-4 relative">
             <div className="sticky top-4 space-y-4">
               {/* Floating Vinyl Sticker Calculator */}
               <div className="rounded-xl p-6" style={{

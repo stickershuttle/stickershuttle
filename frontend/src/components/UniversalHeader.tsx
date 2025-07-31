@@ -671,7 +671,11 @@ export default function UniversalHeader() {
                   minHeight: '40px' // Ensure consistent height
                 }}
               >
-                <i className="fas fa-coins text-yellow-300"></i>
+                                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                    alt="Credits" 
+                    className="w-5 h-5 object-contain"
+                  />
                 {creditBalanceLoaded ? (
                   <span className="text-yellow-200 leading-5">${creditBalance.toFixed(2)}</span>
                 ) : (
