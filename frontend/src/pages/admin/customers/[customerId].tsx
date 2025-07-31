@@ -4,6 +4,7 @@ import AdminLayout from '@/components/AdminLayout';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { getSupabase } from '../../../lib/supabase';
 import { GET_USER_PROFILE, UPDATE_TAX_EXEMPTION, UPDATE_WHOLESALE_STATUS } from '../../../lib/profile-mutations';
+import { ADD_USER_CREDITS, GET_USER_CREDIT_BALANCE, GET_USER_CREDIT_HISTORY } from '../../../lib/credit-mutations';
 
 // Import GET_ALL_CUSTOMERS query
 const GET_ALL_CUSTOMERS = gql`
@@ -145,6 +146,12 @@ export default function CustomerDetail() {
   const [customerUserId, setCustomerUserId] = useState<string | null>(null);
   const [taxExemptLoading, setTaxExemptLoading] = useState(false);
   const [wholesaleLoading, setWholesaleLoading] = useState(false);
+  
+  // Credit management states
+  const [showAddCreditModal, setShowAddCreditModal] = useState(false);
+  const [creditAmount, setCreditAmount] = useState('');
+  const [creditReason, setCreditReason] = useState('');
+  const [creditLoading, setCreditLoading] = useState(false);
 
   // Get all orders first
   const { data: allOrdersData, loading: ordersLoading, error } = useQuery(GET_ORDERS_BY_EMAIL);
@@ -160,6 +167,18 @@ export default function CustomerDetail() {
     variables: { userId: customerUserId },
     skip: !customerUserId
   });
+  
+  // Get user's credit balance if we have a user ID
+  const { data: creditBalanceData, refetch: refetchCreditBalance, loading: creditBalanceLoading } = useQuery(GET_USER_CREDIT_BALANCE, {
+    variables: { userId: customerUserId },
+    skip: !customerUserId
+  });
+  
+  // Get user's credit history to show credits earned from orders
+  const { data: creditHistoryData, loading: creditHistoryLoading } = useQuery(GET_USER_CREDIT_HISTORY, {
+    variables: { userId: customerUserId, limit: 100 },
+    skip: !customerUserId
+  });
 
 
 
@@ -168,6 +187,9 @@ export default function CustomerDetail() {
   
   // Update wholesale status mutation
   const [updateWholesaleStatus] = useMutation(UPDATE_WHOLESALE_STATUS);
+  
+  // Add user credits mutation
+  const [addUserCredits] = useMutation(ADD_USER_CREDITS);
 
   // Check if user is admin
   useEffect(() => {
@@ -242,6 +264,22 @@ export default function CustomerDetail() {
       return dateB - dateA; // Most recent first
     });
   }, [allOrdersData, customerEmail]);
+
+  // Create a mapping of order IDs to credits earned from those orders
+  const orderCreditsMap = React.useMemo(() => {
+    if (!creditHistoryData?.getUserCreditHistory) return {};
+    
+    const map: { [key: string]: number } = {};
+    
+    creditHistoryData.getUserCreditHistory.forEach((transaction: any) => {
+      // Only include 'earned' credits that are linked to orders
+      if (transaction.transactionType === 'earned' && transaction.orderId) {
+        map[transaction.orderId] = parseFloat(transaction.amount) || 0;
+      }
+    });
+    
+    return map;
+  }, [creditHistoryData]);
 
   // Calculate customer stats (paid orders only)
   const customerStats = React.useMemo(() => {
@@ -431,6 +469,49 @@ export default function CustomerDetail() {
     } finally {
       setWholesaleLoading(false);
     }
+  };
+
+  // Handle adding credits
+  const handleAddCredits = async () => {
+    if (!customerUserId) return;
+    if (!creditAmount || parseFloat(creditAmount) <= 0) {
+      alert('Please enter a valid credit amount');
+      return;
+    }
+
+    setCreditLoading(true);
+    try {
+      const { data } = await addUserCredits({
+        variables: {
+          userId: customerUserId,
+          amount: parseFloat(creditAmount),
+          reason: creditReason || 'Store credit added by admin'
+        }
+      });
+
+      if (data?.addCredits?.success) {
+        await refetchCreditBalance();
+        setShowAddCreditModal(false);
+        setCreditAmount('');
+        setCreditReason('');
+        console.log('✅ Credits added successfully');
+      } else {
+        console.error('❌ Failed to add credits:', data?.addCredits?.message);
+        alert(data?.addCredits?.message || 'Failed to add credits');
+      }
+    } catch (error) {
+      console.error('❌ Error adding credits:', error);
+      alert('Failed to add credits');
+    } finally {
+      setCreditLoading(false);
+    }
+  };
+
+  // Handle closing add credit modal
+  const handleCloseAddCreditModal = () => {
+    setShowAddCreditModal(false);
+    setCreditAmount('');
+    setCreditReason('');
   };
 
   if (loading || !isAdmin) {
@@ -697,6 +778,66 @@ export default function CustomerDetail() {
               </div>
             )}
 
+            {/* Credit Management Section */}
+            {customerUserId && (
+              <div className="glass-container p-4 xl:p-6 mb-6 xl:mb-8">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-500/20">
+                      <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-base font-medium text-white">Store Credits</h3>
+                      <p className="text-sm text-gray-400">Current balance: {creditBalanceLoading ? 'Loading...' : formatCurrency(creditBalanceData?.getUserCreditBalance?.balance || 0)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {creditBalanceLoading && (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-400"></div>
+                    )}
+                    <button
+                      onClick={() => setShowAddCreditModal(true)}
+                      className="px-4 py-2 text-white rounded-lg text-sm font-medium transition-all hover:scale-105"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: '1px solid rgba(59, 130, 246, 0.4)',
+                        boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                      }}
+                    >
+                      Add Credits
+                    </button>
+                  </div>
+                </div>
+                {creditBalanceData?.getUserCreditBalance?.balance > 0 && (
+                  <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="text-sm text-green-300">
+                        Customer has {formatCurrency(creditBalanceData?.getUserCreditBalance?.balance || 0)} in store credits available
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {!creditBalanceLoading && !creditBalanceData?.getUserCreditBalance && (
+                  <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      <span className="text-sm text-yellow-300">
+                        No credit information found - customer may be guest-only
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Orders Section */}
             <div className="glass-container overflow-hidden">
               <div className="px-4 xl:px-6 py-3 xl:py-4 border-b border-gray-700">
@@ -746,8 +887,25 @@ export default function CustomerDetail() {
                               ></div>
                               <span className="text-xs text-gray-300">{getProofStatus(order)}</span>
                             </div>
-                            <div className="text-xs text-gray-400">
-                              {totalItems} item{totalItems !== 1 ? 's' : ''}
+                            <div className="flex items-center gap-2">
+                              <div className="text-xs text-gray-400">
+                                {totalItems} item{totalItems !== 1 ? 's' : ''}
+                              </div>
+                              {creditHistoryLoading ? (
+                                <div className="flex items-center gap-1 px-2 py-1 bg-gray-500/10 border border-gray-500/20 rounded-full">
+                                  <div className="animate-spin rounded-full h-2 w-2 border-b border-gray-400"></div>
+                                  <span className="text-xs text-gray-400">Loading...</span>
+                                </div>
+                              ) : orderCreditsMap[order.id] && order.financialStatus === 'paid' && (
+                                <div className="flex items-center gap-1 px-2 py-1 bg-green-500/10 border border-green-500/20 rounded-full">
+                                  <svg className="w-3 h-3 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                                  </svg>
+                                  <span className="text-xs text-green-300 font-medium">
+                                    +{formatCurrency(orderCreditsMap[order.id])}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -786,6 +944,9 @@ export default function CustomerDetail() {
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
                         Total
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                        Credits Earned
                       </th>
                       <th className="px-6 py-3 text-center text-xs font-semibold text-gray-300 uppercase tracking-wider">
                         Actions
@@ -838,6 +999,27 @@ export default function CustomerDetail() {
                               {formatCurrency(order.totalPrice)}
                             </div>
                           </td>
+                          <td className="px-6 py-4">
+                            {creditHistoryLoading ? (
+                              <div className="flex items-center gap-1">
+                                <div className="animate-spin rounded-full h-3 w-3 border-b border-gray-400"></div>
+                                <span className="text-xs text-gray-500">Loading...</span>
+                              </div>
+                            ) : orderCreditsMap[order.id] && order.financialStatus === 'paid' ? (
+                              <div className="flex items-center gap-1">
+                                <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                                </svg>
+                                <span className="text-sm font-medium text-green-300">
+                                  +{formatCurrency(orderCreditsMap[order.id])}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-500">
+                                {order.financialStatus === 'paid' ? 'None' : '-'}
+                              </span>
+                            )}
+                          </td>
                           <td className="px-6 py-4 text-center">
                             <button
                               onClick={(e) => {
@@ -874,6 +1056,84 @@ export default function CustomerDetail() {
             </div>
           </div>
         </div>
+
+        {/* Add Credits Modal */}
+        {showAddCreditModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="rounded-lg p-6 w-full max-w-md"
+                 style={{
+                   background: 'rgba(255, 255, 255, 0.05)',
+                   border: '1px solid rgba(255, 255, 255, 0.1)',
+                   boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                   backdropFilter: 'blur(12px)'
+                 }}>
+              <h3 className="text-xl font-bold text-white mb-4">Add Store Credits</h3>
+              <div className="mb-4">
+                <label htmlFor="creditAmount" className="block text-sm font-medium text-gray-300 mb-1">Credit Amount ($)</label>
+                <input
+                  type="number"
+                  id="creditAmount"
+                  value={creditAmount}
+                  onChange={(e) => setCreditAmount(e.target.value)}
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                  className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                    backdropFilter: 'blur(12px)'
+                  }}
+                />
+              </div>
+              <div className="mb-4">
+                <label htmlFor="creditReason" className="block text-sm font-medium text-gray-300 mb-1">Reason (Optional)</label>
+                <input
+                  type="text"
+                  id="creditReason"
+                  value={creditReason}
+                  onChange={(e) => setCreditReason(e.target.value)}
+                  placeholder="Store credit added by admin"
+                  className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                    backdropFilter: 'blur(12px)'
+                  }}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={handleCloseAddCreditModal}
+                  className="px-4 py-2 text-white rounded hover:bg-gray-700 transition-colors"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                    backdropFilter: 'blur(12px)'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddCredits}
+                  className="px-4 py-2 text-white rounded transition-colors"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                  }}
+                  disabled={creditLoading}
+                >
+                  {creditLoading ? 'Adding...' : 'Add Credits'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   );

@@ -162,13 +162,26 @@ export default function AlertsManagement() {
     e.preventDefault();
     
     try {
+      // Auto-generate title from message for backend compatibility
+      const submitData = {
+        title: formData.message.trim() ? formData.message.substring(0, 50) + (formData.message.length > 50 ? '...' : '') : 'Header Alert',
+        message: formData.message.trim() || 'Alert message',
+        backgroundColor: formData.backgroundColor || '#FFD700',
+        textColor: formData.textColor || '#030140',
+        linkUrl: formData.linkUrl || null,
+        linkText: formData.linkUrl ? 'Learn More' : null,
+        isActive: Boolean(formData.isActive),
+        startDate: formData.startDate || null,
+        endDate: formData.endDate || null
+      };
+
       if (editingAlert) {
         await updateAlert({
-          variables: { id: editingAlert.id, input: formData }
+          variables: { id: editingAlert.id, input: submitData }
         });
       } else {
         await createAlert({
-          variables: { input: formData }
+          variables: { input: submitData }
         });
       }
       
@@ -251,8 +264,8 @@ export default function AlertsManagement() {
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-white mb-2">Sitewide Alerts</h1>
-              <p className="text-gray-400">Manage promotional banners and announcements</p>
+              <h1 className="text-3xl font-bold text-white mb-2">Header Alerts</h1>
+              <p className="text-gray-400">Manage header alerts displayed above the navigation</p>
             </div>
             <button
               onClick={() => setShowForm(true)}
@@ -284,30 +297,7 @@ export default function AlertsManagement() {
               </h3>
 
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Title *</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.title}
-                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-blue-400"
-                      placeholder="e.g., Summer Sale!"
-                    />
-                  </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Link Text</label>
-                    <input
-                      type="text"
-                      value={formData.linkText}
-                      onChange={(e) => setFormData({ ...formData, linkText: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-blue-400"
-                      placeholder="e.g., Shop Now"
-                    />
-                  </div>
-                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Message *</label>
@@ -321,57 +311,15 @@ export default function AlertsManagement() {
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Background Color</label>
-                    <select
-                      value={formData.backgroundColor}
-                      onChange={(e) => setFormData({ ...formData, backgroundColor: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg border border-white/20 bg-white/10 text-white focus:outline-none focus:border-blue-400"
-                      aria-label="Select background color"
-                    >
-                      {COLOR_OPTIONS.map((color) => (
-                        <option key={color.value} value={color.value} className="bg-gray-800 text-white">
-                          {color.name} - {color.description}
-                        </option>
-                      ))}
-                    </select>
-                    <div 
-                      className="w-full h-4 rounded-lg mt-2 border border-white/20"
-                      style={{ backgroundColor: formData.backgroundColor }}
-                    ></div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Text Color</label>
-                    <select
-                      value={formData.textColor}
-                      onChange={(e) => setFormData({ ...formData, textColor: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg border border-white/20 bg-white/10 text-white focus:outline-none focus:border-blue-400"
-                      aria-label="Select text color"
-                    >
-                      {TEXT_COLOR_OPTIONS.map((color) => (
-                        <option key={color.value} value={color.value} className="bg-gray-800 text-white">
-                          {color.name} - {color.description}
-                        </option>
-                      ))}
-                    </select>
-                    <div 
-                      className="w-full h-4 rounded-lg mt-2 border border-white/20"
-                      style={{ backgroundColor: formData.textColor }}
-                    ></div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Link URL</label>
-                    <input
-                      type="url"
-                      value={formData.linkUrl}
-                      onChange={(e) => setFormData({ ...formData, linkUrl: e.target.value })}
-                      className="w-full px-4 py-3 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-blue-400"
-                      placeholder="/products"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Link URL</label>
+                  <input
+                    type="url"
+                    value={formData.linkUrl}
+                    onChange={(e) => setFormData({ ...formData, linkUrl: e.target.value })}
+                    className="w-full px-4 py-3 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-blue-400"
+                    placeholder="/products"
+                  />
                 </div>
 
                 <div>
@@ -390,20 +338,18 @@ export default function AlertsManagement() {
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Preview</label>
                   <div 
-                    className="rounded-lg p-4 text-center font-semibold"
+                    className="py-2 px-4 text-center text-sm text-white"
                     style={{
-                      background: `rgba(${parseInt(formData.backgroundColor.slice(1, 3), 16)}, ${parseInt(formData.backgroundColor.slice(3, 5), 16)}, ${parseInt(formData.backgroundColor.slice(5, 7), 16)}, 0.15)`,
-                      border: `1px solid rgba(${parseInt(formData.backgroundColor.slice(1, 3), 16)}, ${parseInt(formData.backgroundColor.slice(3, 5), 16)}, ${parseInt(formData.backgroundColor.slice(5, 7), 16)}, 0.3)`,
-                      boxShadow: `rgba(${parseInt(formData.backgroundColor.slice(1, 3), 16)}, ${parseInt(formData.backgroundColor.slice(3, 5), 16)}, ${parseInt(formData.backgroundColor.slice(5, 7), 16)}, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset`,
-                      backdropFilter: 'blur(12px)',
-                      color: formData.textColor
+                      backgroundColor: '#030140', // Same as header background
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
                     }}
                   >
-                    <span>{formData.title || 'Alert Title'}</span>
-                    {formData.title && formData.message && ' - '}
-                    <span>{formData.message || 'Alert message will appear here'}</span>
-                    {formData.linkText && (
-                      <span className="ml-2 underline">{formData.linkText}</span>
+                    <span>{formData.message || 'Your alert message will appear here'}</span>
+                    {formData.linkUrl && (
+                      <>
+                        {' • '}
+                        <span className="underline">Learn More</span>
+                      </>
                     )}
                   </div>
                 </div>

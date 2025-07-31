@@ -37,6 +37,8 @@ interface User {
   email: string;
   name: string;
   company?: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 function AdminCredits() {
@@ -112,14 +114,37 @@ function AdminCredits() {
 
   useEffect(() => {
     if (usersData?.getAllUsers) {
-      const formattedUsers = usersData.getAllUsers.map((user: any) => ({
-        id: user.id,
-        email: user.email,
-        name: user.firstName || user.lastName 
-          ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
-          : user.email?.split('@')[0] || 'Unknown User',
-        company: user.company || ''
-      }));
+      const formattedUsers = usersData.getAllUsers.map((user: any) => {
+        // Create a more robust name that's easier to search for
+        let displayName = '';
+        if (user.firstName && user.lastName) {
+          displayName = `${user.firstName} ${user.lastName}`;
+        } else if (user.firstName) {
+          displayName = user.firstName;
+        } else if (user.lastName) {
+          displayName = user.lastName;
+        } else {
+          // Fallback to email prefix if no name is available
+          displayName = user.email?.split('@')[0] || 'Unknown User';
+        }
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: displayName.trim(),
+          company: user.company || '',
+          // Store original name parts for debugging
+          firstName: user.firstName,
+          lastName: user.lastName
+        };
+      });
+      
+      console.log('🔍 Debug: Sample formatted users for search:', formattedUsers.slice(0, 5).map(u => ({
+        name: u.name,
+        email: u.email,
+        firstName: u.firstName,
+        lastName: u.lastName
+      })));
       setUsers(formattedUsers);
       setLoadingUsers(false);
     }
@@ -139,11 +164,21 @@ function AdminCredits() {
       return;
     }
 
-    const filtered = users.filter(user => 
-      user.name.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-      (user.company && user.company.toLowerCase().includes(userSearchTerm.toLowerCase()))
-    ).slice(0, 10); // Limit to 10 results
+    const searchLower = userSearchTerm.toLowerCase().trim();
+    const filtered = users.filter(user => {
+      const nameLower = user.name.toLowerCase();
+      const emailLower = user.email.toLowerCase();
+      const companyLower = (user.company || '').toLowerCase();
+      
+      // Enhanced search: check for partial matches in name, email, and company
+      return nameLower.includes(searchLower) ||
+             emailLower.includes(searchLower) ||
+             companyLower.includes(searchLower) ||
+             // Also check if search term matches the start of first/last name parts
+             nameLower.split(' ').some(namePart => namePart.startsWith(searchLower)) ||
+             // Check if search term matches email username (before @)
+             emailLower.split('@')[0].includes(searchLower);
+    }).slice(0, 50); // Increased limit to 50 results to show more users
 
     setFilteredUsers(filtered);
     setShowUserDropdown(filtered.length > 0);
@@ -674,7 +709,7 @@ function AdminCredits() {
                   </div>
                   
                   {/* User Dropdown */}
-                  {showUserDropdown && filteredUsers.length > 0 && (
+                  {userSearchTerm.trim() && (
                     <div 
                       className="absolute top-full left-0 right-0 mt-1 rounded-lg overflow-hidden z-10 max-h-60 overflow-y-auto"
                       style={{
@@ -684,19 +719,37 @@ function AdminCredits() {
                         backdropFilter: 'blur(12px)'
                       }}
                     >
-                      {filteredUsers.map((user) => (
-                        <button
-                          key={user.id}
-                          onClick={() => handleUserSelect(user)}
-                          className="w-full px-4 py-3 text-left hover:bg-white/10 transition-colors border-b border-white/5 last:border-b-0"
-                        >
-                          <div className="text-white font-medium">{user.name}</div>
-                          <div className="text-gray-400 text-sm">{user.email}</div>
-                          {user.company && (
-                            <div className="text-gray-500 text-xs">{user.company}</div>
+                      {filteredUsers.length > 0 ? (
+                        <>
+                          {filteredUsers.map((user) => (
+                            <button
+                              key={user.id}
+                              onClick={() => handleUserSelect(user)}
+                              className="w-full px-4 py-3 text-left hover:bg-white/10 transition-colors border-b border-white/5 last:border-b-0"
+                            >
+                              <div className="text-white font-medium">{user.name}</div>
+                              <div className="text-gray-400 text-sm">{user.email}</div>
+                              {user.company && (
+                                <div className="text-gray-500 text-xs">{user.company}</div>
+                              )}
+                            </button>
+                          ))}
+                          {filteredUsers.length === 50 && (
+                            <div className="px-4 py-2 text-xs text-amber-300 bg-amber-900/20 border-t border-amber-500/20">
+                              💡 Showing first 50 results. Try a more specific search if you don't see the user you're looking for.
+                            </div>
                           )}
-                        </button>
-                      ))}
+                        </>
+                      ) : (
+                        <div className="px-4 py-3 text-gray-400 text-sm">
+                          No users found matching "{userSearchTerm}". Try searching by:
+                          <ul className="mt-1 ml-4 text-xs">
+                            <li>• Full or partial name</li>
+                            <li>• Email address</li>
+                            <li>• Company name</li>
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

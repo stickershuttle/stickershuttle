@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { getSupabase } from '@/lib/supabase';
 import { useQuery } from '@apollo/client';
 import { GET_USER_CREDIT_BALANCE } from '@/lib/credit-mutations';
+import HeaderAlerts from './HeaderAlerts';
 import CartIndicator from './CartIndicator';
 
 
@@ -265,7 +266,8 @@ export default function UniversalHeader() {
 
   return (
     <>
-    <header className={`w-full fixed top-0 z-50 ${!isAdminPage ? 'pb-[5px]' : ''}`} style={{ backgroundColor: '#030140' }}>
+    <HeaderAlerts />
+    <header className={`w-full fixed z-50 ${!isAdminPage ? 'pb-[5px]' : ''}`} style={{ backgroundColor: '#030140', top: 'var(--header-alerts-height, 0px)' }}>
               <div className={isAdminPage ? "w-full py-4 px-8" : "w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto py-4 px-4"}>
         <div className="flex items-center justify-between relative" style={{ paddingTop: '2px' }}>
           {/* Mobile/Tablet Left Side - Avatar or Login Icons */}

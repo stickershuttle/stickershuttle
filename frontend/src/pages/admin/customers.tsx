@@ -4,6 +4,7 @@ import AdminLayout from '@/components/AdminLayout';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { getSupabase } from '../../lib/supabase';
 import { UPDATE_USER_PROFILE_NAMES } from '../../lib/profile-mutations';
+import { ADD_USER_CREDITS } from '../../lib/credit-mutations';
 
 // GraphQL query to get all customers
 const GET_ALL_CUSTOMERS = gql`
@@ -84,10 +85,18 @@ export default function AdminCustomers() {
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSuccess, setEditSuccess] = useState(false);
+  
+  // Credit modal states
+  const [showAddCreditModal, setShowAddCreditModal] = useState(false);
+  const [creditCustomer, setCreditCustomer] = useState<Customer | null>(null);
+  const [creditAmount, setCreditAmount] = useState('');
+  const [creditReason, setCreditReason] = useState('');
+  const [creditLoading, setCreditLoading] = useState(false);
 
   const { data, loading: customersLoading, error, refetch } = useQuery(GET_ALL_CUSTOMERS);
   const { data: allUsersData, loading: allUsersLoading, error: allUsersError, refetch: refetchAllUsers } = useQuery(GET_ALL_USERS_WITH_ORDER_STATS);
   const [updateUserProfileNames] = useMutation(UPDATE_USER_PROFILE_NAMES);
+  const [addUserCredits] = useMutation(ADD_USER_CREDITS);
 
   // Debug logging
   useEffect(() => {
@@ -153,6 +162,58 @@ export default function AdminCustomers() {
     setEditLastName('');
     setEditError(null);
     setEditSuccess(false);
+  };
+
+  // Handle opening add credit modal
+  const handleAddCreditsClick = (customer: Customer, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent row click navigation
+    setCreditCustomer(customer);
+    setShowAddCreditModal(true);
+    setCreditAmount('');
+    setCreditReason('');
+  };
+
+  // Handle adding credits
+  const handleAddCredits = async () => {
+    if (!creditCustomer) return;
+    if (!creditAmount || parseFloat(creditAmount) <= 0) {
+      alert('Please enter a valid credit amount');
+      return;
+    }
+
+    setCreditLoading(true);
+    try {
+      const { data } = await addUserCredits({
+        variables: {
+          userId: creditCustomer.id,
+          amount: parseFloat(creditAmount),
+          reason: creditReason || 'Store credit added by admin'
+        }
+      });
+
+      if (data?.addCredits?.success) {
+        alert('Credits added successfully!');
+        setShowAddCreditModal(false);
+        setCreditAmount('');
+        setCreditReason('');
+        setCreditCustomer(null);
+      } else {
+        alert(data?.addCredits?.message || 'Failed to add credits');
+      }
+    } catch (error) {
+      console.error('Error adding credits:', error);
+      alert('Failed to add credits');
+    } finally {
+      setCreditLoading(false);
+    }
+  };
+
+  // Handle closing add credit modal
+  const handleCloseAddCreditModal = () => {
+    setShowAddCreditModal(false);
+    setCreditAmount('');
+    setCreditReason('');
+    setCreditCustomer(null);
   };
 
   // Check if user is admin
@@ -729,6 +790,18 @@ export default function AdminCustomers() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                           </svg>
                         </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddCreditsClick(customer, e);
+                          }}
+                          className="p-1.5 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-500 hover:bg-opacity-10 transition-all"
+                          title="Add Credits"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                          </svg>
+                        </button>
                         <div className="text-xs text-gray-500">
                           {customer.lastOrderDate ? `Last order: ${formatDate(customer.lastOrderDate)}` : 'No orders yet'}
                         </div>
@@ -1043,6 +1116,18 @@ export default function AdminCustomers() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                               </svg>
                             </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddCreditsClick(customer, e);
+                              }}
+                              className="p-1.5 rounded-lg text-green-400 hover:text-green-300 hover:bg-green-500 hover:bg-opacity-10 transition-all"
+                              title="Add Credits"
+                            >
+                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                              </svg>
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1141,6 +1226,87 @@ export default function AdminCustomers() {
                    disabled={editLoading}
                  >
                    {editLoading ? 'Saving...' : 'Save Changes'}
+                 </button>
+               </div>
+             </div>
+           </div>
+         )}
+
+         {/* Add Credits Modal */}
+         {showAddCreditModal && creditCustomer && (
+           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+             <div className="rounded-lg p-6 w-full max-w-md"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                    backdropFilter: 'blur(12px)'
+                  }}>
+               <h3 className="text-xl font-bold text-white mb-4">
+                 Add Credits to {creditCustomer.firstName} {creditCustomer.lastName}
+               </h3>
+               <p className="text-sm text-gray-400 mb-4">{creditCustomer.email}</p>
+               <div className="mb-4">
+                 <label htmlFor="creditAmount" className="block text-sm font-medium text-gray-300 mb-1">Credit Amount ($)</label>
+                 <input
+                   type="number"
+                   id="creditAmount"
+                   value={creditAmount}
+                   onChange={(e) => setCreditAmount(e.target.value)}
+                   placeholder="0.00"
+                   min="0"
+                   step="0.01"
+                   className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                   style={{
+                     background: 'rgba(255, 255, 255, 0.05)',
+                     border: '1px solid rgba(255, 255, 255, 0.1)',
+                     boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                     backdropFilter: 'blur(12px)'
+                   }}
+                 />
+               </div>
+               <div className="mb-4">
+                 <label htmlFor="creditReason" className="block text-sm font-medium text-gray-300 mb-1">Reason (Optional)</label>
+                 <input
+                   type="text"
+                   id="creditReason"
+                   value={creditReason}
+                   onChange={(e) => setCreditReason(e.target.value)}
+                   placeholder="Store credit added by admin"
+                   className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                   style={{
+                     background: 'rgba(255, 255, 255, 0.05)',
+                     border: '1px solid rgba(255, 255, 255, 0.1)',
+                     boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                     backdropFilter: 'blur(12px)'
+                   }}
+                 />
+               </div>
+               <div className="flex justify-end gap-2">
+                 <button
+                   onClick={handleCloseAddCreditModal}
+                   className="px-4 py-2 text-white rounded hover:bg-gray-700 transition-colors"
+                   style={{
+                     background: 'rgba(255, 255, 255, 0.05)',
+                     border: '1px solid rgba(255, 255, 255, 0.1)',
+                     boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                     backdropFilter: 'blur(12px)'
+                   }}
+                 >
+                   Cancel
+                 </button>
+                 <button
+                   onClick={handleAddCredits}
+                   className="px-4 py-2 text-white rounded transition-colors"
+                   style={{
+                     background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                     backdropFilter: 'blur(25px) saturate(180%)',
+                     border: '1px solid rgba(59, 130, 246, 0.4)',
+                     boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                   }}
+                   disabled={creditLoading}
+                 >
+                   {creditLoading ? 'Adding...' : 'Add Credits'}
                  </button>
                </div>
              </div>

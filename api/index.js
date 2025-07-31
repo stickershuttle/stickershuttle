@@ -2005,6 +2005,7 @@ const typeDefs = gql`
     dailySales: [DailySalesData]
     proofMetrics: ProofMetrics
     productPerformance: ProductPerformance
+    customerAnalytics: [CustomerAnalytics]
   }
 
   type SummaryMetrics {
@@ -2014,6 +2015,14 @@ const typeDefs = gql`
     uniqueCustomers: Int
     revenueGrowth: Float
     conversionRate: Float
+    dailyAverageRevenue: Float
+    dailyAverageOrders: Float
+    currentMonthProjection: Float
+    avgOrderToDeliveryTime: Float
+    avgProofApprovedToDeliveryTime: Float
+    newCustomers: Int
+    existingCustomers: Int
+    newSignups: Int
   }
 
   type DailySalesData {
@@ -2042,6 +2051,18 @@ const typeDefs = gql`
     revenue: Float
     quantity: Int
     orders: Int
+  }
+
+  type CustomerAnalytics {
+    id: ID!
+    email: String!
+    name: String
+    lifetimeValue: Float!
+    purchaseFrequency: Float
+    totalOrders: Int!
+    firstOrderDate: String
+    lastOrderDate: String
+    avgOrderValue: Float!
   }
 
   # Discount Types
@@ -3368,6 +3389,250 @@ const resolvers = {
         const previousRevenue = previousPeriodOrders.reduce((sum, order) => sum + (order.total_price || 0), 0);
         const revenueGrowth = previousRevenue > 0 ? ((totalRevenue - previousRevenue) / previousRevenue) * 100 : 0;
 
+        // Calculate churn rate (customers who haven't ordered in the last 90 days)
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+        
+        const allCustomerIds = new Set(orders.map(order => order.user_id || order.guest_email).filter(Boolean));
+        const recentCustomerIds = new Set(
+          orders
+            .filter(order => new Date(order.order_created_at || order.created_at) >= ninetyDaysAgo)
+            .map(order => order.user_id || order.guest_email)
+            .filter(Boolean)
+        );
+        
+        // Calculate daily averages
+        const periodDays = Math.ceil((now - startDate) / (1000 * 60 * 60 * 24));
+        const dailyAverageRevenue = periodDays > 0 ? totalRevenue / periodDays : 0;
+        const dailyAverageOrders = periodDays > 0 ? totalOrders / periodDays : 0;
+
+        // Calculate new vs existing customers for the current period
+        const customerFirstOrderMap = new Map();
+        orders.forEach(order => {
+          const customerId = order.user_id || order.guest_email;
+          if (!customerId) return;
+          
+          const orderDate = new Date(order.order_created_at || order.created_at);
+          if (!customerFirstOrderMap.has(customerId) || orderDate < customerFirstOrderMap.get(customerId)) {
+            customerFirstOrderMap.set(customerId, orderDate);
+          }
+        });
+
+        // Track unique customers who ordered in the filtered period
+        const newCustomerSet = new Set();
+        const existingCustomerSet = new Set();
+        
+        filteredOrders.forEach(order => {
+          const customerId = order.user_id || order.guest_email;
+          if (!customerId) return;
+          
+          const firstOrderDate = customerFirstOrderMap.get(customerId);
+          
+          // If customer's first order is within the filtered period, they're new
+          if (firstOrderDate && firstOrderDate >= startDate) {
+            newCustomerSet.add(customerId);
+          } else {
+            existingCustomerSet.add(customerId);
+          }
+        });
+
+        const newCustomers = newCustomerSet.size;
+        const existingCustomers = existingCustomerSet.size;
+
+        // Get new signups (user registrations) for the period
+        let newSignups = 0;
+        try {
+          const { data: signupData, error: signupError } = await client
+            .from('user_profiles')
+            .select('created_at')
+            .gte('created_at', startDate.toISOString())
+            .lte('created_at', now.toISOString());
+          
+          if (!signupError && signupData) {
+            newSignups = signupData.length;
+          }
+        } catch (signupErr) {
+          console.warn('Could not fetch signup data:', signupErr);
+          newSignups = 0;
+        }
+
+        // Calculate current month projection
+        const currentMonth = new Date();
+        const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+        const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+        const daysInMonth = endOfMonth.getDate();
+        const daysPassed = Math.max(1, currentMonth.getDate());
+        
+        // Get current month's revenue so far
+        const currentMonthOrders = orders.filter(order => {
+          const orderDate = new Date(order.order_created_at || order.created_at);
+          return orderDate >= startOfMonth && orderDate <= currentMonth && order.financial_status === 'paid';
+        });
+        
+        const currentMonthRevenue = currentMonthOrders.reduce((sum, order) => sum + (order.total_price || 0), 0);
+        const dailyAverageThisMonth = daysPassed > 0 ? currentMonthRevenue / daysPassed : 0;
+        const currentMonthProjection = dailyAverageThisMonth * daysInMonth;
+
+        // Calculate average order to delivery time
+        const deliveredOrders = filteredOrders.filter(order => 
+          order.fulfillment_status === 'fulfilled' && 
+          order.order_created_at && 
+          order.updated_at
+        );
+        
+        let avgOrderToDeliveryTime = 0;
+        if (deliveredOrders.length > 0) {
+          const totalDeliveryTime = deliveredOrders.reduce((sum, order) => {
+            const orderDate = new Date(order.order_created_at);
+            const deliveryDate = new Date(order.updated_at);
+            const diffInHours = (deliveryDate - orderDate) / (1000 * 60 * 60);
+            return sum + diffInHours;
+          }, 0);
+          avgOrderToDeliveryTime = totalDeliveryTime / deliveredOrders.length;
+        }
+
+        // Calculate average proof approved to delivery time
+        let avgProofApprovedToDeliveryTime = 0;
+        try {
+          // First, get all fulfilled orders in the time range
+          const fulfilledOrderIds = filteredOrders
+            .filter(order => order.fulfillment_status === 'fulfilled')
+            .map(order => order.id);
+
+          if (fulfilledOrderIds.length > 0) {
+            // Get approved proofs for these orders
+            const { data: proofsData, error: proofsError } = await client
+              .from('order_proofs')
+              .select('*')
+              .eq('status', 'approved')
+              .in('order_id', fulfilledOrderIds);
+
+            if (!proofsError && proofsData && proofsData.length > 0) {
+              console.log(`Found ${proofsData.length} approved proofs for fulfilled orders`);
+              
+              let validProofTimes = [];
+              
+              for (const proof of proofsData) {
+                // Find the corresponding order
+                const order = filteredOrders.find(o => o.id === proof.order_id);
+                if (order && order.updated_at && proof.uploaded_at) {
+                  const proofApprovedDate = new Date(proof.uploaded_at);
+                  const deliveryDate = new Date(order.updated_at);
+                  const diffInHours = (deliveryDate - proofApprovedDate) / (1000 * 60 * 60);
+                  
+                  console.log(`Proof ${proof.id}: Approved ${proofApprovedDate.toISOString()}, Delivered ${deliveryDate.toISOString()}, Diff: ${diffInHours} hours`);
+                  
+                  // Only include proof times that are reasonable (0-24 hours)
+                  // This excludes orders that didn't actually require proofs or had long delays
+                  if (diffInHours > 0 && diffInHours <= 24) {
+                    validProofTimes.push(diffInHours);
+                  } else if (diffInHours > 24) {
+                    console.log(`Excluding proof ${proof.id} - too long: ${diffInHours} hours`);
+                  }
+                }
+              }
+              
+              if (validProofTimes.length > 0) {
+                avgProofApprovedToDeliveryTime = validProofTimes.reduce((sum, time) => sum + time, 0) / validProofTimes.length;
+                console.log(`Average proof to delivery time: ${avgProofApprovedToDeliveryTime} hours from ${validProofTimes.length} valid proofs`);
+              } else {
+                console.log('No valid proof timing data found');
+              }
+            } else {
+              console.log('No approved proofs found for fulfilled orders');
+              
+              // Fallback: Try to get any proofs (not just approved) for debugging
+              const { data: allProofsData, error: allProofsError } = await client
+                .from('order_proofs')
+                .select('*, status')
+                .in('order_id', fulfilledOrderIds.slice(0, 5)); // Just first 5 for debugging
+              
+              if (!allProofsError && allProofsData) {
+                console.log('Available proof statuses:', allProofsData.map(p => ({ id: p.id, status: p.status, orderId: p.order_id })));
+              }
+            }
+          }
+        } catch (proofErr) {
+          console.error('Error calculating proof approval to delivery data:', proofErr);
+          avgProofApprovedToDeliveryTime = 0;
+        }
+
+
+
+        // Calculate customer analytics
+        const customerStatsMap = new Map();
+        
+        orders.forEach(order => {
+          const customerId = order.user_id || order.guest_email;
+          const customerEmail = order.customer_email || order.guest_email || 'unknown@example.com';
+          const customerName = order.customer_first_name && order.customer_last_name 
+            ? `${order.customer_first_name} ${order.customer_last_name}` 
+            : null;
+          
+          if (!customerId) return;
+          
+          if (!customerStatsMap.has(customerId)) {
+            customerStatsMap.set(customerId, {
+              id: customerId,
+              email: customerEmail,
+              name: customerName,
+              lifetimeValue: 0,
+              totalOrders: 0,
+              firstOrderDate: null,
+              lastOrderDate: null,
+              orderDates: []
+            });
+          }
+          
+          const stats = customerStatsMap.get(customerId);
+          if (order.financial_status === 'paid') {
+            stats.lifetimeValue += order.total_price || 0;
+            stats.totalOrders += 1;
+            
+            const orderDate = new Date(order.order_created_at || order.created_at);
+            stats.orderDates.push(orderDate);
+            
+            if (!stats.firstOrderDate || orderDate < new Date(stats.firstOrderDate)) {
+              stats.firstOrderDate = orderDate.toISOString();
+            }
+            if (!stats.lastOrderDate || orderDate > new Date(stats.lastOrderDate)) {
+              stats.lastOrderDate = orderDate.toISOString();
+            }
+          }
+        });
+
+        // Calculate purchase frequency and average order value for each customer
+        const customerAnalytics = Array.from(customerStatsMap.values())
+          .filter(customer => customer.totalOrders > 0)
+          .map(customer => {
+            const avgOrderValue = customer.totalOrders > 0 ? customer.lifetimeValue / customer.totalOrders : 0;
+            
+            // Calculate purchase frequency (average days between orders)
+            let purchaseFrequency = null;
+            if (customer.orderDates.length > 1) {
+              customer.orderDates.sort((a, b) => a - b);
+              const intervals = [];
+              for (let i = 1; i < customer.orderDates.length; i++) {
+                const daysBetween = (customer.orderDates[i] - customer.orderDates[i-1]) / (1000 * 60 * 60 * 24);
+                intervals.push(daysBetween);
+              }
+              purchaseFrequency = intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length;
+            }
+            
+            return {
+              id: customer.id,
+              email: customer.email,
+              name: customer.name,
+              lifetimeValue: customer.lifetimeValue,
+              purchaseFrequency,
+              totalOrders: customer.totalOrders,
+              firstOrderDate: customer.firstOrderDate,
+              lastOrderDate: customer.lastOrderDate,
+              avgOrderValue
+            };
+          })
+          .sort((a, b) => b.lifetimeValue - a.lifetimeValue);
+
         return {
           summary: {
             totalRevenue,
@@ -3375,7 +3640,15 @@ const resolvers = {
             averageOrderValue,
             uniqueCustomers,
             revenueGrowth,
-            conversionRate: 2.9 // This would need actual visitor data
+            conversionRate: 2.9, // This would need actual visitor data
+            dailyAverageRevenue,
+            dailyAverageOrders,
+            currentMonthProjection,
+            avgOrderToDeliveryTime,
+            avgProofApprovedToDeliveryTime,
+            newCustomers,
+            existingCustomers,
+            newSignups
           },
           dailySales,
           proofMetrics: {
@@ -3389,7 +3662,8 @@ const resolvers = {
           },
           productPerformance: {
             topProductsByRevenue
-          }
+          },
+          customerAnalytics
         };
       } catch (error) {
         console.error('Error fetching analytics data:', error);
@@ -3739,11 +4013,15 @@ const resolvers = {
         const formattedUsers = authUsers.map(user => {
           const profile = profileMap.get(user.id);
           
+          // Prioritize user_profiles data (like credit transactions do) to ensure consistency
+          const firstName = profile?.first_name || user.user_metadata?.first_name || null;
+          const lastName = profile?.last_name || user.user_metadata?.last_name || null;
+          
           return {
             id: user.id,
             email: user.email,
-            firstName: user.user_metadata?.first_name || profile?.first_name || null,
-            lastName: user.user_metadata?.last_name || profile?.last_name || null,
+            firstName: firstName,
+            lastName: lastName,
             company: profile?.company_name || null,
             createdAt: user.created_at,
             lastSignIn: user.last_sign_in_at
@@ -3751,6 +4029,13 @@ const resolvers = {
         });
 
         console.log(`✅ Successfully fetched ${formattedUsers.length} users`);
+        console.log('📊 Sample formatted users:', formattedUsers.slice(0, 3).map(u => ({
+          id: u.id,
+          email: u.email,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          fullName: `${u.firstName || ''} ${u.lastName || ''}`.trim()
+        })));
         return formattedUsers;
       } catch (error) {
         console.error('❌ Error fetching all users:', error);
@@ -10333,6 +10618,225 @@ const resolvers = {
           message: 'Failed to fix existing earned credits',
           error: error.message
         };
+      }
+    },
+
+    // Sitewide Alert mutations
+    createSitewideAlert: async (_, { input }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        // Admin authentication required
+        requireAdminAuth(user);
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('Alert service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Create the alert
+        const { data: newAlert, error } = await client
+          .from('sitewide_alerts')
+          .insert({
+            title: input.title,
+            message: input.message,
+            background_color: input.backgroundColor || '#FFD700',
+            text_color: input.textColor || '#030140',
+            link_url: input.linkUrl || null,
+            link_text: input.linkText || null,
+            is_active: Boolean(input.isActive),
+            start_date: input.startDate || null,
+            end_date: input.endDate || null,
+            created_by: user.email,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error creating sitewide alert:', error);
+          throw new Error(`Failed to create alert: ${error.message}`);
+        }
+
+        console.log('✅ Successfully created sitewide alert');
+        
+        return {
+          id: String(newAlert.id),
+          title: newAlert.title,
+          message: newAlert.message,
+          backgroundColor: newAlert.background_color,
+          textColor: newAlert.text_color,
+          linkUrl: newAlert.link_url,
+          linkText: newAlert.link_text,
+          isActive: newAlert.is_active,
+          startDate: newAlert.start_date,
+          endDate: newAlert.end_date,
+          createdAt: newAlert.created_at,
+          updatedAt: newAlert.updated_at,
+          createdBy: newAlert.created_by
+        };
+      } catch (error) {
+        console.error('❌ Error in createSitewideAlert:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    updateSitewideAlert: async (_, { id, input }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        // Admin authentication required
+        requireAdminAuth(user);
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('Alert service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Update the alert
+        const updateData = {
+          updated_at: new Date().toISOString()
+        };
+
+        if (input.title !== undefined) updateData.title = input.title;
+        if (input.message !== undefined) updateData.message = input.message;
+        if (input.backgroundColor !== undefined) updateData.background_color = input.backgroundColor;
+        if (input.textColor !== undefined) updateData.text_color = input.textColor;
+        if (input.linkUrl !== undefined) updateData.link_url = input.linkUrl;
+        if (input.linkText !== undefined) updateData.link_text = input.linkText;
+        if (input.isActive !== undefined) updateData.is_active = Boolean(input.isActive);
+        if (input.startDate !== undefined) updateData.start_date = input.startDate;
+        if (input.endDate !== undefined) updateData.end_date = input.endDate;
+
+        const { data: updatedAlert, error } = await client
+          .from('sitewide_alerts')
+          .update(updateData)
+          .eq('id', id)
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error updating sitewide alert:', error);
+          throw new Error(`Failed to update alert: ${error.message}`);
+        }
+
+        console.log('✅ Successfully updated sitewide alert');
+        
+        return {
+          id: String(updatedAlert.id),
+          title: updatedAlert.title,
+          message: updatedAlert.message,
+          backgroundColor: updatedAlert.background_color,
+          textColor: updatedAlert.text_color,
+          linkUrl: updatedAlert.link_url,
+          linkText: updatedAlert.link_text,
+          isActive: updatedAlert.is_active,
+          startDate: updatedAlert.start_date,
+          endDate: updatedAlert.end_date,
+          createdAt: updatedAlert.created_at,
+          updatedAt: updatedAlert.updated_at,
+          createdBy: updatedAlert.created_by
+        };
+      } catch (error) {
+        console.error('❌ Error in updateSitewideAlert:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    deleteSitewideAlert: async (_, { id }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        // Admin authentication required
+        requireAdminAuth(user);
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('Alert service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        const { error } = await client
+          .from('sitewide_alerts')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          console.error('❌ Error deleting sitewide alert:', error);
+          throw new Error(`Failed to delete alert: ${error.message}`);
+        }
+
+        console.log('✅ Successfully deleted sitewide alert');
+        return true;
+      } catch (error) {
+        console.error('❌ Error in deleteSitewideAlert:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    toggleSitewideAlert: async (_, { id, isActive }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        // Admin authentication required
+        requireAdminAuth(user);
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('Alert service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        const { data: updatedAlert, error } = await client
+          .from('sitewide_alerts')
+          .update({ 
+            is_active: Boolean(isActive),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id)
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error toggling sitewide alert:', error);
+          throw new Error(`Failed to toggle alert: ${error.message}`);
+        }
+
+        console.log('✅ Successfully toggled sitewide alert');
+        
+        return {
+          id: String(updatedAlert.id),
+          title: updatedAlert.title,
+          message: updatedAlert.message,
+          backgroundColor: updatedAlert.background_color,
+          textColor: updatedAlert.text_color,
+          linkUrl: updatedAlert.link_url,
+          linkText: updatedAlert.link_text,
+          isActive: updatedAlert.is_active,
+          startDate: updatedAlert.start_date,
+          endDate: updatedAlert.end_date,
+          createdAt: updatedAlert.created_at,
+          updatedAt: updatedAlert.updated_at,
+          createdBy: updatedAlert.created_by
+        };
+      } catch (error) {
+        console.error('❌ Error in toggleSitewideAlert:', error);
+        throw new Error(error.message);
       }
     }
   }
