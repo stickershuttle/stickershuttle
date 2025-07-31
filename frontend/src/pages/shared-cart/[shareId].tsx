@@ -2307,7 +2307,11 @@ export default function SharedCartPage() {
                           <div className="mt-3 pt-3 border-t border-white/10">
                             <div className="flex justify-between text-yellow-400 text-sm font-medium">
                               <span className="flex items-center gap-2">
-                                <i className="fas fa-coins"></i>
+                                <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
+                      alt="Credits" 
+                      className="w-5 h-5 object-contain"
+                    />
                                 Store Credit Earned ({creditRate}%)
                               </span>
                               <span>+${creditEarnings.creditAmount.toFixed(2)}</span>
@@ -2322,7 +2326,11 @@ export default function SharedCartPage() {
                       return (
                         <div className="flex justify-between text-yellow-400 text-sm font-medium mt-3 pt-3 border-t border-white/10">
                           <span className="flex items-center gap-2">
-                            <i className="fas fa-coins"></i>
+                            <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
+                      alt="Credits" 
+                      className="w-5 h-5 object-contain"
+                    />
                             Store Credit Earned ({creditRate}%)
                           </span>
                           <span>+${creditEarnings.creditAmount.toFixed(2)}</span>

@@ -4424,7 +4424,11 @@ function Dashboard() {
         {/* Points Earned Per Order */}
         <div className="container-style p-6">
           <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-            <i className="fas fa-coins text-yellow-400"></i>
+            <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
+                        alt="Credits" 
+                        className="w-5 h-5 object-contain text-yellow-400"
+                      />
             Points Earned
           </h3>
           
@@ -4525,7 +4529,11 @@ function Dashboard() {
                             <span className="text-yellow-400 font-bold text-lg">
                               +${orderData.totalEarned.toFixed(2)}
                             </span>
-                            <i className="fas fa-coins text-yellow-400"></i>
+                            <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
+                        alt="Credits" 
+                        className="w-5 h-5 object-contain text-yellow-400"
+                      />
                           </div>
                         </div>
                         <div className="text-xs text-gray-400">
@@ -4551,7 +4559,11 @@ function Dashboard() {
             } else {
               return (
                 <div className="text-center py-8">
-                  <i className="fas fa-coins text-gray-500 text-4xl mb-4"></i>
+                  <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
+                        alt="Credits" 
+                        className="w-10 h-10 object-contain text-gray-500 mb-4"
+                      />
                   <p className="text-gray-400">No points earned yet</p>
                   <p className="text-gray-500 text-sm">Start earning 5% cashback on every order!</p>
                 </div>

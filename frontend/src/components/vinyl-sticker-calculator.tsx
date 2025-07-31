@@ -1405,7 +1405,11 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
                            backdropFilter: 'blur(12px)'
                          }}>
                       <span className="flex items-center justify-start gap-1.5 text-yellow-200">
-                        <i className="fas fa-coins text-yellow-300"></i>
+                        <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
+                        alt="Credits" 
+                        className="w-5 h-5 object-contain text-yellow-300"
+                      />
                         You'll earn ${(() => {
                           const originalPrice = parseFloat(totalPrice.replace('$', ''));
                           const finalPrice = isWholesaleApproved() 

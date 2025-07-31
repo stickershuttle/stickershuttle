@@ -398,7 +398,12 @@ export default function Header() {
               href="/deals"
               className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105${router.pathname === '/deals' ? ' active' : ''}`}
             >
-              ⚡ Deals
+              <img 
+                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
+                alt="Bolt" 
+                className="w-4 h-4 object-contain inline-block mr-2"
+              />
+              Deals
             </Link>
             <button 
               className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105"
@@ -665,7 +670,11 @@ export default function Header() {
           {/* Navigation Items */}
           <nav className="space-y-2">
             <Link href="/deals" className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">
-              <span className="mr-3">⚡</span>
+              <img 
+                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
+                alt="Bolt" 
+                className="w-4 h-4 object-contain mr-3"
+              />
               Deals
             </Link>
             <button className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">

@@ -165,7 +165,7 @@ export default function Home() {
                            color: '#fbbf24'
                          }}>
                       <img 
-                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
                         alt="Credits" 
                         className="w-4 h-4 object-contain"
                       />
@@ -176,7 +176,7 @@ export default function Home() {
                   {/* Mobile text/icon */}
                   <div className="md:hidden flex items-center justify-center gap-2 text-xs" style={{ color: '#fbbf24' }}>
                     <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
                       alt="Credits" 
                       className="w-3 h-3 object-contain"
                     />
@@ -198,19 +198,19 @@ export default function Home() {
                     href="/products"
                     className="primaryButton px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-[1.004] inline-block rounded-lg"
                   >
-                    Start Here 🡒
+                    Start Here →
                   </a>
                   <a 
                     href="/products/sample-packs" 
                     className="text-white hover:text-purple-200 transition pb-0 md:pb-0"
                   >
-                    Order Sample Pack 🡒
+                    Order Sample Pack →
                   </a>
                   <a 
                     href="/deals" 
                     className="text-white hover:text-purple-200 transition pb-8  md:pb-0 block md:hidden"
                   >
-                   🔥 Deals 🡒
+                   🔥 Deals →
                   </a>
 
         </div>

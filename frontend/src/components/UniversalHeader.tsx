@@ -651,9 +651,11 @@ export default function UniversalHeader() {
                   backdropFilter: 'blur(12px)'
                 }}
               >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#fbbf24' }}>
-                  <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinejoin="round" strokeLinecap="round" />
-                </svg>
+                <img 
+                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
+                  alt="Bolt" 
+                  className="w-5 h-5 object-contain"
+                />
                 Deals
               </Link>
             )}
@@ -672,7 +674,7 @@ export default function UniversalHeader() {
                 }}
               >
                                   <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
                     alt="Credits" 
                     className="w-5 h-5 object-contain"
                   />
@@ -872,9 +874,11 @@ export default function UniversalHeader() {
                           className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
                           onClick={() => setShowProfileDropdown(false)}
                         >
-                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#fbbf24' }}>
-                            <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinejoin="round" strokeLinecap="round" />
-                          </svg>
+                          <img 
+                            src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
+                            alt="Bolt" 
+                            className="w-5 h-5 object-contain"
+                          />
                           <span>Deals</span>
                         </Link>
 
@@ -1086,9 +1090,11 @@ export default function UniversalHeader() {
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#fbbf24' }}>
-                    <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinejoin="round" strokeLinecap="round" />
-                  </svg>
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
+                    alt="Bolt" 
+                    className="w-5 h-5 object-contain"
+                  />
                   <span>Deals</span>
                 </Link>
               )}
@@ -1290,9 +1296,11 @@ export default function UniversalHeader() {
                 className={`w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center${router.pathname === '/deals' || router.asPath === '/deals' ? ' bg-purple-500 bg-opacity-20 border-l-4 border-purple-400' : ''}`} 
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                <svg className="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#fbbf24' }}>
-                  <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinejoin="round" strokeLinecap="round" />
-                </svg>
+                <img 
+                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
+                  alt="Bolt" 
+                  className="w-5 h-5 object-contain mr-3"
+                />
                 Deals
               </Link>
             )}

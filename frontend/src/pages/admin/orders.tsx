@@ -5234,7 +5234,11 @@ export default function AdminOrders() {
                           return (
                             <div className="flex justify-between text-sm pt-2 border-t border-gray-700">
                               <span className="text-green-400 flex items-center gap-1">
-                                <i className="fas fa-coins"></i>
+                                <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
+                        alt="Credits" 
+                        className="w-5 h-5 object-contain"
+                      />
                                 Credits Earned ({(earningRate * 100).toFixed(1)}%)
                               </span>
                               <span className="text-green-400">+{formatCurrency(creditsEarned)}</span>

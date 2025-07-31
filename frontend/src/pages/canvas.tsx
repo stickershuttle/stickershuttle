@@ -1191,7 +1191,7 @@ export default function CanvasPage() {
                     }}
                   >
                     <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
                       alt="Credits" 
                       className="w-5 h-5 object-contain"
                     />

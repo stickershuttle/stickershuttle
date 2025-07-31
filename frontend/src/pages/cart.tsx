@@ -2164,7 +2164,7 @@ export default function CartPage() {
                             <div className="flex justify-between text-yellow-400 text-sm font-medium">
                               <span className="flex items-center gap-2">
                                 <img 
-                                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
                                   alt="Credits" 
                                   className="w-4 h-4 object-contain"
                                 />
@@ -2183,7 +2183,7 @@ export default function CartPage() {
                         <div className="flex justify-between text-yellow-400 text-sm font-medium mt-3 pt-3 border-t border-white/10">
                           <span className="flex items-center gap-2">
                             <img 
-                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
                               alt="Credits" 
                               className="w-4 h-4 object-contain"
                             />

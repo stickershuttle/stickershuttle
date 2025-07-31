@@ -77,7 +77,7 @@ export default function StoreCredit() {
               <div className="relative z-10">
                 <div className="flex items-center justify-center gap-4 mb-6">
                   <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
                     alt="Credits" 
                     className="w-12 h-12 object-contain"
                   />

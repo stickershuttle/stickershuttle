@@ -128,7 +128,7 @@ const FinancialView: React.FC<FinancialViewProps> = ({
              }}>
           <h3 className="text-yellow-300 text-sm font-medium flex items-center justify-center gap-2">
             <img 
-              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
               alt="Credits" 
               className="w-4 h-4 object-contain"
             />
@@ -478,7 +478,7 @@ const FinancialView: React.FC<FinancialViewProps> = ({
             }}
           >
           <img 
-            src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+            src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
             alt="Credits" 
             className="w-4 h-4 object-contain"
           />
@@ -503,7 +503,7 @@ const FinancialView: React.FC<FinancialViewProps> = ({
             }}
           >
             <img 
-              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
               alt="Credits" 
               className="w-4 h-4 object-contain"
             />
@@ -597,7 +597,7 @@ const FinancialView: React.FC<FinancialViewProps> = ({
                      >
                        <div className="flex items-center gap-3">
                          <img 
-                           src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                           src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
                            alt="Credits" 
                            className="w-5 h-5 object-contain"
                          />
@@ -699,7 +699,7 @@ const FinancialView: React.FC<FinancialViewProps> = ({
         <div className="text-center py-12">
           <div className="mb-6">
               <img 
-                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753920074/CoinIcon2_idmqml.png" 
+                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
                 alt="Credits" 
                 className="w-24 h-24 object-contain mx-auto mb-4 opacity-50"
               />
