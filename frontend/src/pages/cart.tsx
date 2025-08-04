@@ -1166,8 +1166,12 @@ export default function CartPage() {
   // Add blind shipment fee (free for wholesale customers)
   const blindShipmentFee = isBlindShipment && !isWholesale ? 5.00 : 0;
   
-  // Calculate wholesale discount (15% off for wholesale customers)
-  const wholesaleDiscount = isWholesale ? safeSubtotal * 0.15 : 0;
+  // Calculate wholesale discount (15% off for wholesale customers, excluding deal items)
+  const nonDealSubtotal = updatedCart.reduce((sum, item) => {
+    const isDealItem = item.customization?.isDeal === true;
+    return sum + (isDealItem ? 0 : item.totalPrice);
+  }, 0);
+  const wholesaleDiscount = isWholesale ? nonDealSubtotal * 0.15 : 0;
   
   const afterDiscounts = safeSubtotal - safeReorderDiscount - safeDiscountAmount - wholesaleDiscount;
   const finalTotal = Math.max(0, afterDiscounts - safeCreditToApply + blindShipmentFee + additionalPaymentTotal);

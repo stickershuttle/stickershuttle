@@ -420,7 +420,7 @@ export default function SignUp() {
                   wholesaleMonthlyCustomers: formData.wholesaleMonthlyCustomers,
                   wholesaleOrderingFor: formData.wholesaleOrderingFor,
                   wholesaleFitExplanation: formData.wholesaleFitExplanation,
-                  signupCreditAmount: 25.00 // $25 welcome bonus for wholesale customers
+                  signupCreditAmount: 0.00 // No signup credit for wholesale customers
                 }
               }
             });
@@ -825,7 +825,7 @@ export default function SignUp() {
               >
                 <div className="flex-1">
                   <h3 className="text-white font-medium text-lg">Wholesale Account</h3>
-                  <p className="text-gray-300 text-sm">Get 15% off orders + $25 welcome bonus</p>
+                  <p className="text-gray-300 text-sm">Want to outsource your sticker orders? Get 15% off orders</p>
                 </div>
                 <button
                   type="button"
@@ -1253,7 +1253,7 @@ export default function SignUp() {
                     >
                       <div className="flex-1">
                         <h3 className="text-white font-medium text-lg">Wholesale Account</h3>
-                        <p className="text-gray-300 text-sm">Get 15% off orders + $25 welcome bonus</p>
+                        <p className="text-gray-300 text-sm">Want to outsource your sticker orders? Get 15% off.</p>
                       </div>
                       <button
                         type="button"

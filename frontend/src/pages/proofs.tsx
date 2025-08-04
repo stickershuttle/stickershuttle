@@ -617,7 +617,7 @@ export default function ProofsPage() {
                     {/* Left Side - Proof Image */}
                     <div className="space-y-4">
                       <div 
-                        className="rounded-xl overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform duration-300"
+                        className="rounded-xl overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform duration-300 relative"
                         style={{
                           backgroundColor: 'rgba(255, 255, 255, 0.03)',
                           border: '1px solid rgba(255, 255, 255, 0.08)'
@@ -630,6 +630,19 @@ export default function ProofsPage() {
                           className="w-full h-auto p-4"
                           style={{ maxHeight: '60vh', objectFit: 'contain' }}
                         />
+                        {/* Dimension Pill */}
+                        {proof.adminNotes && (() => {
+                          const dimensionMatch = proof.adminNotes.match(/PDF_DIMENSIONS:([0-9.]+)x([0-9.]+)/);
+                          if (dimensionMatch) {
+                            const [_, width, height] = dimensionMatch;
+                            return (
+                              <div className="absolute top-6 right-6 bg-blue-600/90 text-white text-sm px-3 py-2 rounded-full font-medium backdrop-blur-sm">
+                                {width}" × {height}"
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                       
                       {/* Cut-line Options - Show based on admin selection */}

@@ -22,6 +22,7 @@ export default function UniversalHeader() {
   const [creditBalance, setCreditBalance] = useState<number>(0);
   const [creditBalanceLoaded, setCreditBalanceLoaded] = useState<boolean>(false);
   const [initialAuthCheck, setInitialAuthCheck] = useState<boolean>(false); // Track initial auth check
+  const [marketplaceSearch, setMarketplaceSearch] = useState<string>('');
   const router = useRouter();
 
   // Admin emails list - same as in admin dashboard
@@ -30,11 +31,33 @@ export default function UniversalHeader() {
   // Check if we're on an admin page
   const isAdminPage = router.pathname.startsWith('/admin');
   
+  // Check if we're on the marketplace page
+  const isMarketplacePage = router.pathname === '/marketplace';
+
+  // Sync marketplace search with URL query
+  useEffect(() => {
+    if (isMarketplacePage && router.query.search) {
+      setMarketplaceSearch(router.query.search as string);
+    } else if (isMarketplacePage && !router.query.search) {
+      setMarketplaceSearch('');
+    }
+  }, [router.query.search, isMarketplacePage]);
+  
   // Handle order search
   const handleOrderSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (orderSearch.trim()) {
       router.push(`/admin/orders?search=${encodeURIComponent(orderSearch.trim())}`);
+    }
+  };
+
+  // Handle marketplace search - live search
+  const handleMarketplaceSearchChange = (value: string) => {
+    setMarketplaceSearch(value);
+    if (value.trim()) {
+      router.push(`/marketplace?search=${encodeURIComponent(value.trim())}`, undefined, { shallow: true });
+    } else {
+      router.push('/marketplace', undefined, { shallow: true });
     }
   };
 
@@ -390,6 +413,34 @@ export default function UniversalHeader() {
                 </svg>
               </button>
             </form>
+          ) : isMarketplacePage ? (
+            // Marketplace Search Bar - Live Search
+            <div className="hidden lg:flex flex-1 items-center relative mx-4">
+              <input
+                type="text"
+                value={marketplaceSearch}
+                onChange={(e) => handleMarketplaceSearchChange(e.target.value)}
+                placeholder="Search stickers..."
+                className="headerButton flex-1 px-4 py-2 pr-12 rounded-lg font-medium text-white placeholder-gray-400 transition-all duration-200 transform hover:scale-[1.005] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{ backgroundColor: 'transparent' }}
+              />
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  strokeWidth={2} 
+                  stroke="currentColor" 
+                  className="w-5 h-5"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 15.803a7.5 7.5 0 0 0 10.607 0Z" 
+                  />
+                </svg>
+              </div>
+            </div>
           ) : (
             <div className={`hidden lg:flex flex-1 items-center relative search-dropdown-container mx-4`}>
               <button 
@@ -633,6 +684,38 @@ export default function UniversalHeader() {
                         <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(196, 181, 253)' }}>Heavy Duty 13oz Vinyl</p>
                       </div>
                     </Link>
+
+                    {/* Marketplace - Only show for authorized users */}
+                    {user && user.email === 'justin@stickershuttle.com' && (
+                      <Link 
+                        href="/marketplace" 
+                        className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleLinkClick('/marketplace');
+                        }}
+                        style={{ textDecoration: 'none' }}
+                      >
+                        <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
+                          <svg 
+                            className="w-6 h-6" 
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                            style={{
+                              filter: 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.4))',
+                              color: 'rgb(16, 185, 129)'
+                            }}
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Marketplace</p>
+                          <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(16, 185, 129)' }}>Ready-to-Ship Stickers</p>
+                        </div>
+                      </Link>
+                    )}
                   </div>
                 </div>
               </div>
@@ -643,23 +726,50 @@ export default function UniversalHeader() {
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center gap-4" style={{ letterSpacing: '-0.5px' }}>
             {!isAdminPage && (
-              <Link 
-                href="/deals"
-                className={`px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2${router.pathname === '/deals' || router.asPath === '/deals' ? ' active' : ''}`}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(12px)'
-                }}
-              >
-                <img 
-                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
-                  alt="Bolt" 
-                  className="w-5 h-5 object-contain"
-                />
-                Deals
-              </Link>
+              <>
+                <Link 
+                  href="/deals"
+                  className={`px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2${router.pathname === '/deals' || router.asPath === '/deals' ? ' active' : ''}`}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)'
+                  }}
+                >
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
+                    alt="Bolt" 
+                    className="w-5 h-5 object-contain"
+                  />
+                  Deals
+                </Link>
+
+                {/* Marketplace - Only show for authorized users */}
+                {user && user.email === 'justin@stickershuttle.com' && (
+                  <Link 
+                    href="/marketplace"
+                    className={`px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2${router.pathname === '/marketplace' || router.asPath === '/marketplace' ? ' active' : ''}`}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                      backdropFilter: 'blur(12px)'
+                    }}
+                  >
+                    <svg 
+                      className="w-5 h-5" 
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor"
+                      style={{ color: 'rgb(16, 185, 129)' }}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                    Marketplace
+                  </Link>
+                )}
+              </>
             )}
             
                         {/* Store Credit Balance - Always show container for logged in users */}

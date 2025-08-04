@@ -6707,13 +6707,22 @@ const resolvers = {
             if (!profileError && profile) {
               userProfile = profile;
               if (profile.is_wholesale_customer && profile.wholesale_status === 'approved') {
-                wholesaleDiscount = cartSubtotal * 0.15; // 15% discount for wholesale customers
+                // Calculate wholesale discount only on non-deal items
+                const nonDealSubtotal = input.cartItems.reduce((sum, item) => {
+                  const itemTotal = safeParseFloat(item.totalPrice, 0);
+                  const isDealItem = item.customization?.isDeal === true;
+                  return sum + (isDealItem ? 0 : itemTotal);
+                }, 0);
+                
+                wholesaleDiscount = nonDealSubtotal * 0.15; // 15% discount for wholesale customers on non-deal items only
                 console.log('🏪 Wholesale discount applied:', {
                   userId: input.userId,
                   wholesaleStatus: profile.wholesale_status,
                   cartSubtotal: cartSubtotal.toFixed(2),
+                  nonDealSubtotal: nonDealSubtotal.toFixed(2),
                   wholesaleDiscount: wholesaleDiscount.toFixed(2),
-                  discountPercentage: '15%'
+                  discountPercentage: '15%',
+                  note: 'Wholesale discount excludes deal items'
                 });
               }
             }
@@ -6917,9 +6926,24 @@ const resolvers = {
                   const originalTotalPrice = safeParseFloat(item.totalPrice, 0);
                   const originalUnitPrice = safeParseFloat(item.unitPrice, 0);
                   
-                  // Calculate what portion of the total discount this item should bear
-                  const itemProportion = originalTotalPrice / cartSubtotal;
-                  const itemWholesaleDiscount = wholesaleDiscount * itemProportion;
+                  // Check if this is a deal item - deal items should not receive wholesale discount
+                  const isDealItem = item.customization?.isDeal === true;
+                  
+                  // Calculate wholesale discount only for non-deal items
+                  let itemWholesaleDiscount = 0;
+                  if (!isDealItem && wholesaleDiscount > 0) {
+                    // Calculate what portion of the non-deal subtotal this item represents
+                    const nonDealSubtotal = input.cartItems.reduce((sum, cartItem) => {
+                      const itemTotal = safeParseFloat(cartItem.totalPrice, 0);
+                      const isItemDeal = cartItem.customization?.isDeal === true;
+                      return sum + (isItemDeal ? 0 : itemTotal);
+                    }, 0);
+                    
+                    if (nonDealSubtotal > 0) {
+                      const itemProportion = originalTotalPrice / nonDealSubtotal;
+                      itemWholesaleDiscount = wholesaleDiscount * itemProportion;
+                    }
+                  }
                   
                   // Check if this item is a reorder item
                   const isReorderItem = item.calculatorSelections?.isReorder === true || item.customization?.isReorder === true;
@@ -6933,7 +6957,7 @@ const resolvers = {
                   console.log('🔍 Line item discount calculation:', {
                     productName: item.productName,
                     originalTotalPrice: originalTotalPrice,
-                    itemProportion: itemProportion,
+                    isDealItem: isDealItem,
                     itemWholesaleDiscount: itemWholesaleDiscount,
                     itemReorderDiscount: itemReorderDiscount,
                     totalItemDiscount: totalItemDiscount,
@@ -6943,7 +6967,7 @@ const resolvers = {
                   
                   // Build discount description
                   const discountDescriptions = [];
-                  if (wholesaleDiscount > 0) discountDescriptions.push('Wholesale 15% Off');
+                  if (itemWholesaleDiscount > 0 && !isDealItem) discountDescriptions.push('Wholesale 15% Off');
                   if (isReorderItem) discountDescriptions.push('Reorder 10% Off');
                   const discountText = discountDescriptions.length > 0 ? ` (${discountDescriptions.join(' + ')})` : '';
                   
@@ -6963,8 +6987,9 @@ const resolvers = {
                     originalTotalPrice: originalTotalPrice,
                     finalTotalPrice: lineItem.totalPrice,
                     discountText: discountText,
+                    isDealItem: isDealItem,
                     isReorderItem: isReorderItem,
-                    wholesaleDiscount: wholesaleDiscount > 0 ? '15%' : 'none',
+                    wholesaleDiscount: itemWholesaleDiscount > 0 ? '15%' : isDealItem ? 'excluded (deal item)' : 'none',
                     reorderDiscount: isReorderItem ? '10%' : 'none'
                   });
                   

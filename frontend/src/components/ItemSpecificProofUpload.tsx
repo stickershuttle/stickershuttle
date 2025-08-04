@@ -162,6 +162,54 @@ export default function ItemSpecificProofUpload({
     }));
 
     try {
+      // Check for CutContour layer if it's a PDF (same as main ProofUpload)
+      let cutContourInfo: any = null;
+      let adminNotes: string | null = null;
+      
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        console.log(`🔍 ADMIN: Analyzing PDF ${file.name} for cut contour layers...`);
+        
+        try {
+          // Import the PDF analysis utility
+          const pdfModule = await import('../utils/pdf-cutcontour-detection');
+          const analyzePDFCutContour = pdfModule.analyzePDFCutContour;
+          
+          cutContourInfo = await analyzePDFCutContour(file);
+          
+          console.log(`📊 ADMIN: PDF Analysis Results for ${file.name}:`);
+          console.log(`📋 ADMIN: Total layers found: ${cutContourInfo.layersFound.length}`);
+          console.log(`📋 ADMIN: Layer names: ${cutContourInfo.layersFound.join(', ') || 'None detected'}`);
+          console.log(`📋 ADMIN: Spot colors: ${cutContourInfo.spotColorsFound.join(', ') || 'None detected'}`);
+          console.log(`🎯 ADMIN: CutContour detected: ${cutContourInfo.hasCutContour ? 'YES' : 'NO'}`);
+          
+          if (cutContourInfo.hasCutContour && cutContourInfo.dimensionsInches) {
+            const dims = cutContourInfo.dimensionsInches;
+            console.log(`📏 ADMIN: Cut contour dimensions: ${dims.width}" × ${dims.height}"`);
+            
+            // Store dimensions in admin notes
+            adminNotes = `PDF_DIMENSIONS:${dims.width.toFixed(2)}x${dims.height.toFixed(2)}`;
+          } else {
+            console.log(`⚠️ ADMIN: No CutContour layer found in ${file.name}`);
+          }
+        } catch (error) {
+          console.error('⚠️ Could not analyze PDF for cut contours:', error);
+          if (isAdmin) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+            alert(`❌ PDF ANALYSIS ERROR
+
+📄 File: ${file.name}
+⚠️ Error: ${errorMessage}
+
+This might indicate:
+• Corrupted or invalid PDF file
+• PDF without proper layer structure  
+• Browser compatibility issue with PDF.js
+
+Please try re-uploading or contact support.`);
+          }
+        }
+      }
+
       // Upload to Cloudinary
       const cloudinaryResult = await uploadToCloudinary(
         file,
@@ -176,7 +224,7 @@ export default function ItemSpecificProofUpload({
         }
       );
 
-      // Save to backend with orderItemId
+      // Save to backend with orderItemId  
       const result = await addOrderProof({
         variables: {
           orderId,
@@ -185,7 +233,9 @@ export default function ItemSpecificProofUpload({
             proofPublicId: cloudinaryResult.public_id,
             proofTitle: file.name,
             // This is the key part - assign to specific order item
-            orderItemId: orderItem.id
+            orderItemId: orderItem.id,
+            // Store dimensions in adminNotes for now (will be hidden from customer, shown as pill)
+            adminNotes: adminNotes
           }
         }
       });

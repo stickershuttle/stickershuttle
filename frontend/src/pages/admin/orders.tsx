@@ -3702,7 +3702,7 @@ export default function AdminOrders() {
                             {selectedOrder.proofs.filter((p: any) => p.status === 'approved').map((proof: any, idx: number) => (
                               <div key={idx} className="space-y-2">
                                 <div 
-                                  className="rounded-lg overflow-hidden aspect-square p-2"
+                                  className="rounded-lg overflow-hidden aspect-square p-2 relative"
                                   style={{
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     border: '1px solid rgba(255, 255, 255, 0.1)'
@@ -3713,6 +3713,19 @@ export default function AdminOrders() {
                                     alt={proof.proofTitle}
                                     className="w-full h-full object-contain"
                                   />
+                                  {/* Dimension Pill */}
+                                  {proof.adminNotes && (() => {
+                                    const dimensionMatch = proof.adminNotes.match(/PDF_DIMENSIONS:([0-9.]+)x([0-9.]+)/);
+                                    if (dimensionMatch) {
+                                      const [_, width, height] = dimensionMatch;
+                                      return (
+                                        <div className="absolute top-2 right-2 bg-blue-600/90 text-white text-xs px-2 py-1 rounded-full font-medium backdrop-blur-sm">
+                                          {width}" × {height}"
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
                                 </div>
                                 <div>
                                   <p className="text-sm font-medium text-white truncate">{proof.proofTitle}</p>
@@ -4738,7 +4751,7 @@ export default function AdminOrders() {
                           {selectedOrder.proofs.filter((p: any) => p.status === 'approved').map((proof: any) => (
                             <div key={proof.id} className="space-y-2">
                               <div 
-                                className="rounded-lg overflow-hidden aspect-square p-2"
+                                className="rounded-lg overflow-hidden aspect-square p-2 relative"
                                 style={{
                                   backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                   border: '1px solid rgba(255, 255, 255, 0.1)'
@@ -4749,6 +4762,19 @@ export default function AdminOrders() {
                                   alt={proof.proofTitle}
                                   className="w-full h-full object-contain"
                                 />
+                                {/* Dimension Pill */}
+                                {proof.adminNotes && (() => {
+                                  const dimensionMatch = proof.adminNotes.match(/PDF_DIMENSIONS:([0-9.]+)x([0-9.]+)/);
+                                  if (dimensionMatch) {
+                                    const [_, width, height] = dimensionMatch;
+                                    return (
+                                      <div className="absolute top-2 right-2 bg-blue-600/90 text-white text-xs px-2 py-1 rounded-full font-medium backdrop-blur-sm">
+                                        {width}" × {height}"
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
                               <button
                                 onClick={() => window.open(proof.proofUrl, '_blank')}
@@ -4803,7 +4829,7 @@ export default function AdminOrders() {
                           {selectedOrder.proofs.filter((p: any) => p.status === 'approved').map((proof: any) => (
                             <div key={proof.id} className="space-y-2">
                               <div 
-                                className="rounded-lg overflow-hidden aspect-square p-2"
+                                className="rounded-lg overflow-hidden aspect-square p-2 relative"
                                 style={{
                                   backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                   border: '1px solid rgba(255, 255, 255, 0.1)'
@@ -4814,6 +4840,19 @@ export default function AdminOrders() {
                                   alt={proof.proofTitle}
                                   className="w-full h-full object-contain"
                                 />
+                                {/* Dimension Pill */}
+                                {proof.adminNotes && (() => {
+                                  const dimensionMatch = proof.adminNotes.match(/PDF_DIMENSIONS:([0-9.]+)x([0-9.]+)/);
+                                  if (dimensionMatch) {
+                                    const [_, width, height] = dimensionMatch;
+                                    return (
+                                      <div className="absolute top-2 right-2 bg-blue-600/90 text-white text-xs px-2 py-1 rounded-full font-medium backdrop-blur-sm">
+                                        {width}" × {height}"
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
                               <button
                                 onClick={() => window.open(proof.proofUrl, '_blank')}
