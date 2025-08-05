@@ -745,6 +745,20 @@ export default function UniversalHeader() {
                   Deals
                 </Link>
 
+                <Link 
+                  href="/background-removal"
+                  className={`px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2${router.pathname === '/background-removal' || router.asPath === '/background-removal' ? ' active' : ''}`}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)'
+                  }}
+                >
+                  <span className="text-lg">🪄</span>
+                  Background Removal
+                </Link>
+
                 {/* Marketplace - Only show for authorized users */}
                 {user && user.email === 'justin@stickershuttle.com' && (
                   <Link 
@@ -994,6 +1008,15 @@ export default function UniversalHeader() {
                           <span>Deals</span>
                         </Link>
 
+                        <Link 
+                          href="/background-removal"
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                          onClick={() => setShowProfileDropdown(false)}
+                        >
+                          <span className="text-lg">🪄</span>
+                          <span>Background Removal</span>
+                        </Link>
+
                         <hr className="border-white/10 my-2" />
 
                         {isAdmin && (
@@ -1197,18 +1220,29 @@ export default function UniversalHeader() {
               <hr className="border-white/10 my-2" />
 
               {!isAdminPage && (
-                <Link 
-                  href="/deals"
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
-                    alt="Bolt" 
-                    className="w-5 h-5 object-contain"
-                  />
-                  <span>Deals</span>
-                </Link>
+                <>
+                  <Link 
+                    href="/deals"
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
+                      alt="Bolt" 
+                      className="w-5 h-5 object-contain"
+                    />
+                    <span>Deals</span>
+                  </Link>
+
+                  <Link 
+                    href="/background-removal"
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <span className="text-lg">🪄</span>
+                    <span>Background Removal</span>
+                  </Link>
+                </>
               )}
 
               <hr className="border-white/10 my-2" />
@@ -1403,18 +1437,29 @@ export default function UniversalHeader() {
           {/* Navigation Items */}
           <nav className="space-y-2">
             {!isAdminPage && (
-              <Link 
-                href="/deals" 
-                className={`w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center${router.pathname === '/deals' || router.asPath === '/deals' ? ' bg-purple-500 bg-opacity-20 border-l-4 border-purple-400' : ''}`} 
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <img 
-                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
-                  alt="Bolt" 
-                  className="w-5 h-5 object-contain mr-3"
-                />
-                Deals
-              </Link>
+              <>
+                <Link 
+                  href="/deals" 
+                  className={`w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center${router.pathname === '/deals' || router.asPath === '/deals' ? ' bg-purple-500 bg-opacity-20 border-l-4 border-purple-400' : ''}`} 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
+                    alt="Bolt" 
+                    className="w-5 h-5 object-contain mr-3"
+                  />
+                  Deals
+                </Link>
+
+                <Link 
+                  href="/background-removal" 
+                  className={`w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center${router.pathname === '/background-removal' || router.asPath === '/background-removal' ? ' bg-purple-500 bg-opacity-20 border-l-4 border-purple-400' : ''}`} 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <span className="text-lg mr-3">🪄</span>
+                  Background Removal
+                </Link>
+              </>
             )}
             
             {/* Mobile Authentication Navigation - Show login/signup */}

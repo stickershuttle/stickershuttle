@@ -32,6 +32,11 @@ export interface CalculatorMetadata {
   calculatedArea?: number;
   timestamp?: string;
   cutLines?: string;
+  marketplaceProduct?: {
+    productId: string;
+    productTitle: string;
+    markupPercentage: number;
+  };
 }
 
 // Cloudinary configuration

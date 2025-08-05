@@ -6,7 +6,7 @@ import { useCart } from "@/components/CartContext";
 import { getSupabase } from "@/lib/supabase";
 import Link from "next/link";
 import Head from "next/head";
-import StickerCalculator from "@/components/vinyl-sticker-calculator";
+import MarketplaceStickerCalculator from "@/components/marketplace-sticker-calculator";
 import { loadRealPricingData, BasePriceRow, QuantityDiscountRow } from "@/utils/real-pricing";
 
 interface MarketplaceProduct {
@@ -16,6 +16,7 @@ interface MarketplaceProduct {
   short_description: string;
   price: number;
   original_price?: number;
+  markup_percentage?: number;
   images: string[];
   default_image: string;
   category: string;
@@ -489,7 +490,7 @@ export default function MarketplaceProductPage() {
               <p className="text-gray-300 text-sm">Loading pricing calculator...</p>
             </div>
           ) : realPricingData ? (
-            <StickerCalculator 
+            <MarketplaceStickerCalculator 
               initialBasePricing={[
                 { sqInches: 4, price: 0.50 },
                 { sqInches: 9, price: 0.75 },
@@ -497,6 +498,9 @@ export default function MarketplaceProductPage() {
                 { sqInches: 25, price: 1.25 }
               ]} 
               realPricingData={realPricingData}
+              markupPercentage={product?.markup_percentage || 0}
+              productTitle={product?.title || 'Marketplace Product'}
+              productId={product?.id || 'unknown'}
             />
           ) : (
             <div className="flex flex-col items-center justify-center py-20">
@@ -604,7 +608,7 @@ export default function MarketplaceProductPage() {
               </button>
 
                 <div className="text-center text-gray-400 text-sm mb-6">
-                  Or customize your own design with the calculator above
+                  Or use the calculator above to customize size and quantity
                 </div>
 
                 {/* Product Details */}

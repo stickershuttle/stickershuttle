@@ -13,6 +13,7 @@ interface MarketplaceProduct {
   short_description: string;
   price: number;
   original_price?: number;
+  markup_percentage?: number;
   images: string[];
   default_image: string;
   category: string;
@@ -39,6 +40,7 @@ export default function MarketplaceAdmin() {
     short_description: "",
     price: "",
     original_price: "",
+    markup_percentage: "",
     images: [] as string[],
     default_image: "",
     categories: [] as string[], // Changed to array for multiple selection
@@ -134,6 +136,7 @@ export default function MarketplaceAdmin() {
         category: formData.categories[0] || "Die-Cut", // Use first category for now, until we update DB schema
         price: parseFloat(formData.price),
         original_price: formData.original_price ? parseFloat(formData.original_price) : null,
+        markup_percentage: formData.markup_percentage ? parseFloat(formData.markup_percentage) : 0,
         stock_quantity: parseInt(formData.stock_quantity.toString()),
         tags: formData.tags.filter(tag => tag.trim() !== '')
       };
@@ -173,6 +176,7 @@ export default function MarketplaceAdmin() {
       short_description: "",
       price: "",
       original_price: "",
+      markup_percentage: "",
       images: [],
       default_image: "",
       categories: [],
@@ -231,6 +235,7 @@ export default function MarketplaceAdmin() {
       short_description: product.short_description,
       price: product.price.toString(),
       original_price: product.original_price?.toString() || "",
+      markup_percentage: product.markup_percentage?.toString() || "",
       images: product.images,
       default_image: product.default_image,
       categories: product.category ? [product.category] : [], // Convert single category to array
@@ -926,6 +931,21 @@ export default function MarketplaceAdmin() {
                         placeholder="0.00"
                       />
                       <p className="text-gray-400 text-xs mt-1">Optional - shows as crossed out price</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-white text-sm font-medium mb-2">Calculator Markup (%)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="200"
+                        value={formData.markup_percentage}
+                        onChange={(e) => setFormData(prev => ({ ...prev, markup_percentage: e.target.value }))}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        placeholder="0.0"
+                      />
+                      <p className="text-gray-400 text-xs mt-1">Markup percentage to apply to calculator prices (e.g., 25 for 25% markup)</p>
                     </div>
                   </div>
                 </div>
