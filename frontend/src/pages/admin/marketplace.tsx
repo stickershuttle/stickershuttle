@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import AdminLayout from "@/components/AdminLayout";
+import CreatorManagementModal from "@/components/CreatorManagementModal";
 import { getSupabase } from "@/lib/supabase";
 import { uploadToCloudinary, validateFile, CloudinaryUploadResult, UploadProgress } from "@/utils/cloudinary";
+import { useQuery } from "@apollo/client";
+import { GET_CREATOR_BY_USER_ID } from "@/lib/profile-mutations";
 
 const ADMIN_EMAILS = ['justin@stickershuttle.com'];
 
@@ -11,9 +14,26 @@ interface MarketplaceProduct {
   title: string;
   description: string;
   short_description: string;
+  creator_id?: string;
+  collection_id?: string;
+  creator?: {
+    id: string;
+    creator_name: string;
+    email: string;
+  };
   price: number;
   original_price?: number;
   markup_percentage?: number;
+  size_pricing?: {
+    "3": number;
+    "4": number;
+    "5": number;
+  };
+  size_compare_pricing?: {
+    "3": number;
+    "4": number;
+    "5": number;
+  };
   images: string[];
   default_image: string;
   category: string;
@@ -27,11 +47,12 @@ interface MarketplaceProduct {
   updated_at: string;
 }
 
-export default function MarketplaceAdmin() {
+export default function CreatorsSpaceAdmin() {
   const router = useRouter();
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [user, setUser] = useState<any>(null);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [editingProduct, setEditingProduct] = useState<MarketplaceProduct | null>(null);
   const [formData, setFormData] = useState({
@@ -41,10 +62,22 @@ export default function MarketplaceAdmin() {
     price: "",
     original_price: "",
     markup_percentage: "",
+    size_pricing: {
+      "3": "3.99",
+      "4": "4.99",
+      "5": "5.99"
+    },
+    size_compare_pricing: {
+      "3": "4.99",
+      "4": "5.99",
+      "5": "6.99"
+    } as { "3": string; "4": string; "5": string; },
     images: [] as string[],
     default_image: "",
     categories: [] as string[], // Changed to array for multiple selection
     product_type: "single", // New field for single vs pack
+    creator_id: "", // Creator assignment
+    collection_id: "", // Collection assignment
     tags: [] as string[],
     is_active: true,
     is_featured: false,
@@ -54,49 +87,137 @@ export default function MarketplaceAdmin() {
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+  const [showCreatorModal, setShowCreatorModal] = useState(false);
+  const [editingCreator, setEditingCreator] = useState(null);
+  const [creators, setCreators] = useState([]);
+  const [collections, setCollections] = useState([]);
+  const [activeTab, setActiveTab] = useState('products');
+  const [showBatchUpload, setShowBatchUpload] = useState(false);
+  const [batchFiles, setBatchFiles] = useState<File[]>([]);
+  const [batchConfig, setBatchConfig] = useState({
+    category: "Die-Cut",
+    creator_id: "",
+    collection_id: "",
+    is_active: true,
+    is_featured: false,
+    stock_quantity: 1000,
+    size_pricing: {
+      "3": "3.99",
+      "4": "4.99", 
+      "5": "5.99"
+    },
+    size_compare_pricing: {
+      "3": "4.99",
+      "4": "5.99",
+      "5": "6.99"
+    },
+    markup_percentage: ""
+  });
+  const [batchUploading, setBatchUploading] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{current: number, total: number, currentFile: string}>({current: 0, total: 0, currentFile: ""});
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateProduct, setDuplicateProduct] = useState<MarketplaceProduct | null>(null);
+  const [duplicateQuantity, setDuplicateQuantity] = useState(1);
+  const [isDuplicating, setIsDuplicating] = useState(false);
+  const [showCreateCollection, setShowCreateCollection] = useState(false);
+  const [collectionFormData, setCollectionFormData] = useState({
+    name: "",
+    description: "",
+    slug: "",
+    image_url: "",
+    creator_id: "",
+    is_active: true,
+    is_featured: false,
+    sort_order: 0
+  });
+  const [isCreatingCollection, setIsCreatingCollection] = useState(false);
 
   const supabase = getSupabase();
 
-  // Check if user is admin
+  // Check if user is a creator
+  const { data: creatorData } = useQuery(GET_CREATOR_BY_USER_ID, {
+    variables: { userId: user?.id || '' },
+    skip: !user?.id,
+  });
+
+  const isCreator = creatorData?.getCreatorByUserId?.isActive || false;
+  const currentCreatorId = creatorData?.getCreatorByUserId?.id;
+
+  // Check if user is admin or creator
   useEffect(() => {
-    async function checkAdmin() {
+    async function checkAccess() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
 
         if (!session?.user) {
-          router.push('/login?message=Admin access required');
+          router.push('/login?message=Access required');
           return;
         }
+
+        setUser(session.user);
 
         // Check if user email is in admin list
-        if (!ADMIN_EMAILS.includes(session.user.email || '')) {
-          router.push('/account/dashboard');
+        if (ADMIN_EMAILS.includes(session.user.email || '')) {
+          setIsAdmin(true);
+          setLoading(false);
           return;
         }
 
-        setIsAdmin(true);
+        // If not admin, we'll wait for the creator query to complete
+        // The loading will be set to false after the creator check
       } catch (error) {
-        console.error('Error checking admin status:', error);
+        console.error('Error checking access:', error);
         router.push('/login');
-      } finally {
         setLoading(false);
       }
     }
 
-    checkAdmin();
+    checkAccess();
   }, []);
 
+  // Handle creator access check
   useEffect(() => {
-    if (isAdmin) {
-      fetchProducts();
+    if (user && !isAdmin) {
+      // Wait a moment for the creator query to complete
+      const timer = setTimeout(() => {
+        if (!isCreator) {
+          router.push('/account/dashboard');
+        } else {
+          setLoading(false);
+        }
+      }, 1000);
+
+      return () => clearTimeout(timer);
     }
-  }, [isAdmin]);
+  }, [user, isAdmin, isCreator]);
+
+  useEffect(() => {
+    if (isAdmin || isCreator) {
+      fetchProducts();
+      fetchCollections();
+      if (isAdmin) {
+        fetchCreators();
+      }
+    }
+  }, [isAdmin, isCreator]);
 
   const fetchProducts = async () => {
     try {
       let query = supabase
         .from('marketplace_products')
-        .select('*');
+        .select(`
+          *,
+          creator:creators(
+            id,
+            creator_name,
+            email
+          )
+        `);
+
+      // If user is a creator (not admin), only show their products
+      if (isCreator && !isAdmin && currentCreatorId) {
+        query = query.eq('creator_id', currentCreatorId);
+      }
 
       // Apply category filter
       if (filterCategory !== "all") {
@@ -130,13 +251,31 @@ export default function MarketplaceAdmin() {
       return;
     }
     
+    // Validate collection assignment (temporarily optional)
+    // if (!formData.collection_id) {
+    //   alert('Please assign this product to a collection');
+    //   return;
+    // }
+    
     try {
       const productData = {
         ...formData,
         category: formData.categories[0] || "Die-Cut", // Use first category for now, until we update DB schema
+        creator_id: isCreator && !isAdmin ? currentCreatorId : (formData.creator_id || null),
+        collection_id: formData.collection_id || null,
         price: parseFloat(formData.price),
         original_price: formData.original_price ? parseFloat(formData.original_price) : null,
         markup_percentage: formData.markup_percentage ? parseFloat(formData.markup_percentage) : 0,
+        size_pricing: {
+          "3": formData.size_pricing["3"] ? parseFloat(formData.size_pricing["3"]) : null,
+          "4": formData.size_pricing["4"] ? parseFloat(formData.size_pricing["4"]) : null,
+          "5": formData.size_pricing["5"] ? parseFloat(formData.size_pricing["5"]) : null
+        },
+        size_compare_pricing: {
+          "3": formData.size_compare_pricing?.["3"] ? parseFloat(formData.size_compare_pricing["3"]) : null,
+          "4": formData.size_compare_pricing?.["4"] ? parseFloat(formData.size_compare_pricing["4"]) : null,
+          "5": formData.size_compare_pricing?.["5"] ? parseFloat(formData.size_compare_pricing["5"]) : null
+        },
         stock_quantity: parseInt(formData.stock_quantity.toString()),
         tags: formData.tags.filter(tag => tag.trim() !== '')
       };
@@ -177,10 +316,22 @@ export default function MarketplaceAdmin() {
       price: "",
       original_price: "",
       markup_percentage: "",
+      size_pricing: {
+        "3": "3.99",
+        "4": "4.99",
+        "5": "5.99"
+      },
+      size_compare_pricing: {
+        "3": "4.99",
+        "4": "5.99",
+        "5": "6.99"
+      } as { "3": string; "4": string; "5": string; },
       images: [],
       default_image: "",
       categories: [],
       product_type: "single",
+      creator_id: "",
+      collection_id: "",
       tags: [],
       is_active: true,
       is_featured: false,
@@ -236,10 +387,22 @@ export default function MarketplaceAdmin() {
       price: product.price.toString(),
       original_price: product.original_price?.toString() || "",
       markup_percentage: product.markup_percentage?.toString() || "",
+      size_pricing: {
+        "3": product.size_pricing?.["3"]?.toString() || "",
+        "4": product.size_pricing?.["4"]?.toString() || "",
+        "5": product.size_pricing?.["5"]?.toString() || ""
+      },
+      size_compare_pricing: {
+        "3": product.size_compare_pricing?.["3"]?.toString() || "",
+        "4": product.size_compare_pricing?.["4"]?.toString() || "",
+        "5": product.size_compare_pricing?.["5"]?.toString() || ""
+      },
       images: product.images,
       default_image: product.default_image,
       categories: product.category ? [product.category] : [], // Convert single category to array
       product_type: "single", // Default value, you might want to add this field to the database
+      creator_id: product.creator_id || "",
+      collection_id: product.collection_id || "",
       tags: product.tags,
       is_active: product.is_active,
       is_featured: product.is_featured,
@@ -409,30 +572,408 @@ export default function MarketplaceAdmin() {
     });
   };
 
+  const fetchCreators = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('creators')
+        .select('id, creator_name, email, is_active, profile_photo_url, profile_photo_public_id, total_products, created_at')
+        .order('creator_name', { ascending: true });
+
+      if (error) throw error;
+      setCreators(data || []);
+    } catch (error) {
+      console.error('Error fetching creators:', error);
+    }
+  };
+
+  const fetchCollections = async () => {
+    try {
+      // Check if collections table exists first
+      const { data, error } = await supabase
+        .from('collections')
+        .select('id, name, description, slug, image_url, is_active, is_featured, sort_order, creator_id, created_at')
+        .order('sort_order', { ascending: true })
+        .limit(1);
+
+      if (error) {
+        console.log('Collections table not found or not accessible:', error);
+        setCollections([]);
+        return;
+      }
+      
+      // If the test query worked, fetch all collections
+      const { data: allCollections, error: fetchError } = await supabase
+        .from('collections')
+        .select('id, name, description, slug, image_url, is_active, is_featured, sort_order, creator_id, created_at')
+        .order('sort_order', { ascending: true });
+
+      if (fetchError) throw fetchError;
+      setCollections(allCollections || []);
+    } catch (error) {
+      console.error('Error fetching collections:', error);
+      setCollections([]);
+    }
+  };
+
+  const handleCreatorSaved = () => {
+    // Refresh creators list and close modal
+    fetchCreators();
+    setShowCreatorModal(false);
+    setEditingCreator(null);
+  };
+
+  const handleCreateCollection = async () => {
+    if (!collectionFormData.name.trim()) {
+      alert('Please enter a collection name');
+      return;
+    }
+
+    setIsCreatingCollection(true);
+
+    try {
+      // Generate slug from name if not provided
+      const slug = collectionFormData.slug.trim() || 
+        collectionFormData.name.toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, '')
+          .replace(/\s+/g, '-')
+          .replace(/-+/g, '-')
+          .trim();
+
+      const collectionData = {
+        ...collectionFormData,
+        slug,
+        creator_id: collectionFormData.creator_id || null,
+        sort_order: collectionFormData.sort_order || collections.length
+      };
+
+      const { data, error } = await supabase
+        .from('collections')
+        .insert([collectionData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Refresh collections list
+      await fetchCollections();
+      
+      // Reset form and close modal
+      setCollectionFormData({
+        name: "",
+        description: "",
+        slug: "",
+        image_url: "",
+        creator_id: "",
+        is_active: true,
+        is_featured: false,
+        sort_order: 0
+      });
+      setShowCreateCollection(false);
+      
+      alert('Collection created successfully!');
+    } catch (error) {
+      console.error('Error creating collection:', error);
+      alert('Error creating collection. Please try again.');
+    } finally {
+      setIsCreatingCollection(false);
+    }
+  };
+
+  const handleQuickCollectionChange = async (productId: string, newCollectionId: string) => {
+    try {
+      const { error } = await supabase
+        .from('marketplace_products')
+        .update({ collection_id: newCollectionId })
+        .eq('id', productId);
+
+      if (error) throw error;
+
+      // Update the local state
+      setProducts(prev => prev.map(product => 
+        product.id === productId 
+          ? { ...product, collection_id: newCollectionId }
+          : product
+      ));
+
+      // Show success message
+      const collection = collections.find(c => c.id === newCollectionId);
+      alert(`Product moved to "${collection?.name}" collection`);
+    } catch (error) {
+      console.error('Error updating product collection:', error);
+      alert('Error updating collection. Please try again.');
+    }
+  };
+
+  const handleQuickCreatorChange = async (collectionId: string, newCreatorId: string) => {
+    try {
+      const { error } = await supabase
+        .from('collections')
+        .update({ creator_id: newCreatorId || null })
+        .eq('id', collectionId);
+
+      if (error) throw error;
+
+      // Update the local state
+      setCollections(prev => prev.map(collection => 
+        collection.id === collectionId 
+          ? { ...collection, creator_id: newCreatorId || null }
+          : collection
+      ));
+
+      // Show success message
+      const creator = creators.find(c => c.id === newCreatorId);
+      const collectionName = collections.find(c => c.id === collectionId)?.name;
+      if (newCreatorId) {
+        alert(`Collection "${collectionName}" assigned to ${creator?.creator_name}`);
+      } else {
+        alert(`Collection "${collectionName}" unassigned from creator`);
+      }
+    } catch (error) {
+      console.error('Error updating collection creator:', error);
+      alert('Error updating creator assignment. Please try again.');
+    }
+  };
+
+  const handleBatchUpload = async () => {
+    if (batchFiles.length === 0) return;
+
+    // Validate collection assignment (temporarily optional)
+    // if (!batchConfig.collection_id) {
+    //   alert('Please select a collection for the batch upload');
+    //   return;
+    // }
+
+    setBatchUploading(true);
+    setBatchProgress({ current: 0, total: batchFiles.length, currentFile: "" });
+
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+      let skippedCount = 0;
+      const errors: string[] = [];
+      const skipped: string[] = [];
+
+      for (let i = 0; i < batchFiles.length; i++) {
+        const file = batchFiles[i];
+        setBatchProgress({ current: i + 1, total: batchFiles.length, currentFile: file.name });
+
+        // Skip AI files - they are for reference only
+        if (file.name.toLowerCase().endsWith('.ai')) {
+          skippedCount++;
+          skipped.push(file.name);
+          continue;
+        }
+
+        try {
+          // Upload image to Cloudinary
+          const imageUrl = await handleFileUpload(file);
+          
+          // Generate product title from filename
+          const fileName = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+          const productTitle = fileName
+            .replace(/[-_]/g, ' ') // Replace hyphens and underscores with spaces
+            .replace(/\b\w/g, l => l.toUpperCase()) // Capitalize each word
+            .trim() + ' Sticker'; // Add "Sticker" suffix
+
+          // Generate short description
+          const shortDescription = `High-quality ${batchConfig.category.toLowerCase()} sticker design`;
+
+          // Generate full description
+          const description = `**${productTitle}**
+
+• High-quality vinyl sticker
+• Weather-resistant and durable
+• Perfect for laptops, water bottles, cars, and more
+• Easy to apply and remove
+• Vibrant colors that won't fade
+
+**Available Sizes:**
+• 3" - $${batchConfig.size_pricing["3"]}
+• 4" - $${batchConfig.size_pricing["4"]}  
+• 5" - $${batchConfig.size_pricing["5"]}
+
+Great for personalizing your gear or as a gift!`;
+
+          // Create product data
+          const productData = {
+            title: productTitle,
+            description: description,
+            short_description: shortDescription,
+            category: batchConfig.category,
+            creator_id: isCreator && !isAdmin ? currentCreatorId : (batchConfig.creator_id || null),
+            collection_id: batchConfig.collection_id || null,
+            price: parseFloat(batchConfig.size_pricing["4"]), // Use 4" as fallback price
+            original_price: null,
+            markup_percentage: batchConfig.markup_percentage ? parseFloat(batchConfig.markup_percentage) : 0,
+            size_pricing: {
+              "3": batchConfig.size_pricing["3"] ? parseFloat(batchConfig.size_pricing["3"]) : null,
+              "4": batchConfig.size_pricing["4"] ? parseFloat(batchConfig.size_pricing["4"]) : null,
+              "5": batchConfig.size_pricing["5"] ? parseFloat(batchConfig.size_pricing["5"]) : null
+            },
+            size_compare_pricing: {
+              "3": batchConfig.size_compare_pricing?.["3"] ? parseFloat(batchConfig.size_compare_pricing["3"]) : null,
+              "4": batchConfig.size_compare_pricing?.["4"] ? parseFloat(batchConfig.size_compare_pricing["4"]) : null,
+              "5": batchConfig.size_compare_pricing?.["5"] ? parseFloat(batchConfig.size_compare_pricing["5"]) : null
+            },
+            images: [imageUrl],
+            default_image: imageUrl,
+            tags: [batchConfig.category.toLowerCase(), 'vinyl', 'sticker', 'design'],
+            is_active: batchConfig.is_active,
+            is_featured: batchConfig.is_featured,
+            stock_quantity: batchConfig.stock_quantity
+          };
+
+          // Insert product into database
+          const { error } = await supabase
+            .from('marketplace_products')
+            .insert([productData]);
+
+          if (error) {
+            throw error;
+          }
+
+          successCount++;
+        } catch (error) {
+          console.error(`Error processing ${file.name}:`, error);
+          errorCount++;
+          errors.push(`${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      // Show results
+      let message = '';
+      if (successCount > 0) {
+        message = `Successfully uploaded ${successCount} design${successCount !== 1 ? 's' : ''}!`;
+      }
+      if (skippedCount > 0) {
+        message += `${message ? ' ' : ''}${skippedCount} AI file${skippedCount !== 1 ? 's' : ''} skipped (source files only).`;
+      }
+      if (errorCount > 0) {
+        message += `${message ? ' ' : ''}${errorCount} file${errorCount !== 1 ? 's' : ''} failed.`;
+      }
+      
+      if (message) {
+        alert(message);
+      } else {
+        alert('No files were processed. Please select image files to upload.');
+      }
+
+      if (errors.length > 0) {
+        console.error('Batch upload errors:', errors);
+      }
+      if (skipped.length > 0) {
+        console.log('Skipped AI files:', skipped);
+      }
+
+      // Refresh products and close modal
+      await fetchProducts();
+      setShowBatchUpload(false);
+      setBatchFiles([]);
+      setBatchProgress({current: 0, total: 0, currentFile: ""});
+
+    } catch (error) {
+      console.error('Batch upload error:', error);
+      alert('An error occurred during batch upload. Please try again.');
+    } finally {
+      setBatchUploading(false);
+    }
+  };
+
+  const handleDuplicateProduct = async () => {
+    if (!duplicateProduct || duplicateQuantity < 1) return;
+
+    setIsDuplicating(true);
+
+    try {
+      const duplicates = [];
+      
+      for (let i = 1; i <= duplicateQuantity; i++) {
+        const duplicateData = {
+          title: `${duplicateProduct.title} (Copy ${i})`,
+          description: duplicateProduct.description,
+          short_description: duplicateProduct.short_description,
+          category: duplicateProduct.category,
+          creator_id: duplicateProduct.creator_id,
+          collection_id: duplicateProduct.collection_id,
+          price: duplicateProduct.price,
+          original_price: duplicateProduct.original_price,
+          markup_percentage: duplicateProduct.markup_percentage,
+          size_pricing: duplicateProduct.size_pricing,
+          size_compare_pricing: duplicateProduct.size_compare_pricing,
+          images: duplicateProduct.images,
+          default_image: duplicateProduct.default_image,
+          tags: duplicateProduct.tags,
+          is_active: duplicateProduct.is_active,
+          is_featured: false, // Don't duplicate featured status
+          stock_quantity: duplicateProduct.stock_quantity
+        };
+
+        duplicates.push(duplicateData);
+      }
+
+      const { error } = await supabase
+        .from('marketplace_products')
+        .insert(duplicates);
+
+      if (error) throw error;
+
+      alert(`Successfully created ${duplicateQuantity} duplicate${duplicateQuantity !== 1 ? 's' : ''} of "${duplicateProduct.title}"`);
+      
+      // Refresh products and close modal
+      await fetchProducts();
+      setShowDuplicateModal(false);
+      setDuplicateProduct(null);
+      setDuplicateQuantity(1);
+
+    } catch (error) {
+      console.error('Error duplicating product:', error);
+      alert(`Error duplicating product: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsDuplicating(false);
+    }
+  };
+
+  const toggleCreatorStatus = async (creator: any) => {
+    try {
+      const { error } = await supabase
+        .from('creators')
+        .update({ is_active: !creator.is_active, updated_at: new Date().toISOString() })
+        .eq('id', creator.id);
+
+      if (error) throw error;
+
+      // Refresh creators list
+      fetchCreators();
+    } catch (error) {
+      console.error('Error toggling creator status:', error);
+      alert('Failed to update creator status. Please try again.');
+    }
+  };
+
   if (loading) {
     return (
-      <AdminLayout title="Marketplace - Admin Dashboard">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-white">Loading...</div>
-        </div>
-      </AdminLayout>
+              <AdminLayout title="Creators Space - Admin Dashboard">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-white">Loading...</div>
+          </div>
+        </AdminLayout>
     );
   }
 
-  if (!isAdmin) {
+  if (!isAdmin && !isCreator) {
     return (
-      <AdminLayout title="Marketplace - Admin Dashboard">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-white">Access Denied</div>
-        </div>
-      </AdminLayout>
+              <AdminLayout title="Creators Space - Admin Dashboard">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-white">Access Denied</div>
+          </div>
+        </AdminLayout>
     );
   }
 
   // If showing add product, render the full viewport
   if (showAddProduct) {
     return (
-      <AdminLayout title={editingProduct ? "Edit Product - Admin Dashboard" : "Add Product - Admin Dashboard"}>
+      <AdminLayout title={editingProduct ? "Edit Product - Creators Space" : "Add Product - Creators Space"}>
         <style jsx>{`
           .container-style {
             background: rgba(255, 255, 255, 0.05);
@@ -549,6 +1090,50 @@ export default function MarketplaceAdmin() {
                         placeholder="Brief product description"
                       />
                     </div>
+
+                    {collections.length > 0 && (
+                      <div>
+                        <label className="block text-white text-sm font-medium mb-2">Collection (Optional)</label>
+                        <select
+                          value={formData.collection_id}
+                          onChange={(e) => setFormData(prev => ({ ...prev, collection_id: e.target.value }))}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          aria-label="Assign product to collection"
+                        >
+                          <option value="">Select a collection</option>
+                          {collections.map((collection) => (
+                            <option key={collection.id} value={collection.id} className="bg-gray-800">
+                              {collection.name}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-gray-400 text-xs mt-1">
+                          Collections help organize products (will be required once collections are set up)
+                        </p>
+                      </div>
+                    )}
+
+                    {isAdmin && (
+                      <div>
+                        <label className="block text-white text-sm font-medium mb-2">Assign to Creator (Optional)</label>
+                        <select
+                          value={formData.creator_id}
+                          onChange={(e) => setFormData(prev => ({ ...prev, creator_id: e.target.value }))}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          aria-label="Assign product to creator"
+                        >
+                          <option value="">No creator assigned</option>
+                          {creators.map((creator) => (
+                            <option key={creator.id} value={creator.id} className="bg-gray-800">
+                              {creator.creator_name} ({creator.email})
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-gray-400 text-xs mt-1">
+                          Assign this product to a creator for commission tracking
+                        </p>
+                      </div>
+                    )}
 
                     <div>
                       <label className="block text-white text-sm font-medium mb-2">Description</label>
@@ -907,8 +1492,115 @@ export default function MarketplaceAdmin() {
                   <h2 className="text-lg font-semibold text-white mb-4">Pricing</h2>
                   
                   <div className="space-y-4">
+                    {/* Size-based Pricing */}
+                    <div className="space-y-4">
+                      <h3 className="text-white text-sm font-medium">Size-based Pricing</h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-white text-xs font-medium mb-2">3" Price ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formData.size_pricing["3"]}
+                            onChange={(e) => setFormData(prev => ({ 
+                              ...prev, 
+                              size_pricing: { ...prev.size_pricing, "3": e.target.value }
+                            }))}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-white text-xs font-medium mb-2">4" Price ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formData.size_pricing["4"]}
+                            onChange={(e) => setFormData(prev => ({ 
+                              ...prev, 
+                              size_pricing: { ...prev.size_pricing, "4": e.target.value }
+                            }))}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-white text-xs font-medium mb-2">5" Price ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formData.size_pricing["5"]}
+                            onChange={(e) => setFormData(prev => ({ 
+                              ...prev, 
+                              size_pricing: { ...prev.size_pricing, "5": e.target.value }
+                            }))}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-gray-400 text-xs">Set individual prices for each sticker size</p>
+                    </div>
+
+                    {/* Size-based Compare At Pricing */}
+                    <div className="space-y-4">
+                      <h3 className="text-white text-sm font-medium">Size-based Compare At Pricing (Optional)</h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-white text-xs font-medium mb-2">3" Compare At ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formData.size_compare_pricing?.["3"] || ""}
+                            onChange={(e) => setFormData(prev => ({ 
+                              ...prev, 
+                              size_compare_pricing: { ...(prev.size_compare_pricing || {}), "3": e.target.value }
+                            }))}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-white text-xs font-medium mb-2">4" Compare At ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formData.size_compare_pricing?.["4"] || ""}
+                            onChange={(e) => setFormData(prev => ({ 
+                              ...prev, 
+                              size_compare_pricing: { ...(prev.size_compare_pricing || {}), "4": e.target.value }
+                            }))}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-white text-xs font-medium mb-2">5" Compare At ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formData.size_compare_pricing?.["5"] || ""}
+                            onChange={(e) => setFormData(prev => ({ 
+                              ...prev, 
+                              size_compare_pricing: { ...(prev.size_compare_pricing || {}), "5": e.target.value }
+                            }))}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-gray-400 text-xs">Shows as crossed-out price for each size (optional)</p>
+                    </div>
+
+                    {/* Fallback Price */}
                     <div>
-                      <label className="block text-white text-sm font-medium mb-2">Price ($)</label>
+                      <label className="block text-white text-sm font-medium mb-2">Fallback Price ($)</label>
                       <input
                         type="number"
                         step="0.01"
@@ -918,6 +1610,7 @@ export default function MarketplaceAdmin() {
                         placeholder="0.00"
                         required
                       />
+                      <p className="text-gray-400 text-xs mt-1">Used when size-specific pricing is not available</p>
                     </div>
 
                     <div>
@@ -1016,7 +1709,7 @@ export default function MarketplaceAdmin() {
   }
 
   return (
-    <AdminLayout title="Marketplace - Admin Dashboard">
+    <AdminLayout title="Creators Space - Admin Dashboard">
       <style jsx>{`
         .container-style {
           background: rgba(255, 255, 255, 0.05);
@@ -1051,8 +1744,135 @@ export default function MarketplaceAdmin() {
       
       <div className="p-6">
 
-        {/* Filter and Add Product */}
+        {/* Action Buttons */}
         <div className="container-style rounded-2xl p-6 mb-6">
+          <div className={`grid ${isAdmin ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'} gap-4 mb-6`}>
+            <button
+              onClick={() => {
+                resetForm();
+                setEditingProduct(null);
+                setShowAddProduct(true);
+              }}
+              className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/30 rounded-xl hover:border-blue-400/50 transition-all duration-200 hover:bg-white/5 group"
+            >
+              <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center mb-3 group-hover:bg-blue-500/30 transition-colors">
+                <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
+              <span className="text-white text-sm font-medium">Add New Sticker</span>
+            </button>
+
+            <button
+              onClick={() => {
+                resetForm();
+                setFormData(prev => ({ ...prev, product_type: "pack" }));
+                setEditingProduct(null);
+                setShowAddProduct(true);
+              }}
+              className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/30 rounded-xl hover:border-green-400/50 transition-all duration-200 hover:bg-white/5 group"
+            >
+              <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center mb-3 group-hover:bg-green-500/30 transition-colors">
+                <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+              <span className="text-white text-sm font-medium">Add Sticker Pack</span>
+            </button>
+
+            {/* Batch Upload Button - Available to both admin and creators */}
+            <button
+              onClick={() => {
+                setBatchFiles([]);
+                setShowBatchUpload(true);
+              }}
+              className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/30 rounded-xl hover:border-orange-400/50 transition-all duration-200 hover:bg-white/5 group"
+            >
+              <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center mb-3 group-hover:bg-orange-500/30 transition-colors">
+                <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+              </div>
+              <span className="text-white text-sm font-medium">Batch Upload</span>
+            </button>
+
+            {isAdmin && (
+              <>
+                <button
+                  onClick={() => {
+                    setEditingCreator(null);
+                    setShowCreatorModal(true);
+                  }}
+                  className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/30 rounded-xl hover:border-purple-400/50 transition-all duration-200 hover:bg-white/5 group"
+                >
+                  <div className="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center mb-3 group-hover:bg-purple-500/30 transition-colors">
+                    <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <span className="text-white text-sm font-medium">Add New Creator</span>
+                </button>
+
+                {/* Only show Create Collection button if we can access collections table */}
+                <button
+                  onClick={() => setShowCreateCollection(true)}
+                  className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/30 rounded-xl hover:border-green-400/50 transition-all duration-200 hover:bg-white/5 group"
+                  title={collections.length === 0 ? "Collections database not set up yet" : "Create a new collection"}
+                >
+                  <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center mb-3 group-hover:bg-green-500/30 transition-colors">
+                    <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  </div>
+                  <span className="text-white text-sm font-medium">Create Collection</span>
+                  {collections.length === 0 && (
+                    <span className="text-yellow-400 text-xs mt-1">(Database setup required)</span>
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Tab Navigation */}
+          {isAdmin && (
+            <div className="flex space-x-1 mb-6 border-b border-white/20">
+              <button
+                onClick={() => setActiveTab('products')}
+                className={`px-6 py-3 text-sm font-medium rounded-t-lg transition-all duration-200 ${
+                  activeTab === 'products'
+                    ? 'bg-blue-500/20 text-blue-300 border-b-2 border-blue-400'
+                    : 'text-white/70 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                Products ({products.length})
+              </button>
+              {collections.length > 0 && (
+                <button
+                  onClick={() => setActiveTab('collections')}
+                  className={`px-6 py-3 text-sm font-medium rounded-t-lg transition-all duration-200 ${
+                    activeTab === 'collections'
+                      ? 'bg-green-500/20 text-green-300 border-b-2 border-green-400'
+                      : 'text-white/70 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  Collections ({collections.length})
+                </button>
+              )}
+              <button
+                onClick={() => setActiveTab('creators')}
+                className={`px-6 py-3 text-sm font-medium rounded-t-lg transition-all duration-200 ${
+                  activeTab === 'creators'
+                    ? 'bg-purple-500/20 text-purple-300 border-b-2 border-purple-400'
+                    : 'text-white/70 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                Creators ({creators.length})
+              </button>
+            </div>
+          )}
+
+          {/* Filter - Only show for products tab or for creators */}
+          {(activeTab === 'products' || !isAdmin) && (
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
             <div className="flex items-center gap-4">
               <label className="text-white text-sm font-medium">Filter by Shape:</label>
@@ -1070,126 +1890,1043 @@ export default function MarketplaceAdmin() {
                 ))}
               </select>
             </div>
-            
-            <button
-                          onClick={() => {
-              resetForm();
-              setEditingProduct(null);
-              setShowAddProduct(true);
-            }}
-              className="emerald-button-style px-6 py-3 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-105"
-            >
-              Add New Product
-            </button>
           </div>
+          )}
         </div>
 
-        {/* Products Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {/* Add Product Placeholder Card */}
-          <div
-            onClick={() => {
-              resetForm();
-              setEditingProduct(null);
-              setShowAddProduct(true);
-            }}
-            className="container-style border-2 border-dashed border-white/20 rounded-2xl p-4 cursor-pointer hover:border-emerald-500/50 hover:bg-white/10 transition-all duration-200 flex flex-col items-center justify-center min-h-[400px]"
-          >
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                <svg className="w-8 h-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        {/* Products Tab */}
+        {(activeTab === 'products' || !isAdmin) && (
+        <div className="container-style rounded-2xl p-6">
+          <h3 className="text-xl font-bold text-white mb-4">Products</h3>
+          {products.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-12 gap-4">
+              {products.map((product) => (
+                <div key={product.id} className="container-style rounded-xl p-4 hover:scale-105 transition-all duration-200 group">
+                  {/* Product Image */}
+                  <div className="aspect-square rounded-lg overflow-hidden mb-3 bg-gray-800">
+                    <img
+                      src={product.default_image || product.images[0] || '/placeholder.png'}
+                      alt={product.title}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+
+                  {/* Product Info */}
+                  <div className="space-y-2">
+                    {/* Title */}
+                    <h3 className="text-white font-medium text-sm line-clamp-2 min-h-[2.5rem]">
+                      {product.title}
+                    </h3>
+
+                    {/* Creator */}
+                    <p className="text-gray-400 text-xs truncate">
+                      {product.creator?.creator_name || 'No Creator Assigned'}
+                    </p>
+
+                    {/* Collection */}
+                    {collections.length > 0 && (
+                      <p className="text-green-400 text-xs truncate">
+                        {collections.find(c => c.id === product.collection_id)?.name || 'No Collection'}
+                      </p>
+                    )}
+
+                    {/* Category & Price */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-300 text-xs px-2 py-1 bg-white/10 rounded">
+                        {product.category}
+                      </span>
+                      <span className="text-white font-semibold text-sm">
+                        ${product.price}
+                      </span>
+                    </div>
+
+                    {/* Status */}
+                    <div className="flex gap-1">
+                      <span className={`px-2 py-1 rounded text-xs text-center flex-1 ${
+                        product.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {product.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                      {product.is_featured && (
+                        <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs">
+                          ★
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <button
+                        onClick={() => {
+                          handleEdit(product);
+                          setShowAddProduct(true);
+                        }}
+                        className="button-style px-2 py-1 text-white rounded text-xs font-medium transition-all duration-200 hover:scale-105"
+                      >
+                        Edit
+                      </button>
+                      
+                      {/* Collection Assignment */}
+                      {collections.length > 0 && (
+                        <div className="relative">
+                          <select
+                            value={product.collection_id || ""}
+                            onChange={(e) => handleQuickCollectionChange(product.id, e.target.value)}
+                            className="w-full px-2 py-1 bg-green-600/80 hover:bg-green-600 text-white rounded text-xs font-medium transition-all duration-200 hover:scale-105 cursor-pointer"
+                            aria-label={`Change collection for ${product.title}`}
+                          >
+                            <option value="" disabled className="bg-gray-800">
+                              Select Collection
+                            </option>
+                            {collections.map((collection) => (
+                              <option key={collection.id} value={collection.id} className="bg-gray-800">
+                                {collection.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          setDuplicateProduct(product);
+                          setShowDuplicateModal(true);
+                        }}
+                        className="px-2 py-1 bg-purple-600/80 hover:bg-purple-600 text-white rounded text-xs font-medium transition-all duration-200 hover:scale-105"
+                      >
+                        Duplicate
+                      </button>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => toggleActive(product)}
+                          className={`px-2 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex-1 ${
+                            product.is_active 
+                              ? 'bg-red-600/80 hover:bg-red-600 text-white' 
+                              : 'bg-green-600/80 hover:bg-green-600 text-white'
+                          }`}
+                        >
+                          {product.is_active ? 'Hide' : 'Show'}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(product.id)}
+                          className="px-2 py-1 bg-red-600/80 hover:bg-red-600 text-white rounded text-xs font-medium transition-all duration-200 hover:scale-105"
+                        >
+                          Del
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            // Empty State
+            <div className="p-12 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-500/20 flex items-center justify-center">
+                <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-2.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 009.586 13H7" />
                 </svg>
               </div>
-              <h3 className="text-white font-semibold mb-2">Add New Product</h3>
-              <p className="text-gray-400 text-sm">Click to create a new marketplace product</p>
+              <h3 className="text-white font-semibold mb-2">No Products Yet</h3>
+              <p className="text-gray-400 text-sm">Click "Add New Sticker" to create your first creators space product</p>
+            </div>
+          )}
+        </div>
+        )}
+
+        {/* Collections Tab */}
+        {activeTab === 'collections' && (
+        <div className="container-style rounded-2xl p-6">
+          <h3 className="text-xl font-bold text-white mb-4">Collections</h3>
+          {collections.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {collections.map((collection) => (
+                <div key={collection.id} className="container-style rounded-xl p-6 hover:scale-105 transition-all duration-200 group">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 rounded-full overflow-hidden bg-green-500/20 flex items-center justify-center">
+                        {collection.image_url ? (
+                          <img
+                            src={collection.image_url}
+                            alt={collection.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                          </svg>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="text-white font-semibold">{collection.name}</h4>
+                        <p className="text-gray-400 text-sm">{collection.slug}</p>
+                        <p className="text-purple-400 text-xs">
+                          {creators.find(c => c.id === collection.creator_id)?.creator_name || 'No Creator Assigned'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {collection.is_featured && (
+                        <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs">
+                          Featured
+                        </span>
+                      )}
+                      <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        collection.is_active 
+                          ? 'bg-green-500/20 text-green-400' 
+                          : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {collection.is_active ? 'Active' : 'Inactive'}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {collection.description && (
+                    <p className="text-gray-300 text-sm mb-4 line-clamp-2">
+                      {collection.description}
+                    </p>
+                  )}
+                  
+                  <div className="space-y-2 mb-4">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Sort Order:</span>
+                      <span className="text-white">{collection.sort_order}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Created:</span>
+                      <span className="text-white">
+                        {new Date(collection.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Creator Assignment */}
+                    <div className="relative">
+                      <select
+                        value={collection.creator_id || ""}
+                        onChange={(e) => handleQuickCreatorChange(collection.id, e.target.value)}
+                        className="w-full px-2 py-1 bg-purple-600/80 hover:bg-purple-600 text-white rounded text-xs font-medium transition-all duration-200 hover:scale-105 cursor-pointer"
+                        aria-label={`Change creator for ${collection.name}`}
+                      >
+                        <option value="" className="bg-gray-800">
+                          No Creator
+                        </option>
+                        {creators.map((creator) => (
+                          <option key={creator.id} value={creator.id} className="bg-gray-800">
+                            {creator.creator_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex space-x-2">
+                      <button className="flex-1 px-3 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg text-sm font-medium transition-colors">
+                        Edit
+                      </button>
+                      <button className="flex-1 px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-sm font-medium transition-colors">
+                        {collection.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-12 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center">
+                <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+              <h3 className="text-white font-semibold mb-2">No Collections Yet</h3>
+              <p className="text-gray-400 text-sm">Collections will appear here once created</p>
+            </div>
+          )}
+        </div>
+        )}
+
+        {/* Creators Tab */}
+        {activeTab === 'creators' && (
+        <div className="container-style rounded-2xl p-6">
+          <h3 className="text-xl font-bold text-white mb-4">Creators</h3>
+          {creators.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {creators.filter(creator => creator.is_active).map((creator) => (
+                <div key={creator.id} className="container-style rounded-xl p-6 hover:scale-105 transition-all duration-200 group">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 rounded-full overflow-hidden bg-purple-500/20 flex items-center justify-center">
+                        {creator.profile_photo_url ? (
+                          <img
+                            src={creator.profile_photo_url}
+                            alt={creator.creator_name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="text-white font-semibold">{creator.creator_name}</h4>
+                        <p className="text-gray-400 text-sm">{creator.email}</p>
+                      </div>
+                    </div>
+                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      creator.is_active 
+                        ? 'bg-green-500/20 text-green-400' 
+                        : 'bg-red-500/20 text-red-400'
+                    }`}>
+                      {creator.is_active ? 'Active' : 'Inactive'}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2 mb-4">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Products:</span>
+                      <span className="text-white">{creator.total_products || 0}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Joined:</span>
+                      <span className="text-white">
+                        {new Date(creator.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => {
+                        setEditingCreator(creator);
+                        setShowCreatorModal(true);
+                      }}
+                      className="flex-1 px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => toggleCreatorStatus(creator)}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        creator.is_active
+                          ? 'bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400'
+                          : 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
+                      }`}
+                    >
+                      {creator.is_active ? 'Deactivate' : 'Activate'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-12 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-500/20 flex items-center justify-center">
+                <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <h3 className="text-white font-semibold mb-2">No Creators Yet</h3>
+              <p className="text-gray-400 text-sm">Click "Add New Creator" to assign your first creator</p>
+            </div>
+          )}
+        </div>
+        )}
+      </div>
+
+      {/* Creator Management Modal */}
+      <CreatorManagementModal
+        isOpen={showCreatorModal}
+        onClose={() => {
+          setShowCreatorModal(false);
+          setEditingCreator(null);
+        }}
+        editingCreator={editingCreator}
+        onCreatorSaved={handleCreatorSaved}
+      />
+
+      {/* Batch Upload Modal */}
+      {showBatchUpload && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="container-style rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Batch Upload Designs</h2>
+                  <p className="text-gray-400">Upload multiple design files to create products automatically</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowBatchUpload(false);
+                    setBatchFiles([]);
+                    setBatchProgress({current: 0, total: 0, currentFile: ""});
+                  }}
+                  disabled={batchUploading}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Close batch upload modal"
+                >
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {!batchUploading ? (
+                <>
+                  {/* File Drop Area */}
+                  <div 
+                    className="border-2 border-dashed border-orange-400/50 rounded-xl p-12 text-center hover:border-orange-400 transition-colors cursor-pointer backdrop-blur-md mb-6"
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const files = Array.from(e.dataTransfer.files).filter(file => 
+                        file.type.startsWith('image/') || file.name.toLowerCase().endsWith('.ai')
+                      );
+                      setBatchFiles(prev => [...prev, ...files]);
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.multiple = true;
+                      input.accept = 'image/*,.ai';
+                      input.onchange = (e) => {
+                        const files = Array.from((e.target as HTMLInputElement).files || []).filter(file => 
+                          file.type.startsWith('image/') || file.name.toLowerCase().endsWith('.ai')
+                        );
+                        setBatchFiles(prev => [...prev, ...files]);
+                      };
+                      input.click();
+                    }}
+                  >
+                    <div className="mb-4">
+                      <div className="mb-3 flex justify-center">
+                        <svg className="w-16 h-16 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                      </div>
+                      <p className="text-white font-medium text-lg mb-2">
+                        Drop multiple images here or click to browse
+                      </p>
+                      <p className="text-white/60 text-sm">
+                        Select multiple design files to upload in batch. All image formats and .ai files supported.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Selected Files List */}
+                  {batchFiles.length > 0 && (
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-white font-semibold">Selected Files ({batchFiles.length})</h3>
+                        <button
+                          onClick={() => setBatchFiles([])}
+                          className="text-red-400 hover:text-red-300 text-sm"
+                        >
+                          Clear All
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-60 overflow-y-auto">
+                        {batchFiles.map((file, index) => {
+                          const isAiFile = file.name.toLowerCase().endsWith('.ai');
+                          return (
+                          <div key={index} className="relative group">
+                            <div className="aspect-square bg-gray-800 rounded-lg overflow-hidden border border-white/20 flex items-center justify-center">
+                              {isAiFile ? (
+                                <div className="text-center p-4">
+                                  <svg className="w-12 h-12 text-purple-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                  <p className="text-white text-xs font-medium">AI File</p>
+                                  <p className="text-purple-400 text-xs">Design Source</p>
+                                </div>
+                              ) : (
+                                <img
+                                  src={URL.createObjectURL(file)}
+                                  alt={file.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                            </div>
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                              <button
+                                onClick={() => setBatchFiles(prev => prev.filter((_, i) => i !== index))}
+                                className="px-2 py-1 bg-red-600/80 hover:bg-red-600 text-white rounded text-xs"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                            <p className="text-white text-xs mt-2 truncate">{file.name}</p>
+                            {isAiFile && (
+                              <div className="mt-1 px-2 py-1 bg-purple-500/20 text-purple-300 rounded text-xs text-center">
+                                Source File Only
+                              </div>
+                            )}
+                          </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* AI Files Notice */}
+                  {batchFiles.some(file => file.name.toLowerCase().endsWith('.ai')) && (
+                    <div className="mb-6 p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <svg className="w-5 h-5 text-purple-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                          <h4 className="text-purple-300 font-medium text-sm mb-1">AI Files Detected</h4>
+                          <p className="text-purple-200 text-xs">
+                            Adobe Illustrator (.ai) files are included for reference but will be skipped during upload. 
+                            Only image files (.png, .jpg, .svg, etc.) will be processed and uploaded to create sticker products.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Batch Configuration */}
+                  {batchFiles.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                      {/* Basic Settings */}
+                      <div className="space-y-4">
+                        <h3 className="text-white font-semibold mb-3">Basic Settings</h3>
+                        
+                        {collections.length > 0 && (
+                          <div>
+                            <label className="block text-white text-sm font-medium mb-2">Collection (Optional)</label>
+                            <select
+                              value={batchConfig.collection_id}
+                              onChange={(e) => setBatchConfig(prev => ({ ...prev, collection_id: e.target.value }))}
+                              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                              aria-label="Select collection for batch upload"
+                            >
+                              <option value="">Select a collection</option>
+                              {collections.map((collection) => (
+                                <option key={collection.id} value={collection.id} className="bg-gray-800">
+                                  {collection.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        <div>
+                          <label className="block text-white text-sm font-medium mb-2">Category</label>
+                          <select
+                            value={batchConfig.category}
+                            onChange={(e) => setBatchConfig(prev => ({ ...prev, category: e.target.value }))}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                            aria-label="Select category for batch upload"
+                          >
+                            {categories.map((category) => (
+                              <option key={category} value={category} className="bg-gray-800">
+                                {category}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {isAdmin && (
+                          <div>
+                            <label className="block text-white text-sm font-medium mb-2">Assign to Creator</label>
+                            <select
+                              value={batchConfig.creator_id}
+                              onChange={(e) => setBatchConfig(prev => ({ ...prev, creator_id: e.target.value }))}
+                              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                              aria-label="Assign to creator"
+                            >
+                              <option value="" className="bg-gray-800">No creator assigned</option>
+                              {creators.map((creator) => (
+                                <option key={creator.id} value={creator.id} className="bg-gray-800">
+                                  {creator.creator_name} ({creator.email})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        <div>
+                          <label className="block text-white text-sm font-medium mb-2">Stock Quantity</label>
+                          <input
+                            type="number"
+                            value={batchConfig.stock_quantity}
+                            onChange={(e) => setBatchConfig(prev => ({ ...prev, stock_quantity: parseInt(e.target.value) }))}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                            min="-1"
+                            aria-label="Stock quantity for batch upload"
+                          />
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setBatchConfig(prev => ({ ...prev, is_active: !prev.is_active }))}
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                batchConfig.is_active ? 'bg-blue-600' : 'bg-gray-600'
+                              }`}
+                              aria-label="Toggle active status for batch upload"
+                            >
+                              <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                  batchConfig.is_active ? 'translate-x-6' : 'translate-x-1'
+                                }`}
+                              />
+                            </button>
+                            <span className="text-white text-sm">Active</span>
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setBatchConfig(prev => ({ ...prev, is_featured: !prev.is_featured }))}
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                batchConfig.is_featured ? 'bg-yellow-600' : 'bg-gray-600'
+                              }`}
+                              aria-label="Toggle featured status for batch upload"
+                            >
+                              <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                  batchConfig.is_featured ? 'translate-x-6' : 'translate-x-1'
+                                }`}
+                              />
+                            </button>
+                            <span className="text-white text-sm">Featured</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Pricing Settings */}
+                      <div className="space-y-4">
+                        <h3 className="text-white font-semibold mb-3">Pricing Settings</h3>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-white text-xs font-medium mb-1">3" Price ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={batchConfig.size_pricing["3"]}
+                              onChange={(e) => setBatchConfig(prev => ({ 
+                                ...prev, 
+                                size_pricing: { ...prev.size_pricing, "3": e.target.value }
+                              }))}
+                              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                              aria-label="3 inch price for batch upload"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-white text-xs font-medium mb-1">4" Price ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={batchConfig.size_pricing["4"]}
+                              onChange={(e) => setBatchConfig(prev => ({ 
+                                ...prev, 
+                                size_pricing: { ...prev.size_pricing, "4": e.target.value }
+                              }))}
+                              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                              aria-label="4 inch price for batch upload"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-white text-xs font-medium mb-1">5" Price ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={batchConfig.size_pricing["5"]}
+                              onChange={(e) => setBatchConfig(prev => ({ 
+                                ...prev, 
+                                size_pricing: { ...prev.size_pricing, "5": e.target.value }
+                              }))}
+                              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                              aria-label="5 inch price for batch upload"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-white text-xs font-medium mb-1">Calculator Markup (%)</label>
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max="200"
+                              value={batchConfig.markup_percentage}
+                              onChange={(e) => setBatchConfig(prev => ({ ...prev, markup_percentage: e.target.value }))}
+                              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                              placeholder="0.0"
+                              aria-label="Calculator markup percentage for batch upload"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  {batchFiles.length > 0 && (
+                    <div className="flex justify-end gap-3">
+                      <button
+                        onClick={() => {
+                          setShowBatchUpload(false);
+                          setBatchFiles([]);
+                        }}
+                        className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors border border-white/20"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleBatchUpload}
+                        className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors"
+                      >
+                        Upload {batchFiles.length} Design{batchFiles.length !== 1 ? 's' : ''}
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* Upload Progress */
+                <div className="text-center py-12">
+                  <div className="mb-6">
+                    <svg className="w-16 h-16 text-orange-400 mx-auto mb-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <h3 className="text-2xl font-bold text-white mb-2">Uploading Designs...</h3>
+                    <p className="text-gray-400">
+                      Processing {batchProgress.current} of {batchProgress.total} files
+                    </p>
+                  </div>
+
+                  <div className="max-w-md mx-auto mb-6">
+                    <div className="w-full bg-white/20 rounded-full h-3 mb-4">
+                      <div 
+                        className="bg-orange-400 h-3 rounded-full transition-all duration-300"
+                        style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-white text-sm">
+                      Currently processing: {batchProgress.currentFile}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+        </div>
+      )}
 
-          {products.map((product) => (
-            <div
-              key={product.id}
-              className="container-style rounded-2xl p-4"
-            >
-              {/* Product Image */}
-              <div className="aspect-square mb-4 rounded-lg overflow-hidden">
-                <img
-                  src={product.default_image || product.images[0] || '/placeholder.png'}
-                  alt={product.title}
-                  className="w-full h-full object-cover"
+      {/* Duplicate Product Modal */}
+      {showDuplicateModal && duplicateProduct && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="container-style rounded-2xl max-w-md w-full">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-white mb-1">Duplicate Product</h2>
+                  <p className="text-gray-400 text-sm">Create copies of "{duplicateProduct.title}"</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowDuplicateModal(false);
+                    setDuplicateProduct(null);
+                    setDuplicateQuantity(1);
+                  }}
+                  disabled={isDuplicating}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Close duplicate modal"
+                >
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {!isDuplicating ? (
+                <>
+                  {/* Product Preview */}
+                  <div className="mb-6 p-4 bg-white/5 rounded-lg border border-white/10">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-lg overflow-hidden flex items-center justify-center p-2" style={{ backgroundColor: '#cae0ff' }}>
+                        <img
+                          src={duplicateProduct.default_image || duplicateProduct.images[0]}
+                          alt={duplicateProduct.title}
+                          className="max-w-full max-h-full object-contain"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-white font-semibold text-sm mb-1">{duplicateProduct.title}</h3>
+                        <p className="text-gray-400 text-xs mb-2">{duplicateProduct.category}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-400 font-medium text-sm">${duplicateProduct.price}</span>
+                          {duplicateProduct.original_price && (
+                            <span className="text-gray-500 text-xs line-through">${duplicateProduct.original_price}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quantity Selector */}
+                  <div className="mb-6">
+                    <label className="block text-white text-sm font-medium mb-3">Number of Duplicates</label>
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={() => setDuplicateQuantity(Math.max(1, duplicateQuantity - 1))}
+                        className="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold transition-colors flex items-center justify-center"
+                        disabled={duplicateQuantity <= 1}
+                      >
+                        -
+                      </button>
+                      <div className="flex-1">
+                        <input
+                          type="number"
+                          min="1"
+                          max="50"
+                          value={duplicateQuantity}
+                          onChange={(e) => setDuplicateQuantity(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white text-center text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          aria-label="Number of duplicates"
+                        />
+                      </div>
+                      <button
+                        onClick={() => setDuplicateQuantity(Math.min(50, duplicateQuantity + 1))}
+                        className="w-10 h-10 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold transition-colors flex items-center justify-center"
+                        disabled={duplicateQuantity >= 50}
+                      >
+                        +
+                      </button>
+                    </div>
+                    <p className="text-gray-400 text-xs mt-2">Maximum 50 duplicates at once</p>
+                  </div>
+
+                  {/* Preview of duplicate names */}
+                  <div className="mb-6 p-4 bg-white/5 rounded-lg border border-white/10">
+                    <h4 className="text-white text-sm font-medium mb-2">Duplicate Names Preview:</h4>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {Array.from({ length: Math.min(duplicateQuantity, 5) }, (_, i) => (
+                        <div key={i} className="text-gray-300 text-xs">
+                          • {duplicateProduct.title} (Copy {i + 1})
+                        </div>
+                      ))}
+                      {duplicateQuantity > 5 && (
+                        <div className="text-gray-400 text-xs">
+                          ... and {duplicateQuantity - 5} more
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={() => {
+                        setShowDuplicateModal(false);
+                        setDuplicateProduct(null);
+                        setDuplicateQuantity(1);
+                      }}
+                      className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors border border-white/20"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleDuplicateProduct}
+                      className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+                    >
+                      Create {duplicateQuantity} Duplicate{duplicateQuantity !== 1 ? 's' : ''}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* Duplicating Progress */
+                <div className="text-center py-8">
+                  <div className="mb-4">
+                    <svg className="w-12 h-12 text-purple-400 mx-auto mb-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <h3 className="text-xl font-bold text-white mb-2">Creating Duplicates...</h3>
+                    <p className="text-gray-400">
+                      Creating {duplicateQuantity} duplicate{duplicateQuantity !== 1 ? 's' : ''} of "{duplicateProduct.title}"
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Collection Modal */}
+      {showCreateCollection && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="container-style rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">Create New Collection</h2>
+              <button
+                onClick={() => setShowCreateCollection(false)}
+                className="text-white/60 hover:text-white transition-colors"
+                aria-label="Close create collection modal"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">
+                  Collection Name <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={collectionFormData.name}
+                  onChange={(e) => setCollectionFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Enter collection name"
+                  required
+                  aria-label="Collection name"
                 />
               </div>
 
-              {/* Product Info */}
-              <div className="space-y-2">
-                <h3 className="text-white font-semibold truncate">{product.title}</h3>
-                <p className="text-gray-400 text-sm line-clamp-2">{product.short_description}</p>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-white font-bold">${product.price}</span>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      product.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                    }`}>
-                      {product.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                    {product.is_featured && (
-                      <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs">
-                        Featured
-                      </span>
-                    )}
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">Description</label>
+                <textarea
+                  value={collectionFormData.description}
+                  onChange={(e) => setCollectionFormData(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 h-24 resize-none"
+                  placeholder="Describe this collection..."
+                  aria-label="Collection description"
+                />
+              </div>
+
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">
+                  Slug (URL-friendly name)
+                </label>
+                <input
+                  type="text"
+                  value={collectionFormData.slug}
+                  onChange={(e) => setCollectionFormData(prev => ({ ...prev, slug: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="auto-generated-from-name"
+                  aria-label="Collection slug"
+                />
+                <p className="text-gray-400 text-xs mt-1">
+                  Leave empty to auto-generate from collection name
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">Image URL (Optional)</label>
+                <input
+                  type="url"
+                  value={collectionFormData.image_url}
+                  onChange={(e) => setCollectionFormData(prev => ({ ...prev, image_url: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="https://example.com/collection-image.jpg"
+                  aria-label="Collection image URL"
+                />
+              </div>
+
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">Assign to Creator (Optional)</label>
+                <select
+                  value={collectionFormData.creator_id}
+                  onChange={(e) => setCollectionFormData(prev => ({ ...prev, creator_id: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                  aria-label="Assign collection to creator"
+                >
+                  <option value="">No creator assigned</option>
+                  {creators.map((creator) => (
+                    <option key={creator.id} value={creator.id} className="bg-gray-800">
+                      {creator.creator_name} ({creator.email})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-gray-400 text-xs mt-1">
+                  Assign this collection to a creator for ownership and management
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white text-sm font-medium mb-2">Sort Order</label>
+                  <input
+                    type="number"
+                    value={collectionFormData.sort_order}
+                    onChange={(e) => setCollectionFormData(prev => ({ ...prev, sort_order: parseInt(e.target.value) || 0 }))}
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    min="0"
+                    placeholder="0"
+                    aria-label="Sort order"
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      id="collection-active"
+                      checked={collectionFormData.is_active}
+                      onChange={(e) => setCollectionFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                      className="rounded text-green-500 focus:ring-green-500"
+                      aria-label="Collection active status"
+                    />
+                    <label htmlFor="collection-active" className="text-white text-sm">
+                      Active (visible to users)
+                    </label>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      id="collection-featured"
+                      checked={collectionFormData.is_featured}
+                      onChange={(e) => setCollectionFormData(prev => ({ ...prev, is_featured: e.target.checked }))}
+                      className="rounded text-green-500 focus:ring-green-500"
+                      aria-label="Collection featured status"
+                    />
+                    <label htmlFor="collection-featured" className="text-white text-sm">
+                      Featured collection
+                    </label>
                   </div>
                 </div>
-
-                {/* Stats */}
-                <div className="flex items-center justify-between text-xs text-gray-400">
-                  <span>Views: {product.views_count}</span>
-                  <span>Sold: {product.sold_quantity}</span>
-                </div>
-
-                                 {/* Actions */}
-                 <div className="flex flex-wrap items-center gap-2 pt-2">
-                   <button
-                     onClick={() => {
-                       handleEdit(product);
-                       setShowAddProduct(true);
-                     }}
-                     className="button-style px-3 py-1 text-white rounded text-sm font-medium transition-all duration-200 hover:scale-105"
-                   >
-                     Edit
-                   </button>
-                   <button
-                     onClick={() => toggleActive(product)}
-                     className={`px-3 py-1 rounded text-sm font-medium transition-all duration-200 hover:scale-105 ${
-                       product.is_active 
-                         ? 'bg-red-600/80 hover:bg-red-600 text-white border border-red-500/50' 
-                         : 'bg-green-600/80 hover:bg-green-600 text-white border border-green-500/50'
-                     }`}
-                   >
-                     {product.is_active ? 'Deactivate' : 'Activate'}
-                   </button>
-                   <button
-                     onClick={() => toggleFeatured(product)}
-                     className={`px-3 py-1 rounded text-sm font-medium transition-all duration-200 hover:scale-105 ${
-                       product.is_featured 
-                         ? 'bg-gray-600/80 hover:bg-gray-600 text-white border border-gray-500/50' 
-                         : 'bg-yellow-600/80 hover:bg-yellow-600 text-white border border-yellow-500/50'
-                     }`}
-                   >
-                     {product.is_featured ? 'Unfeature' : 'Feature'}
-                   </button>
-                   <button
-                     onClick={() => handleDelete(product.id)}
-                     className="px-3 py-1 bg-red-600/80 hover:bg-red-600 text-white rounded text-sm font-medium transition-all duration-200 hover:scale-105 border border-red-500/50"
-                   >
-                     Delete
-                   </button>
-                 </div>
               </div>
             </div>
-          ))}
+
+            <div className="flex space-x-4 mt-8">
+              <button
+                onClick={() => setShowCreateCollection(false)}
+                className="flex-1 px-6 py-3 border border-white/20 text-white rounded-xl hover:bg-white/5 transition-all duration-200"
+                disabled={isCreatingCollection}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateCollection}
+                disabled={isCreatingCollection || !collectionFormData.name.trim()}
+                className="flex-1 button-style px-6 py-3 text-white font-medium rounded-xl transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              >
+                {isCreatingCollection ? (
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Creating...</span>
+                  </div>
+                ) : (
+                  'Create Collection'
+                )}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </AdminLayout>
   );
 } 

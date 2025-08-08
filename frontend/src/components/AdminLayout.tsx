@@ -201,7 +201,7 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
         });
       } else if (segments[1] === 'marketplace') {
         breadcrumbs.push({
-          label: 'Marketplace',
+          label: 'Creators Space',
           href: '/admin/marketplace',
           icon: (
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -632,9 +632,9 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
                   }}
                 >
                   <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
-                  Marketplace
+                  Creators Space
                 </a>
 
                 {/* Shared Carts */}

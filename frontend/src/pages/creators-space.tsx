@@ -66,11 +66,11 @@ function ProductCard({ product }: { product: MarketplaceProduct }) {
     <div className="relative group">
       <Link href={`/marketplace/product/${product.id}`} className="block transition-transform duration-200 hover:scale-105">
         {/* Product Image with light blue background */}
-        <div className="aspect-square mb-3 rounded-lg overflow-hidden flex items-center justify-center p-8" style={{ backgroundColor: '#cae0ff' }}>
+        <div className="aspect-square mb-3 rounded-lg overflow-hidden" style={{ backgroundColor: '#cae0ff' }}>
           <img
             src={product.default_image || product.images[0] || '/placeholder.png'}
             alt={product.title}
-            className="max-w-full max-h-full object-contain group-hover:scale-110 transition-transform duration-200"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
           />
         </div>
 
@@ -188,7 +188,6 @@ export default function Marketplace() {
   const [user, setUser] = useState<any>(null);
   const [userLoading, setUserLoading] = useState(true);
   const [showMobileFilters, setShowMobileFilters] = useState<boolean>(false);
-  const [selectedCreatorId, setSelectedCreatorId] = useState<string | null>(null);
   const router = useRouter();
 
   // Check if user is a creator
@@ -276,11 +275,6 @@ export default function Marketplace() {
           )
         `)
         .eq('is_active', true);
-
-      // Apply creator filter
-      if (selectedCreatorId) {
-        query = query.eq('creator_id', selectedCreatorId);
-      }
 
       // Apply category filter
       if (!selectedCategories.includes("all") && selectedCategories.length > 0) {
@@ -409,7 +403,7 @@ export default function Marketplace() {
 
   useEffect(() => {
     fetchProducts();
-  }, [selectedCategories, showSaleItems, searchQuery, sortBy, selectedCreatorId]);
+  }, [selectedCategories, showSaleItems, searchQuery, sortBy]);
 
   const categories = [
     { 
@@ -597,6 +591,58 @@ export default function Marketplace() {
 
   return (
     <Layout title="Marketplace - Sticker Shuttle">
+      {/* Promotional Banner */}
+      <section className="pt-[20px] pb-8">
+        <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
+          <div 
+            className="bg-white bg-opacity-5 backdrop-blur-sm rounded-2xl py-8 px-8 md:px-12 relative overflow-hidden h-32 md:h-36"
+            style={{
+              backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749652894/StickerShuttle_Banner_PurpleCustomStickers_zxst8r.webp)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat'
+            }}
+          >
+            {/* Overlay for better text readability */}
+            <div 
+              className="absolute inset-0 rounded-2xl"
+              style={{
+                background: 'linear-gradient(135deg, rgba(10, 10, 46, 0.7) 0%, rgba(26, 26, 74, 0.6) 25%, rgba(45, 27, 107, 0.5) 50%, rgba(76, 29, 149, 0.4) 75%, rgba(124, 58, 237, 0.3) 100%)'
+              }}
+            ></div>
+            
+            <div className="relative z-10 flex items-center justify-between h-full">
+              <div className="flex-1">
+                <div className="flex items-center gap-8 mb-0">
+                  <div className="flex flex-col items-center gap-1 cursor-pointer transition-all duration-500 hover:drop-shadow-[0_0_20px_rgba(124,58,237,0.5)] hover:scale-105">
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1754416141/CreatorsSpaceWhite_ebiqt3.svg" 
+                      alt="Creators Space" 
+                      className="h-12 md:h-16 w-auto transition-all duration-500"
+                    />
+                    <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full text-xs font-medium transition-all duration-500 hover:bg-blue-500/30 hover:text-blue-200">
+                      BETA
+                    </span>
+                  </div>
+                  <p className="text-white/80 text-sm md:text-base leading-relaxed">
+                    A collaborative space for Sticker Shuttle and amazing creators around the United States.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="ml-8 text-right">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/20 border border-red-400/30">
+                  <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
+                  <span className="text-red-200 font-semibold text-sm">
+                    Active Sale - Up to 30% Off
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <style jsx>{`
         .container-style {
           background: rgba(255, 255, 255, 0.05);
@@ -616,7 +662,7 @@ export default function Marketplace() {
 
 
       {/* Main Content with Sidebar */}
-      <section className="pt-[20px] pb-8">
+      <section className="pb-8">
         <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           {/* Mobile Filter Toggle Button */}
           <div className="lg:hidden mb-6">
@@ -636,9 +682,9 @@ export default function Marketplace() {
                 </svg>
                 <span className="text-white font-semibold">Filters & Categories</span>
                 <div className="flex items-center gap-2">
-                  {(!selectedCategories.includes("all") || showSaleItems || selectedCreatorId) && (
+                  {(!selectedCategories.includes("all") || showSaleItems) && (
                     <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs">
-                      {selectedCategories.filter(cat => cat !== "all").length + (showSaleItems ? 1 : 0) + (selectedCreatorId ? 1 : 0)} active
+                      {selectedCategories.filter(cat => cat !== "all").length + (showSaleItems ? 1 : 0)} active
                     </span>
                   )}
                 </div>
@@ -664,23 +710,6 @@ export default function Marketplace() {
                 boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
                 backdropFilter: 'blur(12px)'
               }}>
-                {/* Creators Space Logo */}
-                <div className="flex flex-col items-center justify-center text-center pb-6 border-b border-white/10">
-                  <div className="flex flex-col items-center gap-2 cursor-pointer transition-all duration-500 hover:drop-shadow-[0_0_20px_rgba(124,58,237,0.5)] hover:scale-105 mb-2">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1754416141/CreatorsSpaceWhite_ebiqt3.svg" 
-                      alt="Creators Space" 
-                      className="h-12 md:h-14 w-auto transition-all duration-500"
-                    />
-                    <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full text-xs font-medium transition-all duration-500 hover:bg-blue-500/30 hover:text-blue-200">
-                      BETA
-                    </span>
-                  </div>
-                  <p className="text-white/70 text-xs leading-relaxed">
-                    A collaborative space for Sticker Shuttle and amazing creators
-                  </p>
-                </div>
-
                 {/* Filter Header */}
                 <div className="flex items-center gap-3 pb-4 border-b border-white/10">
                   {/* Mobile Close Button */}
@@ -704,7 +733,6 @@ export default function Marketplace() {
                         setShowSaleItems(false);
                         setSearchQuery("");
                         setSortBy("newest");
-                        setSelectedCreatorId(null);
                       }}
                       className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
                     >
@@ -865,127 +893,113 @@ export default function Marketplace() {
                   </div>
                 </div>
 
-                {/* Browse by Creator */}
+                {/* Browse by Artist */}
                 <div>
                   <label className="block text-sm font-semibold text-white mb-3">
                     <div className="flex items-center gap-2">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
-                      Browse by Creator
+                      Browse by Artist
                     </div>
                   </label>
                   <div className="space-y-0.5">
-                    {/* Get unique creators from products */}
-                    {(() => {
-                      const uniqueCreators = new Map();
-                      products.forEach(product => {
-                        if (product.creator && !uniqueCreators.has(product.creator.id)) {
-                          uniqueCreators.set(product.creator.id, {
-                            ...product.creator,
-                            productCount: products.filter(p => p.creator?.id === product.creator.id).length
-                          });
-                        }
-                      });
+                    {/* Steve Wolf */}
+                    <button
+                      className="w-full group relative text-left p-3 rounded-xl transition-all duration-200 overflow-hidden hover:bg-white/5"
+                    >
                       
-                      const creatorsArray = Array.from(uniqueCreators.values());
-                      
-                      if (creatorsArray.length === 0) {
-                        return (
-                          <div className="text-white/50 text-xs text-center py-2">
-                            No creators found
+                      {/* Content */}
+                      <div className="relative z-10">
+                        <div className="flex items-center gap-3 mb-1">
+                          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                            SW
                           </div>
-                        );
-                      }
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-sm text-white/80 group-hover:text-white transition-colors">
+                              Steve Wolf
+                            </h3>
+                            <p className="text-xs text-white/50 group-hover:text-white/60 transition-colors">
+                              12 designs • Digital Art
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Sticker Shuttle */}
+                    <button
+                      className="w-full group relative text-left p-3 rounded-xl transition-all duration-200 overflow-hidden hover:bg-white/5"
+                    >
                       
-                      return creatorsArray.map((creator) => {
-                        const initials = creator.creator_name
-                          .split(' ')
-                          .map(word => word[0])
-                          .join('')
-                          .toUpperCase()
-                          .slice(0, 2);
-                        
-                        // Generate a consistent color based on creator name
-                        const colors = [
-                          'from-purple-500 to-pink-500',
-                          'from-blue-500 to-cyan-500',
-                          'from-pink-500 to-rose-500',
-                          'from-green-500 to-emerald-500',
-                          'from-yellow-500 to-orange-500',
-                          'from-indigo-500 to-purple-500'
-                        ];
-                        const colorIndex = creator.creator_name.charCodeAt(0) % colors.length;
-                        const gradientColor = colors[colorIndex];
-                        
-                        const isSelected = selectedCreatorId === creator.id;
-                        
-                        return (
-                          <button
-                            key={creator.id}
-                            onClick={() => {
-                              if (isSelected) {
-                                setSelectedCreatorId(null);
-                              } else {
-                                setSelectedCreatorId(creator.id);
-                              }
-                            }}
-                            className={`w-full group relative text-left p-3 rounded-xl transition-all duration-200 overflow-hidden ${
-                              isSelected 
-                                ? 'bg-blue-600/30 border border-blue-500/50' 
-                                : 'hover:bg-white/5'
-                            }`}
-                          >
-                            <div className="relative z-10">
-                              <div className="flex items-center gap-3 mb-1">
-                                {creator.profile_photo_url || creator.user_profiles?.profile_photo_url ? (
-                                  <div className="w-8 h-8 rounded-full overflow-hidden">
-                                    <img
-                                      src={creator.profile_photo_url || creator.user_profiles.profile_photo_url}
-                                      alt={creator.creator_name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  </div>
-                                ) : (
-                                  <div className={`w-8 h-8 bg-gradient-to-br ${gradientColor} rounded-full flex items-center justify-center text-white text-sm font-bold`}>
-                                    {initials}
-                                  </div>
-                                )}
-                                <div className="flex-1">
-                                  <h3 className={`font-semibold text-sm transition-colors ${
-                                    isSelected 
-                                      ? 'text-blue-300' 
-                                      : 'text-white/80 group-hover:text-white'
-                                  }`}>
-                                    {creator.user_profiles?.first_name && creator.user_profiles?.last_name 
-                                      ? `${creator.user_profiles.first_name} ${creator.user_profiles.last_name}`
-                                      : creator.creator_name
-                                    }
-                                  </h3>
-                                  <p className={`text-xs transition-colors ${
-                                    isSelected 
-                                      ? 'text-blue-400/70' 
-                                      : 'text-white/50 group-hover:text-white/60'
-                                  }`}>
-                                    {creator.productCount} {creator.productCount === 1 ? 'design' : 'designs'}
-                                  </p>
-                                </div>
-                                {isSelected && (
-                                  <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                )}
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      });
-                    })()}
+                      {/* Content */}
+                      <div className="relative z-10">
+                        <div className="flex items-center gap-3 mb-1">
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                            SS
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-sm text-white/80 group-hover:text-white transition-colors">
+                              Sticker Shuttle
+                            </h3>
+                            <p className="text-xs text-white/50 group-hover:text-white/60 transition-colors">
+                              25+ designs • Official Collection
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Maya Rodriguez */}
+                    <button
+                      className="w-full group relative text-left p-3 rounded-xl transition-all duration-200 overflow-hidden hover:bg-white/5"
+                    >
+                      
+                      {/* Content */}
+                      <div className="relative z-10">
+                        <div className="flex items-center gap-3 mb-1">
+                          <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                            MR
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-sm text-white/80 group-hover:text-white transition-colors">
+                              Maya Rodriguez
+                            </h3>
+                            <p className="text-xs text-white/50 group-hover:text-white/60 transition-colors">
+                              8 designs • Illustration
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Alex Chen */}
+                    <button
+                      className="w-full group relative text-left p-3 rounded-xl transition-all duration-200 overflow-hidden hover:bg-white/5"
+                    >
+                      
+                      {/* Content */}
+                      <div className="relative z-10">
+                        <div className="flex items-center gap-3 mb-1">
+                          <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                            AC
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-sm text-white/80 group-hover:text-white transition-colors">
+                              Alex Chen
+                            </h3>
+                            <p className="text-xs text-white/50 group-hover:text-white/60 transition-colors">
+                              15 designs • Typography
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
                   </div>
                 </div>
 
                 {/* Sort - Only show when filtering */}
-                {(!selectedCategories.includes("all") || showSaleItems || searchQuery.trim() || selectedCreatorId) && (
+                {(!selectedCategories.includes("all") || showSaleItems || searchQuery.trim()) && (
                   <div>
                     <label htmlFor="sort" className="block text-sm font-semibold text-white mb-3">
                       <div className="flex items-center gap-2">
@@ -1039,8 +1053,8 @@ export default function Marketplace() {
 
             {/* Main Content - Products */}
             <main className="flex-1 min-w-0 space-y-8">
-              {/* Show promotional sections only when "All Shapes" is selected, no sale filter, no search, and no creator selected */}
-              {selectedCategories.includes("all") && !showSaleItems && !searchQuery.trim() && !selectedCreatorId && (
+              {/* Show promotional sections only when "All Shapes" is selected, no sale filter, and no search */}
+              {selectedCategories.includes("all") && !showSaleItems && !searchQuery.trim() && (
                 <>
                   {/* Featured Sticker Packs */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
@@ -1133,100 +1147,85 @@ export default function Marketplace() {
                       </h2>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4 mb-8">
                         {products
-                          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) // Sort by most recent
+                          .sort(() => 0.5 - Math.random()) // Randomize
                           .slice(0, 6) // Take first 6
                           .map((product) => (
-                            <ProductCard key={`recent-${product.id}`} product={product} />
+                            <ProductCard key={`pick-${product.id}`} product={product} />
                           ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Featured Creators Section */}
+                  {/* Collections Section */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-8">
-                    {(() => {
-                      const uniqueCreators = new Map();
-                      products.forEach(product => {
-                        if (product.creator && !uniqueCreators.has(product.creator.id)) {
-                          uniqueCreators.set(product.creator.id, {
-                            ...product.creator,
-                            productCount: products.filter(p => p.creator?.id === product.creator.id).length
-                          });
-                        }
-                      });
-                      
-                      const creatorsArray = Array.from(uniqueCreators.values()).slice(0, 3);
-                      
-                      return creatorsArray.map((creator) => {
-                        const initials = creator.creator_name
-                          .split(' ')
-                          .map(word => word[0])
-                          .join('')
-                          .toUpperCase()
-                          .slice(0, 2);
-                        
-                        // Generate a consistent color based on creator name
-                        const colors = [
-                          'from-purple-500 to-pink-500',
-                          'from-blue-500 to-cyan-500',
-                          'from-pink-500 to-rose-500',
-                          'from-green-500 to-emerald-500',
-                          'from-yellow-500 to-orange-500',
-                          'from-indigo-500 to-purple-500'
-                        ];
-                        const colorIndex = creator.creator_name.charCodeAt(0) % colors.length;
-                        const gradientColor = colors[colorIndex];
-                        
-                        return (
-                          <div
-                            key={creator.id}
-                            onClick={() => setSelectedCreatorId(creator.id)}
-                            className="rounded-xl p-4 sm:p-6 cursor-pointer transition-all duration-200 hover:scale-105 group h-28 sm:h-32 relative overflow-hidden"
-                            style={{
-                              background: 'rgba(255, 255, 255, 0.05)',
-                              border: '1px solid rgba(255, 255, 255, 0.1)',
-                              boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                              backdropFilter: 'blur(12px)'
-                            }}
-                          >
-                            <div className="relative z-10 h-full flex items-center justify-between">
-                              <div className="flex items-center gap-4">
-                                {creator.profile_photo_url || creator.user_profiles?.profile_photo_url ? (
-                                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full overflow-hidden ring-2 ring-white/20">
-                                    <img
-                                      src={creator.profile_photo_url || creator.user_profiles.profile_photo_url}
-                                      alt={creator.creator_name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  </div>
-                                ) : (
-                                  <div className={`w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br ${gradientColor} rounded-full flex items-center justify-center text-white text-lg font-bold ring-2 ring-white/20`}>
-                                    {initials}
-                                  </div>
-                                )}
-                                <div>
-                                  <h3 className="text-white font-semibold text-base sm:text-lg group-hover:text-blue-300 transition-colors">
-                                    {creator.user_profiles?.first_name && creator.user_profiles?.last_name 
-                                      ? `${creator.user_profiles.first_name} ${creator.user_profiles.last_name}`
-                                      : creator.creator_name
-                                    }
-                                  </h3>
-                                  <p className="text-white/60 text-sm">
-                                    {creator.productCount} {creator.productCount === 1 ? 'design' : 'designs'}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 text-blue-400 group-hover:text-blue-300 transition-colors">
-                                <span className="text-sm font-medium hidden sm:inline">Shop Creator</span>
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
+                {/* For the Holidays */}
+                <div 
+                  className="rounded-xl p-4 sm:p-6 cursor-pointer transition-all duration-200 hover:scale-105 group h-28 sm:h-32 relative overflow-hidden"
+                  style={{
+                    backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749652894/StickerShuttle_Banner_PurpleCustomStickers_zxst8r.webp)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat'
+                  }}
+                >
+                  <div 
+                    className="absolute inset-0 rounded-xl"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(220, 38, 38, 0.7) 0%, rgba(185, 28, 28, 0.5) 100%)'
+                    }}
+                  ></div>
+                  <div className="relative z-10 text-left h-full flex items-center">
+                    <h3 className="text-xl font-bold text-white group-hover:text-red-200 transition-colors">
+                      For the Holidays
+                    </h3>
+                  </div>
+                </div>
+
+                {/* For the Friends */}
+                <div 
+                  className="rounded-xl p-4 sm:p-6 cursor-pointer transition-all duration-200 hover:scale-105 group h-28 sm:h-32 relative overflow-hidden"
+                  style={{
+                    backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749652894/StickerShuttle_Banner_PurpleCustomStickers_zxst8r.webp)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat'
+                  }}
+                >
+                  <div 
+                    className="absolute inset-0 rounded-xl"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.7) 0%, rgba(21, 128, 61, 0.5) 100%)'
+                    }}
+                  ></div>
+                  <div className="relative z-10 text-left h-full flex items-center">
+                    <h3 className="text-xl font-bold text-white group-hover:text-green-200 transition-colors">
+                      For the Friends
+                    </h3>
+                  </div>
+                </div>
+
+                {/* For the Laughs */}
+                <div 
+                  className="rounded-xl p-4 sm:p-6 cursor-pointer transition-all duration-200 hover:scale-105 group h-28 sm:h-32 relative overflow-hidden"
+                  style={{
+                    backgroundImage: 'url(https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749652894/StickerShuttle_Banner_PurpleCustomStickers_zxst8r.webp)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat'
+                  }}
+                >
+                  <div 
+                    className="absolute inset-0 rounded-xl"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.7) 0%, rgba(161, 98, 7, 0.5) 100%)'
+                    }}
+                  ></div>
+                  <div className="relative z-10 text-left h-full flex items-center">
+                    <h3 className="text-xl font-bold text-white group-hover:text-yellow-200 transition-colors">
+                      For the Laughs
+                    </h3>
+                  </div>
+                </div>
                   </div>
                 </>
               )}
@@ -1234,14 +1233,8 @@ export default function Marketplace() {
               {/* Explore Stickers Section - Always show when filtering */}
               <div>
                 <h2 className="text-2xl font-bold text-white mb-6">
-                  {(!selectedCategories.includes("all") || showSaleItems || searchQuery.trim() || selectedCreatorId) ? 
+                  {(!selectedCategories.includes("all") || showSaleItems || searchQuery.trim()) ? 
                     (searchQuery.trim() ? `Search Results for "${searchQuery}"` :
-                     selectedCreatorId ? (() => {
-                       const creator = products.find(p => p.creator?.id === selectedCreatorId)?.creator;
-                       return creator ? `Designs by ${creator.user_profiles?.first_name && creator.user_profiles?.last_name 
-                         ? `${creator.user_profiles.first_name} ${creator.user_profiles.last_name}`
-                         : creator.creator_name}` : "Creator's Designs";
-                     })() :
                      showSaleItems ? "Sale Items" : 
                      selectedCategories.length === 1 ? 
                        categories.find(cat => cat.value === selectedCategories[0])?.label || "Filtered Stickers" :
@@ -1261,7 +1254,6 @@ export default function Marketplace() {
                   setShowSaleItems(false);
                   setSearchQuery("");
                   setSortBy("newest");
-                  setSelectedCreatorId(null);
                 }}
                 className="button-style px-6 py-3 text-white font-medium rounded-lg transition-colors"
               >
@@ -1272,8 +1264,8 @@ export default function Marketplace() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4">
               {products
                 .sort((a, b) => {
-                  // When filtering by category, sale items, searching, or creator, sort by most recent first
-                  if (!selectedCategories.includes("all") || showSaleItems || searchQuery.trim() || selectedCreatorId) {
+                  // When filtering by category, sale items, or searching, sort by most recent first
+                  if (!selectedCategories.includes("all") || showSaleItems || searchQuery.trim()) {
                     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
                   }
                   // Otherwise use the selected sort order
@@ -1294,26 +1286,11 @@ export default function Marketplace() {
       <section className="pb-8">
         <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           <div className="container-style p-8 text-center">
-            <h2 className="text-2xl font-bold text-white mb-4">
-              Looking for Custom Stickers?
-            </h2>
-            <p className="text-gray-300 mb-6 max-w-2xl mx-auto">
-              Don't see what you're looking for? We also offer custom sticker printing 
-              with our advanced calculators for vinyl, holographic, chrome, and more.
-            </p>
+            <h2 className="text-2xl font-bold text-white mb-4">Partner With Us</h2>
+            <p className="text-gray-300 mb-6 max-w-2xl mx-auto">Want your own Creators Space? We charge a flat $2 per sticker to produce and fulfill—no hidden fees. You set the price and keep the rest.</p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                href="/products/vinyl-stickers"
-                className="button-style px-6 py-3 text-white font-medium rounded-lg transition-colors"
-              >
-                Custom Vinyl Stickers
-              </Link>
-              <Link
-                href="/products/holographic-stickers"
-                className="button-style px-6 py-3 text-white font-medium rounded-lg transition-colors"
-              >
-                Custom Holographic Stickers
-              </Link>
+              <Link href="/creators-space-apply" className="button-style px-6 py-3 text-white font-semibold rounded-lg transition-colors">Apply for a Space</Link>
+              <Link href="/products" className="px-6 py-3 text-white font-medium rounded-lg border border-white/20 hover:bg-white/10 transition-colors">Order Custom Stickers</Link>
             </div>
           </div>
         </div>

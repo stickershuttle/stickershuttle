@@ -887,6 +887,10 @@ const typeDefs = gql`
     getAllUsers: [User!]!
     getUserProfile(userId: ID!): UserProfile
     
+    # Creator queries
+    getCreatorByUserId(userId: ID!): Creator
+    getCreatorSalesStats(creatorId: ID!): CreatorSalesStats
+    
     # Admin wholesale queries
     getPendingWholesaleApplications: [UserProfile!]!
     getAllWholesaleCustomers: [UserProfile!]!
@@ -1008,6 +1012,9 @@ const typeDefs = gql`
     
     # Tax exemption mutations
     updateTaxExemption(userId: ID!, input: TaxExemptionInput!): UserProfileResult!
+    
+    # Creator management mutations
+    updateCreatorStatus(userId: ID!, isCreator: Boolean!): CreatorResult!
     
     # Wholesale client management mutations
     createWholesaleClient(input: CreateWholesaleClientInput!): WholesaleClientResult!
@@ -1164,6 +1171,50 @@ const typeDefs = gql`
     success: Boolean!
     message: String
     userProfile: UserProfile
+  }
+
+  # Creator Types
+  type Creator {
+    id: ID!
+    userId: ID!
+    creatorName: String!
+    email: String!
+    isActive: Boolean!
+    totalProducts: Int!
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  type CreatorResult {
+    success: Boolean!
+    message: String
+    creator: Creator
+  }
+
+  type SoldProduct {
+    id: ID!
+    name: String!
+    imageUrl: String
+    totalSold: Int!
+    totalRevenue: Float!
+    price: Float!
+  }
+
+  type RecentSale {
+    id: ID!
+    productName: String!
+    quantity: Int!
+    price: Float!
+    soldAt: String!
+    orderNumber: String!
+  }
+
+  type CreatorSalesStats {
+    totalSales: Int!
+    totalRevenue: Float!
+    totalProducts: Int!
+    soldProducts: [SoldProduct!]!
+    recentSales: [RecentSale!]!
   }
 
   type WholesaleApprovalResult {
@@ -3985,20 +4036,43 @@ const resolvers = {
         console.log('📋 Fetching all users using admin API...');
         const client = supabaseClient.getServiceClient();
         
-        // Use Supabase Admin API to list users
-        const { data: authData, error: authError } = await client.auth.admin.listUsers();
+        // Use Supabase Admin API to list users with pagination to get ALL users
+        let allUsers = [];
+        let page = 1;
+        const perPage = 1000; // Max per page
         
-        if (authError) {
-          console.error('❌ Error fetching auth users:', authError);
-          throw new Error('Failed to fetch users from auth');
+        while (true) {
+          const { data: authData, error: authError } = await client.auth.admin.listUsers({
+            page: page,
+            perPage: perPage
+          });
+          
+          if (authError) {
+            console.error('❌ Error fetching auth users:', authError);
+            throw new Error('Failed to fetch users from auth');
+          }
+          
+          if (!authData.users || authData.users.length === 0) {
+            break; // No more users
+          }
+          
+          allUsers = allUsers.concat(authData.users);
+          
+          // If we got less than perPage, we've reached the end
+          if (authData.users.length < perPage) {
+            break;
+          }
+          
+          page++;
         }
+        
+        console.log(`📊 Total users found across all pages: ${allUsers.length}`);
+        const authUsers = allUsers;
 
-        const authUsers = authData.users || [];
-
-        // Get user profiles for additional info
+        // Get user profiles for additional info including wholesale status
         const { data: profiles, error: profileError } = await client
           .from('user_profiles')
-          .select('user_id, first_name, last_name, company_name');
+          .select('user_id, first_name, last_name, company_name, is_wholesale_customer, wholesale_status');
         
         if (profileError) {
           console.warn('⚠️ Error fetching user profiles:', profileError);
@@ -4028,7 +4102,7 @@ const resolvers = {
           };
         });
 
-        console.log(`✅ Successfully fetched ${formattedUsers.length} users`);
+        console.log(`✅ Successfully fetched ${formattedUsers.length} users (including wholesale customers)`);
         console.log('📊 Sample formatted users:', formattedUsers.slice(0, 3).map(u => ({
           id: u.id,
           email: u.email,
@@ -4102,6 +4176,91 @@ const resolvers = {
         };
       } catch (error) {
         console.error('❌ Error in getUserProfile:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    // Creator queries
+    getCreatorByUserId: async (_, { userId }) => {
+      try {
+        console.log('🎨 Fetching creator for user:', userId);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Creator service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Fetch creator data
+        const { data: creator, error } = await client
+          .from('creators')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .single();
+
+        if (error) {
+          if (error.code === 'PGRST116') {
+            // No creator found - user is not a creator
+            console.log('⚠️ No creator found for user:', userId);
+            return null;
+          }
+          throw new Error(`Failed to fetch creator: ${error.message}`);
+        }
+
+        console.log('✅ Creator found:', creator.creator_name);
+        
+        return {
+          id: creator.id,
+          userId: creator.user_id,
+          creatorName: creator.creator_name,
+          email: creator.email,
+          isActive: creator.is_active,
+          totalProducts: creator.total_products || 0,
+          createdAt: creator.created_at,
+          updatedAt: creator.updated_at
+        };
+      } catch (error) {
+        console.error('❌ Error in getCreatorByUserId:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    getCreatorSalesStats: async (_, { creatorId }) => {
+      try {
+        console.log('📊 Fetching creator sales stats for:', creatorId);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Creator service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get creator's products
+        const { data: products, error: productsError } = await client
+          .from('marketplace_products')
+          .select('*')
+          .eq('creator_id', creatorId)
+          .eq('is_active', true);
+
+        if (productsError) {
+          throw new Error(`Failed to fetch creator products: ${productsError.message}`);
+        }
+
+        // For now, return mock data since we need to implement order tracking for marketplace products
+        // This will be implemented when marketplace orders are tracked
+        const mockStats = {
+          totalSales: 0,
+          totalRevenue: 0.0,
+          totalProducts: products ? products.length : 0,
+          soldProducts: [],
+          recentSales: []
+        };
+
+        console.log('✅ Creator stats fetched');
+        return mockStats;
+      } catch (error) {
+        console.error('❌ Error in getCreatorSalesStats:', error);
         throw new Error(error.message);
       }
     },
@@ -9257,6 +9416,122 @@ const resolvers = {
           success: false,
           message: error.message,
           userProfile: null
+        };
+      }
+    },
+
+    // Creator management mutations
+    updateCreatorStatus: async (_, { userId, isCreator }) => {
+      try {
+        console.log('🎨 Updating creator status:', { userId, isCreator });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Creator service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        if (isCreator) {
+          // Get user's email and name for creator record
+          const { data: authUser, error: authError } = await client.auth.admin.getUserById(userId);
+          
+          if (authError) {
+            throw new Error(`Failed to fetch user data: ${authError.message}`);
+          }
+
+          // Get user profile for additional info
+          const { data: profile, error: profileError } = await client
+            .from('user_profiles')
+            .select('first_name, last_name')
+            .eq('user_id', userId)
+            .single();
+
+          const firstName = profile?.first_name || authUser.user?.user_metadata?.first_name || '';
+          const lastName = profile?.last_name || authUser.user?.user_metadata?.last_name || '';
+          const creatorName = `${firstName} ${lastName}`.trim() || authUser.user?.email?.split('@')[0] || 'Creator';
+
+          // Create or reactivate creator
+          const { data: creator, error: upsertError } = await client
+            .from('creators')
+            .upsert({
+              user_id: userId,
+              creator_name: creatorName,
+              email: authUser.user?.email,
+              is_active: true,
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'user_id'
+            })
+            .select('*')
+            .single();
+
+          if (upsertError) {
+            throw new Error(`Failed to create/update creator: ${upsertError.message}`);
+          }
+
+          console.log('✅ Creator created/activated successfully');
+          
+          return {
+            success: true,
+            message: 'Creator status updated successfully',
+            creator: {
+              id: creator.id,
+              userId: creator.user_id,
+              creatorName: creator.creator_name,
+              email: creator.email,
+              isActive: creator.is_active,
+              totalProducts: creator.total_products || 0,
+              createdAt: creator.created_at,
+              updatedAt: creator.updated_at
+            }
+          };
+        } else {
+          // Deactivate creator
+          const { data: creator, error: updateError } = await client
+            .from('creators')
+            .update({
+              is_active: false,
+              updated_at: new Date().toISOString()
+            })
+            .eq('user_id', userId)
+            .select('*')
+            .single();
+
+          if (updateError) {
+            if (updateError.code === 'PGRST116') {
+              // No creator found - that's fine, user wasn't a creator anyway
+              return {
+                success: true,
+                message: 'User was not a creator',
+                creator: null
+              };
+            }
+            throw new Error(`Failed to deactivate creator: ${updateError.message}`);
+          }
+
+          console.log('✅ Creator deactivated successfully');
+          
+          return {
+            success: true,
+            message: 'Creator status updated successfully',
+            creator: {
+              id: creator.id,
+              userId: creator.user_id,
+              creatorName: creator.creator_name,
+              email: creator.email,
+              isActive: creator.is_active,
+              totalProducts: creator.total_products || 0,
+              createdAt: creator.created_at,
+              updatedAt: creator.updated_at
+            }
+          };
+        }
+      } catch (error) {
+        console.error('❌ Error in updateCreatorStatus:', error);
+        return {
+          success: false,
+          message: error.message,
+          creator: null
         };
       }
     },

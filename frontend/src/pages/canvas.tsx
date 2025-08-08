@@ -386,6 +386,26 @@ export default function CanvasPage() {
     };
   }, []);
 
+  // Listen for profile updates to sync profile photos
+  useEffect(() => {
+    const handleProfileUpdate = (event: any) => {
+      const { profile_photo_url } = event.detail;
+      
+      if (profile_photo_url) {
+        setProfile(prevProfile => ({
+          ...prevProfile,
+          profile_photo_url: profile_photo_url
+        }));
+      }
+    };
+
+    window.addEventListener('profileUpdated', handleProfileUpdate);
+    
+    return () => {
+      window.removeEventListener('profileUpdated', handleProfileUpdate);
+    };
+  }, []);
+
   // Refetch credit balance when user changes
   useEffect(() => {
     if (user?.id && refetchCreditBalance) {

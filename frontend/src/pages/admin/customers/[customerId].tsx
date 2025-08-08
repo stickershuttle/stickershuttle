@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import AdminLayout from '@/components/AdminLayout';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { getSupabase } from '../../../lib/supabase';
-import { GET_USER_PROFILE, UPDATE_TAX_EXEMPTION, UPDATE_WHOLESALE_STATUS } from '../../../lib/profile-mutations';
+import { GET_USER_PROFILE, UPDATE_TAX_EXEMPTION, UPDATE_WHOLESALE_STATUS, UPDATE_CREATOR_STATUS, GET_CREATOR_BY_USER_ID } from '../../../lib/profile-mutations';
 import { ADD_USER_CREDITS, GET_USER_CREDIT_BALANCE, GET_USER_CREDIT_HISTORY } from '../../../lib/credit-mutations';
 
 // Import GET_ALL_CUSTOMERS query
@@ -146,6 +146,7 @@ export default function CustomerDetail() {
   const [customerUserId, setCustomerUserId] = useState<string | null>(null);
   const [taxExemptLoading, setTaxExemptLoading] = useState(false);
   const [wholesaleLoading, setWholesaleLoading] = useState(false);
+  const [creatorLoading, setCreatorLoading] = useState(false);
   
   // Credit management states
   const [showAddCreditModal, setShowAddCreditModal] = useState(false);
@@ -180,6 +181,12 @@ export default function CustomerDetail() {
     skip: !customerUserId
   });
 
+  // Get creator data if user is a creator
+  const { data: creatorData, refetch: refetchCreatorData, loading: creatorDataLoading } = useQuery(GET_CREATOR_BY_USER_ID, {
+    variables: { userId: customerUserId },
+    skip: !customerUserId
+  });
+
 
 
   // Update tax exemption mutation
@@ -190,6 +197,9 @@ export default function CustomerDetail() {
   
   // Add user credits mutation
   const [addUserCredits] = useMutation(ADD_USER_CREDITS);
+
+  // Update creator status mutation
+  const [updateCreatorStatus] = useMutation(UPDATE_CREATOR_STATUS);
 
   // Check if user is admin
   useEffect(() => {
@@ -514,6 +524,32 @@ export default function CustomerDetail() {
     setCreditReason('');
   };
 
+  // Handle creator status toggle
+  const handleCreatorStatusToggle = async (isCreator: boolean) => {
+    if (!customerUserId) return;
+
+    setCreatorLoading(true);
+    try {
+      const { data } = await updateCreatorStatus({
+        variables: {
+          userId: customerUserId,
+          isCreator: isCreator
+        }
+      });
+
+      if (data?.updateCreatorStatus?.success) {
+        await refetchCreatorData();
+        console.log('✅ Creator status updated successfully');
+      } else {
+        console.error('❌ Failed to update creator status:', data?.updateCreatorStatus?.message);
+      }
+    } catch (error) {
+      console.error('❌ Error updating creator status:', error);
+    } finally {
+      setCreatorLoading(false);
+    }
+  };
+
   if (loading || !isAdmin) {
     return (
       <AdminLayout>
@@ -771,6 +807,77 @@ export default function CustomerDetail() {
                       </svg>
                       <span className="text-sm text-yellow-300">
                         No user profile found - customer may be guest-only
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Creator Status Toggle */}
+            {customerUserId && (
+              <div className="glass-container p-4 xl:p-6 mb-6 xl:mb-8">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-500/20">
+                      <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-base font-medium text-white">Creator Status</h3>
+                      <p className="text-sm text-gray-400">Creators can sell products in the marketplace and earn revenue</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {(creatorLoading || creatorDataLoading) && (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-400"></div>
+                    )}
+                    {!creatorDataLoading && (
+                      <>
+                        <button
+                          onClick={() => handleCreatorStatusToggle(!creatorData?.getCreatorByUserId?.isActive)}
+                          disabled={creatorLoading || creatorDataLoading}
+                          aria-label={`Toggle creator status ${creatorData?.getCreatorByUserId?.isActive ? 'off' : 'on'}`}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 ${
+                            creatorData?.getCreatorByUserId?.isActive 
+                              ? 'bg-purple-600' 
+                              : 'bg-gray-600'
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              creatorData?.getCreatorByUserId?.isActive ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                        <span className="text-sm text-gray-300">
+                          {creatorData?.getCreatorByUserId?.isActive ? 'Creator' : 'Regular User'}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {creatorData?.getCreatorByUserId?.isActive && (
+                  <div className="mt-4 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                      <span className="text-sm text-purple-300">
+                        This user is a creator with {creatorData?.getCreatorByUserId?.totalProducts || 0} products in the marketplace
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {!creatorDataLoading && !creatorData?.getCreatorByUserId && (
+                  <div className="mt-4 p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      <span className="text-sm text-gray-300">
+                        Regular user - not a creator
                       </span>
                     </div>
                   </div>

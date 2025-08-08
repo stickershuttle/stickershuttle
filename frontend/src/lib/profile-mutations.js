@@ -206,4 +206,67 @@ export const UPDATE_TAX_EXEMPTION = gql`
       }
     }
   }
+`;
+
+// Update creator status
+export const UPDATE_CREATOR_STATUS = gql`
+  mutation UpdateCreatorStatus($userId: ID!, $isCreator: Boolean!) {
+    updateCreatorStatus(userId: $userId, isCreator: $isCreator) {
+      success
+      message
+      creator {
+        id
+        userId
+        creatorName
+        email
+        isActive
+        totalProducts
+        createdAt
+        updatedAt
+      }
+    }
+  }
+`;
+
+// Get creator by user ID
+export const GET_CREATOR_BY_USER_ID = gql`
+  query GetCreatorByUserId($userId: ID!) {
+    getCreatorByUserId(userId: $userId) {
+      id
+      userId
+      creatorName
+      email
+      isActive
+      totalProducts
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+// Get creator sales statistics
+export const GET_CREATOR_SALES_STATS = gql`
+  query GetCreatorSalesStats($creatorId: ID!) {
+    getCreatorSalesStats(creatorId: $creatorId) {
+      totalSales
+      totalRevenue
+      totalProducts
+      soldProducts {
+        id
+        name
+        imageUrl
+        totalSold
+        totalRevenue
+        price
+      }
+      recentSales {
+        id
+        productName
+        quantity
+        price
+        soldAt
+        orderNumber
+      }
+    }
+  }
 `; 

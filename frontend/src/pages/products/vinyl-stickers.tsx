@@ -1,5 +1,6 @@
 import Layout from "@/components/Layout";
 import StickerCalculator from "@/components/vinyl-sticker-calculator";
+import { useRouter } from "next/router";
 import FloatingChatWidget from "@/components/FloatingChatWidget";
 import { useState, useEffect } from "react";
 import { loadRealPricingData, BasePriceRow, QuantityDiscountRow } from "@/utils/real-pricing";
@@ -8,6 +9,8 @@ import { getSupabase } from "@/lib/supabase";
 import Head from "next/head";
 
 export default function VinylStickers() {
+  const router = useRouter();
+  const preloadImage = typeof window !== 'undefined' ? (router.query.preloadImage as string | undefined) : undefined;
   const [realPricingData, setRealPricingData] = useState<{
     basePricing: BasePriceRow[];
     quantityDiscounts: QuantityDiscountRow[];
@@ -359,6 +362,7 @@ export default function VinylStickers() {
             <StickerCalculator 
               initialBasePricing={basePricing} 
               realPricingData={realPricingData}
+              preloadImageUrl={preloadImage}
             />
           ) : (
             <div className="flex flex-col items-center justify-center py-20">

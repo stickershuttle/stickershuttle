@@ -685,7 +685,7 @@ export default function UniversalHeader() {
                       </div>
                     </Link>
 
-                    {/* Marketplace - Only show for authorized users */}
+                    {/* Creators Space - Only show for authorized users */}
                     {user && user.email === 'justin@stickershuttle.com' && (
                       <Link 
                         href="/marketplace" 
@@ -697,21 +697,18 @@ export default function UniversalHeader() {
                         style={{ textDecoration: 'none' }}
                       >
                         <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
-                          <svg 
-                            className="w-6 h-6" 
-                            fill="none" 
-                            viewBox="0 0 24 24" 
-                            stroke="currentColor"
+                          <img 
+                            src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1754405671/WhiteRocket_s2nw4c.svg" 
+                            alt="Rocket" 
+                            className="w-6 h-6 object-contain"
                             style={{
                               filter: 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.4))',
                               color: 'rgb(16, 185, 129)'
                             }}
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                          </svg>
+                          />
                         </div>
                         <div className="flex-1">
-                          <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Marketplace</p>
+                          <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Creators Space</p>
                           <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(16, 185, 129)' }}>Ready-to-Ship Stickers</p>
                         </div>
                       </Link>
@@ -771,16 +768,13 @@ export default function UniversalHeader() {
                       backdropFilter: 'blur(12px)'
                     }}
                   >
-                    <svg 
-                      className="w-5 h-5" 
-                      fill="none" 
-                      viewBox="0 0 24 24" 
-                      stroke="currentColor"
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1754405671/WhiteRocket_s2nw4c.svg" 
+                      alt="Rocket" 
+                      className="w-5 h-5 object-contain"
                       style={{ color: 'rgb(16, 185, 129)' }}
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
-                    Marketplace
+                    />
+                    Creators Space
                   </Link>
                 )}
               </>

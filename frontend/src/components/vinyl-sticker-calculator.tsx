@@ -27,9 +27,10 @@ interface StickerCalculatorProps {
     basePricing: BasePriceRow[];
     quantityDiscounts: QuantityDiscountRow[];
   } | null
+  preloadImageUrl?: string | undefined
 }
 
-export default function StickerCalculator({ initialBasePricing, realPricingData }: StickerCalculatorProps) {
+export default function StickerCalculator({ initialBasePricing, realPricingData, preloadImageUrl }: StickerCalculatorProps) {
   const { addToCart, isRushOrder, updateAllItemsRushOrder } = useCart();
   const router = useRouter();
   const [basePricing, setBasePricing] = useState<BasePricing[]>(initialBasePricing)
@@ -95,6 +96,39 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
     document.addEventListener('click', handleClickOutside)
     return () => document.removeEventListener('click', handleClickOutside)
   }, [showInfoTooltip])
+
+  // Preload image from URL (e.g., from marketplace product)
+  useEffect(() => {
+    if (!preloadImageUrl) return;
+    // If already uploaded, do nothing
+    if (uploadedFile) return;
+    try {
+      const url = decodeURIComponent(preloadImageUrl);
+      if (!url || !/^https?:\/\//i.test(url)) return;
+      const mockUpload: CloudinaryUploadResult = {
+        secure_url: url,
+        public_id: `preload-${Date.now()}`,
+        original_filename: 'marketplace-design',
+        width: 800,
+        height: 600,
+        format: (url.split('.').pop() || 'png').split('?')[0],
+        bytes: 0
+      };
+      setUploadedFile(mockUpload);
+      setUploadLater(false);
+      // If URL includes #upload, scroll to upload section smoothly on mount
+      if (typeof window !== 'undefined' && window.location.hash === '#upload') {
+        setTimeout(() => {
+          const el = document.getElementById('upload');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 50);
+      }
+    } catch (e) {
+      console.warn('Failed to preload image from URL:', e);
+    }
+  }, [preloadImageUrl]);
 
   // Fetch user and profile data
   useEffect(() => {
@@ -1436,7 +1470,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData 
           {/* Bottom Section */}
           <div className="mb-4 lg:mb-6">
             {/* Single Wide Container for Artwork Upload, Additional Instructions, and Proof Options */}
-            <div className="container-style p-4 lg:p-6 transition-colors duration-200">
+              <div id="upload" className="container-style p-4 lg:p-6 transition-colors duration-200">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Left Column - Artwork Upload & Additional Instructions */}
                 <div>

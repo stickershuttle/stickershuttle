@@ -8,7 +8,7 @@ import { useLazyQuery, useMutation, useQuery, useApolloClient } from '@apollo/cl
 import { GET_ORDER_BY_ID } from '../../lib/order-mutations';
 
 import { SYNC_CUSTOMER_TO_KLAVIYO } from '../../lib/klaviyo-mutations';
-import { UPDATE_USER_PROFILE_PHOTO, UPDATE_USER_PROFILE_BANNER, GET_USER_PROFILE } from '../../lib/profile-mutations';
+import { UPDATE_USER_PROFILE_PHOTO, UPDATE_USER_PROFILE_BANNER, GET_USER_PROFILE, GET_CREATOR_BY_USER_ID } from '../../lib/profile-mutations';
 import { GET_WHOLESALE_CLIENTS, GET_CLIENT_ORDERS, CREATE_WHOLESALE_CLIENT, UPDATE_WHOLESALE_CLIENT, DELETE_WHOLESALE_CLIENT, ASSIGN_ORDER_TO_CLIENT, UNASSIGN_ORDER_FROM_CLIENT } from '../../lib/wholesale-client-mutations';
 import { GET_USER_CREDIT_BALANCE, GET_UNREAD_CREDIT_NOTIFICATIONS, MARK_CREDIT_NOTIFICATIONS_READ } from '../../lib/credit-mutations';
 import ErrorBoundary from '../../components/ErrorBoundary';
@@ -35,6 +35,7 @@ import SettingsView from '../../components/dashboard/tabs/SettingsView';
 import SupportView from '../../components/dashboard/tabs/SupportView';
 import OrderDetailsView from '../../components/dashboard/tabs/OrderDetailsView';
 import OrderDetailsPopupView from '../../components/dashboard/tabs/OrderDetailsPopupView';
+import CreatorView from '../../components/dashboard/tabs/CreatorView';
 import ProofReviewInterface from '../../components/dashboard/ProofReviewInterface';
 
 // Mutation to update proof status
@@ -78,7 +79,7 @@ const UPDATE_PROOF_FILE_BY_CUSTOMER = gql`
 import useInvoiceGenerator, { InvoiceData } from '../../components/InvoiceGenerator';
 import gql from 'graphql-tag';
 
-type DashboardView = 'default' | 'all-orders' | 'financial' | 'items-analysis' | 'design-vault' | 'clients' | 'proofs' | 'order-details' | 'order-details-popup' | 'settings' | 'support';
+type DashboardView = 'default' | 'all-orders' | 'financial' | 'items-analysis' | 'design-vault' | 'clients' | 'proofs' | 'creator' | 'order-details' | 'order-details-popup' | 'settings' | 'support';
 
 function Dashboard() {
   const router = useRouter();
@@ -370,6 +371,14 @@ function Dashboard() {
         }
       }
     }
+  });
+
+  // Get creator data to check if user is a creator
+  const { data: creatorData, loading: creatorLoading, error: creatorError } = useQuery(GET_CREATOR_BY_USER_ID, {
+    variables: { userId: (user as any)?.id },
+    skip: !(user as any)?.id,
+    fetchPolicy: 'cache-and-network',
+    errorPolicy: 'all'
   });
 
   // State management
@@ -1120,7 +1129,7 @@ function Dashboard() {
       const orderNumber = router.query.orderNumber as string;
       
       if (requestedView) {
-        const validViews: DashboardView[] = ['default', 'all-orders', 'financial', 'items-analysis', 'design-vault', 'clients', 'proofs', 'order-details', 'order-details-popup', 'settings', 'support'];
+        const validViews: DashboardView[] = ['default', 'all-orders', 'financial', 'items-analysis', 'design-vault', 'clients', 'proofs', 'creator', 'order-details', 'order-details-popup', 'settings', 'support'];
         
         if (validViews.includes(requestedView as DashboardView)) {
           // Only update if the view is actually different
@@ -1695,10 +1704,110 @@ function Dashboard() {
   };
 
   const handleProfilePictureClick = (e?: React.MouseEvent) => {
-    if (e) e.preventDefault();
-    const fileInput = document.getElementById('profile-photo-input') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.click();
+    if (e) {
+      e.stopPropagation(); // Prevent click from bubbling to banner
+    }
+    if (uploadingProfilePhoto) return;
+    
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        handleProfilePhotoUpload(file);
+      }
+    };
+    input.click();
+  };
+
+  const handleProfilePhotoUpload = async (file: File) => {
+    if (!user) return;
+    
+    // Rate limiting: Prevent actions within 1 second of last action
+    const now = Date.now();
+    if (now - lastProfileActionTime.current < 1000) {
+      console.log('Rate limiting: Too soon since last action, skipping...');
+      alert('⏰ Please wait a moment between profile updates.');
+      return;
+    }
+    
+    try {
+      setUploadingProfilePhoto(true);
+      lastProfileActionTime.current = now;
+      
+      // Validate file
+      const { validateFile } = await import('../../utils/cloudinary');
+      const validation = validateFile(file);
+      if (!validation.valid) {
+        alert(validation.error);
+        return;
+      }
+
+      // Upload to Cloudinary
+      const { uploadToCloudinary } = await import('../../utils/cloudinary');
+      const result = await uploadToCloudinary(file, undefined, undefined, 'profile-photos');
+
+      // Update profile using GraphQL mutation
+      const { data, errors } = await client.mutate({
+        mutation: UPDATE_USER_PROFILE_PHOTO,
+        variables: {
+          userId: (user as any).id,
+          photoUrl: result.secure_url,
+          photoPublicId: result.public_id
+        }
+      });
+
+      if (errors || !data?.updateUserProfilePhoto?.success) {
+        console.error('GraphQL error updating profile photo:', errors);
+        const errorMessage = errors?.[0]?.message || data?.updateUserProfilePhoto?.message || 'Failed to update profile photo';
+        
+        if (errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('Too many requests')) {
+          alert('🚫 Rate limit reached! Please wait 1-2 minutes before trying again. Our servers need a brief cooldown to prevent overload.');
+        } else {
+          alert(errorMessage);
+        }
+        return;
+      }
+
+      // Update local profile state and cache
+      setProfile((prev: any) => ({
+        ...prev,
+        profile_photo_url: result.secure_url,
+        profile_photo_public_id: result.public_id
+      }));
+      
+      // Update cached photo
+      setCachedProfilePhoto(result.secure_url);
+      localStorage.setItem('userProfilePhoto', result.secure_url);
+
+      // Broadcast profile update to other components (like UniversalHeader)
+      console.log('📡 Dashboard broadcasting profile update:', {
+        profile_photo_url: result.secure_url,
+        profile_photo_public_id: result.public_id
+      });
+      window.dispatchEvent(new CustomEvent('profileUpdated', {
+        detail: {
+          profile_photo_url: result.secure_url,
+          profile_photo_public_id: result.public_id
+        }
+      }));
+
+      console.log('✅ Profile photo updated successfully');
+      
+    } catch (error) {
+      console.error('Error uploading profile photo:', error);
+      const errorMessage = (error as any)?.message || 'Failed to upload profile photo';
+      
+      if (errorMessage.includes('429') || errorMessage.includes('rate limit') || errorMessage.includes('Too many requests')) {
+        alert('🚫 Rate limit reached! Please wait 1-2 minutes before trying again. Our servers need a brief cooldown to prevent overload.');
+      } else if ((error as any)?.networkError?.statusCode === 429) {
+        alert('🚫 Rate limit reached! Please wait 1-2 minutes before trying again. Our servers need a brief cooldown to prevent overload.');
+      } else {
+        alert('Failed to upload profile photo. Please try again in a moment.');
+      }
+    } finally {
+      setUploadingProfilePhoto(false);
     }
   };
 
@@ -2308,6 +2417,14 @@ function Dashboard() {
             getProductImage={getProductImage}
             user={user}
             profile={profile}
+          />
+        );
+      case 'creator':
+        return (
+          <CreatorView
+            user={user}
+            profile={profile}
+            setCurrentView={setCurrentViewString}
           />
         );
       case 'settings':
@@ -3106,6 +3223,40 @@ function Dashboard() {
                       </div>
                     </button>
                   )}
+
+                  {/* Creator - Only show if user is a creator */}
+                  {creatorData?.getCreatorByUserId?.isActive && (
+                    <button 
+                      onClick={() => updateCurrentView('creator')}
+                      className={`block p-3 lg:p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden rounded-2xl ${
+                        currentView === 'creator' ? '' : ''
+                      }`}
+                      style={currentView === 'creator' ? {
+                        background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.4) 0%, rgba(168, 85, 247, 0.25) 50%, rgba(168, 85, 247, 0.1) 100%)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: '1px solid rgba(168, 85, 247, 0.4)',
+                        boxShadow: '0 4px 16px rgba(168, 85, 247, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                      } : {
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
+                      }}
+                    >
+                      <div className="flex items-center gap-2 lg:gap-3">
+                        <div className="p-1.5 lg:p-2 rounded-lg bg-transparent">
+                          <svg className="w-5 lg:w-7 h-5 lg:h-7" fill="currentColor" viewBox="0 0 24 24"
+                               style={{ color: '#a855f7', filter: 'drop-shadow(0 4px 12px rgba(168, 85, 247, 0.15))' }}>
+                            <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-semibold text-white text-xs lg:text-sm truncate">Creator</h4>
+                          <p className="text-xs text-gray-300">{creatorData?.getCreatorByUserId?.totalProducts || 0} products</p>
+                        </div>
+                      </div>
+                    </button>
+                  )}
                 </div>
 
                 {/* Secondary Actions - Hidden on mobile, shown at bottom */}
@@ -3438,6 +3589,10 @@ function Dashboard() {
               </span>
             )}
           </button>
+
+
+
+
 
           <button
             onClick={() => {
