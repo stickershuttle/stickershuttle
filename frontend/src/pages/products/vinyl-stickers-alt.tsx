@@ -1,5 +1,5 @@
 import Layout from "@/components/Layout";
-import StickerCalculator from "@/components/vinyl-sticker-calculator-alt";
+import StickerCalculator from "@/components/vinyl-sticker-calculator";
 import FloatingChatWidget from "@/components/FloatingChatWidget";
 import { useState, useEffect } from "react";
 import { loadRealPricingData, BasePriceRow, QuantityDiscountRow } from "@/utils/real-pricing";
