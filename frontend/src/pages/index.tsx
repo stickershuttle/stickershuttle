@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Layout from "../components/Layout";
@@ -8,14 +8,10 @@ import { useRouter } from "next/router";
 import { getSupabase } from "../lib/supabase";
 
 export default function Home() {
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [hasStarted, setHasStarted] = useState<boolean>(false);
-  const [posterImage] = useState<string>("https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601387/d2b7fa8c-41a7-421a-9fde-3d7cf2b0a3a3.png");
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -47,26 +43,7 @@ export default function Home() {
     }
   };
 
-  const toggleVideo = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-        setIsPlaying(false);
-      } else {
-        if (!hasStarted) {
-          setHasStarted(true);
-          // Reset to beginning when first playing
-          videoRef.current.currentTime = 0;
-        }
-        videoRef.current.play();
-        setIsPlaying(true);
-      }
-    }
-  };
-
-  const handleVideoEnded = () => {
-    setIsPlaying(false);
-  };
+  
 
   // Enhanced structured data for homepage
   const structuredData = {
@@ -688,90 +665,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Video Section */}
-        <section className="py-4 md:hidden">
-          <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
-            <div className="flex flex-col space-y-6 lg:grid lg:grid-cols-2 lg:gap-8 lg:space-y-0 lg:items-stretch">
-              {/* Video */}
-              <div className="relative rounded-xl overflow-hidden cursor-pointer" onClick={toggleVideo}>
-                <video 
-                  ref={videoRef}
-                  className="w-full rounded-xl"
-                  style={{ 
-                    height: '400px',
-                    width: '100%',
-                    objectFit: 'cover'
-                  }}
-                  onEnded={handleVideoEnded}
-                  playsInline
-                  preload="metadata"
-                  poster="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601387/d2b7fa8c-41a7-421a-9fde-3d7cf2b0a3a3.png"
-                  controls={hasStarted}
-                >
-                  <source src="https://stickershuttle.com/cdn/shop/videos/c/vp/8f87f3238509493faba9ce1552b073de/8f87f3238509493faba9ce1552b073de.HD-1080p-7.2Mbps-38779776.mp4?v=0" type="video/mp4" />
-                  Your browser does not support the video tag.
-                </video>
-                
-                {/* Custom Play Button Overlay - Only show when video hasn't started */}
-                {!hasStarted && (
-                  <div className="absolute inset-0 flex items-center justify-center rounded-xl">
-                    <div className="w-20 h-20 bg-white bg-opacity-90 rounded-full flex items-center justify-center hover:bg-opacity-100 transition-all duration-200 transform hover:scale-105 shadow-lg">
-                      <div className="w-0 h-0 border-l-[16px] border-l-black border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Content Container - Hidden on tablet/mobile */}
-              <div 
-                className="hidden md:flex rounded-2xl p-6 md:p-8 flex-col justify-center"
-                style={{ 
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(12px)',
-                  minHeight: '400px',
-                  height: '100%'
-                }}
-              >
-                <div className="flex items-center mb-6">
-                  <div 
-                    className="text-4xl mr-4"
-                  >
-                    📦
-                  </div>
-                  <h2 className="text-3xl font-bold text-white">Free shipping, always.</h2>
-                </div>
-                
-                <div className="space-y-4 mb-8 flex-grow">
-                  <p className="text-gray-300 leading-relaxed">
-                    At Sticker Shuttle, we get what it&apos;s like to run a small business. That&apos;s why we&apos;re passionate about helping other small businesses with high-quality custom stickers and banners that launch your brand and connect with customers—all without breaking the bank.
-                  </p>
-                  
-                  <p className="text-gray-300 leading-relaxed">
-                    When you work with us, you&apos;re supporting a local business that&apos;s all about community, creativity, and craftsmanship. Let&apos;s stick together and grow together!
-                  </p>
-                </div>
-
-                <Link href="/products">
-                  <button 
-                    className="px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-105 rounded-lg mt-auto"
-                    style={{
-                      backgroundColor: '#ffd713',
-                      color: '#030140',
-                      boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)',
-                      border: 'solid',
-                      borderWidth: '0.03125rem',
-                      borderColor: '#8d9912'
-                    }}
-                  >
-                    Order your stickers today →
-                  </button>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </section>
+        
 
         {/* Testimonials Section */}
         <section className="pt-0 pb-8 md:py-8">

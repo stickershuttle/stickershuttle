@@ -696,21 +696,11 @@ export default function UniversalHeader() {
                         }}
                         style={{ textDecoration: 'none' }}
                       >
-                        <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
-                          <img 
-                            src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1754405671/WhiteRocket_s2nw4c.svg" 
-                            alt="Rocket" 
-                            className="w-6 h-6 object-contain"
-                            style={{
-                              filter: 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.4))',
-                              color: 'rgb(16, 185, 129)'
-                            }}
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Creators Space</p>
-                          <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(16, 185, 129)' }}>Ready-to-Ship Stickers</p>
-                        </div>
+                        <img 
+                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1754416141/CreatorsSpaceWhite_ebiqt3.svg" 
+                          alt="Creators Space" 
+                          className="h-8 w-auto object-contain"
+                        />
                       </Link>
                     )}
                   </div>
@@ -760,21 +750,14 @@ export default function UniversalHeader() {
                 {user && user.email === 'justin@stickershuttle.com' && (
                   <Link 
                     href="/marketplace"
-                    className={`px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2${router.pathname === '/marketplace' || router.asPath === '/marketplace' ? ' active' : ''}`}
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                      backdropFilter: 'blur(12px)'
-                    }}
+                    className={`rounded-lg transition-all duration-200 transform hover:scale-105 flex items-center${router.pathname === '/marketplace' || router.asPath === '/marketplace' ? ' active' : ''}`}
+                    aria-label="Creators Space"
                   >
                     <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1754405671/WhiteRocket_s2nw4c.svg" 
-                      alt="Rocket" 
-                      className="w-5 h-5 object-contain"
-                      style={{ color: 'rgb(16, 185, 129)' }}
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1754416141/CreatorsSpaceWhite_ebiqt3.svg" 
+                      alt="Creators Space" 
+                      className="h-8 w-auto object-contain"
                     />
-                    Creators Space
                   </Link>
                 )}
               </>

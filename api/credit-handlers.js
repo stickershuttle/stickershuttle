@@ -6,6 +6,29 @@ const initializeWithSupabase = (supabaseClient) => {
   supabase = supabaseClient;
 };
 
+// Small utility to retry transient Supabase network failures (e.g., EAI_AGAIN)
+const withTransientRetry = async (fn, retries = 2) => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const cause = err?.cause || err;
+      const isTransient =
+        (cause && (cause.code === 'EAI_AGAIN' || cause.errno === -3001)) ||
+        /fetch failed/i.test(err?.message || '') ||
+        /getaddrinfo EAI_AGAIN/i.test(String(err));
+      if (attempt < retries && isTransient) {
+        const delay = 200 * (attempt + 1);
+        console.warn(`Supabase transient error (attempt ${attempt + 1}/${retries + 1}), retrying in ${delay}ms`);
+        await sleep(delay);
+        continue;
+      }
+      throw err;
+    }
+  }
+};
+
 // Validate credit application
 const validateCreditApplication = async (userId, orderSubtotal, requestedCredits) => {
   try {
@@ -248,11 +271,12 @@ const getUserCreditBalance = async (userId) => {
 const getUnreadCreditNotifications = async (userId) => {
   try {
     const client = supabase.getServiceClient();
-    const { data, error } = await client
-      .rpc('get_unread_credit_notifications', { p_user_id: userId });
-    
-    if (error) throw error;
-    
+    const data = await withTransientRetry(async () => {
+      const { data, error } = await client
+        .rpc('get_unread_credit_notifications', { p_user_id: userId });
+      if (error) throw error;
+      return data;
+    }, 2);
     return data || [];
   } catch (error) {
     console.error('Error getting unread credit notifications:', error);
@@ -264,11 +288,12 @@ const getUnreadCreditNotifications = async (userId) => {
 const markCreditNotificationsRead = async (userId) => {
   try {
     const client = supabase.getServiceClient();
-    const { error } = await client
-      .rpc('mark_credit_notifications_read', { p_user_id: userId });
-    
-    if (error) throw error;
-    
+    await withTransientRetry(async () => {
+      const { error } = await client
+        .rpc('mark_credit_notifications_read', { p_user_id: userId });
+      if (error) throw error;
+      return true;
+    }, 2);
     return { success: true };
   } catch (error) {
     console.error('Error marking credit notifications as read:', error);

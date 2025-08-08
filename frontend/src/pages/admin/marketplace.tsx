@@ -13,7 +13,7 @@ interface MarketplaceProduct {
   id: string;
   title: string;
   description: string;
-  short_description: string;
+  short_description?: string;
   creator_id?: string;
   collection_id?: string;
   creator?: {
@@ -74,7 +74,7 @@ export default function CreatorsSpaceAdmin() {
     } as { "3": string; "4": string; "5": string; },
     images: [] as string[],
     default_image: "",
-    categories: [] as string[], // Changed to array for multiple selection
+    categories: ["Die-Cut"] as string[], // Default to Die-Cut
     product_type: "single", // New field for single vs pack
     creator_id: "", // Creator assignment
     collection_id: "", // Collection assignment
@@ -89,8 +89,10 @@ export default function CreatorsSpaceAdmin() {
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [showCreatorModal, setShowCreatorModal] = useState(false);
   const [editingCreator, setEditingCreator] = useState(null);
-  const [creators, setCreators] = useState([]);
-  const [collections, setCollections] = useState([]);
+  const [creators, setCreators] = useState<any[]>([]);
+  const [collections, setCollections] = useState<any[]>([]);
+  const [collectionTable, setCollectionTable] = useState<'creator_collections' | 'collections'>('collections');
+  const [collectionsEnabled, setCollectionsEnabled] = useState(false);
   const [activeTab, setActiveTab] = useState('products');
   const [showBatchUpload, setShowBatchUpload] = useState(false);
   const [batchFiles, setBatchFiles] = useState<File[]>([]);
@@ -228,7 +230,7 @@ export default function CreatorsSpaceAdmin() {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) throw (error as any);
       setProducts(data || []);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -245,12 +247,8 @@ export default function CreatorsSpaceAdmin() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate categories
-    if (formData.categories.length === 0) {
-      alert('Please select at least one category');
-      return;
-    }
-    
+    // Categories no longer required
+
     // Validate collection assignment (temporarily optional)
     // if (!formData.collection_id) {
     //   alert('Please assign this product to a collection');
@@ -258,14 +256,32 @@ export default function CreatorsSpaceAdmin() {
     // }
     
     try {
-      const productData = {
-        ...formData,
-        category: formData.categories[0] || "Die-Cut", // Use first category for now, until we update DB schema
+      // Derive required price from size-based pricing (no standalone fallback field)
+      const parseMoney = (v?: string | number | null) => {
+        const n = typeof v === 'number' ? v : parseFloat((v || '').toString());
+        return Number.isFinite(n) ? n : null;
+      };
+
+      const derivedPrice =
+        parseMoney(formData.size_pricing['4']) ??
+        parseMoney(formData.size_pricing['3']) ??
+        parseMoney(formData.size_pricing['5']);
+
+      if (derivedPrice === null) {
+        alert('Please enter at least one size price (3\", 4\", or 5\") before saving.');
+        return;
+      }
+
+      const productData: any = {
+        title: ensureStickerSuffix(formData.title),
+        description: formData.description,
+        short_description: formData.short_description || "",
+        category: "Die-Cut",
         creator_id: isCreator && !isAdmin ? currentCreatorId : (formData.creator_id || null),
-        collection_id: formData.collection_id || null,
-        price: parseFloat(formData.price),
-        original_price: formData.original_price ? parseFloat(formData.original_price) : null,
-        markup_percentage: formData.markup_percentage ? parseFloat(formData.markup_percentage) : 0,
+        collection_id: collectionsEnabled ? (formData.collection_id || null) : null,
+        price: derivedPrice,
+        original_price: null,
+        markup_percentage: 0,
         size_pricing: {
           "3": formData.size_pricing["3"] ? parseFloat(formData.size_pricing["3"]) : null,
           "4": formData.size_pricing["4"] ? parseFloat(formData.size_pricing["4"]) : null,
@@ -276,13 +292,13 @@ export default function CreatorsSpaceAdmin() {
           "4": formData.size_compare_pricing?.["4"] ? parseFloat(formData.size_compare_pricing["4"]) : null,
           "5": formData.size_compare_pricing?.["5"] ? parseFloat(formData.size_compare_pricing["5"]) : null
         },
+        images: formData.images,
+        default_image: formData.default_image || (formData.images[0] || null),
         stock_quantity: parseInt(formData.stock_quantity.toString()),
-        tags: formData.tags.filter(tag => tag.trim() !== '')
+        tags: formData.tags.filter(tag => tag.trim() !== ''),
+        is_active: formData.is_active,
+        is_featured: formData.is_featured
       };
-      
-      // Remove the categories and product_type fields since they're not in the DB yet
-      delete productData.categories;
-      delete productData.product_type;
 
       if (editingProduct) {
         const { error } = await supabase
@@ -303,8 +319,9 @@ export default function CreatorsSpaceAdmin() {
       resetForm();
       await fetchProducts();
     } catch (error) {
-      console.error('Error saving product:', error);
-      alert(`Error saving product: ${error.message}`);
+      console.error('Error saving product:', error as any);
+      const msg = (error as any)?.message || 'Unknown error';
+      alert(`Error saving product: ${msg}`);
     }
   };
 
@@ -347,6 +364,12 @@ export default function CreatorsSpaceAdmin() {
     "Oval"
   ];
 
+  // Ensure all product titles end with " Sticker" exactly once
+  const ensureStickerSuffix = (rawTitle: string): string => {
+    const baseTitle = (rawTitle || "").trim().replace(/\s+sticker\s*$/i, "").trim();
+    return baseTitle ? `${baseTitle} Sticker` : "Sticker";
+  };
+
   const handleFileUpload = async (file: File): Promise<string> => {
     setIsUploading(true);
     setUploadProgress(null);
@@ -383,7 +406,7 @@ export default function CreatorsSpaceAdmin() {
     setFormData({
       title: product.title,
       description: product.description,
-      short_description: product.short_description,
+      short_description: product.short_description || "",
       price: product.price.toString(),
       original_price: product.original_price?.toString() || "",
       markup_percentage: product.markup_percentage?.toString() || "",
@@ -536,6 +559,19 @@ export default function CreatorsSpaceAdmin() {
     }
   };
 
+  const addTagsFromCommaSeparated = (text: string) => {
+    const parts = text
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean);
+    if (parts.length === 0) return;
+    setFormData(prev => ({
+      ...prev,
+      tags: [...prev.tags, ...parts.filter(p => !prev.tags.includes(p))]
+    }));
+    setTagInput('');
+  };
+
   const handleTagKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -587,32 +623,10 @@ export default function CreatorsSpaceAdmin() {
   };
 
   const fetchCollections = async () => {
-    try {
-      // Check if collections table exists first
-      const { data, error } = await supabase
-        .from('collections')
-        .select('id, name, description, slug, image_url, is_active, is_featured, sort_order, creator_id, created_at')
-        .order('sort_order', { ascending: true })
-        .limit(1);
-
-      if (error) {
-        console.log('Collections table not found or not accessible:', error);
-        setCollections([]);
-        return;
-      }
-      
-      // If the test query worked, fetch all collections
-      const { data: allCollections, error: fetchError } = await supabase
-        .from('collections')
-        .select('id, name, description, slug, image_url, is_active, is_featured, sort_order, creator_id, created_at')
-        .order('sort_order', { ascending: true });
-
-      if (fetchError) throw fetchError;
-      setCollections(allCollections || []);
-    } catch (error) {
-      console.error('Error fetching collections:', error);
-      setCollections([]);
-    }
+    // Collections temporarily disabled per requirements
+    setCollections([]);
+    setCollectionsEnabled(false);
+    setCollectionTable('collections');
   };
 
   const handleCreatorSaved = () => {
@@ -647,7 +661,7 @@ export default function CreatorsSpaceAdmin() {
       };
 
       const { data, error } = await supabase
-        .from('collections')
+        .from(collectionTable)
         .insert([collectionData])
         .select()
         .single();
@@ -798,13 +812,11 @@ Great for personalizing your gear or as a gift!`;
           const productData = {
             title: productTitle,
             description: description,
-            short_description: shortDescription,
+            short_description: undefined,
             category: batchConfig.category,
             creator_id: isCreator && !isAdmin ? currentCreatorId : (batchConfig.creator_id || null),
-            collection_id: batchConfig.collection_id || null,
-            price: parseFloat(batchConfig.size_pricing["4"]), // Use 4" as fallback price
-            original_price: null,
-            markup_percentage: batchConfig.markup_percentage ? parseFloat(batchConfig.markup_percentage) : 0,
+            collection_id: collectionsEnabled ? (batchConfig.collection_id || null) : null,
+            price: parseFloat(batchConfig.size_pricing["4"]),
             size_pricing: {
               "3": batchConfig.size_pricing["3"] ? parseFloat(batchConfig.size_pricing["3"]) : null,
               "4": batchConfig.size_pricing["4"] ? parseFloat(batchConfig.size_pricing["4"]) : null,
@@ -889,15 +901,13 @@ Great for personalizing your gear or as a gift!`;
       
       for (let i = 1; i <= duplicateQuantity; i++) {
         const duplicateData = {
-          title: `${duplicateProduct.title} (Copy ${i})`,
+          title: `${ensureStickerSuffix(duplicateProduct.title)} (Copy ${i})`,
           description: duplicateProduct.description,
           short_description: duplicateProduct.short_description,
           category: duplicateProduct.category,
           creator_id: duplicateProduct.creator_id,
-          collection_id: duplicateProduct.collection_id,
+          collection_id: collectionsEnabled ? duplicateProduct.collection_id : null,
           price: duplicateProduct.price,
-          original_price: duplicateProduct.original_price,
-          markup_percentage: duplicateProduct.markup_percentage,
           size_pricing: duplicateProduct.size_pricing,
           size_compare_pricing: duplicateProduct.size_compare_pricing,
           images: duplicateProduct.images,
@@ -1062,7 +1072,112 @@ Great for personalizing your gear or as a gift!`;
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left Column - Main Content */}
               <div className="lg:col-span-2 space-y-6">
-                
+
+                {/* Product Images */}
+                <div className="container-style rounded-2xl p-6">
+                  <h2 className="text-lg font-semibold text-white mb-4">Product Images</h2>
+                  
+                  {/* Hidden file input */}
+                  <input
+                    id="image-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    disabled={isUploading}
+                    aria-label="Upload product image"
+                  />
+
+                  {/* Upload Area */}
+                  <div 
+                    className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative mb-6"
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onClick={() => document.getElementById('image-upload')?.click()}
+                  >
+                    {isUploading ? (
+                      <div className="mb-4">
+                        <div className="text-4xl mb-3">⏳</div>
+                        <p className="text-white font-medium text-base mb-2">Uploading...</p>
+                        {uploadProgress && (
+                          <div className="w-full bg-white/20 rounded-full h-2 mb-2">
+                            <div 
+                              className="bg-purple-400 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${uploadProgress.percentage}%` }}
+                            ></div>
+                          </div>
+                        )}
+                        {uploadProgress && (
+                          <p className="text-white/80 text-sm">{uploadProgress.percentage}% complete</p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mb-4">
+                        <div className="mb-3 flex justify-center -ml-4">
+                          <img 
+                            src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751341811/StickerShuttleFileIcon4_gkhsu5.png" 
+                            alt="Upload file" 
+                            className="w-20 h-20 object-contain"
+                          />
+                        </div>
+                        <p className="text-white font-medium text-base mb-2 hidden md:block">
+                          Drag or click to upload your file
+                          <span className="text-white/40 ml-2">{formData.title?.trim() ? ensureStickerSuffix(formData.title) : 'Sticker'}</span>
+                        </p>
+                        <p className="text-white font-medium text-base mb-2 md:hidden">Tap to add file</p>
+                        <p className="text-white/80 text-sm">All formats supported. Max file size: 25MB</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Image List */}
+                  {formData.images.length > 0 && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-white text-sm font-medium">Uploaded Images:</p>
+                      </div>
+                      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2">
+                        {formData.images.map((image, index) => (
+                          <div key={index} className="relative group">
+                            {/* Small 1:1 thumbnail */}
+                            <div className="aspect-square rounded-md border border-white/20 overflow-hidden bg-gray-800 w-16 h-16 sm:w-20 sm:h-20">
+                              <img
+                                src={image}
+                                alt={`Product ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md flex items-center justify-center">
+                              <div className="flex gap-1">
+                                <label className="flex items-center gap-1 text-[10px] text-white bg-white/20 px-1.5 py-0.5 rounded">
+                                  <input
+                                    type="radio"
+                                    name="default_image"
+                                    checked={formData.default_image === image}
+                                    onChange={() => setFormData(prev => ({ ...prev, default_image: image }))}
+                                    className="w-3 h-3"
+                                    aria-label={`Set as default image`}
+                                  />
+                                  Default
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => removeImage(index)}
+                                  className="px-1.5 py-0.5 bg-red-600/80 hover:bg-red-600 text-white rounded text-[10px] transition-colors"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+
                 {/* Product Information */}
                 <div className="container-style rounded-2xl p-6">
                   <h2 className="text-lg font-semibold text-white mb-4">Product Information</h2>
@@ -1070,30 +1185,27 @@ Great for personalizing your gear or as a gift!`;
                   <div className="space-y-4">
                     <div>
                       <label className="block text-white text-sm font-medium mb-2">Title</label>
-                      <input
-                        type="text"
-                        value={formData.title}
-                        onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        placeholder="Enter product title"
-                        required
-                      />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={formData.title}
+                          onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                          onBlur={(e) => setFormData(prev => ({ ...prev, title: ensureStickerSuffix(e.target.value) }))}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 pr-28"
+                          placeholder="Enter product title"
+                          required
+                        />
+                        <span className="absolute inset-y-0 right-3 flex items-center text-white/40 pointer-events-none text-sm">
+                          {(formData.title || '').match(/\s*sticker\s*$/i) ? '' : ' Sticker'}
+                        </span>
+                      </div>
                     </div>
 
-                    <div>
-                      <label className="block text-white text-sm font-medium mb-2">Short Description</label>
-                      <input
-                        type="text"
-                        value={formData.short_description}
-                        onChange={(e) => setFormData(prev => ({ ...prev, short_description: e.target.value }))}
-                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        placeholder="Brief product description"
-                      />
-                    </div>
+                    {/* Short Description removed per request */}
 
-                    {collections.length > 0 && (
+                    {false && collectionsEnabled && collections.length > 0 && (
                       <div>
-                        <label className="block text-white text-sm font-medium mb-2">Collection (Optional)</label>
+                        <label className="block text-white text-sm font-medium mb-2">Collection</label>
                         <select
                           value={formData.collection_id}
                           onChange={(e) => setFormData(prev => ({ ...prev, collection_id: e.target.value }))}
@@ -1215,111 +1327,6 @@ Great for personalizing your gear or as a gift!`;
                   </div>
                 </div>
 
-                {/* Product Images */}
-                <div className="container-style rounded-2xl p-6">
-                  <h2 className="text-lg font-semibold text-white mb-4">Product Images</h2>
-                  
-                  {/* Hidden file input */}
-                  <input
-                    id="image-upload"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    disabled={isUploading}
-                    aria-label="Upload product image"
-                  />
-
-                  {/* Upload Area */}
-                  <div 
-                    className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative mb-6"
-                    onDrop={handleDrop}
-                    onDragOver={handleDragOver}
-                    onClick={() => document.getElementById('image-upload')?.click()}
-                  >
-                    {isUploading ? (
-                      <div className="mb-4">
-                        <div className="text-4xl mb-3">⏳</div>
-                        <p className="text-white font-medium text-base mb-2">Uploading...</p>
-                        {uploadProgress && (
-                          <div className="w-full bg-white/20 rounded-full h-2 mb-2">
-                            <div 
-                              className="bg-purple-400 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${uploadProgress.percentage}%` }}
-                            ></div>
-                          </div>
-                        )}
-                        {uploadProgress && (
-                          <p className="text-white/80 text-sm">{uploadProgress.percentage}% complete</p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="mb-4">
-                        <div className="mb-3 flex justify-center">
-                          <img 
-                            src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751341811/StickerShuttleFileIcon4_gkhsu5.png" 
-                            alt="Upload file" 
-                            className="w-20 h-20 object-contain"
-                          />
-                        </div>
-                        <p className="text-white font-medium text-base mb-2">
-                          Drop image here or click to upload
-                        </p>
-                        <p className="text-white/60 text-sm">
-                          All formats supported. Max file size: 25MB
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Image List */}
-                  {formData.images.length > 0 && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <p className="text-white text-sm font-medium">Uploaded Images:</p>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {formData.images.map((image, index) => (
-                          <div key={index} className="relative group">
-                            {/* 1:1 aspect ratio container without background */}
-                            <div className="aspect-square rounded-lg border border-white/20 overflow-hidden bg-gray-800">
-                              <img
-                                src={image}
-                                alt={`Product ${index + 1}`}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
-                              <div className="flex gap-2">
-                                <label className="flex items-center gap-1 text-xs text-white bg-white/20 px-2 py-1 rounded">
-                                  <input
-                                    type="radio"
-                                    name="default_image"
-                                    checked={formData.default_image === image}
-                                    onChange={() => setFormData(prev => ({ ...prev, default_image: image }))}
-                                    className="w-3 h-3"
-                                    aria-label={`Set as default image`}
-                                  />
-                                  Default
-                                </label>
-                                <button
-                                  type="button"
-                                  onClick={() => removeImage(index)}
-                                  className="px-2 py-1 bg-red-600/80 hover:bg-red-600 text-white rounded text-xs transition-colors"
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-
                 {/* Product Organization */}
                 <div className="container-style rounded-2xl p-6">
                   <h2 className="text-lg font-semibold text-white mb-4">Product Organization</h2>
@@ -1431,7 +1438,13 @@ Great for personalizing your gear or as a gift!`;
                       value={tagInput}
                       onChange={(e) => setTagInput(e.target.value)}
                       onKeyPress={handleTagKeyPress}
-                      placeholder="Type a tag and press Enter"
+                      onBlur={(e) => {
+                        if (e.target.value.includes(',')) {
+                          addTagsFromCommaSeparated(e.target.value);
+                          e.target.value = '';
+                        }
+                      }}
+                      placeholder="Type tags and press Enter or paste comma-separated list"
                       className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     <p className="text-gray-400 text-xs mt-2">Press Enter to add tags</p>
@@ -1485,6 +1498,62 @@ Great for personalizing your gear or as a gift!`;
                       <span className="text-white text-sm">Featured</span>
                     </div>
                   </div>
+                </div>
+
+                {/* Social Sharing Preview */}
+                <div className="container-style rounded-2xl p-6">
+                  <h2 className="text-lg font-semibold text-white mb-4">Social Sharing Preview</h2>
+
+                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                    {/* Social Card Preview */}
+                    <div className="space-y-3">
+                      {/* Image Preview with 1:1 aspect ratio and background */}
+                      <div className="aspect-square bg-gray-800 rounded-lg overflow-hidden relative">
+                        {/* Background Image */}
+                        <img
+                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1754091658/BGSquare_eai516.png"
+                          alt="Background"
+                          className="w-full h-full object-cover absolute inset-0"
+                        />
+                        
+                        {/* Sticker Design Overlay */}
+                        {formData.default_image || formData.images[0] ? (
+                          <div className="absolute inset-0 flex items-center justify-center p-16">
+                            <img
+                              src={formData.default_image || formData.images[0]}
+                              alt="Sticker design"
+                              className="max-w-full max-h-full object-contain drop-shadow-lg"
+                            />
+                          </div>
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-white/80">
+                            <div className="text-center">
+                              <div className="text-2xl mb-2">🖼️</div>
+                              <p className="text-sm">Upload an image to see preview</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Title and Description */}
+                      <div>
+                        <h3 className="text-white font-medium text-sm line-clamp-2">
+                          {formData.title
+                            ? `${formData.title} on the Sticker Shuttle Marketplace`
+                            : 'Product Title on the Sticker Shuttle Marketplace'
+                          }
+                        </h3>
+                        <p className="text-gray-400 text-xs mt-1 line-clamp-2">
+                          {formData.short_description || formData.description || 'Product description will appear here'}
+                        </p>
+                        <p className="text-gray-500 text-xs mt-1">stickershuttle.com</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-gray-400 text-xs mt-3">
+                    This is how your product will appear when shared on social media platforms.
+                  </p>
                 </div>
 
                 {/* Pricing */}
@@ -1599,104 +1668,8 @@ Great for personalizing your gear or as a gift!`;
                     </div>
 
                     {/* Fallback Price */}
-                    <div>
-                      <label className="block text-white text-sm font-medium mb-2">Fallback Price ($)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={formData.price}
-                        onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
-                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        placeholder="0.00"
-                        required
-                      />
-                      <p className="text-gray-400 text-xs mt-1">Used when size-specific pricing is not available</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-white text-sm font-medium mb-2">Compare at Price ($)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={formData.original_price}
-                        onChange={(e) => setFormData(prev => ({ ...prev, original_price: e.target.value }))}
-                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        placeholder="0.00"
-                      />
-                      <p className="text-gray-400 text-xs mt-1">Optional - shows as crossed out price</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-white text-sm font-medium mb-2">Calculator Markup (%)</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        max="200"
-                        value={formData.markup_percentage}
-                        onChange={(e) => setFormData(prev => ({ ...prev, markup_percentage: e.target.value }))}
-                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        placeholder="0.0"
-                      />
-                      <p className="text-gray-400 text-xs mt-1">Markup percentage to apply to calculator prices (e.g., 25 for 25% markup)</p>
-                    </div>
+                    {/* Removed fallback/compare/markup per request */}
                   </div>
-                </div>
-
-                                {/* Social Sharing Preview */}
-                <div className="container-style rounded-2xl p-6">
-                  <h2 className="text-lg font-semibold text-white mb-4">Social Sharing Preview</h2>
-
-                  <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                    {/* Social Card Preview */}
-                    <div className="space-y-3">
-                      {/* Image Preview with 1:1 aspect ratio and background */}
-                      <div className="aspect-square bg-gray-800 rounded-lg overflow-hidden relative">
-                        {/* Background Image */}
-                        <img
-                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1754091658/BGSquare_eai516.png"
-                          alt="Background"
-                          className="w-full h-full object-cover absolute inset-0"
-                        />
-                        
-                        {/* Sticker Design Overlay */}
-                        {formData.default_image || formData.images[0] ? (
-                          <div className="absolute inset-0 flex items-center justify-center p-16">
-                            <img
-                              src={formData.default_image || formData.images[0]}
-                              alt="Sticker design"
-                              className="max-w-full max-h-full object-contain drop-shadow-lg"
-                            />
-                          </div>
-                        ) : (
-                          <div className="absolute inset-0 flex items-center justify-center text-white/80">
-                            <div className="text-center">
-                              <div className="text-2xl mb-2">🖼️</div>
-                              <p className="text-sm">Upload an image to see preview</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Title and Description */}
-                      <div>
-                        <h3 className="text-white font-medium text-sm line-clamp-2">
-                          {formData.title
-                            ? `${formData.title} on the Sticker Shuttle Marketplace`
-                            : 'Product Title on the Sticker Shuttle Marketplace'
-                          }
-                        </h3>
-                        <p className="text-gray-400 text-xs mt-1 line-clamp-2">
-                          {formData.short_description || formData.description || 'Product description will appear here'}
-                        </p>
-                        <p className="text-gray-500 text-xs mt-1">stickershuttle.com</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="text-gray-400 text-xs mt-3">
-                    This is how your product will appear when shared on social media platforms.
-                  </p>
                 </div>
 
 
@@ -1813,12 +1786,13 @@ Great for personalizing your gear or as a gift!`;
                   <span className="text-white text-sm font-medium">Add New Creator</span>
                 </button>
 
-                {/* Only show Create Collection button if we can access collections table */}
-                <button
-                  onClick={() => setShowCreateCollection(true)}
-                  className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/30 rounded-xl hover:border-green-400/50 transition-all duration-200 hover:bg-white/5 group"
-                  title={collections.length === 0 ? "Collections database not set up yet" : "Create a new collection"}
-                >
+            {/* Collections feature toggle - hidden when disabled */}
+            {false && collectionsEnabled && (
+            <button
+              onClick={() => setShowCreateCollection(true)}
+              className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/30 rounded-xl hover:border-green-400/50 transition-all duration-200 hover:bg-white/5 group"
+              title={collections.length === 0 ? "Collections database not set up yet" : "Create a new collection"}
+            >
                   <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center mb-3 group-hover:bg-green-500/30 transition-colors">
                     <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -1828,7 +1802,8 @@ Great for personalizing your gear or as a gift!`;
                   {collections.length === 0 && (
                     <span className="text-yellow-400 text-xs mt-1">(Database setup required)</span>
                   )}
-                </button>
+            </button>
+            )}
               </>
             )}
           </div>
@@ -1846,7 +1821,7 @@ Great for personalizing your gear or as a gift!`;
               >
                 Products ({products.length})
               </button>
-              {collections.length > 0 && (
+              {false && collectionsEnabled && collections.length > 0 && (
                 <button
                   onClick={() => setActiveTab('collections')}
                   className={`px-6 py-3 text-sm font-medium rounded-t-lg transition-all duration-200 ${
@@ -2034,8 +2009,8 @@ Great for personalizing your gear or as a gift!`;
         </div>
         )}
 
-        {/* Collections Tab */}
-        {activeTab === 'collections' && (
+        {/* Collections Tab - hidden when collections feature disabled */}
+        {false && collectionsEnabled && activeTab === 'collections' && (
         <div className="container-style rounded-2xl p-6">
           <h3 className="text-xl font-bold text-white mb-4">Collections</h3>
           {collections.length > 0 ? (
@@ -2665,9 +2640,7 @@ Great for personalizing your gear or as a gift!`;
                         <p className="text-gray-400 text-xs mb-2">{duplicateProduct.category}</p>
                         <div className="flex items-center gap-2">
                           <span className="text-green-400 font-medium text-sm">${duplicateProduct.price}</span>
-                          {duplicateProduct.original_price && (
-                            <span className="text-gray-500 text-xs line-through">${duplicateProduct.original_price}</span>
-                          )}
+                          {/* Compare-at price removed */}
                         </div>
                       </div>
                     </div>
@@ -2712,7 +2685,7 @@ Great for personalizing your gear or as a gift!`;
                     <div className="space-y-1 max-h-32 overflow-y-auto">
                       {Array.from({ length: Math.min(duplicateQuantity, 5) }, (_, i) => (
                         <div key={i} className="text-gray-300 text-xs">
-                          • {duplicateProduct.title} (Copy {i + 1})
+                          • {ensureStickerSuffix(duplicateProduct.title)} (Copy {i + 1})
                         </div>
                       ))}
                       {duplicateQuantity > 5 && (
@@ -2763,7 +2736,7 @@ Great for personalizing your gear or as a gift!`;
       )}
 
       {/* Create Collection Modal */}
-      {showCreateCollection && (
+      {false && showCreateCollection && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="container-style rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">

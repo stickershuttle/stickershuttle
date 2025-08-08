@@ -83,9 +83,9 @@ export default function CreatorsSpaceApply() {
       canonical="https://stickershuttle.com/creators-space-apply"
     >
       {/* Hero */}
-      <section className="py-10">
+      <section className="pt-6 pb-2 md:pt-8 md:pb-4">
         <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
-          <div className="rounded-2xl p-0 text-center relative overflow-hidden min-h-[360px]">
+          <div className="rounded-2xl p-0 text-center relative overflow-hidden min-h-[300px] md:min-h-[320px]">
             {/* Background banner (match homepage) */}
             <div className="absolute inset-0 hero-creators-banner" />
             {/* Overlay gradient */}
@@ -93,7 +93,7 @@ export default function CreatorsSpaceApply() {
               background: 'linear-gradient(135deg, rgba(10, 10, 46, 0.75) 0%, rgba(26, 26, 74, 0.65) 35%, rgba(45, 27, 107, 0.6) 65%, rgba(124, 58, 237, 0.45) 100%)'
             }} />
 
-            <div className="relative z-10 max-w-4xl mx-auto py-12 px-6">
+            <div className="relative z-10 max-w-4xl mx-auto py-8 md:py-10 px-6">
               <div className="flex items-center justify-center mb-3 md:mb-4">
                 <img
                   src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1754416141/CreatorsSpaceWhite_ebiqt3.svg"
@@ -101,11 +101,9 @@ export default function CreatorsSpaceApply() {
                   className="h-16 md:h-24 w-auto drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)]"
                 />
               </div>
-              <p className="text-purple-100/90 text-lg md:text-3xl font-semibold mb-2 md:mb-3">
-                Finally, a sticker company that puts <i>you</i> first.
-              </p>
+
               <p className="text-gray-300 text-lg md:text-xl leading-relaxed mb-8">
-              <b>Your job:</b> sell. <b>Our job:</b> everything else.
+              <b>Your job:</b> Sell stickers. <br /><b>Our job:</b> Everything else.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <a href="#apply" className="px-8 py-4 rounded-lg font-bold text-white transition-all duration-300 hover:scale-105 inline-block" style={buttonStyle}>
@@ -136,7 +134,7 @@ export default function CreatorsSpaceApply() {
       `}</style>
 
       {/* How it Works - Modern Timeline */}
-      <section className="py-12 relative overflow-hidden">
+      <section className="pt-2 md:pt-4 pb-10 md:pb-12 relative overflow-hidden">
         <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-3">How It Works</h2>
@@ -161,8 +159,8 @@ export default function CreatorsSpaceApply() {
                   </svg>
                 </div>
                 <span className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Step 1</span>
-                <h3 className="text-xl font-bold mb-2">Apply</h3>
-                <p className="text-gray-400 text-sm text-center">Share your creative vision and tell us about your audience</p>
+                <h3 className="text-xl font-bold mb-2">Become a creator.</h3>
+                <p className="text-gray-400 text-sm text-center">Share your creative vision and tell us about your audience. We're being selective on who we work with at first.</p>
               </div>
             </div>
 
@@ -179,8 +177,8 @@ export default function CreatorsSpaceApply() {
                   </svg>
                 </div>
                 <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">Step 2</span>
-                <h3 className="text-xl font-bold mb-2">Upload</h3>
-                <p className="text-gray-400 text-sm text-center">Submit your designs and we'll handle all the technical prep</p>
+                <h3 className="text-xl font-bold mb-2">Send us your designs.</h3>
+                <p className="text-gray-400 text-sm text-center">Submit your designs and we'll handle all the technical prep. Upload it to our platform, prep it for print, send you a proof, etc.</p>
               </div>
             </div>
 
@@ -197,8 +195,8 @@ export default function CreatorsSpaceApply() {
                   </svg>
                 </div>
                 <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2">Step 3</span>
-                <h3 className="text-xl font-bold mb-2">We Fulfill</h3>
-                <p className="text-gray-400 text-sm text-center">Professional printing, cutting, and shipping handled for you</p>
+                <h3 className="text-xl font-bold mb-2">We do everything else.</h3>
+                <p className="text-gray-400 text-sm text-center">We print, laminate, cut, pack, and ship stickers of your designs to your customers. Straight from the source. All orders shipped same-day*.</p>
               </div>
             </div>
 
@@ -215,8 +213,8 @@ export default function CreatorsSpaceApply() {
                   </svg>
                 </div>
                 <span className="text-xs font-bold text-purple-400 uppercase tracking-wider mb-2">Step 4</span>
-                <h3 className="text-xl font-bold mb-2">You Earn</h3>
-                <p className="text-gray-400 text-sm text-center">Set your prices and receive regular payouts</p>
+                <h3 className="text-xl font-bold mb-2">You make bank.</h3>
+                <p className="text-gray-400 text-sm text-center">We charge $2 per sticker, and you keep the rest. We handle the stuff you don't want to do—printing, packing and delivery. Get paid weekly, monthly, or quarterly.</p>
               </div>
             </div>
           </div>

@@ -6,6 +6,7 @@ import { getSupabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useQuery } from "@apollo/client";
 import { GET_CREATOR_BY_USER_ID } from "@/lib/profile-mutations";
+import LoadingGrid from "@/components/LoadingGrid";
 
 interface MarketplaceProduct {
   id: string;
@@ -120,10 +121,14 @@ function ProductCard({ product }: { product: MarketplaceProduct }) {
                 })()}
               </div>
               <span className="text-white/70 text-xs">
-                by {product.creator.user_profiles?.first_name && product.creator.user_profiles?.last_name 
-                  ? `${product.creator.user_profiles.first_name} ${product.creator.user_profiles.last_name}`
-                  : product.creator.creator_name
-                }
+                by {(() => {
+                  const c = product.creator;
+                  if (c?.creator_name) return c.creator_name;
+                  if (c?.user_profiles?.first_name && c?.user_profiles?.last_name) {
+                    return `${c.user_profiles.first_name} ${c.user_profiles.last_name}`;
+                  }
+                  return c?.creator_name || 'Creator';
+                })()}
               </span>
             </div>
           )}
@@ -224,15 +229,15 @@ export default function Marketplace() {
       
       // Update products with the new profile photo for the current user
       if (user?.id && profile_photo_url) {
-        setProducts(prevProducts => 
-          prevProducts.map(product => {
+        setProducts((prevProducts) => 
+          prevProducts.map((product: MarketplaceProduct) => {
             if (product.creator?.user_id === user.id) {
               return {
                 ...product,
                 creator: {
-                  ...product.creator,
+                  ...product.creator!,
                   user_profiles: {
-                    ...product.creator.user_profiles,
+                    ...(product.creator!.user_profiles || {}),
                     profile_photo_url: profile_photo_url
                   }
                 }
@@ -263,6 +268,7 @@ export default function Marketplace() {
   }, []);
 
   const fetchProducts = async () => {
+    setLoading(true);
     try {
       let query = supabase
         .from('marketplace_products')
@@ -321,7 +327,7 @@ export default function Marketplace() {
       
       // Fetch user profile data for creators
       const productsWithCreatorProfiles = await Promise.all(
-        (data || []).map(async (product) => {
+        (data || []).map(async (product: any) => {
           if (product.creators?.user_id) {
             console.log('🔍 Fetching profile for creator:', product.creators.creator_name, 'user_id:', product.creators.user_id);
             try {
@@ -523,11 +529,11 @@ export default function Marketplace() {
     }
   };
 
-  if (userLoading || loading) {
+  if (userLoading) {
     return (
       <Layout title="Marketplace - Sticker Shuttle">
         <div className="flex items-center justify-center h-64">
-          <div className="text-white">Loading marketplace...</div>
+          <div className="text-white">Loading account...</div>
         </div>
       </Layout>
     );
@@ -677,7 +683,7 @@ export default function Marketplace() {
                     </span>
                   </div>
                   <p className="text-white/70 text-xs leading-relaxed">
-                    A collaborative space for Sticker Shuttle and amazing creators
+                    A collaborative space for Sticker Shuttle to work with other creators.
                   </p>
                 </div>
 
@@ -713,29 +719,7 @@ export default function Marketplace() {
                   </div>
                 </div>
 
-                {/* Creator Add Product Button */}
-                {isCreator && (
-                  <div className="pb-6 border-b border-white/10">
-                    <Link href="/admin/marketplace">
-                      <button
-                        className="w-full flex items-center justify-center gap-3 p-4 rounded-xl transition-all duration-200 hover:scale-105 group"
-                        style={{
-                          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.4) 0%, rgba(16, 185, 129, 0.25) 50%, rgba(16, 185, 129, 0.1) 100%)',
-                          backdropFilter: 'blur(25px) saturate(180%)',
-                          border: '1px solid rgba(16, 185, 129, 0.4)',
-                          boxShadow: 'rgba(16, 185, 129, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                        }}
-                      >
-                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center group-hover:bg-emerald-500/30 transition-colors">
-                          <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                          </svg>
-                        </div>
-                        <span className="text-white font-semibold text-lg">Add a Sticker</span>
-                      </button>
-                    </Link>
-                  </div>
-                )}
+                
 
                 {/* Sale Items Filter */}
                 <div>
@@ -879,11 +863,11 @@ export default function Marketplace() {
                     {/* Get unique creators from products */}
                     {(() => {
                       const uniqueCreators = new Map();
-                      products.forEach(product => {
+                      products.forEach((product: MarketplaceProduct) => {
                         if (product.creator && !uniqueCreators.has(product.creator.id)) {
                           uniqueCreators.set(product.creator.id, {
                             ...product.creator,
-                            productCount: products.filter(p => p.creator?.id === product.creator.id).length
+                            productCount: products.filter((p: MarketplaceProduct) => p.creator?.id === product.creator!.id).length
                           });
                         }
                       });
@@ -898,10 +882,10 @@ export default function Marketplace() {
                         );
                       }
                       
-                      return creatorsArray.map((creator) => {
+                      return creatorsArray.map((creator: any) => {
                         const initials = creator.creator_name
                           .split(' ')
-                          .map(word => word[0])
+                          .map((word: string) => word[0])
                           .join('')
                           .toUpperCase()
                           .slice(0, 2);
@@ -957,10 +941,11 @@ export default function Marketplace() {
                                       ? 'text-blue-300' 
                                       : 'text-white/80 group-hover:text-white'
                                   }`}>
-                                    {creator.user_profiles?.first_name && creator.user_profiles?.last_name 
-                                      ? `${creator.user_profiles.first_name} ${creator.user_profiles.last_name}`
-                                      : creator.creator_name
-                                    }
+                                    {creator.creator_name || (
+                                      creator.user_profiles?.first_name && creator.user_profiles?.last_name
+                                        ? `${creator.user_profiles.first_name} ${creator.user_profiles.last_name}`
+                                        : 'Creator'
+                                    )}
                                   </h3>
                                   <p className={`text-xs transition-colors ${
                                     isSelected 
@@ -1033,6 +1018,14 @@ export default function Marketplace() {
                       Showing results for "{searchQuery}"
                     </div>
                   )}
+                  <div className="mt-3 pt-3 border-t border-white/10">
+                    <Link href="/creators-space-apply" className="text-xs text-blue-400 hover:text-blue-300 inline-flex items-center gap-1">
+                      Apply to be a creator
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </Link>
+                  </div>
                 </div>
               </div>
             </aside>
@@ -1146,21 +1139,21 @@ export default function Marketplace() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-8">
                     {(() => {
                       const uniqueCreators = new Map();
-                      products.forEach(product => {
+                      products.forEach((product: MarketplaceProduct) => {
                         if (product.creator && !uniqueCreators.has(product.creator.id)) {
                           uniqueCreators.set(product.creator.id, {
                             ...product.creator,
-                            productCount: products.filter(p => p.creator?.id === product.creator.id).length
+                            productCount: products.filter((p: MarketplaceProduct) => p.creator?.id === product.creator!.id).length
                           });
                         }
                       });
                       
                       const creatorsArray = Array.from(uniqueCreators.values()).slice(0, 3);
                       
-                      return creatorsArray.map((creator) => {
+                       return creatorsArray.map((creator: any) => {
                         const initials = creator.creator_name
                           .split(' ')
-                          .map(word => word[0])
+                          .map((word: string) => word[0])
                           .join('')
                           .toUpperCase()
                           .slice(0, 2);
@@ -1206,10 +1199,11 @@ export default function Marketplace() {
                                 )}
                                 <div>
                                   <h3 className="text-white font-semibold text-base sm:text-lg group-hover:text-blue-300 transition-colors">
-                                    {creator.user_profiles?.first_name && creator.user_profiles?.last_name 
-                                      ? `${creator.user_profiles.first_name} ${creator.user_profiles.last_name}`
-                                      : creator.creator_name
-                                    }
+                                    {creator.creator_name || (
+                                      creator.user_profiles?.first_name && creator.user_profiles?.last_name
+                                        ? `${creator.user_profiles.first_name} ${creator.user_profiles.last_name}`
+                                        : 'Creator'
+                                    )}
                                   </h3>
                                   <p className="text-white/60 text-sm">
                                     {creator.productCount} {creator.productCount === 1 ? 'design' : 'designs'}
@@ -1236,11 +1230,13 @@ export default function Marketplace() {
                 <h2 className="text-2xl font-bold text-white mb-6">
                   {(!selectedCategories.includes("all") || showSaleItems || searchQuery.trim() || selectedCreatorId) ? 
                     (searchQuery.trim() ? `Search Results for "${searchQuery}"` :
-                     selectedCreatorId ? (() => {
+                      selectedCreatorId ? (() => {
                        const creator = products.find(p => p.creator?.id === selectedCreatorId)?.creator;
-                       return creator ? `Designs by ${creator.user_profiles?.first_name && creator.user_profiles?.last_name 
+                       if (!creator) return "Creator's Designs";
+                       const displayName = creator.creator_name || (creator.user_profiles?.first_name && creator.user_profiles?.last_name
                          ? `${creator.user_profiles.first_name} ${creator.user_profiles.last_name}`
-                         : creator.creator_name}` : "Creator's Designs";
+                         : 'Creator');
+                       return `Designs by ${displayName}`;
                      })() :
                      showSaleItems ? "Sale Items" : 
                      selectedCategories.length === 1 ? 
@@ -1250,7 +1246,9 @@ export default function Marketplace() {
                     "Explore Stickers"
                   }
                 </h2>
-                {products.length === 0 ? (
+                {loading ? (
+                  <LoadingGrid count={12} />
+                ) : products.length === 0 ? (
             <div className="container-style p-8 text-center">
               <div className="text-gray-400 text-lg mb-4">
                 No products found matching your criteria.

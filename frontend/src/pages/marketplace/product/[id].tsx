@@ -577,10 +577,15 @@ export default function MarketplaceProductPage() {
                 <div>
                   <div className="text-white text-sm font-medium">Created by</div>
                   <div className="text-gray-300 text-sm">
-                    {product.creator?.user_profiles?.first_name && product.creator.user_profiles?.last_name 
-                      ? `${product.creator.user_profiles.first_name} ${product.creator.user_profiles.last_name}`
-                      : product.creator?.creator_name || 'Sticker Shuttle'
-                    }
+                    {(() => {
+                      const c = product.creator;
+                      if (!c) return 'Sticker Shuttle';
+                      if (c.creator_name) return c.creator_name;
+                      if (c.user_profiles?.first_name && c.user_profiles?.last_name) {
+                        return `${c.user_profiles.first_name} ${c.user_profiles.last_name}`;
+                      }
+                      return 'Sticker Shuttle';
+                    })()}
                   </div>
                 </div>
               </div>

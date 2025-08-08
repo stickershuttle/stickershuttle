@@ -49,12 +49,11 @@ function requireAdminAuth(user) {
   if (!user) {
     throw new AuthenticationError('Authentication required');
   }
-  
   const ADMIN_EMAILS = ['justin@stickershuttle.com', 'admin@stickershuttle.com', 'orbit@stickershuttle.com'];
-  if (!ADMIN_EMAILS.includes(user.email)) {
+  const email = String(user.email || '').toLowerCase();
+  if (!ADMIN_EMAILS.includes(email)) {
     throw new AuthenticationError('Admin access required');
   }
-  
   return true;
 }
 
@@ -11262,6 +11261,30 @@ async function startServer() {
       json({ limit: '50mb' }),
       expressMiddleware(server, {
         context: async ({ req }) => {
+          // Helper: tiny retry for transient DNS failures from Supabase auth (EAI_AGAIN)
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+          const getUserWithRetry = async (client, token, retries = 2) => {
+            for (let attempt = 0; attempt <= retries; attempt++) {
+              try {
+                const result = await client.auth.getUser(token);
+                return result;
+              } catch (err) {
+                const cause = err?.cause || err;
+                const isTransient =
+                  (cause && (cause.code === 'EAI_AGAIN' || cause.errno === -3001)) ||
+                  /fetch failed/i.test(err?.message || '') ||
+                  /getaddrinfo EAI_AGAIN/i.test(String(err));
+                if (attempt < retries && isTransient) {
+                  const delay = 200 * (attempt + 1);
+                  console.warn(`Auth verification transient error (attempt ${attempt + 1}/${retries + 1}), retrying in ${delay}ms`);
+                  await sleep(delay);
+                  continue;
+                }
+                throw err;
+              }
+            }
+          };
+
           // Extract auth token from header
           const token = req.headers.authorization?.replace('Bearer ', '');
           
@@ -11270,7 +11293,7 @@ async function startServer() {
             try {
               const client = supabaseClient.getServiceClient();
               // Verify the JWT token with Supabase
-              const { data: { user: authUser }, error } = await client.auth.getUser(token);
+              const { data: { user: authUser }, error } = await getUserWithRetry(client, token, 2);
               
               if (!error && authUser) {
                 user = authUser;
