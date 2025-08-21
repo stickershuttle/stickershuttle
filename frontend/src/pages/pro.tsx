@@ -120,7 +120,7 @@ const StickerShuttlePro = () => {
   return (
     <>
       <Head>
-        <title>Sticker Shuttle Pro - Premium Sticker Subscription | Sticker Shuttle</title>
+        <title>Sticker Shuttle Pro</title>
         <meta name="description" content="Get 100 custom stickers monthly, FREE 2-day shipping, 25% off Marketspace, priority printing, and exclusive support with Sticker Shuttle Pro." />
         <meta name="keywords" content="sticker subscription, premium stickers, custom stickers monthly, fast shipping, sticker shuttle pro" />
         <meta property="og:title" content="Sticker Shuttle Pro - Premium Sticker Subscription" />
