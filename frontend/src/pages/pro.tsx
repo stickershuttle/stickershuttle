@@ -125,12 +125,17 @@ const StickerShuttlePro = () => {
         <meta name="keywords" content="sticker subscription, premium stickers, custom stickers monthly, fast shipping, sticker shuttle pro" />
         <meta property="og:title" content="Sticker Shuttle Pro - Premium Sticker Subscription" />
         <meta property="og:description" content="Get 100 custom stickers monthly, FREE 2-day shipping, 25% off Marketspace, priority printing, and exclusive support." />
-        <meta property="og:image" content="https://stickershuttle.com/pro-og-image.jpg" />
+        <meta property="og:image" content="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" />
         <meta property="og:url" content="https://stickershuttle.com/pro" />
         <link rel="canonical" href="https://stickershuttle.com/pro" />
+        <link rel="icon" type="image/png" href="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" />
+        <link rel="shortcut icon" href="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" />
+        <link rel="apple-touch-icon" href="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" />
+        <link rel="icon" sizes="16x16 32x32 48x48" href="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" />
+        <link rel="icon" type="image/x-icon" href="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" />
       </Head>
 
-      <div className="min-h-screen text-white" style={{ backgroundColor: '#030140' }}>
+      <div className="min-h-screen text-white" style={{ backgroundColor: '#030140', minHeight: '100vh' }}>
         <UniversalHeader />
         
         {/* Hero Section */}
@@ -174,26 +179,46 @@ const StickerShuttlePro = () => {
               {/* Benefits List */}
               <div className="mt-8 flex justify-center">
                 <ul className="space-y-2 text-gray-300" style={{ fontFamily: 'Rubik, sans-serif' }}>
-                  <li className="flex items-center">
-                    <span className="text-xl mr-3 flex-shrink-0">🎁</span>
+                  <li className="flex items-center justify-center">
+                    <span className="text-xl mr-3 flex-shrink-0">🏷️</span>
                     <span><span style={{ fontWeight: 'bold' }}>100 custom stickers</span> monthly (normally $87)</span>
                   </li>
-                  <li className="flex items-center">
+                  <li className="flex items-center justify-center">
                     <span className="text-xl mr-3 flex-shrink-0">📦</span>
                     <span><span style={{ fontWeight: 'bold' }}>FREE 2-Day Air</span> shipping on custom orders</span>
                   </li>
-                  <li className="flex items-center">
-                    <span className="text-xl mr-3 flex-shrink-0">🤝</span>
-                    <span><span style={{ fontWeight: 'bold' }}>15% off</span> everything in the Marketspace</span>
-                  </li>
-                  <li className="flex items-center">
+                  <li className="flex items-center justify-center">
                     <span className="text-xl mr-3 flex-shrink-0">☝️</span>
                     <span><span style={{ fontWeight: 'bold' }}>Priority printing</span> - jump to the front of the line</span>
                   </li>
-                  <li className="flex items-center">
+                  <li className="flex items-center justify-center">
+                    <span className="text-xl mr-3 flex-shrink-0">🤫</span>
+                    <span><span style={{ fontWeight: 'bold' }}>Access to</span> Pro only deals & discounts</span>
+                  </li>
+                  <li className="flex items-center justify-center">
+                    <span className="text-xl mr-3 flex-shrink-0">🤝</span>
+                    <span><span style={{ fontWeight: 'bold' }}>15% off</span> everything in the Marketspace</span>
+                  </li>
+
+                  <li className="flex items-center justify-center">
                     <span className="text-xl mr-3 flex-shrink-0">💬</span>
                     <span><span style={{ fontWeight: 'bold' }}>Exclusive text support</span> for instant help</span>
                   </li>
+                  
+                  {/* Bonus Section */}
+                  <li className="flex items-center justify-center">
+                    <span className="text-sm font-medium text-blue-300 uppercase tracking-wide">Limited-Time Bonuses</span>
+                  </li>
+                  
+                  <li className="flex items-center justify-center">
+                    <span className="text-xl mr-3 flex-shrink-0">🎁</span>
+                    <span><span style={{ fontWeight: 'bold' }}>FREE 30-Day Small Business Challenge</span></span>
+                  </li>
+                  <li className="flex items-center justify-center">
+                    <span className="text-xl mr-3 flex-shrink-0">🎁</span>
+                    <span><span style={{ fontWeight: 'bold' }}>150+ Exclusive Customizable Designs</span></span>
+                  </li>
+
                 </ul>
               </div>
               
@@ -273,8 +298,15 @@ const StickerShuttlePro = () => {
                       border: selectedPlan === 'monthly' ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
                     }}
                     onClick={() => setSelectedPlan('monthly')}>
-                    <h3 className="text-2xl font-bold mb-2">Pro Monthly</h3>
-                    <div className="text-4xl font-bold mb-2">$39</div>
+                    <div className="flex items-start justify-center gap-2 mb-4">
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                        alt="Sticker Shuttle Pro Logo" 
+                        className="h-8 w-auto object-contain"
+                      />
+                      <span className="text-2xl font-bold -mt-1">Monthly</span>
+                    </div>
+                    <div className="text-4xl font-bold mb-2" style={{ fontFamily: 'Rubik, sans-serif' }}>$39</div>
                     <div className="text-sm">per month</div>
                   </div>
                   
@@ -299,9 +331,16 @@ const StickerShuttlePro = () => {
                         Best Value
                       </div>
                     )}
-                    <h3 className="text-2xl font-bold mb-2">Pro Annual</h3>
+                    <div className="flex items-start justify-center gap-2 mb-2">
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                        alt="Sticker Shuttle Pro Logo" 
+                        className="h-8 w-auto object-contain"
+                      />
+                      <span className="text-2xl font-bold -mt-1">Annual</span>
+                    </div>
                     <div className="flex items-center justify-center gap-3 mb-2">
-                      <div className="text-4xl font-bold">$397</div>
+                      <div className="text-4xl font-bold" style={{ fontFamily: 'Rubik, sans-serif' }}>$397</div>
                       <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold text-white"
                            style={{
                              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.8) 0%, rgba(220, 38, 38, 0.8) 100%)',
@@ -336,15 +375,19 @@ const StickerShuttlePro = () => {
         </div>
 
         {/* FAQ Section */}
-        <div className="py-0">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="py-0" style={{ backgroundColor: '#030140' }}>
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#030140' }}>
                          <div className="text-center mb-8">
-               <h2 className="text-4xl font-bold text-white mb-6">
-                 Frequently Asked Questions
-               </h2>
+               <div className="flex justify-center mb-6">
+                 <img 
+                   src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755794735/faq_wbkcw7.png" 
+                   alt="Frequently Asked Questions" 
+                   className="h-16 w-auto object-contain"
+                 />
+               </div>
              </div>
             
-            <div className="space-y-6">
+            <div className="space-y-6" style={{ backgroundColor: '#030140' }}>
               {[
                 {
                   question: "How do the 100 monthly stickers work?",
@@ -367,22 +410,55 @@ const StickerShuttlePro = () => {
                   answer: "Pro members get a direct SMS line to our support team for faster response times and personalized assistance with orders and design questions. We're here to help!"
                 }
               ].map((faq, index) => (
-                <div key={index} 
-                     className="p-6 rounded-xl"
-                     style={{
-                       background: 'rgba(255, 255, 255, 0.05)',
-                       border: '1px solid rgba(255, 255, 255, 0.1)',
-                       boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                       backdropFilter: 'blur(12px)'
-                     }}>
-                  <h3 className="text-xl font-semibold text-white mb-3">{faq.question}</h3>
-                  <p className="text-gray-300">{faq.answer}</p>
+                <div key={index} className="flex gap-3">
+                  {/* Question Bubble */}
+                  <div className="flex-shrink-0">
+                    <img 
+                      src={[
+                        "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751390217/StickerShuttle_Avatar4_ozomh4.png",
+                        "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751390215/StickerShuttle_Avatar3_ybu1x4.png",
+                        "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751390215/StickerShuttle_Avatar2_iflxh7.png",
+                        "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751390215/StickerShuttle_Avatar1_dmnkat.png"
+                      ][index % 4]}
+                      alt="User Avatar" 
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <div className="bg-blue-500/20 rounded-2xl rounded-tl-md px-4 pt-4 pb-3 mb-4"
+                         style={{
+                           border: '1px solid rgba(59, 130, 246, 0.3)',
+                           boxShadow: 'rgba(59, 130, 246, 0.2) 0px 4px 16px'
+                         }}>
+                      <h3 className="text-lg font-semibold text-white">{faq.question}</h3>
+                    </div>
+                    
+                    {/* Answer Bubble */}
+                    <div className="flex gap-3">
+                      <div className="flex-shrink-0">
+                        <img 
+                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591685/Candy_Gradient_-_Circle_Peel_-_SA_o742cg.png" 
+                          alt="Sticker Shuttle Avatar" 
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <div className="bg-gray-700/30 rounded-2xl rounded-tl-md p-4"
+                             style={{
+                               border: '1px solid rgba(255, 255, 255, 0.1)',
+                               boxShadow: 'rgba(0, 0, 0, 0.2) 0px 4px 16px'
+                             }}>
+                          <p className="text-gray-200">{faq.answer}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
             
             {/* Join Pro Button */}
-            <div className="flex justify-center mt-12">
+            <div className="flex justify-center mt-12 mb-16">
               <button className="px-12 py-5 rounded-xl text-xl font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] flex items-center gap-3 animate-pulse-subtle button-gradient"
                       style={{
                         backdropFilter: 'blur(25px) saturate(180%)',
@@ -396,11 +472,19 @@ const StickerShuttlePro = () => {
           </div>
         </div>
 
-        <UniversalFooter />
+        <div className="hidden md:block">
+          <UniversalFooter />
+        </div>
       </div>
 
       {/* Custom CSS for infinite scroll animation */}
-      <style jsx>{`
+      <style jsx global>{`
+        body {
+          background-color: #030140 !important;
+        }
+        html {
+          background-color: #030140 !important;
+        }
         @keyframes scroll {
           0% {
             transform: translateX(0);
