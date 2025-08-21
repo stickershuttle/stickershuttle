@@ -113,6 +113,7 @@ function calculateCreatorEarnings(price: number, quantity: number = 1, size: str
 function ProductCard({ product, buildPackMode = false, selected, onToggleSelect, onAddToCart, getPriceOverride }: { product: MarketplaceProduct, buildPackMode?: boolean, selected?: boolean, onToggleSelect?: (id: string) => void, onAddToCart?: (product: MarketplaceProduct) => void, getPriceOverride?: (product: MarketplaceProduct) => number }) {
   const displayPrice = getPriceOverride ? getPriceOverride(product) : product.price;
   const creatorEarnings = calculateCreatorEarnings(displayPrice);
+  const storeCredit = displayPrice * 0.05; // 5% store credit
   
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -221,7 +222,7 @@ function ProductCard({ product, buildPackMode = false, selected, onToggleSelect,
                   </span>
                 )}
               </div>
-              {!buildPackMode && (
+                              {!buildPackMode && (
                 <div className="flex items-center text-yellow-200 text-xs">
                   <span>+</span>
                   <img 
@@ -229,7 +230,7 @@ function ProductCard({ product, buildPackMode = false, selected, onToggleSelect,
                     alt="Credits" 
                     className="w-3 h-3 object-contain ml-0.5 mr-1.5"
                   />
-                  <span>${creatorEarnings.toFixed(2)} in store credit</span>
+                  <span>${storeCredit.toFixed(2)} in store credit</span>
                 </div>
               )}
             </div>
@@ -324,7 +325,7 @@ function ProductCard({ product, buildPackMode = false, selected, onToggleSelect,
                       alt="Credits" 
                       className="w-3 h-3 object-contain ml-0.5 mr-1.5"
                     />
-                    <span>${creatorEarnings.toFixed(2)} in store credit</span>
+                    <span>${storeCredit.toFixed(2)} in store credit</span>
                   </div>
                 )}
               </div>
@@ -1650,14 +1651,14 @@ export default function Marketplace() {
                 {/* Build a Pack Button - Desktop only */}
                 <div className="hidden lg:block mb-6">
                   <div className="relative">
-                    {/* 50% OFF Pill - Positioned like a bow at top right */}
-                    {!buildPackMode && (
-                      <div className="absolute -top-3 -right-3 z-30 transform rotate-12">
-                        <span className="inline-flex items-center justify-center text-xs bg-red-500 text-white px-2 py-1 rounded-full font-bold shadow-lg">
-                          50% OFF
-                        </span>
-                      </div>
-                    )}
+                                      {/* 50% OFF Pill - Positioned like a bow at top right */}
+                  {!buildPackMode && (
+                    <div className="absolute -top-2 -right-5 z-[9999] transform rotate-12">
+                      <span className="inline-flex items-center justify-center text-xs bg-red-500 text-white px-2 py-1 rounded-full font-bold shadow-lg">
+                        50% OFF
+                      </span>
+                    </div>
+                  )}
                     
                     <button
                       onClick={() => {
@@ -2120,7 +2121,7 @@ export default function Marketplace() {
                 <div className="relative">
                   {/* 50% OFF Pill - Positioned like a bow at top right */}
                   {!buildPackMode && (
-                    <div className="absolute -top-3 -right-3 z-30 transform rotate-12">
+                    <div className="absolute -top-3 -right-3 z-[99999] transform rotate-12" style={{ position: 'fixed', top: '15px', right: '10px' }}>
                       <span className="inline-flex items-center justify-center text-xs bg-red-500 text-white px-2 py-1 rounded-full font-bold shadow-lg">
                         50% OFF
                       </span>
@@ -2766,67 +2767,67 @@ export default function Marketplace() {
                            right: '0'
                          }}>
                            <div className="flex flex-col gap-3">
-                             {/* Top Row: Selected Sticker Thumbnails */}
-                             <div className="flex items-center justify-center gap-2">
-                               {selectedPackProducts.map((product, index) => (
-                                 <div
-                                   key={product.id}
-                                   className={`relative w-10 h-10 rounded-lg border-2 transition-all duration-300 ${
-                                     selectedPackIds.length === 5 
-                                       ? 'border-yellow-400/80 scale-110 shadow-lg shadow-yellow-400/30' 
-                                       : 'border-white/20'
-                                   }`}
-                                   style={{
-                                     background: selectedPackIds.length === 5 
-                                       ? 'rgba(255, 215, 0, 0.1)' 
-                                       : 'rgba(255, 255, 255, 0.05)',
-                                     backdropFilter: 'blur(12px)'
-                                   }}
-                                 >
-                                   <img 
-                                     src={product.default_image} 
-                                     alt={product.title}
-                                     className="w-full h-full object-cover"
-                                   />
-                                   {/* Remove button */}
-                                   <button
-                                     onClick={() => togglePackSelection(product.id)}
-                                     className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center hover:bg-red-600 transition-colors z-10"
-                                   >
-                                     ×
-                                   </button>
-                                   
-                                   {/* Success indicator when 5 selected */}
-                                   {selectedPackIds.length === 5 && (
-                                     <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
-                                       <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                       </svg>
-                                     </div>
-                                   )}
-                                 </div>
-                               ))}
-                               
-                               {/* Placeholder thumbnails for remaining slots */}
-                               {Array.from({ length: 5 - selectedPackIds.length }, (_, index) => (
-                                 <div 
-                                   key={`placeholder-${index}`}
-                                   className="w-10 h-10 rounded-lg border-2 border-dashed border-white/20 flex items-center justify-center"
-                                   style={{
-                                     background: 'rgba(255, 255, 255, 0.02)',
-                                     backdropFilter: 'blur(12px)'
-                                   }}
-                                 >
-                                   <svg className="w-4 h-4 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                   </svg>
-                                 </div>
-                               ))}
-                             </div>
-
-                             {/* Bottom Row: Size Selection and Add to Cart */}
+                             {/* Top Row: Selected Sticker Thumbnails + Size Selection */}
                              <div className="flex items-center justify-between gap-3">
-                               {/* Size Selection Buttons */}
+                               {/* Left: Selected Sticker Thumbnails */}
+                               <div className="flex items-center gap-2">
+                                 {selectedPackProducts.map((product, index) => (
+                                   <div
+                                     key={product.id}
+                                     className={`relative w-10 h-10 rounded-lg border-2 transition-all duration-300 ${
+                                       selectedPackIds.length === 5 
+                                         ? 'border-yellow-400/80 scale-110 shadow-lg shadow-yellow-400/30' 
+                                         : 'border-white/20'
+                                     }`}
+                                     style={{
+                                       background: selectedPackIds.length === 5 
+                                         ? 'rgba(255, 215, 0, 0.1)' 
+                                         : 'rgba(255, 255, 255, 0.05)',
+                                       backdropFilter: 'blur(12px)'
+                                     }}
+                                   >
+                                     <img 
+                                       src={product.default_image} 
+                                       alt={product.title}
+                                       className="w-full h-full object-cover"
+                                     />
+                                     {/* Remove button */}
+                                     <button
+                                       onClick={() => togglePackSelection(product.id)}
+                                       className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center hover:bg-red-600 transition-colors z-10"
+                                     >
+                                       ×
+                                     </button>
+                                     
+                                     {/* Success indicator when 5 selected */}
+                                     {selectedPackIds.length === 5 && (
+                                       <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
+                                         <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                         </svg>
+                                       </div>
+                                     )}
+                                   </div>
+                                 ))}
+                                 
+                                 {/* Placeholder thumbnails for remaining slots */}
+                                 {Array.from({ length: 5 - selectedPackIds.length }, (_, index) => (
+                                   <div 
+                                     key={`placeholder-${index}`}
+                                     className="w-10 h-10 rounded-lg border-2 border-dashed border-white/20 flex items-center justify-center"
+                                     style={{
+                                       background: 'rgba(255, 255, 255, 0.02)',
+                                       backdropFilter: 'blur(12px)'
+                                     }}
+                                   >
+                                     <svg className="w-4 h-4 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                     </svg>
+                                   </div>
+                                 ))}
+                               </div>
+
+                               {/* Right: Size Selection Dropdown */}
                                <div className="flex items-center gap-1">
                                  {[
                                    { size: '3"', price: 9.98 },
@@ -2858,12 +2859,14 @@ export default function Marketplace() {
                                    </button>
                                  ))}
                                </div>
+                             </div>
 
-                               {/* Add to Cart Button */}
+                             {/* Bottom Row: Add to Cart Button - Full Width */}
+                             <div className="w-full">
                                <button
                                  disabled={selectedPackIds.length !== 5}
                                  onClick={handleAddPackToCart}
-                                 className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap transform hover:scale-105 ${
+                                 className={`w-full px-4 py-3 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap transform hover:scale-105 ${
                                    selectedPackIds.length === 5
                                      ? ''
                                      : 'opacity-50 cursor-not-allowed'

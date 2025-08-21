@@ -410,29 +410,43 @@ export default function UniversalHeader() {
             <div className={isAdminPage ? "" : "lg:mr-6"}>
               <Link href="/" className="flex items-center gap-2">
                 <div className="relative h-12 w-auto logo-container">
-                  {/* Main Sticker Shuttle Logo */}
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
-                    alt="Sticker Shuttle Logo" 
-                    className={`h-12 w-auto object-contain ${!isMarketspacePage ? 'logo-hover' : ''} cursor-pointer transition-all duration-500 ${isMarketspacePage ? 'logo-out' : 'logo-in'}`}
-                    style={{ maxWidth: 'none' }}
-                  />
-                  
-                  {/* Marketspace Logo with back arrow */}
-                  <div className={`absolute top-0 left-0 flex items-center gap-2 transition-all duration-500 ${isMarketspacePage ? 'logo-in' : 'logo-out'}`}>
-                    {/* Back arrow for marketspace */}
-                    {isMarketspacePage && (
-                      <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
+                  {/* Admin SSPro Logo - Show only for admin users */}
+                  {isAdmin && (
                     <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755176111/MarketspaceLogo_y4s7os.svg" 
-                      alt="Marketspace Logo" 
-                      className={`h-12 w-auto object-contain ${isMarketspacePage ? 'logo-hover' : ''} cursor-pointer`}
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755791936/SSPro_wxtsdq.png" 
+                      alt="SSPro Logo" 
+                      className="h-12 w-auto object-contain cursor-pointer transition-all duration-500 logo-hover"
                       style={{ maxWidth: 'none' }}
                     />
-                  </div>
+                  )}
+                  
+                  {/* Main Sticker Shuttle Logo - Show for non-admin users or when not admin */}
+                  {!isAdmin && (
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
+                      alt="Sticker Shuttle Logo" 
+                      className={`h-12 w-auto object-contain ${!isMarketspacePage ? 'logo-hover' : ''} cursor-pointer transition-all duration-500 ${isMarketspacePage ? 'logo-out' : 'logo-in'}`}
+                      style={{ maxWidth: 'none' }}
+                    />
+                  )}
+                  
+                  {/* Marketspace Logo with back arrow - Only show for non-admin users */}
+                  {!isAdmin && (
+                    <div className={`absolute top-0 left-0 flex items-center gap-2 transition-all duration-500 ${isMarketspacePage ? 'logo-in' : 'logo-out'}`}>
+                      {/* Back arrow for marketspace */}
+                      {isMarketspacePage && (
+                        <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755176111/MarketspaceLogo_y4s7os.svg" 
+                        alt="Marketspace Logo" 
+                        className={`h-12 w-auto object-contain ${isMarketspacePage ? 'logo-hover' : ''} cursor-pointer`}
+                        style={{ maxWidth: 'none' }}
+                      />
+                    </div>
+                  )}
                 </div>
               </Link>
             </div>
@@ -474,21 +488,35 @@ export default function UniversalHeader() {
           <div className="lg:hidden absolute left-1/2 transform -translate-x-1/2 z-40">
             <Link href="/">
               <div className="relative h-12 w-auto logo-container">
-                {/* Main Sticker Shuttle Logo */}
-                <img 
-                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
-                  alt="Sticker Shuttle Logo" 
-                  className={`h-12 w-auto object-contain ${!isMarketspacePage ? 'logo-hover' : ''} cursor-pointer transition-all duration-500 ${isMarketspacePage ? 'logo-out' : 'logo-in'}`}
-                  style={{ maxWidth: 'none' }}
-                />
+                {/* Admin SSPro Logo - Show only for admin users */}
+                {isAdmin && (
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755791936/SSPro_wxtsdq.png" 
+                    alt="SSPro Logo" 
+                    className="h-12 w-auto object-contain cursor-pointer transition-all duration-500 logo-hover"
+                    style={{ maxWidth: 'none' }}
+                  />
+                )}
                 
-                {/* Marketplace Logo */}
-                <img 
-                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755176111/MarketspaceLogo_y4s7os.svg" 
-                  alt="Marketspace Logo" 
-                  className={`absolute top-0 left-0 h-12 w-auto object-contain ${isMarketspacePage ? 'logo-hover' : ''} cursor-pointer transition-all duration-500 ${isMarketspacePage ? 'logo-in' : 'logo-out'}`}
-                  style={{ maxWidth: 'none' }}
-                />
+                {/* Main Sticker Shuttle Logo - Show for non-admin users */}
+                {!isAdmin && (
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
+                    alt="Sticker Shuttle Logo" 
+                    className={`h-12 w-auto object-contain ${!isMarketspacePage ? 'logo-hover' : ''} cursor-pointer transition-all duration-500 ${isMarketspacePage ? 'logo-out' : 'logo-in'}`}
+                    style={{ maxWidth: 'none' }}
+                  />
+                )}
+                
+                {/* Marketplace Logo - Only show for non-admin users */}
+                {!isAdmin && (
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755176111/MarketspaceLogo_y4s7os.svg" 
+                    alt="Marketspace Logo" 
+                    className={`absolute top-0 left-0 h-12 w-auto object-contain ${isMarketspacePage ? 'logo-hover' : ''} cursor-pointer transition-all duration-500 ${isMarketspacePage ? 'logo-in' : 'logo-out'}`}
+                    style={{ maxWidth: 'none' }}
+                  />
+                )}
               </div>
             </Link>
           </div>
@@ -1380,11 +1408,19 @@ export default function UniversalHeader() {
         <div className="p-6">
           {/* Menu Header */}
           <div className="flex items-center justify-between mb-8">
-            <img 
-              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
-              alt="Sticker Shuttle Logo" 
-              className="h-8 w-auto object-contain"
-            />
+            {isAdmin ? (
+              <img 
+                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755791936/SSPro_wxtsdq.png" 
+                alt="SSPro Logo" 
+                className="h-8 w-auto object-contain"
+              />
+            ) : (
+              <img 
+                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
+                alt="Sticker Shuttle Logo" 
+                className="h-8 w-auto object-contain"
+              />
+            )}
             <button 
               onClick={() => setIsMobileMenuOpen(false)}
               className="text-white text-xl p-2"
