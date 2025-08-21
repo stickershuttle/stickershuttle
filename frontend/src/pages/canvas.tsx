@@ -1180,22 +1180,8 @@ export default function CanvasPage() {
 
               {/* Right Side - User Elements */}
               <div className="flex items-center gap-3">
-                {/* Deals Button */}
-                <Link 
-                  href="/deals"
-                  className="px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.3) 0%, rgba(251, 191, 36, 0.15) 50%, rgba(251, 191, 36, 0.05) 100%)',
-                    border: '1px solid rgba(251, 191, 36, 0.4)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(12px)'
-                  }}
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" style={{ color: '#fbbf24' }}>
-                    <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinejoin="round" strokeLinecap="round" />
-                  </svg>
-                  Deals
-                </Link>
+                {/* Deals Button - hidden for wholesale (header handles profile lookup and redirect guards page) */}
+                {/* Removed to avoid showing to wholesale users */}
 
                 {/* Store Credit Balance - Show if logged in */}
                 {showAccountDashboard && (

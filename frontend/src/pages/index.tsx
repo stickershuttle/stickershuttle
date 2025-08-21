@@ -183,12 +183,7 @@ export default function Home() {
                   >
                     Order Sample Pack →
                   </a>
-                  <a 
-                    href="/deals" 
-                    className="text-white hover:text-purple-200 transition pb-8  md:pb-0 block md:hidden"
-                  >
-                   🔥 Deals →
-                  </a>
+                  {/* Hide deals link for wholesale users (handled in header globally). Keeping home CTA generic. */}
 
         </div>
 

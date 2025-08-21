@@ -199,10 +199,10 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
             </svg>
           )
         });
-      } else if (segments[1] === 'marketplace') {
+      } else if (segments[1] === 'marketspace') {
         breadcrumbs.push({
           label: 'Creators Space',
-          href: '/admin/marketplace',
+          href: '/admin/marketspace',
           icon: (
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
@@ -272,7 +272,7 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
         <div 
           className="hidden xl:block fixed left-0 right-0 z-10 px-6 py-3"
           style={{
-            top: 'calc(4rem + var(--header-alerts-height, 0px))',
+            top: 'calc(4rem + var(--header-alerts-height, 0px) + 44px)',
             backgroundColor: 'rgba(3, 1, 64, 0.95)',
             backdropFilter: 'blur(10px)',
             borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
@@ -612,20 +612,20 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
 
                 {/* Marketplace */}
                 <a
-                  href="/admin/marketplace"
+                  href="/admin/marketspace"
                   className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
-                    router.asPath.startsWith('/admin/marketplace')
+                    router.asPath.startsWith('/admin/marketspace')
                       ? 'text-white bg-emerald-500/15 border-l-3 border-emerald-500'
                       : 'text-gray-400 hover:text-white border-l-3 border-transparent'
                   }`}
                   onMouseEnter={(e) => {
-                    if (!router.asPath.startsWith('/admin/marketplace')) {
+                    if (!router.asPath.startsWith('/admin/marketspace')) {
                       e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
                       e.currentTarget.style.color = '#6EE7B7';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!router.asPath.startsWith('/admin/marketplace')) {
+                    if (!router.asPath.startsWith('/admin/marketspace')) {
                       e.currentTarget.style.backgroundColor = 'transparent';
                       e.currentTarget.style.color = '';
                     }

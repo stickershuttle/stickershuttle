@@ -272,9 +272,11 @@ export default function AdminOrders() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   const [columns, setColumns] = useState(defaultColumns);
-  const [timeFilter, setTimeFilter] = useState('mtd');  // '1' = today, '7' = last 7 days, 'mtd' = month to date, '30' = last 30 days, etc.
+  const [timeFilter, setTimeFilter] = useState('mtd');  // '1' = today, 'yesterday' = yesterday, '2daysago' = 2 days ago, '7' = last 7 days, 'mtd' = month to date, 'ytd' = year to date, '30' = last 30 days, etc.
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState('all');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [customDateRange, setCustomDateRange] = useState({ start: null as Date | null, end: null as Date | null });
@@ -2071,11 +2073,28 @@ export default function AdminOrders() {
     
     const now = new Date();
     let cutoffDate = new Date();
+    let endDate = new Date();
     
     switch (days) {
       case '1':
         // Today
         cutoffDate.setHours(0, 0, 0, 0);
+        break;
+      case 'yesterday':
+        // Yesterday
+        cutoffDate = new Date(now);
+        cutoffDate.setDate(now.getDate() - 1);
+        cutoffDate.setHours(0, 0, 0, 0);
+        endDate = new Date(cutoffDate);
+        endDate.setHours(23, 59, 59, 999);
+        break;
+      case '2daysago':
+        // 2 Days Ago
+        cutoffDate = new Date(now);
+        cutoffDate.setDate(now.getDate() - 2);
+        cutoffDate.setHours(0, 0, 0, 0);
+        endDate = new Date(cutoffDate);
+        endDate.setHours(23, 59, 59, 999);
         break;
       case '7':
         cutoffDate.setDate(now.getDate() - 7);
@@ -2083,6 +2102,11 @@ export default function AdminOrders() {
       case 'mtd':
         // Month to date - first day of current month
         cutoffDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        cutoffDate.setHours(0, 0, 0, 0);
+        break;
+      case 'ytd':
+        // Year to date - first day of current year
+        cutoffDate = new Date(now.getFullYear(), 0, 1);
         cutoffDate.setHours(0, 0, 0, 0);
         break;
       case '30':
@@ -2094,12 +2118,26 @@ export default function AdminOrders() {
       case '365':
         cutoffDate.setFullYear(now.getFullYear() - 1);
         break;
+      case 'custom':
+        // Custom date range
+        if (customStartDate && customEndDate) {
+          cutoffDate = new Date(customStartDate);
+          cutoffDate.setHours(0, 0, 0, 0);
+          endDate = new Date(customEndDate);
+          endDate.setHours(23, 59, 59, 999);
+        } else {
+          return orders;
+        }
+        break;
       default:
         return orders;
     }
     
     return orders.filter(order => {
       const orderDate = new Date(order.orderCreatedAt || order.createdAt || '');
+      if (days === 'yesterday' || days === '2daysago' || days === 'custom') {
+        return orderDate >= cutoffDate && orderDate <= endDate;
+      }
       return orderDate >= cutoffDate;
     });
   };
@@ -2151,11 +2189,15 @@ export default function AdminOrders() {
   const getTimeFilterLabel = (days: string) => {
     switch (days) {
       case '1': return 'Today';
+      case 'yesterday': return 'Yesterday';
+      case '2daysago': return '2 Days Ago';
       case '7': return 'Last 7 days';
       case 'mtd': return 'Month to date';
+      case 'ytd': return 'Year to date';
       case '30': return 'Last 30 days';
       case '90': return 'Last 90 days';
       case '365': return 'Last 365 days';
+      case 'custom': return `${customStartDate} to ${customEndDate}`;
       default: return 'All time';
     }
   };
@@ -2307,6 +2349,46 @@ export default function AdminOrders() {
                       Today
                     </button>
                     <button
+                      onClick={() => setTimeFilter('yesterday')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        timeFilter === 'yesterday'
+                          ? 'text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      style={{
+                        background: timeFilter === 'yesterday' 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: `1px solid ${timeFilter === 'yesterday' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                        boxShadow: timeFilter === 'yesterday' 
+                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                      }}
+                    >
+                      Yesterday
+                    </button>
+                    <button
+                      onClick={() => setTimeFilter('2daysago')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        timeFilter === '2daysago'
+                          ? 'text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      style={{
+                        background: timeFilter === '2daysago' 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: `1px solid ${timeFilter === '2daysago' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                        boxShadow: timeFilter === '2daysago' 
+                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                      }}
+                    >
+                      2 Days Ago
+                    </button>
+                    <button
                       onClick={() => setTimeFilter('7')}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                         timeFilter === '7'
@@ -2345,6 +2427,26 @@ export default function AdminOrders() {
                       }}
                     >
                       Month to date
+                    </button>
+                    <button
+                      onClick={() => setTimeFilter('ytd')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        timeFilter === 'ytd'
+                          ? 'text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      style={{
+                        background: timeFilter === 'ytd' 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: `1px solid ${timeFilter === 'ytd' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                        boxShadow: timeFilter === 'ytd' 
+                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                      }}
+                    >
+                      Year to date
                     </button>
                     <button
                       onClick={() => setTimeFilter('30')}
@@ -2406,13 +2508,97 @@ export default function AdminOrders() {
                     >
                       Last year
                     </button>
+                    <button
+                      onClick={() => {
+                        setTimeFilter('custom');
+                        // Set default dates if not already set
+                        if (!customStartDate || !customEndDate) {
+                          const today = new Date();
+                          const lastWeek = new Date();
+                          lastWeek.setDate(today.getDate() - 7);
+                          setCustomStartDate(lastWeek.toISOString().split('T')[0]);
+                          setCustomEndDate(today.toISOString().split('T')[0]);
+                        }
+                      }}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        timeFilter === 'custom'
+                          ? 'text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      style={{
+                        background: timeFilter === 'custom' 
+                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: `1px solid ${timeFilter === 'custom' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                        boxShadow: timeFilter === 'custom' 
+                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                      }}
+                    >
+                      Custom Range
+                    </button>
                   </div>
+
+                  {/* Custom Date Range Selector */}
+                  {timeFilter === 'custom' && (
+                    <div className="mt-4 p-4 rounded-lg" style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                      backdropFilter: 'blur(12px)'
+                    }}>
+                      <div className="flex flex-col sm:flex-row gap-4 items-center">
+                        <div className="flex flex-col">
+                          <label htmlFor="desktop-start-date" className="text-sm text-gray-300 mb-2">Start Date</label>
+                          <input
+                            id="desktop-start-date"
+                            type="date"
+                            value={customStartDate}
+                            onChange={(e) => setCustomStartDate(e.target.value)}
+                            className="px-3 py-2 rounded-lg text-white text-sm bg-transparent border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              backdropFilter: 'blur(12px)'
+                            }}
+                            aria-label="Start date for custom date range"
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label htmlFor="desktop-end-date" className="text-sm text-gray-300 mb-2">End Date</label>
+                          <input
+                            id="desktop-end-date"
+                            type="date"
+                            value={customEndDate}
+                            onChange={(e) => setCustomEndDate(e.target.value)}
+                            className="px-3 py-2 rounded-lg text-white text-sm bg-transparent border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              backdropFilter: 'blur(12px)'
+                            }}
+                            aria-label="End date for custom date range"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Mobile Filter Dropdown */}
                   <div className="lg:hidden relative">
                     <select
                       value={timeFilter}
-                      onChange={(e) => setTimeFilter(e.target.value)}
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        setTimeFilter(newValue);
+                        // Set default dates for custom range if not already set
+                        if (newValue === 'custom' && (!customStartDate || !customEndDate)) {
+                          const today = new Date();
+                          const lastWeek = new Date();
+                          lastWeek.setDate(today.getDate() - 7);
+                          setCustomStartDate(lastWeek.toISOString().split('T')[0]);
+                          setCustomEndDate(today.toISOString().split('T')[0]);
+                        }
+                      }}
                       className="w-full px-4 py-3 pr-10 rounded-lg text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all appearance-none cursor-pointer"
                       style={{
                         background: 'rgba(255, 255, 255, 0.05)',
@@ -2425,16 +2611,63 @@ export default function AdminOrders() {
                       aria-label="Select time filter"
                     >
                       <option value="1" style={{ backgroundColor: '#030140' }}>Today</option>
+                      <option value="yesterday" style={{ backgroundColor: '#030140' }}>Yesterday</option>
+                      <option value="2daysago" style={{ backgroundColor: '#030140' }}>2 Days Ago</option>
                       <option value="7" style={{ backgroundColor: '#030140' }}>Last 7 days</option>
                       <option value="mtd" style={{ backgroundColor: '#030140' }}>Month to date</option>
+                      <option value="ytd" style={{ backgroundColor: '#030140' }}>Year to date</option>
                       <option value="30" style={{ backgroundColor: '#030140' }}>Last 30 days</option>
                       <option value="90" style={{ backgroundColor: '#030140' }}>Last 90 days</option>
                       <option value="365" style={{ backgroundColor: '#030140' }}>Last year</option>
+                      <option value="custom" style={{ backgroundColor: '#030140' }}>Custom Range</option>
                     </select>
                     <svg className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
+
+                  {/* Mobile Custom Date Range Selector */}
+                  {timeFilter === 'custom' && (
+                    <div className="mt-4 p-4 rounded-lg" style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                      backdropFilter: 'blur(12px)'
+                    }}>
+                      <div className="flex flex-col gap-4">
+                        <div className="flex flex-col">
+                          <label htmlFor="mobile-start-date" className="text-sm text-gray-300 mb-2">Start Date</label>
+                          <input
+                            id="mobile-start-date"
+                            type="date"
+                            value={customStartDate}
+                            onChange={(e) => setCustomStartDate(e.target.value)}
+                            className="px-3 py-2 rounded-lg text-white text-sm bg-transparent border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              backdropFilter: 'blur(12px)'
+                            }}
+                            aria-label="Start date for custom date range"
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label htmlFor="mobile-end-date" className="text-sm text-gray-300 mb-2">End Date</label>
+                          <input
+                            id="mobile-end-date"
+                            type="date"
+                            value={customEndDate}
+                            onChange={(e) => setCustomEndDate(e.target.value)}
+                            className="px-3 py-2 rounded-lg text-white text-sm bg-transparent border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              backdropFilter: 'blur(12px)'
+                            }}
+                            aria-label="End date for custom date range"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Analytics Cards - Mobile: 2x2 Grid, Desktop: 1x4 Grid */}
@@ -2451,10 +2684,42 @@ export default function AdminOrders() {
                       <div className="flex items-center justify-between mb-1 lg:mb-2">
                         <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Total Sales</span>
                       </div>
-                      <div className="text-sm lg:text-xl font-bold mb-1" style={{ color: '#86efac' }}>
-                        {formatCurrency(timeFilteredAnalytics?.totalSales || 0)}
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <div className="text-sm lg:text-xl font-bold mb-1" style={{ color: '#86efac' }}>
+                            {formatCurrency(timeFilteredAnalytics?.totalSales || 0)}
+                          </div>
+                          <div className="text-xs text-gray-500 hidden lg:block">Revenue generated</div>
+                        </div>
+                        
+                        {/* Mini Chart - Analytics Style */}
+                        <div className="hidden lg:block ml-4">
+                          {timeFilteredAnalytics?.chartData && timeFilteredAnalytics.chartData.length > 0 && (
+                            <div style={{ width: '100px', height: '50px' }}>
+                              <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={timeFilteredAnalytics.chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                                  <defs>
+                                    <linearGradient id="miniSalesGradient" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3}/>
+                                      <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
+                                    </linearGradient>
+                                  </defs>
+                                  <Area 
+                                    type="monotone" 
+                                    dataKey="sales" 
+                                    stroke="#a855f7"
+                                    strokeWidth={2}
+                                    fillOpacity={1} 
+                                    fill="url(#miniSalesGradient)"
+                                    animationDuration={1000}
+                                    animationEasing="ease-out"
+                                  />
+                                </AreaChart>
+                              </ResponsiveContainer>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-500 hidden lg:block">Revenue generated</div>
                     </div>
 
                     <div 

@@ -7,7 +7,9 @@ export type ProductCategory =
   | 'clear-stickers'    // Added
   | 'sticker-sheets'    // Added
   | 'vinyl-banners'
-  | 'deals';            // Added for preset deals
+  | 'deals'             // Added for preset deals
+  | 'marketplace'       // Added for marketplace products
+  | 'marketplace-pack'; // Added for marketplace packs
 
 // Size definitions for products
 export interface ProductSize {

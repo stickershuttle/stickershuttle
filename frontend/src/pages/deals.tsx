@@ -5,6 +5,9 @@ import { useCart } from "@/components/CartContext";
 import { useRouter } from "next/router";
 import { PRESET_DEALS, DealProduct, getAllActiveDeals } from "@/data/deals/preset-deals";
 import { uploadToCloudinary, validateFile, CloudinaryUploadResult, UploadProgress } from "@/utils/cloudinary";
+import { useQuery } from "@apollo/client";
+import { GET_USER_PROFILE } from "@/lib/profile-mutations";
+import { getSupabase } from "@/lib/supabase";
 
 // ImagePreview component for handling different file types
 const ImagePreview = ({ fileUrl, fileName, format }: { 
@@ -85,6 +88,8 @@ const ImagePreview = ({ fileUrl, fileName, format }: {
 
 export default function Deals() {
   const [deals, setDeals] = useState<DealProduct[]>(PRESET_DEALS);
+  const [user, setUser] = useState<any>(null);
+  const [checkingUser, setCheckingUser] = useState<boolean>(true);
   const [uploadStates, setUploadStates] = useState<{[key: string]: {
     file: CloudinaryUploadResult | null;
     isUploading: boolean;
@@ -100,6 +105,37 @@ export default function Deals() {
   
   const { addToCart } = useCart();
   const router = useRouter();
+  
+  // Load user session
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const supabase = getSupabase();
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user || null);
+      } catch (e) {
+        // no-op
+      } finally {
+        setCheckingUser(false);
+      }
+    };
+    loadUser();
+  }, []);
+
+  // Query profile for wholesale status
+  const { data: profileData } = useQuery(GET_USER_PROFILE, {
+    variables: { userId: user?.id || '' },
+    skip: !user?.id,
+  });
+
+  const isWholesale = !!profileData?.getUserProfile?.isWholesaleCustomer;
+
+  // Redirect wholesale users away from deals page
+  useEffect(() => {
+    if (isWholesale) {
+      router.replace('/products');
+    }
+  }, [isWholesale, router]);
 
   // Load deals from localStorage or use preset deals
   const loadDeals = () => {
@@ -664,6 +700,9 @@ export default function Deals() {
               </div>
     );
   };
+
+  // Prevent flash if redirecting
+  if (isWholesale) return null;
 
   return (
     <Layout title="Special Deals - Premium Sticker Packages | Sticker Shuttle">

@@ -38,7 +38,7 @@ export default function Layout({
       
       <div className="min-h-screen text-white relative" style={{ backgroundColor: '#030140', fontFamily: 'Inter, sans-serif' }}>
         <UniversalHeader />
-        <main style={{ paddingTop: 'calc(4rem + var(--header-alerts-height, 0px))' }}>
+        <main className="pt-[calc(4rem+var(--header-alerts-height,0px)+52px)] sm:pt-[calc(4rem+var(--header-alerts-height,0px)+44px)]">
           {children}
         </main>
         <UniversalFooter />

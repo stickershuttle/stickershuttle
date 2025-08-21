@@ -139,6 +139,16 @@ const calculateItemPricing = (
       area: 1 // Default area for additional cost
     };
   }
+
+  // Marketplace items: trust stored unit/total price from product page
+  if (item.product.category === 'marketplace' || item.product.category === 'marketplace-stickers') {
+    return {
+      total: (typeof item.unitPrice === 'number' ? item.unitPrice : 0) * quantity,
+      perSticker: typeof item.unitPrice === 'number' ? item.unitPrice : 0,
+      discountPercentage: 0,
+      area: 9
+    };
+  }
   
   // For vinyl banners, use the original pricing from the calculator - don't recalculate
   if (item.product.category === 'vinyl-banners') {
@@ -1220,6 +1230,30 @@ export default function CartPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <h1 className="text-3xl font-bold text-white">Your Cart</h1>
           </div>
+
+          {/* Honeymoon Closure Warning */}
+          <div className="mb-6 p-4 rounded-lg border" style={{
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.8))',
+            borderColor: 'rgba(239, 68, 68, 0.6)',
+            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+          }}>
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 mt-0.5">
+                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-white font-semibold text-sm mb-1">Important Notice</h3>
+                <p className="text-white text-sm leading-relaxed">
+                All orders in August will be fulfilled. We will be closed from <strong>Sept. 4th-17th</strong>. Any orders during that time will be fulfilled when we return. For emergency orders, please text us (303) 219-0518.{' '}
+                  <Link href="/blog/ciao-bella-were-off-to-italy" className="underline hover:no-underline transition-all duration-200 font-medium">
+                    Read more →
+                  </Link>
+                </p>
+              </div>
+            </div>
+          </div>
           
           {updatedCart.length === 0 ? (
             <>
@@ -1578,13 +1612,13 @@ export default function CartPage() {
                                 <div className="text-sm text-gray-300 font-medium">Additional Cost</div>
                               </div>
                             </div>
-                          ) : item.customization.customFiles?.[0] || item.product.name === 'Sample Pack by Sticker Shuttle' ? (
+                          ) : (item.customization.customFiles?.[0] || item.product.defaultImage || item.product.images?.[0] || item.product.name === 'Sample Pack by Sticker Shuttle') ? (
                             <div className="aspect-square rounded-xl overflow-hidden bg-gray-800/50 p-4">
                               <AIFileImage
-                                src={item.customization.customFiles?.[0] || (item.product.name === 'Sample Pack by Sticker Shuttle' ? 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750890354/Sample-Pack_jsy2yf.png' : '')}
+                                src={item.customization.customFiles?.[0] || item.product.defaultImage || item.product.images?.[0] || (item.product.name === 'Sample Pack by Sticker Shuttle' ? 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750890354/Sample-Pack_jsy2yf.png' : '')}
                                 filename={item.customization.customFiles?.[0] ? 
                                   item.customization.customFiles[0].split('/').pop()?.split('?')[0] || 'design.jpg' : 
-                                  'sample-pack.png'
+                                  (item.product.defaultImage || item.product.images?.[0] ? (item.product.defaultImage || item.product.images?.[0]).split('/').pop() || 'product.jpg' : 'sample-pack.png')
                                 }
                                 alt={item.product.name}
                                 className="w-full h-full object-contain"

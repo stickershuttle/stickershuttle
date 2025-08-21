@@ -8,6 +8,9 @@ import { useQuery, useMutation } from "@apollo/client";
 import { GET_CREATOR_BY_USER_ID } from "@/lib/profile-mutations";
 import { GET_PROMOTIONAL_CONTAINERS, UPDATE_PROMOTIONAL_CONTAINER } from "@/lib/promotional-container-mutations";
 import LoadingGrid from "@/components/LoadingGrid";
+import { useCart } from "@/components/CartContext";
+import { generateCartItemId } from "@/types/product";
+import { calculateRealPrice, BasePriceRow, QuantityDiscountRow, loadRealPricingData, PRESET_SIZES } from "@/utils/real-pricing";
 
 interface MarketplaceProduct {
   id: string;
@@ -61,27 +64,16 @@ interface PromotionalContainer {
 }
 
 // Simple Product Card Component
-function ProductCard({ product, buildPackMode = false, selected, onToggleSelect }: { product: MarketplaceProduct, buildPackMode?: boolean, selected?: boolean, onToggleSelect?: (id: string) => void }) {
+function ProductCard({ product, buildPackMode = false, selected, onToggleSelect, onAddToCart, getPriceOverride }: { product: MarketplaceProduct, buildPackMode?: boolean, selected?: boolean, onToggleSelect?: (id: string) => void, onAddToCart?: (product: MarketplaceProduct) => void, getPriceOverride?: (product: MarketplaceProduct) => number }) {
+  const displayPrice = getPriceOverride ? getPriceOverride(product) : product.price;
+  
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
-    // Add to cart logic here - you can integrate with your existing cart system
-    const cartItem = {
-      id: product.id,
-      title: product.title,
-      image: product.default_image || product.images[0],
-      price: product.price,
-      type: 'marketplace'
-    };
-    
-    // Get existing cart from localStorage
-    const existingCart = JSON.parse(localStorage.getItem('marketplaceCart') || '[]');
-    existingCart.push(cartItem);
-    localStorage.setItem('marketplaceCart', JSON.stringify(existingCart));
-    
-    // Show success feedback
-    alert(`Added ${product.title} to cart!`);
+    if (onAddToCart) {
+      onAddToCart(product);
+    }
   };
 
   return (
@@ -172,10 +164,10 @@ function ProductCard({ product, buildPackMode = false, selected, onToggleSelect 
             <div className="flex items-center gap-2">
               {!buildPackMode && (
                 <span className="text-white font-bold text-base">
-                  ${product.price}
+                  ${displayPrice.toFixed(2)}
                 </span>
               )}
-              {product.original_price && product.original_price > product.price && (
+              {product.original_price && product.original_price > displayPrice && (
                 <span className="text-gray-400 text-xs line-through">
                   ${product.original_price}
                 </span>
@@ -254,10 +246,10 @@ function ProductCard({ product, buildPackMode = false, selected, onToggleSelect 
               <div className="flex items-center gap-2">
                 {!buildPackMode && (
                   <span className="text-white font-bold text-base">
-                    ${product.price}
+                    ${displayPrice.toFixed(2)}
                   </span>
                 )}
-                {product.original_price && product.original_price > product.price && (
+                {product.original_price && product.original_price > displayPrice && (
                   <span className="text-gray-400 text-xs line-through">
                     ${product.original_price}
                   </span>
@@ -306,6 +298,7 @@ function ProductCard({ product, buildPackMode = false, selected, onToggleSelect 
 }
 
 export default function Marketplace() {
+  const { addToCart } = useCart();
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategories, setSelectedCategories] = useState<string[]>(["all"]);
@@ -325,6 +318,96 @@ export default function Marketplace() {
   const [selectedPackProducts, setSelectedPackProducts] = useState<MarketplaceProduct[]>([]);
   const [editingContainer, setEditingContainer] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<PromotionalContainer>>({});
+  
+  // Pricing data state
+  const [realPricingData, setRealPricingData] = useState<{
+    basePricing: BasePriceRow[];
+    quantityDiscounts: QuantityDiscountRow[];
+  } | null>(null);
+
+  // Load pricing data
+  useEffect(() => {
+    const loadPricing = async () => {
+      try {
+        console.log('🔄 Loading marketplace pricing data...');
+        const data = await loadRealPricingData();
+        setRealPricingData(data);
+        console.log('✅ Successfully loaded marketplace pricing data');
+      } catch (error) {
+        console.error('❌ Failed to load marketplace pricing data:', error);
+      }
+    };
+
+    loadPricing();
+  }, []);
+
+  // Calculate dynamic price for marketplace products (single 3" sticker)
+  const getMarketplaceProductPrice = (product: MarketplaceProduct): number => {
+    if (!realPricingData) {
+      return product.price; // Fallback to database price if pricing data not loaded
+    }
+
+    // For marketplace products, calculate the price for a single 3" sticker
+    // The CSV pricing is for bulk orders, but we need single-unit pricing
+    const sqInches = PRESET_SIZES.medium.sqInches; // 9 sq inches for 3" sticker
+    
+    // Get the base price for 9 sq inches from the CSV data
+    const basePrice = realPricingData.basePricing.find(row => row.sqInches === sqInches)?.basePrice || 1.35;
+    
+    // For single stickers, apply a markup since bulk pricing doesn't apply
+    // Single sticker pricing = base price + setup costs + single-unit markup
+    // This should result in exactly $3.99 for a 3" sticker
+    const singleStickerPrice = basePrice * 2.955; // Multiplier to get exactly $3.99 from $1.35
+    
+    return Math.round(singleStickerPrice * 100) / 100; // Round to 2 decimal places
+  };
+
+  // Handle adding marketplace product to cart
+  const handleAddMarketplaceProductToCart = (product: MarketplaceProduct) => {
+    const calculatedPrice = getMarketplaceProductPrice(product);
+    
+    const cartItem = {
+      id: generateCartItemId(),
+      product: {
+        id: product.id,
+        sku: `MARKETPLACE-${product.id}`,
+        name: product.title,
+        category: "marketplace" as const,
+        description: product.description,
+        shortDescription: product.short_description,
+        basePrice: calculatedPrice,
+        pricingModel: "per-unit" as const,
+        images: product.images,
+        defaultImage: product.default_image,
+        features: [],
+        attributes: [],
+        customizable: false,
+        isActive: product.is_active,
+        createdAt: product.created_at,
+        updatedAt: product.updated_at,
+      },
+      customization: {
+        productId: product.id,
+        selections: {},
+        options: {},
+        totalPrice: calculatedPrice,
+        unitPrice: calculatedPrice,
+        quantity: 1,
+        notes: "",
+        uploadedFiles: [],
+        isRushOrder: false,
+      },
+      quantity: 1,
+      unitPrice: calculatedPrice,
+      totalPrice: calculatedPrice,
+      addedAt: new Date().toISOString(),
+    };
+
+    addToCart(cartItem);
+    
+    // Show success feedback
+    alert(`Added ${product.title} to cart!`);
+  };
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -408,6 +491,13 @@ export default function Marketplace() {
   // Get promotional containers
   const { data: containersData, loading: containersLoading, refetch: refetchContainers } = useQuery(GET_PROMOTIONAL_CONTAINERS);
   const promotionalContainers = containersData?.getPromotionalContainers || [];
+  
+  // Debug promotional containers
+  useEffect(() => {
+    if (containersData?.getPromotionalContainers) {
+      console.log('📋 Promotional containers loaded:', containersData.getPromotionalContainers);
+    }
+  }, [containersData]);
 
   // Update promotional container mutation
   const [updatePromotionalContainer] = useMutation(UPDATE_PROMOTIONAL_CONTAINER);
@@ -633,20 +723,28 @@ export default function Marketplace() {
 
   const fetchCollections = async () => {
     try {
+      console.log('🔍 Fetching collections...');
+      
       // Prefer creator_collections (older schema where FK references that table)
       let result = await supabase
         .from('creator_collections')
         .select('id, name')
         .order('name', { ascending: true });
 
+      console.log('📊 creator_collections result:', result);
+
       if ((result.error && (result as any).status !== 406) || (result.data || []).length === 0) {
+        console.log('🔄 Trying regular collections table...');
         result = await supabase
           .from('collections')
           .select('id, name')
           .order('name', { ascending: true });
+        
+        console.log('📊 collections result:', result);
       }
 
       if (result.error) throw result.error;
+      console.log('✅ Collections loaded:', result.data);
       setCollections(result.data || []);
     } catch (err) {
       console.error('Error fetching collections:', err);
@@ -767,17 +865,51 @@ export default function Marketplace() {
   const handleAddPackToCart = () => {
     if (selectedPackIds.length !== 5) return;
     const selectedProducts = selectedPackProducts;
-    const packItem: any = {
-      id: `pack-${Date.now()}`,
-      title: 'Sticker Pack (5) - Build Your Pack',
-      image: selectedProducts[0]?.default_image || selectedProducts[0]?.images?.[0] || '/placeholder.png',
-      price: 12.99,
-      type: 'marketplace_pack',
-      items: selectedProducts.map(p => ({ id: p.id, title: p.title, image: p.default_image || p.images?.[0] }))
+    
+    const packCartItem = {
+      id: generateCartItemId(),
+      product: {
+        id: `marketplace-pack-${Date.now()}`,
+        sku: `MARKETPLACE-PACK-${Date.now()}`,
+        name: 'Sticker Pack (5) - Build Your Pack',
+        category: "marketplace-pack" as const,
+        description: 'Custom sticker pack with 5 selected designs from the marketplace',
+        shortDescription: 'Custom 5-design sticker pack',
+        basePrice: 12.99,
+        pricingModel: "per-unit" as const,
+        images: selectedProducts.map(p => p.default_image || p.images?.[0]).filter(Boolean),
+        defaultImage: selectedProducts[0]?.default_image || selectedProducts[0]?.images?.[0] || '/placeholder.png',
+        features: [],
+        attributes: [],
+        customizable: false,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      customization: {
+        productId: `marketplace-pack-${Date.now()}`,
+        selections: {},
+        options: {
+          packItems: selectedProducts.map(p => ({ 
+            id: p.id, 
+            title: p.title, 
+            image: p.default_image || p.images?.[0] 
+          }))
+        },
+        totalPrice: 12.99,
+        unitPrice: 12.99,
+        quantity: 1,
+        notes: `Pack contains: ${selectedProducts.map(p => p.title).join(', ')}`,
+        uploadedFiles: [],
+        isRushOrder: false,
+      },
+      quantity: 1,
+      unitPrice: 12.99,
+      totalPrice: 12.99,
+      addedAt: new Date().toISOString(),
     };
-    const existingCart = JSON.parse(localStorage.getItem('marketplaceCart') || '[]');
-    existingCart.push(packItem);
-    localStorage.setItem('marketplaceCart', JSON.stringify(existingCart));
+
+    addToCart(packCartItem);
     alert('Sticker pack added to cart!');
     setBuildPackMode(false);
     setSelectedPackIds([]);
@@ -788,12 +920,24 @@ export default function Marketplace() {
   const generateScatteredBackground = (collectionId: string) => {
     if (!collectionId) return null;
     
+    // Debug logging
+    console.log('🔍 generateScatteredBackground called with collectionId:', collectionId);
+    console.log('📦 Total products available:', products.length);
+    console.log('📦 Products with collection_id:', products.filter(p => p.collection_id).length);
+    console.log('📦 All collection IDs in products:', [...new Set(products.map(p => p.collection_id).filter(Boolean))]);
+    
     // Get products from the selected collection
     const collectionProducts = products.filter(p => p.collection_id === collectionId);
-    if (collectionProducts.length === 0) return null;
+    console.log('🎯 Products found for collection', collectionId, ':', collectionProducts.length);
     
-    // Take up to 6 products for better spacing
-    const backgroundProducts = collectionProducts.slice(0, 6);
+    if (collectionProducts.length === 0) {
+      console.log('❌ No products found for collection', collectionId);
+      return null;
+    }
+    
+    // Use only products from this specific collection, up to 6 maximum
+    const backgroundProducts = collectionProducts.slice(0, Math.min(6, collectionProducts.length));
+    console.log('✅ Using', backgroundProducts.length, 'products for scattered background');
     
     // Generate positions - avoid left third (33%), spread out more with slight overlaps
     const scatteredStickers = backgroundProducts.map((product, index) => {
@@ -1017,7 +1161,7 @@ export default function Marketplace() {
 
   if (userLoading) {
     return (
-      <Layout title="Marketplace - Sticker Shuttle">
+      <Layout title="Market Space - Sticker Shuttle">
         <div className="flex items-center justify-center h-64">
           <div className="text-white">Loading account...</div>
         </div>
@@ -1032,7 +1176,7 @@ export default function Marketplace() {
   
   if (!hasAccess) {
     return (
-      <Layout title="Marketplace - Coming Soon | Sticker Shuttle">
+      <Layout title="Market Space - Coming Soon | Sticker Shuttle">
         <section className="pt-[20px] pb-8">
           <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
             <div 
@@ -1090,7 +1234,7 @@ export default function Marketplace() {
   }
 
   return (
-    <Layout title="Marketplace - Sticker Shuttle">
+    <Layout title="Market Space by Sticker Shuttle">
       <style jsx>{`
         .container-style {
           background: rgba(255, 255, 255, 0.05);
@@ -1104,6 +1248,17 @@ export default function Marketplace() {
           backdrop-filter: blur(25px) saturate(180%);
           border: 1px solid rgba(59, 130, 246, 0.4);
           box-shadow: rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset;
+        }
+        
+        /* Responsive Background Image for Custom Stickers CTA */
+        .custom-stickers-cta {
+          background-image: url('https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751994147/StickerShuttle_Banner_MainMobile_a93h3q.png');
+        }
+        
+        @media (min-width: 768px) {
+          .custom-stickers-cta {
+            background-image: url('https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751382016/StickerShuttle_Banner_Main_nlzoro.png');
+          }
         }
       `}</style>
 
@@ -1621,7 +1776,13 @@ export default function Marketplace() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 items-start">
-                      {promotionalContainers.map((container: PromotionalContainer) => (
+                      {promotionalContainers.map((container: PromotionalContainer) => {
+                        console.log('🎨 Rendering promotional container:', {
+                          id: container.id,
+                          title: container.title,
+                          collectionId: container.collectionId
+                        });
+                        return (
                         <div key={container.id} className="relative">
                           {/* Admin Edit Button */}
                           {isAdmin && (
@@ -1677,9 +1838,7 @@ export default function Marketplace() {
                                           alt=""
                                           className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
                                           style={{ 
-                                            filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.1))',
-                                            border: '1px solid rgba(200, 200, 200, 0.67)',
-                                            backgroundColor: 'rgba(255, 255, 255, 0.05)'
+                                            filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.1)) drop-shadow(0 0 0 1px rgba(200, 200, 200, 0.67))'
                                           }}
                                         />
                                       </div>
@@ -1761,7 +1920,8 @@ export default function Marketplace() {
                               </div>
                             </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
 
@@ -1776,7 +1936,7 @@ export default function Marketplace() {
                           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) // Sort by most recent
                           .slice(0, 6) // Take first 6
                           .map((product) => (
-                            <ProductCard key={`recent-${product.id}`} product={product} />
+                            <ProductCard key={`recent-${product.id}`} product={product} onAddToCart={handleAddMarketplaceProductToCart} getPriceOverride={getMarketplaceProductPrice} />
                           ))}
                       </div>
                     </div>
@@ -1997,7 +2157,7 @@ export default function Marketplace() {
                   const paginatedProducts = getPaginatedProducts(combinedProducts);
                   
                   return paginatedProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} buildPackMode={buildPackMode} selected={selectedPackIds.includes(product.id)} onToggleSelect={togglePackSelection} />
+                    <ProductCard key={product.id} product={product} buildPackMode={buildPackMode} selected={selectedPackIds.includes(product.id)} onToggleSelect={togglePackSelection} onAddToCart={handleAddMarketplaceProductToCart} getPriceOverride={getMarketplaceProductPrice} />
                   ));
                 }
                 
@@ -2016,7 +2176,7 @@ export default function Marketplace() {
                 const paginatedProducts = getPaginatedProducts(sortedProducts);
                 
                 return paginatedProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} buildPackMode={buildPackMode} selected={selectedPackIds.includes(product.id)} onToggleSelect={togglePackSelection} />
+                  <ProductCard key={product.id} product={product} buildPackMode={buildPackMode} selected={selectedPackIds.includes(product.id)} onToggleSelect={togglePackSelection} onAddToCart={handleAddMarketplaceProductToCart} getPriceOverride={getMarketplaceProductPrice} />
                 ));
               })()}
             </div>
@@ -2158,27 +2318,28 @@ export default function Marketplace() {
       {/* Call to Action */}
       <section className="pb-8">
         <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
-          <div className="container-style p-8 text-center">
+          <div 
+            className="container-style custom-stickers-cta p-8 text-center relative overflow-hidden"
+            style={{
+              backgroundSize: 'cover',
+              backgroundPosition: 'center bottom',
+              backgroundRepeat: 'no-repeat'
+            }}
+          >
             <h2 className="text-2xl font-bold text-white mb-4">
-              Looking for Custom Stickers?
+              Need custom stickers?
             </h2>
             <p className="text-gray-300 mb-6 max-w-2xl mx-auto">
-              Don't see what you're looking for? We also offer custom sticker printing 
-              with our advanced calculators for vinyl, holographic, chrome, and more.
+              Don't see what you're looking for? We also offer custom sticker printing. 
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/products/vinyl-stickers"
                 className="button-style px-6 py-3 text-white font-medium rounded-lg transition-colors"
               >
-                Custom Vinyl Stickers
+                Get Started
               </Link>
-              <Link
-                href="/products/holographic-stickers"
-                className="button-style px-6 py-3 text-white font-medium rounded-lg transition-colors"
-              >
-                Custom Holographic Stickers
-              </Link>
+
             </div>
           </div>
         </div>

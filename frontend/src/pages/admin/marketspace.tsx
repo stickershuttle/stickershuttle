@@ -6,6 +6,7 @@ import { getSupabase } from "@/lib/supabase";
 import { uploadToCloudinary, validateFile, CloudinaryUploadResult, UploadProgress } from "@/utils/cloudinary";
 import { useQuery } from "@apollo/client";
 import { GET_CREATOR_BY_USER_ID } from "@/lib/profile-mutations";
+import MarketplaceStickerCalculator from "@/components/marketspace-sticker-calculator";
 
 const ADMIN_EMAILS = ['justin@stickershuttle.com'];
 
@@ -94,47 +95,44 @@ export default function CreatorsSpaceAdmin() {
   const [collectionTable, setCollectionTable] = useState<'creator_collections' | 'collections'>('collections');
   const [collectionsEnabled, setCollectionsEnabled] = useState(false);
   const [activeTab, setActiveTab] = useState('products');
-  const [showBatchUpload, setShowBatchUpload] = useState(false);
-  const [batchFiles, setBatchFiles] = useState<File[]>([]);
-  const [batchConfig, setBatchConfig] = useState({
-    category: "Die-Cut",
-    creator_id: "",
-    collection_id: "",
-    is_active: true,
-    is_featured: false,
-    stock_quantity: 1000,
-    size_pricing: {
-      "3": "3.99",
-      "4": "4.99", 
-      "5": "5.99"
-    },
-    size_compare_pricing: {
-      "3": "4.99",
-      "4": "5.99",
-      "5": "6.99"
-    },
-    markup_percentage: ""
+  const [showEditCollection, setShowEditCollection] = useState(false);
+  const [editingCollection, setEditingCollection] = useState<any>(null);
+  const [collectionFormData, setCollectionFormData] = useState({
+    name: ""
   });
-  const [batchUploading, setBatchUploading] = useState(false);
-  const [batchProgress, setBatchProgress] = useState<{current: number, total: number, currentFile: string}>({current: 0, total: 0, currentFile: ""});
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicateProduct, setDuplicateProduct] = useState<MarketplaceProduct | null>(null);
   const [duplicateQuantity, setDuplicateQuantity] = useState(1);
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [showCreateCollection, setShowCreateCollection] = useState(false);
-  const [collectionFormData, setCollectionFormData] = useState({
-    name: "",
-    description: "",
-    slug: "",
-    image_url: "",
-    creator_id: "",
-    is_active: true,
-    is_featured: false,
-    sort_order: 0
-  });
   const [isCreatingCollection, setIsCreatingCollection] = useState(false);
+  const [showBatchUpload, setShowBatchUpload] = useState(false);
+  const [batchFiles, setBatchFiles] = useState<File[]>([]);
+  const [batchUploading, setBatchUploading] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{current: number, total: number, currentFile: string}>({current: 0, total: 0, currentFile: ""});
+  const [batchProductData, setBatchProductData] = useState<{[key: string]: {
+    title: string;
+    collection_id: string;
+    creator_id: string;
+    category: string;
+    size_pricing: {
+      "3": string;
+      "4": string;
+      "5": string;
+    };
+  }}>({});
 
-  const supabase = getSupabase();
+  // Initialize Supabase client only on the client to avoid build/export env checks
+  const [supabase, setSupabase] = useState<any>(null);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        setSupabase(getSupabase());
+      } catch (e) {
+        console.error('Supabase init error:', e);
+      }
+    }
+  }, []);
 
   // Check if user is a creator
   const { data: creatorData } = useQuery(GET_CREATOR_BY_USER_ID, {
@@ -149,6 +147,7 @@ export default function CreatorsSpaceAdmin() {
   useEffect(() => {
     async function checkAccess() {
       try {
+        if (!supabase) return;
         const { data: { session } } = await supabase.auth.getSession();
 
         if (!session?.user) {
@@ -173,9 +172,9 @@ export default function CreatorsSpaceAdmin() {
         setLoading(false);
       }
     }
-
+    
     checkAccess();
-  }, []);
+  }, [supabase]);
 
   // Handle creator access check
   useEffect(() => {
@@ -276,7 +275,7 @@ export default function CreatorsSpaceAdmin() {
         title: ensureStickerSuffix(formData.title),
         description: formData.description,
         short_description: formData.short_description || "",
-        category: "Die-Cut",
+        category: formData.categories.length > 0 ? formData.categories[0] : "Die-Cut",
         creator_id: isCreator && !isAdmin ? currentCreatorId : (formData.creator_id || null),
         collection_id: collectionsEnabled ? (formData.collection_id || null) : null,
         price: derivedPrice,
@@ -623,10 +622,86 @@ export default function CreatorsSpaceAdmin() {
   };
 
   const fetchCollections = async () => {
-    // Collections temporarily disabled per requirements
-    setCollections([]);
-    setCollectionsEnabled(false);
-    setCollectionTable('collections');
+    try {
+      setCollectionTable('creator_collections');
+      const response = await fetch('/api/marketspace/collections');
+      const json = await response.json();
+      if (!response.ok) throw new Error(json?.error?.message || 'Failed to load collections');
+      
+      // Get additional data for each collection
+      const collectionsWithStats = await Promise.all(
+        (json.collections || []).map(async (collection: any) => {
+          try {
+            // Count products in this collection and get assignment dates
+            const { data: products, error: countError } = await supabase
+              .from('marketplace_products')
+              .select('id, created_at, updated_at, price')
+              .eq('collection_id', collection.id);
+
+            if (countError) {
+              console.error('Error counting products for collection:', collection.id, countError);
+              return {
+                ...collection,
+                stickerCount: 0,
+                lastStickerAssigned: null,
+                totalRevenue: 0
+              };
+            }
+
+            const stickerCount = products?.length || 0;
+            
+            // Use updated_at as proxy for when collection was assigned (when product was last modified)
+            // This assumes that assigning to collection updates the updated_at field
+            const lastStickerAssigned = products && products.length > 0 
+              ? products.sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0].updated_at
+              : null;
+
+            // Calculate total revenue from sales of products in this collection
+            let totalRevenue = 0;
+            if (products && products.length > 0) {
+              const productIds = products.map((p: any) => p.id);
+              
+              // Get order items for these products from paid orders
+              const { data: orderItems, error: revenueError } = await supabase
+                .from('order_items')
+                .select(`
+                  total_price,
+                  customer_order_id,
+                  orders_main!inner(financial_status)
+                `)
+                .in('product_id', productIds)
+                .eq('orders_main.financial_status', 'paid');
+
+              if (!revenueError && orderItems) {
+                totalRevenue = orderItems.reduce((sum: number, item: any) => sum + (item.total_price || 0), 0);
+              }
+            }
+
+            return {
+              ...collection,
+              stickerCount,
+              lastStickerAssigned,
+              totalRevenue
+            };
+          } catch (error) {
+            console.error('Error fetching stats for collection:', collection.id, error);
+            return {
+              ...collection,
+              stickerCount: 0,
+              lastStickerAssigned: null,
+              totalRevenue: 0
+            };
+          }
+        })
+      );
+
+      setCollections(collectionsWithStats);
+      setCollectionsEnabled(collectionsWithStats.length > 0);
+    } catch (err) {
+      console.error('Error fetching collections:', err);
+      setCollections([]);
+      setCollectionsEnabled(false);
+    }
   };
 
   const handleCreatorSaved = () => {
@@ -645,42 +720,26 @@ export default function CreatorsSpaceAdmin() {
     setIsCreatingCollection(true);
 
     try {
-      // Generate slug from name if not provided
-      const slug = collectionFormData.slug.trim() || 
-        collectionFormData.name.toLowerCase()
-          .replace(/[^a-z0-9\s-]/g, '')
-          .replace(/\s+/g, '-')
-          .replace(/-+/g, '-')
-          .trim();
-
+      // Only use name field since that's all the creator_collections table has
       const collectionData = {
-        ...collectionFormData,
-        slug,
-        creator_id: collectionFormData.creator_id || null,
-        sort_order: collectionFormData.sort_order || collections.length
+        name: collectionFormData.name.trim()
       };
 
-      const { data, error } = await supabase
-        .from(collectionTable)
-        .insert([collectionData])
-        .select()
-        .single();
-
-      if (error) throw error;
+      // Use API route to bypass RLS (service role)
+      const response = await fetch('/api/marketspace/collections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: collectionData.name })
+      });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json?.error?.message || 'Create failed');
 
       // Refresh collections list
       await fetchCollections();
       
       // Reset form and close modal
       setCollectionFormData({
-        name: "",
-        description: "",
-        slug: "",
-        image_url: "",
-        creator_id: "",
-        is_active: true,
-        is_featured: false,
-        sort_order: 0
+        name: ""
       });
       setShowCreateCollection(false);
       
@@ -690,6 +749,124 @@ export default function CreatorsSpaceAdmin() {
       alert('Error creating collection. Please try again.');
     } finally {
       setIsCreatingCollection(false);
+    }
+  };
+
+  const handleBatchUpload = async () => {
+    if (batchFiles.length === 0) return;
+
+    setBatchUploading(true);
+    setBatchProgress({ current: 0, total: batchFiles.length, currentFile: "" });
+
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < batchFiles.length; i++) {
+        const file = batchFiles[i];
+        const fileKey = `${file.name}-${i}`;
+        const productData = batchProductData[fileKey];
+
+        setBatchProgress({ current: i + 1, total: batchFiles.length, currentFile: file.name });
+
+        if (!productData || !productData.title.trim()) {
+          errorCount++;
+          errors.push(`${file.name}: Missing title`);
+          continue;
+        }
+
+        try {
+          // Upload image to Cloudinary
+          const imageUrl = await handleFileUpload(file);
+          
+          // Generate description
+          const description = `**${productData.title}**
+
+• High-quality vinyl sticker
+• Weather-resistant and durable
+• Perfect for laptops, water bottles, cars, and more
+• Easy to apply and remove
+• Vibrant colors that won't fade
+
+**Available Sizes:**
+• 3" - $${productData.size_pricing["3"]}
+• 4" - $${productData.size_pricing["4"]}  
+• 5" - $${productData.size_pricing["5"]}
+
+Great for personalizing your gear or as a gift!`;
+
+          // Create product data
+          const newProductData = {
+            title: productData.title.trim(),
+            description: description,
+            short_description: undefined,
+            category: productData.category,
+            creator_id: isCreator && !isAdmin ? currentCreatorId : (productData.creator_id || null),
+            collection_id: productData.collection_id || null,
+            price: parseFloat(productData.size_pricing["4"]),
+            size_pricing: {
+              "3": productData.size_pricing["3"] ? parseFloat(productData.size_pricing["3"]) : null,
+              "4": productData.size_pricing["4"] ? parseFloat(productData.size_pricing["4"]) : null,
+              "5": productData.size_pricing["5"] ? parseFloat(productData.size_pricing["5"]) : null
+            },
+            images: [imageUrl],
+            default_image: imageUrl,
+            tags: [productData.category.toLowerCase(), 'vinyl', 'sticker', 'design'],
+            is_active: true,
+            is_featured: false,
+            stock_quantity: 1000
+          };
+
+          // Insert product into database
+          const { error } = await supabase
+            .from('marketplace_products')
+            .insert([newProductData]);
+
+          if (error) {
+            throw error;
+          }
+
+          successCount++;
+        } catch (error) {
+          console.error(`Error processing ${file.name}:`, error);
+          errorCount++;
+          errors.push(`${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      // Show results
+      let message = '';
+      if (successCount > 0) {
+        message = `Successfully uploaded ${successCount} product${successCount !== 1 ? 's' : ''}!`;
+      }
+      if (errorCount > 0) {
+        message += `${message ? ' ' : ''}${errorCount} product${errorCount !== 1 ? 's' : ''} failed.`;
+      }
+      
+      if (message) {
+        alert(message);
+      } else {
+        alert('No products were processed. Please configure your products.');
+      }
+
+      if (errors.length > 0) {
+        console.error('Batch upload errors:', errors);
+      }
+
+      // Refresh products and close modal if successful
+      if (successCount > 0) {
+        await fetchProducts();
+        setShowBatchUpload(false);
+        setBatchFiles([]);
+        setBatchProductData({});
+      }
+
+    } catch (error) {
+      console.error('Batch upload error:', error);
+      alert('An error occurred during batch upload. Please try again.');
+    } finally {
+      setBatchUploading(false);
     }
   };
 
@@ -718,178 +895,76 @@ export default function CreatorsSpaceAdmin() {
     }
   };
 
-  const handleQuickCreatorChange = async (collectionId: string, newCreatorId: string) => {
+
+
+  const handleEditCollection = (collection: any) => {
+    setEditingCollection(collection);
+    setCollectionFormData({
+      name: collection.name || ""
+    });
+    setShowEditCollection(true);
+  };
+
+
+
+  const handleSaveCollection = async () => {
+    if (!editingCollection) return;
+
     try {
       const { error } = await supabase
-        .from('collections')
-        .update({ creator_id: newCreatorId || null })
-        .eq('id', collectionId);
+        .from(collectionTable)
+        .update({
+          name: collectionFormData.name
+        })
+        .eq('id', editingCollection.id);
 
       if (error) throw error;
 
       // Update the local state
       setCollections(prev => prev.map(collection => 
-        collection.id === collectionId 
-          ? { ...collection, creator_id: newCreatorId || null }
+        collection.id === editingCollection.id 
+          ? { ...collection, name: collectionFormData.name }
           : collection
       ));
 
-      // Show success message
-      const creator = creators.find(c => c.id === newCreatorId);
-      const collectionName = collections.find(c => c.id === collectionId)?.name;
-      if (newCreatorId) {
-        alert(`Collection "${collectionName}" assigned to ${creator?.creator_name}`);
-      } else {
-        alert(`Collection "${collectionName}" unassigned from creator`);
-      }
+      setShowEditCollection(false);
+      setEditingCollection(null);
+      alert(`Collection "${collectionFormData.name}" updated successfully`);
     } catch (error) {
-      console.error('Error updating collection creator:', error);
-      alert('Error updating creator assignment. Please try again.');
+      console.error('Error updating collection:', error);
+      alert('Error updating collection. Please try again.');
     }
   };
 
-  const handleBatchUpload = async () => {
-    if (batchFiles.length === 0) return;
+  const handleDeleteCollection = async (collection: any) => {
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete the collection "${collection.name}"?\n\nThis action cannot be undone. Any products assigned to this collection will be unassigned.`
+    );
 
-    // Validate collection assignment (temporarily optional)
-    // if (!batchConfig.collection_id) {
-    //   alert('Please select a collection for the batch upload');
-    //   return;
-    // }
-
-    setBatchUploading(true);
-    setBatchProgress({ current: 0, total: batchFiles.length, currentFile: "" });
+    if (!confirmDelete) return;
 
     try {
-      let successCount = 0;
-      let errorCount = 0;
-      let skippedCount = 0;
-      const errors: string[] = [];
-      const skipped: string[] = [];
+      const response = await fetch(`/api/marketspace/collections?id=${collection.id}`, {
+        method: 'DELETE',
+      });
 
-      for (let i = 0; i < batchFiles.length; i++) {
-        const file = batchFiles[i];
-        setBatchProgress({ current: i + 1, total: batchFiles.length, currentFile: file.name });
+      const result = await response.json();
 
-        // Skip AI files - they are for reference only
-        if (file.name.toLowerCase().endsWith('.ai')) {
-          skippedCount++;
-          skipped.push(file.name);
-          continue;
-        }
-
-        try {
-          // Upload image to Cloudinary
-          const imageUrl = await handleFileUpload(file);
-          
-          // Generate product title from filename
-          const fileName = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
-          const productTitle = fileName
-            .replace(/[-_]/g, ' ') // Replace hyphens and underscores with spaces
-            .replace(/\b\w/g, l => l.toUpperCase()) // Capitalize each word
-            .trim() + ' Sticker'; // Add "Sticker" suffix
-
-          // Generate short description
-          const shortDescription = `High-quality ${batchConfig.category.toLowerCase()} sticker design`;
-
-          // Generate full description
-          const description = `**${productTitle}**
-
-• High-quality vinyl sticker
-• Weather-resistant and durable
-• Perfect for laptops, water bottles, cars, and more
-• Easy to apply and remove
-• Vibrant colors that won't fade
-
-**Available Sizes:**
-• 3" - $${batchConfig.size_pricing["3"]}
-• 4" - $${batchConfig.size_pricing["4"]}  
-• 5" - $${batchConfig.size_pricing["5"]}
-
-Great for personalizing your gear or as a gift!`;
-
-          // Create product data
-          const productData = {
-            title: productTitle,
-            description: description,
-            short_description: undefined,
-            category: batchConfig.category,
-            creator_id: isCreator && !isAdmin ? currentCreatorId : (batchConfig.creator_id || null),
-            collection_id: collectionsEnabled ? (batchConfig.collection_id || null) : null,
-            price: parseFloat(batchConfig.size_pricing["4"]),
-            size_pricing: {
-              "3": batchConfig.size_pricing["3"] ? parseFloat(batchConfig.size_pricing["3"]) : null,
-              "4": batchConfig.size_pricing["4"] ? parseFloat(batchConfig.size_pricing["4"]) : null,
-              "5": batchConfig.size_pricing["5"] ? parseFloat(batchConfig.size_pricing["5"]) : null
-            },
-            size_compare_pricing: {
-              "3": batchConfig.size_compare_pricing?.["3"] ? parseFloat(batchConfig.size_compare_pricing["3"]) : null,
-              "4": batchConfig.size_compare_pricing?.["4"] ? parseFloat(batchConfig.size_compare_pricing["4"]) : null,
-              "5": batchConfig.size_compare_pricing?.["5"] ? parseFloat(batchConfig.size_compare_pricing["5"]) : null
-            },
-            images: [imageUrl],
-            default_image: imageUrl,
-            tags: [batchConfig.category.toLowerCase(), 'vinyl', 'sticker', 'design'],
-            is_active: batchConfig.is_active,
-            is_featured: batchConfig.is_featured,
-            stock_quantity: batchConfig.stock_quantity
-          };
-
-          // Insert product into database
-          const { error } = await supabase
-            .from('marketplace_products')
-            .insert([productData]);
-
-          if (error) {
-            throw error;
-          }
-
-          successCount++;
-        } catch (error) {
-          console.error(`Error processing ${file.name}:`, error);
-          errorCount++;
-          errors.push(`${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+      if (!response.ok) {
+        throw new Error(result?.error?.message || 'Failed to delete collection');
       }
 
-      // Show results
-      let message = '';
-      if (successCount > 0) {
-        message = `Successfully uploaded ${successCount} design${successCount !== 1 ? 's' : ''}!`;
-      }
-      if (skippedCount > 0) {
-        message += `${message ? ' ' : ''}${skippedCount} AI file${skippedCount !== 1 ? 's' : ''} skipped (source files only).`;
-      }
-      if (errorCount > 0) {
-        message += `${message ? ' ' : ''}${errorCount} file${errorCount !== 1 ? 's' : ''} failed.`;
-      }
-      
-      if (message) {
-        alert(message);
-      } else {
-        alert('No files were processed. Please select image files to upload.');
-      }
+      // Update the local state
+      setCollections(prev => prev.filter(c => c.id !== collection.id));
 
-      if (errors.length > 0) {
-        console.error('Batch upload errors:', errors);
-      }
-      if (skipped.length > 0) {
-        console.log('Skipped AI files:', skipped);
-      }
-
-      // Refresh products and close modal
-      await fetchProducts();
-      setShowBatchUpload(false);
-      setBatchFiles([]);
-      setBatchProgress({current: 0, total: 0, currentFile: ""});
-
+      alert(`Collection "${collection.name}" deleted successfully`);
     } catch (error) {
-      console.error('Batch upload error:', error);
-      alert('An error occurred during batch upload. Please try again.');
-    } finally {
-      setBatchUploading(false);
+      console.error('Error deleting collection:', error);
+      alert('Error deleting collection. Please try again.');
     }
   };
+
+
 
   const handleDuplicateProduct = async () => {
     if (!duplicateProduct || duplicateQuantity < 1) return;
@@ -1203,9 +1278,9 @@ Great for personalizing your gear or as a gift!`;
 
                     {/* Short Description removed per request */}
 
-                    {false && collectionsEnabled && collections.length > 0 && (
-                      <div>
-                        <label className="block text-white text-sm font-medium mb-2">Collection</label>
+                    <div>
+                      <label className="block text-white text-sm font-medium mb-2">Collection</label>
+                      {collections.length > 0 ? (
                         <select
                           value={formData.collection_id}
                           onChange={(e) => setFormData(prev => ({ ...prev, collection_id: e.target.value }))}
@@ -1219,11 +1294,24 @@ Great for personalizing your gear or as a gift!`;
                             </option>
                           ))}
                         </select>
-                        <p className="text-gray-400 text-xs mt-1">
-                          Collections help organize products (will be required once collections are set up)
-                        </p>
-                      </div>
-                    )}
+                      ) : (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-gray-400 text-xs">No collections yet</span>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => setShowCreateCollection(true)}
+                              className="emerald-button-style px-3 py-1 rounded-lg text-white text-xs"
+                            >
+                              Create Collection
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-gray-400 text-xs mt-1">
+                        Collections help organize products (will be required once collections are set up)
+                      </p>
+                    </div>
 
                     {isAdmin && (
                       <div>
@@ -1753,21 +1841,7 @@ Great for personalizing your gear or as a gift!`;
               <span className="text-white text-sm font-medium">Add Sticker Pack</span>
             </button>
 
-            {/* Batch Upload Button - Available to both admin and creators */}
-            <button
-              onClick={() => {
-                setBatchFiles([]);
-                setShowBatchUpload(true);
-              }}
-              className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/30 rounded-xl hover:border-orange-400/50 transition-all duration-200 hover:bg-white/5 group"
-            >
-              <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center mb-3 group-hover:bg-orange-500/30 transition-colors">
-                <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-              </div>
-              <span className="text-white text-sm font-medium">Batch Upload</span>
-            </button>
+
 
             {isAdmin && (
               <>
@@ -1786,8 +1860,10 @@ Great for personalizing your gear or as a gift!`;
                   <span className="text-white text-sm font-medium">Add New Creator</span>
                 </button>
 
-            {/* Collections feature toggle - hidden when disabled */}
-            {false && collectionsEnabled && (
+            {/* Create Collection */}
+            {(
+              true
+            ) && (
             <button
               onClick={() => setShowCreateCollection(true)}
               className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/30 rounded-xl hover:border-green-400/50 transition-all duration-200 hover:bg-white/5 group"
@@ -1810,7 +1886,8 @@ Great for personalizing your gear or as a gift!`;
 
           {/* Tab Navigation */}
           {isAdmin && (
-            <div className="flex space-x-1 mb-6 border-b border-white/20">
+            <div className="flex items-center justify-between mb-6 border-b border-white/20">
+              <div className="flex space-x-1">
               <button
                 onClick={() => setActiveTab('products')}
                 className={`px-6 py-3 text-sm font-medium rounded-t-lg transition-all duration-200 ${
@@ -1821,7 +1898,7 @@ Great for personalizing your gear or as a gift!`;
               >
                 Products ({products.length})
               </button>
-              {false && collectionsEnabled && collections.length > 0 && (
+              {collections.length > 0 && (
                 <button
                   onClick={() => setActiveTab('collections')}
                   className={`px-6 py-3 text-sm font-medium rounded-t-lg transition-all duration-200 ${
@@ -1842,6 +1919,19 @@ Great for personalizing your gear or as a gift!`;
                 }`}
               >
                 Creators ({creators.length})
+                </button>
+              </div>
+              
+              {/* Batch Upload Button */}
+              <button
+                onClick={() => setShowBatchUpload(true)}
+                className="px-4 py-2 text-sm font-medium text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 rounded-lg transition-all duration-200 flex items-center gap-2"
+                title="Batch Upload Products"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                Batch Upload
               </button>
             </div>
           )}
@@ -2009,14 +2099,32 @@ Great for personalizing your gear or as a gift!`;
         </div>
         )}
 
-        {/* Collections Tab - hidden when collections feature disabled */}
-        {false && collectionsEnabled && activeTab === 'collections' && (
+        {/* Collections Tab */}
+        {activeTab === 'collections' && (
         <div className="container-style rounded-2xl p-6">
           <h3 className="text-xl font-bold text-white mb-4">Collections</h3>
           {collections.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {collections.map((collection) => (
-                <div key={collection.id} className="container-style rounded-xl p-6 hover:scale-105 transition-all duration-200 group">
+                <div key={collection.id} className="container-style rounded-xl p-6 hover:scale-105 transition-all duration-200 group relative">
+                  {/* Delete Button */}
+                  <button
+                    onClick={() => handleDeleteCollection(collection)}
+                    className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110"
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.2)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      boxShadow: 'rgba(239, 68, 68, 0.3) 0px 4px 16px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                      backdropFilter: 'blur(12px)'
+                    }}
+                    title="Delete collection"
+                    aria-label={`Delete collection ${collection.name}`}
+                  >
+                    <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center space-x-3">
                       <div className="w-12 h-12 rounded-full overflow-hidden bg-green-500/20 flex items-center justify-center">
@@ -2034,73 +2142,53 @@ Great for personalizing your gear or as a gift!`;
                       </div>
                       <div>
                         <h4 className="text-white font-semibold">{collection.name}</h4>
-                        <p className="text-gray-400 text-sm">{collection.slug}</p>
-                        <p className="text-purple-400 text-xs">
-                          {creators.find(c => c.id === collection.creator_id)?.creator_name || 'No Creator Assigned'}
-                        </p>
+                        <p className="text-gray-400 text-sm">Collection ID: {collection.id}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {collection.is_featured && (
-                        <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs">
-                          Featured
-                        </span>
-                      )}
-                      <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        collection.is_active 
-                          ? 'bg-green-500/20 text-green-400' 
-                          : 'bg-red-500/20 text-red-400'
-                      }`}>
-                        {collection.is_active ? 'Active' : 'Inactive'}
+                      <div className="px-2 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-medium">
+                        {collection.stickerCount || 0} stickers
                       </div>
                     </div>
                   </div>
                   
-                  {collection.description && (
-                    <p className="text-gray-300 text-sm mb-4 line-clamp-2">
-                      {collection.description}
-                    </p>
-                  )}
-                  
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Sort Order:</span>
-                      <span className="text-white">{collection.sort_order}</span>
+                      <span className="text-gray-400">Total Stickers:</span>
+                      <span className="text-white font-semibold">{collection.stickerCount || 0}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Created:</span>
-                      <span className="text-white">
-                        {new Date(collection.created_at).toLocaleDateString()}
+                      <span className="text-gray-400">Last Assigned:</span>
+                      <span className="text-white text-xs">
+                        {collection.lastStickerAssigned 
+                          ? new Date(collection.lastStickerAssigned).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })
+                          : 'Never'
+                        }
                       </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Revenue:</span>
+                      <span className="text-green-400 font-semibold">
+                        ${(collection.totalRevenue || 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Collection ID:</span>
+                      <span className="text-white font-mono text-xs">{collection.id}</span>
                     </div>
                   </div>
 
                   <div className="space-y-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {/* Creator Assignment */}
-                    <div className="relative">
-                      <select
-                        value={collection.creator_id || ""}
-                        onChange={(e) => handleQuickCreatorChange(collection.id, e.target.value)}
-                        className="w-full px-2 py-1 bg-purple-600/80 hover:bg-purple-600 text-white rounded text-xs font-medium transition-all duration-200 hover:scale-105 cursor-pointer"
-                        aria-label={`Change creator for ${collection.name}`}
-                      >
-                        <option value="" className="bg-gray-800">
-                          No Creator
-                        </option>
-                        {creators.map((creator) => (
-                          <option key={creator.id} value={creator.id} className="bg-gray-800">
-                            {creator.creator_name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
                     <div className="flex space-x-2">
-                      <button className="flex-1 px-3 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg text-sm font-medium transition-colors">
-                        Edit
-                      </button>
-                      <button className="flex-1 px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-sm font-medium transition-colors">
-                        {collection.is_active ? 'Deactivate' : 'Activate'}
+                      <button 
+                        onClick={() => handleEditCollection(collection)}
+                        className="flex-1 px-3 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg text-sm font-medium transition-colors"
+                      >
+                        Edit Name
                       </button>
                     </div>
                   </div>
@@ -2221,6 +2309,144 @@ Great for personalizing your gear or as a gift!`;
         onCreatorSaved={handleCreatorSaved}
       />
 
+      {/* Collection Edit Modal */}
+      {showEditCollection && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="container-style rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white">Edit Collection</h2>
+                <button
+                  onClick={() => {
+                    setShowEditCollection(false);
+                    setEditingCollection(null);
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors"
+                  title="Close modal"
+                  aria-label="Close collection edit modal"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Form */}
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-white text-sm font-medium mb-2">Collection Name *</label>
+                  <input
+                    type="text"
+                    value={collectionFormData.name}
+                    onChange={(e) => setCollectionFormData(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Enter collection name"
+                    required
+                  />
+                </div>
+                
+                <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <p className="text-blue-300 text-sm">
+                    <strong>Note:</strong> Currently, only collection names can be edited. Additional features like descriptions, status toggles, and creator assignments require database schema updates.
+                  </p>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex space-x-4 mt-8">
+                <button
+                  onClick={() => {
+                    setShowEditCollection(false);
+                    setEditingCollection(null);
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveCollection}
+                  disabled={!collectionFormData.name.trim()}
+                  className="flex-1 px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Collection Modal */}
+      {showCreateCollection && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="container-style rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white">Create New Collection</h2>
+                <button
+                  onClick={() => {
+                    setShowCreateCollection(false);
+                    setCollectionFormData({ name: "" });
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors"
+                  title="Close modal"
+                  aria-label="Close create collection modal"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Form */}
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-white text-sm font-medium mb-2">Collection Name *</label>
+                  <input
+                    type="text"
+                    value={collectionFormData.name}
+                    onChange={(e) => setCollectionFormData(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Enter collection name"
+                    required
+                    autoFocus
+                  />
+                </div>
+                
+                <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                  <p className="text-green-300 text-sm">
+                    <strong>Info:</strong> Collections help organize your products and make them easier for customers to browse. You can assign products to collections when creating or editing them.
+                  </p>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex space-x-4 mt-8">
+                <button
+                  onClick={() => {
+                    setShowCreateCollection(false);
+                    setCollectionFormData({ name: "" });
+                  }}
+                  disabled={isCreatingCollection}
+                  className="flex-1 px-4 py-2 bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateCollection}
+                  disabled={!collectionFormData.name.trim() || isCreatingCollection}
+                  className="flex-1 px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isCreatingCollection ? 'Creating...' : 'Create Collection'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Batch Upload Modal */}
       {showBatchUpload && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -2236,6 +2462,7 @@ Great for personalizing your gear or as a gift!`;
                   onClick={() => {
                     setShowBatchUpload(false);
                     setBatchFiles([]);
+                    setBatchProductData({});
                     setBatchProgress({current: 0, total: 0, currentFile: ""});
                   }}
                   disabled={batchUploading}
@@ -2250,121 +2477,459 @@ Great for personalizing your gear or as a gift!`;
 
               {!batchUploading ? (
                 <>
-                  {/* File Drop Area */}
-                  <div 
-                    className="border-2 border-dashed border-orange-400/50 rounded-xl p-12 text-center hover:border-orange-400 transition-colors cursor-pointer backdrop-blur-md mb-6"
+                  {/* File Drop Area - Styled like vinyl calculator */}
+                  <input
+                    type="file"
+                    id="batch-file-input"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      setBatchFiles(prev => [...prev, ...files]);
+                    }}
+                    className="hidden"
+                    aria-label="Upload multiple artwork files"
+                  />
+
+                  {batchFiles.length === 0 ? (
+                    <div 
+                      className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative mb-6"
                     onDrop={(e) => {
                       e.preventDefault();
                       const files = Array.from(e.dataTransfer.files).filter(file => 
-                        file.type.startsWith('image/') || file.name.toLowerCase().endsWith('.ai')
+                          file.type.startsWith('image/')
                       );
                       setBatchFiles(prev => [...prev, ...files]);
                     }}
                     onDragOver={(e) => e.preventDefault()}
-                    onClick={() => {
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.multiple = true;
-                      input.accept = 'image/*,.ai';
-                      input.onchange = (e) => {
-                        const files = Array.from((e.target as HTMLInputElement).files || []).filter(file => 
-                          file.type.startsWith('image/') || file.name.toLowerCase().endsWith('.ai')
-                        );
-                        setBatchFiles(prev => [...prev, ...files]);
-                      };
-                      input.click();
-                    }}
+                      onClick={() => document.getElementById('batch-file-input')?.click()}
                   >
                     <div className="mb-4">
-                      <div className="mb-3 flex justify-center">
-                        <svg className="w-16 h-16 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                      </div>
-                      <p className="text-white font-medium text-lg mb-2">
+                        <div className="text-4xl mb-3">📁</div>
+                        <p className="text-white font-medium text-base mb-2">
                         Drop multiple images here or click to browse
                       </p>
                       <p className="text-white/60 text-sm">
-                        Select multiple design files to upload in batch. All image formats and .ai files supported.
+                          Select multiple design files to upload in batch. PNG, JPG, SVG supported.
                       </p>
                     </div>
                   </div>
-
-                  {/* Selected Files List */}
-                  {batchFiles.length > 0 && (
+                  ) : (
                     <div className="mb-6">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-white font-semibold">Selected Files ({batchFiles.length})</h3>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => document.getElementById('batch-file-input')?.click()}
+                            className="text-purple-400 hover:text-purple-300 text-sm px-3 py-1 rounded border border-purple-400/50 hover:border-purple-300"
+                          >
+                            Add More
+                          </button>
                         <button
                           onClick={() => setBatchFiles([])}
-                          className="text-red-400 hover:text-red-300 text-sm"
+                            className="text-red-400 hover:text-red-300 text-sm px-3 py-1 rounded border border-red-400/50 hover:border-red-300"
                         >
                           Clear All
                         </button>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-60 overflow-y-auto">
+                      </div>
+
+                      {/* Bulk Actions */}
+                      <div className="mb-4 p-4 bg-white/5 rounded-lg border border-white/10">
+                        <h4 className="text-white text-sm font-medium mb-3">Apply to All Products:</h4>
+                        
+                        {/* Bulk Title Suffix */}
+                        <div className="mb-4">
+                          <label className="block text-white text-xs font-medium mb-1">Add Word Before "Sticker"</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="e.g. Vinyl, Die-Cut, Custom"
+                              className="flex-1 px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder-gray-400"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const suffix = (e.target as HTMLInputElement).value.trim();
+                                  if (suffix) {
+                                    setBatchProductData(prev => {
+                                      const updated = { ...prev };
+                                      batchFiles.forEach((file, index) => {
+                                        const fileKey = `${file.name}-${index}`;
+                                        const baseName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                        const newTitle = `${baseName} ${suffix} Sticker`;
+                                        
+                                        if (!updated[fileKey]) {
+                                          updated[fileKey] = {
+                                            title: newTitle,
+                                            collection_id: "",
+                                            creator_id: "",
+                                            category: "Die-Cut",
+                                            size_pricing: { "3": "3.99", "4": "4.99", "5": "5.99" }
+                                          };
+                                        } else {
+                                          updated[fileKey] = { ...updated[fileKey], title: newTitle };
+                                        }
+                                      });
+                                      return updated;
+                                    });
+                                    (e.target as HTMLInputElement).value = '';
+                                  }
+                                }
+                              }}
+                            />
+                            <button
+                              onClick={(e) => {
+                                const input = (e.target as HTMLButtonElement).parentElement?.querySelector('input') as HTMLInputElement;
+                                const suffix = input?.value.trim();
+                                if (suffix) {
+                                  setBatchProductData(prev => {
+                                    const updated = { ...prev };
+                                    batchFiles.forEach((file, index) => {
+                                      const fileKey = `${file.name}-${index}`;
+                                      const baseName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                      const newTitle = `${baseName} ${suffix} Sticker`;
+                                      
+                                      if (!updated[fileKey]) {
+                                        updated[fileKey] = {
+                                          title: newTitle,
+                                          collection_id: "",
+                                          creator_id: "",
+                                          category: "Die-Cut",
+                                          size_pricing: { "3": "3.99", "4": "4.99", "5": "5.99" }
+                                        };
+                                      } else {
+                                        updated[fileKey] = { ...updated[fileKey], title: newTitle };
+                                      }
+                                    });
+                                    return updated;
+                                  });
+                                  input.value = '';
+                                }
+                              }}
+                              className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs transition-colors"
+                            >
+                              Apply
+                            </button>
+                          </div>
+                          <p className="text-gray-400 text-xs mt-1">Press Enter or click Apply to update all titles</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* Bulk Collection */}
+                          <div>
+                            <label className="block text-white text-xs font-medium mb-1">Collection</label>
+                            <select
+                              onChange={(e) => {
+                                const collectionId = e.target.value;
+                                if (e.target.selectedIndex === 0) return; // Skip if "Select Collection" is chosen
+                                
+                                setBatchProductData(prev => {
+                                  const updated = { ...prev };
+                                  batchFiles.forEach((file, index) => {
+                                    const fileKey = `${file.name}-${index}`;
+                                    if (!updated[fileKey]) {
+                                      updated[fileKey] = {
+                                        title: file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + ' Sticker',
+                                        collection_id: collectionId,
+                                        creator_id: "",
+                                        category: "Die-Cut",
+                                        size_pricing: { "3": "3.99", "4": "4.99", "5": "5.99" }
+                                      };
+                                    } else {
+                                      updated[fileKey] = { ...updated[fileKey], collection_id: collectionId };
+                                    }
+                                  });
+                                  return updated;
+                                });
+                                // Reset the select after applying
+                                e.target.value = '';
+                              }}
+                              className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            >
+                              <option value="">Select Collection</option>
+                              <option value="">No Collection</option>
+                              {collections.map((collection) => (
+                                <option key={collection.id} value={collection.id} className="bg-gray-800">
+                                  {collection.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Bulk Creator */}
+                          {isAdmin && (
+                            <div>
+                              <label className="block text-white text-xs font-medium mb-1">Creator</label>
+                              <select
+                                onChange={(e) => {
+                                  const creatorId = e.target.value;
+                                  if (e.target.selectedIndex === 0) return; // Skip if "Select Creator" is chosen
+                                  
+                                  setBatchProductData(prev => {
+                                    const updated = { ...prev };
+                                    batchFiles.forEach((file, index) => {
+                                      const fileKey = `${file.name}-${index}`;
+                                      if (!updated[fileKey]) {
+                                        updated[fileKey] = {
+                                          title: file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + ' Sticker',
+                                          collection_id: "",
+                                          creator_id: creatorId,
+                                          category: "Die-Cut",
+                                          size_pricing: { "3": "3.99", "4": "4.99", "5": "5.99" }
+                                        };
+                                      } else {
+                                        updated[fileKey] = { ...updated[fileKey], creator_id: creatorId };
+                                      }
+                                    });
+                                    return updated;
+                                  });
+                                  // Reset the select after applying
+                                  e.target.value = '';
+                                }}
+                                className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                              >
+                                <option value="">Select Creator</option>
+                                <option value="">No Creator</option>
+                                {creators.map((creator) => (
+                                  <option key={creator.id} value={creator.id} className="bg-gray-800">
+                                    {creator.creator_name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
+                          {/* Bulk Shape/Category */}
+                          <div>
+                            <label className="block text-white text-xs font-medium mb-1">Shape</label>
+                            <select
+                              onChange={(e) => {
+                                const category = e.target.value;
+                                if (!category) return;
+                                
+                                setBatchProductData(prev => {
+                                  const updated = { ...prev };
+                                  batchFiles.forEach((file, index) => {
+                                    const fileKey = `${file.name}-${index}`;
+                                    if (!updated[fileKey]) {
+                                      updated[fileKey] = {
+                                        title: file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + ' Sticker',
+                                        collection_id: "",
+                                        creator_id: "",
+                                        category: category,
+                                        size_pricing: { "3": "3.99", "4": "4.99", "5": "5.99" }
+                                      };
+                                    } else {
+                                      updated[fileKey] = { ...updated[fileKey], category: category };
+                                    }
+                                  });
+                                  return updated;
+                                });
+                                // Reset the select after applying
+                                e.target.value = '';
+                              }}
+                              className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            >
+                              <option value="">Select Shape</option>
+                              {categories.map((category) => (
+                                <option key={category} value={category} className="bg-gray-800">
+                                  {category}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Product Configuration Rows */}
+                  {batchFiles.length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-white font-semibold mb-4">Configure Products</h3>
+                      <div className="space-y-4 max-h-96 overflow-y-auto">
                         {batchFiles.map((file, index) => {
-                          const isAiFile = file.name.toLowerCase().endsWith('.ai');
+                          const fileKey = `${file.name}-${index}`;
+                          const productData = batchProductData[fileKey] || {
+                            title: file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + ' Sticker',
+                            collection_id: "",
+                            creator_id: "",
+                            category: "Die-Cut",
+                            size_pricing: {
+                              "3": "3.99",
+                              "4": "4.99", 
+                              "5": "5.99"
+                            }
+                          };
+
+                          const updateProductData = (field: string, value: any) => {
+                            setBatchProductData(prev => ({
+                              ...prev,
+                              [fileKey]: {
+                                ...productData,
+                                [field]: value
+                              }
+                            }));
+                          };
+
                           return (
-                          <div key={index} className="relative group">
-                            <div className="aspect-square bg-gray-800 rounded-lg overflow-hidden border border-white/20 flex items-center justify-center">
-                              {isAiFile ? (
-                                <div className="text-center p-4">
-                                  <svg className="w-12 h-12 text-purple-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                  </svg>
-                                  <p className="text-white text-xs font-medium">AI File</p>
-                                  <p className="text-purple-400 text-xs">Design Source</p>
-                                </div>
-                              ) : (
+                            <div key={fileKey} className="container-style rounded-lg p-4">
+                              <div className="grid grid-cols-1 lg:grid-cols-6 gap-4 items-start">
+                                {/* Image Preview */}
+                                <div className="lg:col-span-1">
+                                  <div className="aspect-square bg-gray-800 rounded-lg overflow-hidden border border-white/20 flex items-center justify-center p-2" style={{ backgroundColor: '#cae0ff' }}>
                                 <img
                                   src={URL.createObjectURL(file)}
                                   alt={file.name}
-                                  className="w-full h-full object-cover"
+                                      className="max-w-full max-h-full object-contain"
                                 />
-                              )}
                             </div>
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                               <button
                                 onClick={() => setBatchFiles(prev => prev.filter((_, i) => i !== index))}
-                                className="px-2 py-1 bg-red-600/80 hover:bg-red-600 text-white rounded text-xs"
+                                    className="w-full mt-2 px-2 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded text-xs transition-colors"
                               >
                                 Remove
                               </button>
                             </div>
-                            <p className="text-white text-xs mt-2 truncate">{file.name}</p>
-                            {isAiFile && (
-                              <div className="mt-1 px-2 py-1 bg-purple-500/20 text-purple-300 rounded text-xs text-center">
-                                Source File Only
+
+                                {/* Product Details */}
+                                <div className="lg:col-span-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                  {/* Title */}
+                                  <div>
+                                    <label className="block text-white text-xs font-medium mb-1">Title *</label>
+                                    <input
+                                      type="text"
+                                      value={productData.title}
+                                      onChange={(e) => updateProductData('title', e.target.value)}
+                                      className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                      placeholder="Product title"
+                                    />
+                                  </div>
+
+                                  {/* Collection */}
+                                  <div>
+                                    <label className="block text-white text-xs font-medium mb-1">Collection</label>
+                                    <select
+                                      value={productData.collection_id}
+                                      onChange={(e) => updateProductData('collection_id', e.target.value)}
+                                      className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                    >
+                                      <option value="">No Collection</option>
+                                      {collections.map((collection) => (
+                                        <option key={collection.id} value={collection.id} className="bg-gray-800">
+                                          {collection.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  {/* Creator */}
+                                  {isAdmin && (
+                                    <div>
+                                      <label className="block text-white text-xs font-medium mb-1">Creator</label>
+                                      <select
+                                        value={productData.creator_id}
+                                        onChange={(e) => updateProductData('creator_id', e.target.value)}
+                                        className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                      >
+                                        <option value="">No Creator</option>
+                                        {creators.map((creator) => (
+                                          <option key={creator.id} value={creator.id} className="bg-gray-800">
+                                            {creator.creator_name}
+                                          </option>
+                                        ))}
+                                      </select>
                               </div>
                             )}
+
+                                  {/* Category */}
+                                  <div>
+                                    <label className="block text-white text-xs font-medium mb-1">Shape</label>
+                                    <select
+                                      value={productData.category}
+                                      onChange={(e) => updateProductData('category', e.target.value)}
+                                      className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                    >
+                                      {categories.map((category) => (
+                                        <option key={category} value={category} className="bg-gray-800">
+                                          {category}
+                                        </option>
+                                      ))}
+                                    </select>
                           </div>
+                      </div>
+                    </div>
+
+                              {/* Pricing Row */}
+                              <div className="mt-4 pt-4 border-t border-white/10">
+                                <div className="grid grid-cols-3 gap-4">
+                        <div>
+                                    <label className="block text-white text-xs font-medium mb-1">3" Price ($)</label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={productData.size_pricing["3"]}
+                                      onChange={(e) => updateProductData('size_pricing', { ...productData.size_pricing, "3": e.target.value })}
+                                      className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                    />
+                        </div>
+                                  <div>
+                                    <label className="block text-white text-xs font-medium mb-1">4" Price ($)</label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={productData.size_pricing["4"]}
+                                      onChange={(e) => updateProductData('size_pricing', { ...productData.size_pricing, "4": e.target.value })}
+                                      className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-white text-xs font-medium mb-1">5" Price ($)</label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={productData.size_pricing["5"]}
+                                      onChange={(e) => updateProductData('size_pricing', { ...productData.size_pricing, "5": e.target.value })}
+                                      className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           );
                         })}
                       </div>
                     </div>
                   )}
 
-                  {/* AI Files Notice */}
-                  {batchFiles.some(file => file.name.toLowerCase().endsWith('.ai')) && (
-                    <div className="mb-6 p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <svg className="w-5 h-5 text-purple-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <div>
-                          <h4 className="text-purple-300 font-medium text-sm mb-1">AI Files Detected</h4>
-                          <p className="text-purple-200 text-xs">
-                            Adobe Illustrator (.ai) files are included for reference but will be skipped during upload. 
-                            Only image files (.png, .jpg, .svg, etc.) will be processed and uploaded to create sticker products.
-                          </p>
-                        </div>
-                      </div>
+                  {/* Upload Button */}
+                  {batchFiles.length > 0 && (
+                    <div className="flex justify-end">
+                      <button
+                        onClick={handleBatchUpload}
+                        disabled={batchUploading}
+                        className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                      >
+                        {batchUploading ? (
+                          <>
+                            <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            Upload {batchFiles.length} Product{batchFiles.length !== 1 ? 's' : ''}
+                          </>
+                        )}
+                      </button>
                     </div>
                   )}
 
-                  {/* Batch Configuration */}
-                  {batchFiles.length > 0 && (
+                  {/* Old batch configuration removed */}
+                  {false && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                       {/* Basic Settings */}
                       <div className="space-y-4">
@@ -2735,171 +3300,7 @@ Great for personalizing your gear or as a gift!`;
         </div>
       )}
 
-      {/* Create Collection Modal */}
-      {false && showCreateCollection && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="container-style rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-white">Create New Collection</h2>
-              <button
-                onClick={() => setShowCreateCollection(false)}
-                className="text-white/60 hover:text-white transition-colors"
-                aria-label="Close create collection modal"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
 
-            <div className="space-y-6">
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">
-                  Collection Name <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={collectionFormData.name}
-                  onChange={(e) => setCollectionFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="Enter collection name"
-                  required
-                  aria-label="Collection name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">Description</label>
-                <textarea
-                  value={collectionFormData.description}
-                  onChange={(e) => setCollectionFormData(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 h-24 resize-none"
-                  placeholder="Describe this collection..."
-                  aria-label="Collection description"
-                />
-              </div>
-
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">
-                  Slug (URL-friendly name)
-                </label>
-                <input
-                  type="text"
-                  value={collectionFormData.slug}
-                  onChange={(e) => setCollectionFormData(prev => ({ ...prev, slug: e.target.value }))}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="auto-generated-from-name"
-                  aria-label="Collection slug"
-                />
-                <p className="text-gray-400 text-xs mt-1">
-                  Leave empty to auto-generate from collection name
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">Image URL (Optional)</label>
-                <input
-                  type="url"
-                  value={collectionFormData.image_url}
-                  onChange={(e) => setCollectionFormData(prev => ({ ...prev, image_url: e.target.value }))}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="https://example.com/collection-image.jpg"
-                  aria-label="Collection image URL"
-                />
-              </div>
-
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">Assign to Creator (Optional)</label>
-                <select
-                  value={collectionFormData.creator_id}
-                  onChange={(e) => setCollectionFormData(prev => ({ ...prev, creator_id: e.target.value }))}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
-                  aria-label="Assign collection to creator"
-                >
-                  <option value="">No creator assigned</option>
-                  {creators.map((creator) => (
-                    <option key={creator.id} value={creator.id} className="bg-gray-800">
-                      {creator.creator_name} ({creator.email})
-                    </option>
-                  ))}
-                </select>
-                <p className="text-gray-400 text-xs mt-1">
-                  Assign this collection to a creator for ownership and management
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-white text-sm font-medium mb-2">Sort Order</label>
-                  <input
-                    type="number"
-                    value={collectionFormData.sort_order}
-                    onChange={(e) => setCollectionFormData(prev => ({ ...prev, sort_order: parseInt(e.target.value) || 0 }))}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                    min="0"
-                    placeholder="0"
-                    aria-label="Sort order"
-                  />
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id="collection-active"
-                      checked={collectionFormData.is_active}
-                      onChange={(e) => setCollectionFormData(prev => ({ ...prev, is_active: e.target.checked }))}
-                      className="rounded text-green-500 focus:ring-green-500"
-                      aria-label="Collection active status"
-                    />
-                    <label htmlFor="collection-active" className="text-white text-sm">
-                      Active (visible to users)
-                    </label>
-                  </div>
-
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id="collection-featured"
-                      checked={collectionFormData.is_featured}
-                      onChange={(e) => setCollectionFormData(prev => ({ ...prev, is_featured: e.target.checked }))}
-                      className="rounded text-green-500 focus:ring-green-500"
-                      aria-label="Collection featured status"
-                    />
-                    <label htmlFor="collection-featured" className="text-white text-sm">
-                      Featured collection
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex space-x-4 mt-8">
-              <button
-                onClick={() => setShowCreateCollection(false)}
-                className="flex-1 px-6 py-3 border border-white/20 text-white rounded-xl hover:bg-white/5 transition-all duration-200"
-                disabled={isCreatingCollection}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateCollection}
-                disabled={isCreatingCollection || !collectionFormData.name.trim()}
-                className="flex-1 button-style px-6 py-3 text-white font-medium rounded-xl transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-              >
-                {isCreatingCollection ? (
-                  <div className="flex items-center justify-center space-x-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Creating...</span>
-                  </div>
-                ) : (
-                  'Create Collection'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </AdminLayout>
   );
 } 

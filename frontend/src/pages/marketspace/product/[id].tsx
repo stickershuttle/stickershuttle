@@ -6,7 +6,7 @@ import { useCart } from "@/components/CartContext";
 import { getSupabase } from "@/lib/supabase";
 import Link from "next/link";
 import Head from "next/head";
-import MarketplaceStickerCalculator from "@/components/marketplace-sticker-calculator";
+import MarketplaceStickerCalculator from "@/components/marketspace-sticker-calculator";
 import { loadRealPricingData, BasePriceRow, QuantityDiscountRow } from "@/utils/real-pricing";
 import { useQuery } from "@apollo/client";
 import { GET_CREATOR_BY_USER_ID } from "@/lib/profile-mutations";
@@ -44,6 +44,7 @@ interface MarketplaceProduct {
     id: string;
     creator_name: string;
     user_id: string;
+    profile_photo_url?: string;
     user_profiles?: {
       first_name?: string;
       last_name?: string;
@@ -98,15 +99,15 @@ export default function MarketplaceProductPage() {
       // Update product creator profile photo if it matches the current user
       if (user?.id && profile_photo_url && product?.creator?.user_id === user.id) {
         setProduct(prevProduct => {
-          if (!prevProduct) return prevProduct;
-          
+          if (!prevProduct || !prevProduct.creator) return prevProduct;
+
           return {
             ...prevProduct,
             creator: {
               ...prevProduct.creator,
               user_profiles: {
-                ...prevProduct.creator.user_profiles,
-                profile_photo_url: profile_photo_url
+                ...(prevProduct.creator.user_profiles || {}),
+                profile_photo_url
               }
             }
           };
@@ -288,11 +289,19 @@ export default function MarketplaceProductPage() {
         customization: {
           productId: product.id,
           selections: {
-            size: selectedSize,
-            originalPrice: basePrice,
-            discountMultiplier: discountMultiplier
+            size: {
+              type: 'size-preset' as const,
+              value: `${selectedSize}\"`,
+              displayValue: `${selectedSize}\"`,
+              priceImpact: 0
+            }
           },
-          totalPrice: totalPrice
+          totalPrice: totalPrice,
+          customFiles: [selectedImage || product.default_image].filter(Boolean) as string[],
+          // Keep additionalInfo type-compatible
+          additionalInfo: {
+            uploadLater: false
+          }
         },
         quantity: quantity,
         unitPrice: discountedUnitPrice,
@@ -486,7 +495,7 @@ export default function MarketplaceProductPage() {
             <div className="container-style p-6 md:p-8 h-full relative">
               {/* Back Arrow - Top Left */}
               <Link 
-                href="/marketplace"
+                href="/marketspace"
                 className="absolute top-4 left-4 z-20 flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 hover:scale-110"
                 style={{
                   background: 'rgba(255, 255, 255, 0.05)',
@@ -564,7 +573,7 @@ export default function MarketplaceProductPage() {
                 <div className="w-10 h-10 rounded-full overflow-hidden bg-purple-500/20 flex items-center justify-center">
                   {(product.creator?.profile_photo_url || product.creator?.user_profiles?.profile_photo_url) ? (
                     <img 
-                      src={product.creator.profile_photo_url || product.creator.user_profiles.profile_photo_url} 
+                      src={(product.creator?.profile_photo_url || product.creator?.user_profiles?.profile_photo_url) as string}
                       alt={`${product.creator.creator_name} avatar`} 
                       className="w-full h-full object-cover"
                     />
@@ -773,11 +782,11 @@ export default function MarketplaceProductPage() {
 
 
 
-              {/* Add to Cart Button */}
+              {/* Add to Cart Button - Desktop/Tablet */}
               <button
                 onClick={handleAddToCart}
                 disabled={isAddingToCart || (product.stock_quantity !== -1 && product.stock_quantity === 0)}
-                className="button-style w-full py-4 px-6 font-bold text-lg rounded-lg transition-colors mb-6 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="hidden md:block button-style w-full py-4 px-6 font-bold text-lg rounded-lg transition-colors mb-6 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {(() => {
                   const basePrice = product.size_pricing?.[selectedSize] || product.price;
@@ -827,6 +836,35 @@ export default function MarketplaceProductPage() {
           </div>
         </div>
       </section>
+      {/* Spacer so content isn't hidden behind mobile sticky bar */}
+      <div className="h-24 md:hidden" />
+
+      {/* Mobile Sticky Add to Cart Bar */}
+      <div 
+        className="fixed bottom-0 left-0 right-0 md:hidden z-50"
+        style={{ backgroundColor: '#100e4a' }}
+      >
+        <div className="w-[95%] mx-auto px-4 py-7">
+          <button
+            onClick={handleAddToCart}
+            disabled={isAddingToCart || (product.stock_quantity !== -1 && product.stock_quantity === 0)}
+            className="primaryButton w-full py-4 px-6 font-bold text-lg rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {(() => {
+              const basePrice = product.size_pricing?.[selectedSize] || product.price;
+              let discountMultiplier = 1;
+              if (quantity === 5) discountMultiplier = 0.5;
+              else if (quantity === 10) discountMultiplier = 0.4;
+              else if (quantity === 25) discountMultiplier = 0.3;
+              const totalPrice = (basePrice * discountMultiplier * quantity);
+              
+              return isAddingToCart 
+                ? 'Adding to Cart...'
+                : `Add to cart • $${totalPrice.toFixed(2)}`;
+            })()}
+          </button>
+        </div>
+      </div>
 
 
 

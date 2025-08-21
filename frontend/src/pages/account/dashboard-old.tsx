@@ -11,7 +11,7 @@ import {
   GET_USER_CREDIT_BALANCE, 
   GET_UNREAD_CREDIT_NOTIFICATIONS,
   MARK_CREDIT_NOTIFICATIONS_READ,
-  GET_USER_EARNED_CREDITS_BY_ORDER
+  GET_USER_CREDIT_HISTORY
 } from '../../lib/credit-mutations';
 import { SYNC_CUSTOMER_TO_KLAVIYO } from '../../lib/klaviyo-mutations';
 import { UPDATE_USER_PROFILE_PHOTO, UPDATE_USER_PROFILE_BANNER, GET_USER_PROFILE } from '../../lib/profile-mutations';
@@ -1201,7 +1201,7 @@ function Dashboard() {
 
       // Fetch credit history for points earned display
       const { data: creditHistoryData } = await apolloClient.query({
-        query: GET_USER_EARNED_CREDITS_BY_ORDER,
+        query: GET_USER_CREDIT_HISTORY,
         variables: { userId: (user as any).id }
       });
       
@@ -1212,7 +1212,7 @@ function Dashboard() {
         // Calculate lifetime credits earned - ensure it's an array first
         if (Array.isArray(creditHistoryData.getUserCreditHistory)) {
           const lifetimeTotal = creditHistoryData.getUserCreditHistory.reduce((sum: number, credit: any) => {
-            if (credit.transaction_type === 'earned') {
+            if (credit.transactionType === 'earned') {
               return sum + Math.abs(credit.amount);
             }
             return sum;

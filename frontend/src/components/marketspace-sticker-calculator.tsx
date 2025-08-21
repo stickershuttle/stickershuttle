@@ -487,7 +487,7 @@ export default function MarketplaceStickerCalculator({
     const cartItem = createCartItem();
     addToCart(cartItem);
     // Redirect to marketplace with success message
-    router.push('/marketplace?added=true');
+    router.push('/marketspace?added=true');
   };
 
   return (

@@ -921,6 +921,9 @@ const typeDefs = gql`
     getSharedCart(shareId: String!): SharedCartResult!
     getAllSharedCarts(offset: Int, limit: Int): AllSharedCartsResult!
     
+    # Promotional container queries
+    getPromotionalContainers: [PromotionalContainer!]!
+    
     # Credit queries
     getUserCreditBalance(userId: ID!): CreditBalance!
     getUserCreditHistory(userId: ID!, limit: Int): [Credit!]!
@@ -1061,6 +1064,9 @@ const typeDefs = gql`
     reverseCredits(transactionId: ID!, reason: String!): CreditTransactionResult!
     markCreditNotificationAsRead(notificationId: ID!): Boolean!
     fixExistingEarnedCredits: CreditFixResult!
+    
+    # Promotional container mutations
+    updatePromotionalContainer(id: ID!, input: PromotionalContainerInput!): PromotionalContainer!
   }
 
   type Customer {
@@ -2346,6 +2352,41 @@ const typeDefs = gql`
   input CreateSharedCartInput {
     cartData: JSON!
     expiresAt: String
+  }
+  
+  # Promotional Container Types
+  type PromotionalContainer {
+    id: ID!
+    position: Int!
+    title: String!
+    subtitle: String
+    description: String
+    price: String
+    originalPrice: String
+    collectionId: ID
+    linkText: String
+    backgroundImage: String
+    backgroundGradient: String
+    badgeText: String
+    badgeColor: String
+    isActive: Boolean!
+    createdAt: String!
+    updatedAt: String!
+  }
+  
+  input PromotionalContainerInput {
+    title: String
+    subtitle: String
+    description: String
+    price: String
+    originalPrice: String
+    collectionId: ID
+    linkText: String
+    backgroundImage: String
+    backgroundGradient: String
+    badgeText: String
+    badgeColor: String
+    isActive: Boolean
   }
 `;
 
@@ -4235,10 +4276,10 @@ const resolvers = {
 
         const client = supabaseClient.getServiceClient();
         
-        // Get creator's products
+        // 1) Get creator's marketplace products (active)
         const { data: products, error: productsError } = await client
           .from('marketplace_products')
-          .select('*')
+          .select('id, title, default_image, price')
           .eq('creator_id', creatorId)
           .eq('is_active', true);
 
@@ -4246,18 +4287,119 @@ const resolvers = {
           throw new Error(`Failed to fetch creator products: ${productsError.message}`);
         }
 
-        // For now, return mock data since we need to implement order tracking for marketplace products
-        // This will be implemented when marketplace orders are tracked
-        const mockStats = {
-          totalSales: 0,
-          totalRevenue: 0.0,
-          totalProducts: products ? products.length : 0,
-          soldProducts: [],
-          recentSales: []
-        };
+        const totalProducts = products?.length || 0;
+        const productIds = (products || []).map(p => p.id);
 
-        console.log('✅ Creator stats fetched');
-        return mockStats;
+        // Early return if creator has no products
+        if (productIds.length === 0) {
+          return {
+            totalSales: 0,
+            totalRevenue: 0.0,
+            totalProducts,
+            soldProducts: [],
+            recentSales: []
+          };
+        }
+
+        // Build quick lookup for product metadata
+        const productMetaById = new Map((products || []).map(p => [p.id, p]));
+
+        // 2) Get all paid orders (ids and summary info)
+        const { data: paidOrders, error: paidOrdersError } = await client
+          .from('orders_main')
+          .select('id, order_number, order_created_at, created_at, financial_status')
+          .eq('financial_status', 'paid');
+
+        if (paidOrdersError) {
+          throw new Error(`Failed to fetch paid orders: ${paidOrdersError.message}`);
+        }
+
+        const paidOrderIdToMeta = new Map((paidOrders || []).map(o => [o.id, o]));
+        const paidOrderIds = Array.from(paidOrderIdToMeta.keys());
+
+        if (paidOrderIds.length === 0) {
+          return {
+            totalSales: 0,
+            totalRevenue: 0.0,
+            totalProducts,
+            soldProducts: [],
+            recentSales: []
+          };
+        }
+
+        // 3) Fetch order items for this creator's products within paid orders only
+        const { data: items, error: itemsError } = await client
+          .from('order_items_new')
+          .select('id, order_id, product_id, product_name, quantity, unit_price, total_price, created_at, product_category')
+          .in('product_id', productIds)
+          .in('order_id', paidOrderIds)
+          .in('product_category', ['marketplace', 'marketplace-stickers']);
+
+        if (itemsError) {
+          throw new Error(`Failed to fetch order items: ${itemsError.message}`);
+        }
+
+        const creatorItems = items || [];
+
+        // 4) Aggregate totals
+        let totalSales = 0;
+        let totalRevenue = 0;
+        const soldByProduct = new Map();
+
+        for (const item of creatorItems) {
+          const quantity = Number(item.quantity) || 0;
+          const lineTotal = Number(item.total_price) || 0;
+          totalSales += quantity;
+          totalRevenue += lineTotal;
+
+          const existing = soldByProduct.get(item.product_id) || {
+            id: item.product_id,
+            name: item.product_name,
+            imageUrl: productMetaById.get(item.product_id)?.default_image || null,
+            totalSold: 0,
+            totalRevenue: 0,
+            price: Number(item.unit_price) || Number(productMetaById.get(item.product_id)?.price) || 0
+          };
+          existing.totalSold += quantity;
+          existing.totalRevenue += lineTotal;
+          // Keep most recent unit price as display price
+          existing.price = Number(item.unit_price) || existing.price;
+          soldByProduct.set(item.product_id, existing);
+        }
+
+        // 5) Build recent sales list (latest first)
+        const recentSales = creatorItems
+          .map((item) => {
+            const orderMeta = paidOrderIdToMeta.get(item.order_id) || {};
+            const soldAt = orderMeta.order_created_at || orderMeta.created_at || item.created_at;
+            return {
+              id: String(item.id),
+              productName: item.product_name,
+              quantity: Number(item.quantity) || 0,
+              price: Number(item.unit_price) || 0,
+              soldAt: soldAt,
+              orderNumber: orderMeta.order_number || ''
+            };
+          })
+          .sort((a, b) => new Date(b.soldAt).getTime() - new Date(a.soldAt).getTime())
+          .slice(0, 50);
+
+        console.log('✅ Creator stats computed:', {
+          creatorId,
+          products: productIds.length,
+          totalSales,
+          totalRevenue: Number(totalRevenue.toFixed(2)),
+          soldProducts: soldByProduct.size,
+          recentSales: recentSales.length
+        });
+
+        return {
+          totalSales,
+          totalRevenue: Number(totalRevenue.toFixed(2)),
+          totalProducts,
+          soldProducts: Array.from(soldByProduct.values()),
+          recentSales
+        };
       } catch (error) {
         console.error('❌ Error in getCreatorSalesStats:', error);
         throw new Error(error.message);
@@ -5195,6 +5337,49 @@ const resolvers = {
           profilesByList: [],
           errors: [{ error: error.message }]
         };
+      }
+    },
+
+    getPromotionalContainers: async (_, args, context) => {
+      try {
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        const { data: containers, error } = await client
+          .from('promotional_containers')
+          .select('*')
+          .eq('is_active', true)
+          .order('position', { ascending: true });
+
+        if (error) {
+          console.error('❌ Error fetching promotional containers:', error);
+          throw new Error(`Failed to fetch promotional containers: ${error.message}`);
+        }
+
+        return (containers || []).map(container => ({
+          id: String(container.id),
+          position: container.position,
+          title: container.title,
+          subtitle: container.subtitle,
+          description: container.description,
+          price: container.price,
+          originalPrice: container.original_price,
+          collectionId: container.collection_id ? String(container.collection_id) : null,
+          linkText: container.link_text,
+          backgroundImage: container.background_image,
+          backgroundGradient: container.background_gradient,
+          badgeText: container.badge_text,
+          badgeColor: container.badge_color,
+          isActive: container.is_active,
+          createdAt: container.created_at,
+          updatedAt: container.updated_at
+        }));
+      } catch (error) {
+        console.error('❌ Error in getPromotionalContainers:', error);
+        throw new Error(error.message);
       }
     },
 
@@ -11135,6 +11320,78 @@ const resolvers = {
         };
       } catch (error) {
         console.error('❌ Error in toggleSitewideAlert:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    updatePromotionalContainer: async (_, { id, input }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        // Admin authentication required
+        requireAdminAuth(user);
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Build update object with only provided fields
+        const updateData = {
+          updated_at: new Date().toISOString()
+        };
+        
+        if (input.title !== undefined) updateData.title = input.title;
+        if (input.subtitle !== undefined) updateData.subtitle = input.subtitle;
+        if (input.description !== undefined) updateData.description = input.description;
+        if (input.price !== undefined) updateData.price = input.price;
+        if (input.originalPrice !== undefined) updateData.original_price = input.originalPrice;
+        if (input.collectionId !== undefined) updateData.collection_id = input.collectionId;
+        if (input.linkText !== undefined) updateData.link_text = input.linkText;
+        if (input.backgroundImage !== undefined) updateData.background_image = input.backgroundImage;
+        if (input.backgroundGradient !== undefined) updateData.background_gradient = input.backgroundGradient;
+        if (input.badgeText !== undefined) updateData.badge_text = input.badgeText;
+        if (input.badgeColor !== undefined) updateData.badge_color = input.badgeColor;
+        if (input.isActive !== undefined) updateData.is_active = input.isActive;
+
+        const { data: updatedContainer, error } = await client
+          .from('promotional_containers')
+          .update(updateData)
+          .eq('id', id)
+          .select('*')
+          .single();
+
+        if (error) {
+          console.error('❌ Error updating promotional container:', error);
+          throw new Error(`Failed to update promotional container: ${error.message}`);
+        }
+
+        console.log('✅ Successfully updated promotional container');
+        
+        return {
+          id: String(updatedContainer.id),
+          position: updatedContainer.position,
+          title: updatedContainer.title,
+          subtitle: updatedContainer.subtitle,
+          description: updatedContainer.description,
+          price: updatedContainer.price,
+          originalPrice: updatedContainer.original_price,
+          collectionId: updatedContainer.collection_id ? String(updatedContainer.collection_id) : null,
+          linkText: updatedContainer.link_text,
+          backgroundImage: updatedContainer.background_image,
+          backgroundGradient: updatedContainer.background_gradient,
+          badgeText: updatedContainer.badge_text,
+          badgeColor: updatedContainer.badge_color,
+          isActive: updatedContainer.is_active,
+          createdAt: updatedContainer.created_at,
+          updatedAt: updatedContainer.updated_at
+        };
+      } catch (error) {
+        console.error('❌ Error in updatePromotionalContainer:', error);
         throw new Error(error.message);
       }
     }

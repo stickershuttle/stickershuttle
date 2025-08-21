@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { getSupabase } from '@/lib/supabase';
 import { useQuery } from '@apollo/client';
 import { GET_USER_CREDIT_BALANCE } from '@/lib/credit-mutations';
+import { GET_USER_PROFILE } from '@/lib/profile-mutations';
 import HeaderAlerts from './HeaderAlerts';
 import CartIndicator from './CartIndicator';
 
@@ -22,7 +23,7 @@ export default function UniversalHeader() {
   const [creditBalance, setCreditBalance] = useState<number>(0);
   const [creditBalanceLoaded, setCreditBalanceLoaded] = useState<boolean>(false);
   const [initialAuthCheck, setInitialAuthCheck] = useState<boolean>(false); // Track initial auth check
-  const [marketplaceSearch, setMarketplaceSearch] = useState<string>('');
+  const [marketspaceSearch, setMarketspaceSearch] = useState<string>('');
   const router = useRouter();
 
   // Admin emails list - same as in admin dashboard
@@ -31,17 +32,17 @@ export default function UniversalHeader() {
   // Check if we're on an admin page
   const isAdminPage = router.pathname.startsWith('/admin');
   
-  // Check if we're on the marketplace page
-  const isMarketplacePage = router.pathname === '/marketplace';
+  // Check if we're on the marketspace page or a marketspace product page
+  const isMarketspacePage = router.pathname === '/marketspace' || router.pathname.startsWith('/marketspace/');
 
-  // Sync marketplace search with URL query
+  // Sync marketspace search with URL query
   useEffect(() => {
-    if (isMarketplacePage && router.query.search) {
-      setMarketplaceSearch(router.query.search as string);
-    } else if (isMarketplacePage && !router.query.search) {
-      setMarketplaceSearch('');
+    if (isMarketspacePage && router.query.search) {
+      setMarketspaceSearch(router.query.search as string);
+    } else if (isMarketspacePage && !router.query.search) {
+      setMarketspaceSearch('');
     }
-  }, [router.query.search, isMarketplacePage]);
+  }, [router.query.search, isMarketspacePage]);
   
   // Handle order search
   const handleOrderSearch = (e: React.FormEvent) => {
@@ -51,13 +52,13 @@ export default function UniversalHeader() {
     }
   };
 
-  // Handle marketplace search - live search
-  const handleMarketplaceSearchChange = (value: string) => {
-    setMarketplaceSearch(value);
+  // Handle marketspace search - live search
+  const handleMarketspaceSearchChange = (value: string) => {
+    setMarketspaceSearch(value);
     if (value.trim()) {
-      router.push(`/marketplace?search=${encodeURIComponent(value.trim())}`, undefined, { shallow: true });
+      router.push(`/marketspace?search=${encodeURIComponent(value.trim())}`, undefined, { shallow: true });
     } else {
-      router.push('/marketplace', undefined, { shallow: true });
+      router.push('/marketspace', undefined, { shallow: true });
     }
   };
 
@@ -77,6 +78,14 @@ export default function UniversalHeader() {
       setCreditBalanceLoaded(true);
     }
   });
+
+  // Fetch user profile to determine wholesale status
+  const { data: profileData } = useQuery(GET_USER_PROFILE, {
+    variables: { userId: user?.id },
+    skip: !user?.id,
+  });
+
+  const isWholesale = !!profileData?.getUserProfile?.isWholesaleCustomer;
 
 
 
@@ -283,6 +292,19 @@ export default function UniversalHeader() {
     };
   }, [isAdminPage]);
 
+  // Update CSS custom property to account for honeymoon banner
+  useEffect(() => {
+    const currentAlertsHeight = parseInt(
+      getComputedStyle(document.documentElement).getPropertyValue('--header-alerts-height').replace('px', '') || '0'
+    );
+    const totalHeaderHeight = currentAlertsHeight + 36 + 80; // alerts + banner + header
+    document.documentElement.style.setProperty('--total-header-height', `${totalHeaderHeight}px`);
+    
+    return () => {
+      document.documentElement.style.setProperty('--total-header-height', '80px');
+    };
+  }, []);
+
   // Determine visibility for authentication UI elements with better logic
   const showAccountDashboard = user && !authError && initialAuthCheck;
   const showLoginSignupButtons = !showAccountDashboard && initialAuthCheck;
@@ -290,7 +312,25 @@ export default function UniversalHeader() {
   return (
     <>
     <HeaderAlerts />
-    <header className={`w-full fixed z-50 ${!isAdminPage ? 'pb-[5px]' : ''}`} style={{ backgroundColor: '#030140', top: 'var(--header-alerts-height, 0px)' }}>
+    
+    {/* Honeymoon Notice Banner */}
+    <Link href="/blog/ciao-bella-were-off-to-italy" className="w-full fixed z-50 text-center pt-3 pb-4 sm:pb-3 px-3 text-white font-medium block hover:brightness-110 transition-all duration-200 cursor-pointer" style={{ 
+      background: 'linear-gradient(135deg, rgb(147, 51, 234), rgb(168, 85, 247), rgb(196, 181, 253))',
+      top: 'var(--header-alerts-height, 0px)',
+      borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+    }}>
+      <div className="text-xs sm:text-sm leading-tight">
+        <div className="sm:hidden">
+          <div>🚨 <span className="relative inline-block">ATTN<svg className="absolute -bottom-1 left-0 w-full h-2" viewBox="0 0 70 8" fill="none"><path d="M0 6c10-2 20-2 30 0s20 2 30 0c5-1 8-1 10 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.8"/></svg></span>: We'll be closed Sept. 4th-17th</div>
+          <div>for our Honeymoon! Read more →</div>
+        </div>
+        <div className="hidden sm:block">
+          🚨 <span className="relative inline-block">ATTN<svg className="absolute -bottom-1 left-0 w-full h-2" viewBox="0 0 70 8" fill="none"><path d="M0 6c10-2 20-2 30 0s20 2 30 0c5-1 8-1 10 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.8"/></svg></span>: We'll be closed Sept. 4th-17th for our Honeymoon! Read more →
+        </div>
+      </div>
+    </Link>
+    
+    <header className={`w-full fixed z-50 ${!isAdminPage ? 'pb-[5px]' : ''} top-[calc(var(--header-alerts-height,0px)+52px)] sm:top-[calc(var(--header-alerts-height,0px)+44px)]`} style={{ backgroundColor: '#030140' }}>
               <div className={isAdminPage ? "w-full py-4 px-8" : "w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto py-4 px-4"}>
         <div className="flex items-center justify-between relative" style={{ paddingTop: '2px' }}>
           {/* Mobile/Tablet Left Side - Avatar or Login Icons */}
@@ -354,26 +394,88 @@ export default function UniversalHeader() {
           {/* Desktop Left Side - Logo */}
           <div className="hidden lg:flex items-center">
             <div className={isAdminPage ? "" : "lg:mr-6"}>
-              <Link href="/">
-                <img 
-                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
-                  alt="Sticker Shuttle Logo" 
-                  className="h-12 w-auto object-contain logo-hover cursor-pointer"
-                  style={{ maxWidth: 'none' }}
-                />
+              <Link href="/" className="flex items-center gap-2">
+                <div className="relative h-12 w-auto logo-container">
+                  {/* Main Sticker Shuttle Logo */}
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
+                    alt="Sticker Shuttle Logo" 
+                    className={`h-12 w-auto object-contain ${!isMarketspacePage ? 'logo-hover' : ''} cursor-pointer transition-all duration-500 ${isMarketspacePage ? 'logo-out' : 'logo-in'}`}
+                    style={{ maxWidth: 'none' }}
+                  />
+                  
+                  {/* Marketspace Logo with back arrow */}
+                  <div className={`absolute top-0 left-0 flex items-center gap-2 transition-all duration-500 ${isMarketspacePage ? 'logo-in' : 'logo-out'}`}>
+                    {/* Back arrow for marketspace */}
+                    {isMarketspacePage && (
+                      <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755176111/MarketspaceLogo_y4s7os.svg" 
+                      alt="Marketspace Logo" 
+                      className={`h-12 w-auto object-contain ${isMarketspacePage ? 'logo-hover' : ''} cursor-pointer`}
+                      style={{ maxWidth: 'none' }}
+                    />
+                  </div>
+                </div>
               </Link>
             </div>
+            
+            {/* Apply for a Space button - only show on marketplace */}
+            {isMarketspacePage && (
+              <button
+                className="text-center px-4 py-2 ml-6 rounded-lg font-semibold transition-all duration-200 transform hover:scale-[1.015] relative overflow-hidden holographic-button"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.01)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  boxShadow: '2px 2px 0px rgba(0, 0, 0, 0.75), rgba(255, 255, 255, 0.33) 0px 1px 0px inset',
+                  backdropFilter: 'blur(12px)'
+                }}
+                onClick={() => {
+                  router.push('/creators-space-apply');
+                }}
+              >
+                {/* Holographic moving gradient overlay */}
+                <div 
+                  className="absolute inset-0 opacity-30"
+                  style={{
+                    background: 'linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57, #ff9ff3, #54a0ff)',
+                    backgroundSize: '400% 400%',
+                    animation: 'holographicMove 3s ease-in-out infinite'
+                  }}
+                ></div>
+                <span className="inline-flex items-center justify-center relative z-10 text-white">
+                  Apply for a Space
+                  <svg className="w-4 h-4 ml-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+              </button>
+            )}
           </div>
 
           {/* Mobile Logo - Centered */}
           <div className="lg:hidden absolute left-1/2 transform -translate-x-1/2 z-40">
             <Link href="/">
-              <img 
-                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
-                alt="Sticker Shuttle Logo" 
-                className="h-12 w-auto object-contain cursor-pointer"
-                style={{ maxWidth: 'none' }}
-              />
+              <div className="relative h-12 w-auto logo-container">
+                {/* Main Sticker Shuttle Logo */}
+                <img 
+                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
+                  alt="Sticker Shuttle Logo" 
+                  className={`h-12 w-auto object-contain ${!isMarketspacePage ? 'logo-hover' : ''} cursor-pointer transition-all duration-500 ${isMarketspacePage ? 'logo-out' : 'logo-in'}`}
+                  style={{ maxWidth: 'none' }}
+                />
+                
+                {/* Marketplace Logo */}
+                <img 
+                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755176111/MarketspaceLogo_y4s7os.svg" 
+                  alt="Marketspace Logo" 
+                  className={`absolute top-0 left-0 h-12 w-auto object-contain ${isMarketspacePage ? 'logo-hover' : ''} cursor-pointer transition-all duration-500 ${isMarketspacePage ? 'logo-in' : 'logo-out'}`}
+                  style={{ maxWidth: 'none' }}
+                />
+              </div>
             </Link>
           </div>
 
@@ -413,13 +515,13 @@ export default function UniversalHeader() {
                 </svg>
               </button>
             </form>
-          ) : isMarketplacePage ? (
-            // Marketplace Search Bar - Live Search
+          ) : isMarketspacePage ? (
+            // Marketspace Search Bar - Live Search
             <div className="hidden lg:flex flex-1 items-center relative mx-4">
               <input
                 type="text"
-                value={marketplaceSearch}
-                onChange={(e) => handleMarketplaceSearchChange(e.target.value)}
+                value={marketspaceSearch}
+                onChange={(e) => handleMarketspaceSearchChange(e.target.value)}
                 placeholder="Search stickers..."
                 className="headerButton flex-1 px-4 py-2 pr-12 rounded-lg font-medium text-white placeholder-gray-400 transition-all duration-200 transform hover:scale-[1.005] focus:outline-none focus:ring-2 focus:ring-blue-500"
                 style={{ backgroundColor: 'transparent' }}
@@ -688,16 +790,16 @@ export default function UniversalHeader() {
                     {/* Creators Space - Only show for authorized users */}
                     {user && user.email === 'justin@stickershuttle.com' && (
                       <Link 
-                        href="/marketplace" 
+                        href="/marketspace" 
                         className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
                         onClick={(e) => {
                           e.preventDefault();
-                          handleLinkClick('/marketplace');
+                          handleLinkClick('/marketspace');
                         }}
                         style={{ textDecoration: 'none' }}
                       >
                         <img 
-                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1754416141/CreatorsSpaceWhite_ebiqt3.svg" 
+                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755179299/MarketspaceLogoFinal_q2fcer.svg" 
                           alt="Creators Space" 
                           className="h-8 w-auto object-contain"
                         />
@@ -714,47 +816,56 @@ export default function UniversalHeader() {
           <nav className="hidden lg:flex items-center gap-4" style={{ letterSpacing: '-0.5px' }}>
             {!isAdminPage && (
               <>
-                <Link 
-                  href="/deals"
-                  className={`px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2${router.pathname === '/deals' || router.asPath === '/deals' ? ' active' : ''}`}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(12px)'
-                  }}
-                >
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
-                    alt="Bolt" 
-                    className="w-5 h-5 object-contain"
-                  />
-                  Deals
-                </Link>
+                {/* Show deals and background removal only when NOT on marketplace */}
+                {!isMarketspacePage && (
+                  <>
+                    {!isWholesale && (
+                      <Link 
+                        href="/deals"
+                        className={`px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2${router.pathname === '/deals' || router.asPath === '/deals' ? ' active' : ''}`}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                          backdropFilter: 'blur(12px)'
+                        }}
+                      >
+                        <img 
+                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
+                          alt="Bolt" 
+                          className="w-5 h-5 object-contain"
+                        />
+                        Deals
+                      </Link>
+                    )}
 
-                <Link 
-                  href="/background-removal"
-                  className={`px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2${router.pathname === '/background-removal' || router.asPath === '/background-removal' ? ' active' : ''}`}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(12px)'
-                  }}
-                >
-                  <span className="text-lg">🪄</span>
-                  Background Removal
-                </Link>
+                    <Link 
+                      href="/background-removal"
+                      className={`px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2${router.pathname === '/background-removal' || router.asPath === '/background-removal' ? ' active' : ''}`}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                        backdropFilter: 'blur(12px)'
+                      }}
+                    >
+                      <span className="text-lg">🪄</span>
+                      Background Removal
+                    </Link>
+                  </>
+                )}
 
-                {/* Marketplace - Only show for authorized users */}
-                {user && user.email === 'justin@stickershuttle.com' && (
+
+
+                {/* Marketspace - Only show for authorized users when NOT on marketspace */}
+                {user && user.email === 'justin@stickershuttle.com' && !isMarketspacePage && (
                   <Link 
-                    href="/marketplace"
-                    className={`rounded-lg transition-all duration-200 transform hover:scale-105 flex items-center${router.pathname === '/marketplace' || router.asPath === '/marketplace' ? ' active' : ''}`}
-                    aria-label="Creators Space"
+                    href="/marketspace"
+                    className={`rounded-lg transition-all duration-200 transform hover:scale-105 flex items-center${(router.pathname === '/marketspace' || router.pathname.startsWith('/marketspace/') || router.asPath === '/marketspace') ? ' active' : ''}`}
+                    aria-label="Market Space"
                   >
                     <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1754416141/CreatorsSpaceWhite_ebiqt3.svg" 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755176111/MarketspaceLogo_y4s7os.svg"
                       alt="Creators Space" 
                       className="h-8 w-auto object-contain"
                     />
@@ -972,18 +1083,20 @@ export default function UniversalHeader() {
 
                         <hr className="border-white/10 my-2" />
 
-                        <Link 
-                          href="/deals"
-                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
-                          onClick={() => setShowProfileDropdown(false)}
-                        >
-                          <img 
-                            src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
-                            alt="Bolt" 
-                            className="w-5 h-5 object-contain"
-                          />
-                          <span>Deals</span>
-                        </Link>
+                        {!isWholesale && (
+                          <Link 
+                            href="/deals"
+                            className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                            onClick={() => setShowProfileDropdown(false)}
+                          >
+                            <img 
+                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
+                              alt="Bolt" 
+                              className="w-5 h-5 object-contain"
+                            />
+                            <span>Deals</span>
+                          </Link>
+                        )}
 
                         <Link 
                           href="/background-removal"
@@ -1198,18 +1311,20 @@ export default function UniversalHeader() {
 
               {!isAdminPage && (
                 <>
-                  <Link 
-                    href="/deals"
-                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
-                      alt="Bolt" 
-                      className="w-5 h-5 object-contain"
-                    />
-                    <span>Deals</span>
-                  </Link>
+                  {!isWholesale && (
+                    <Link 
+                      href="/deals"
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
+                        alt="Bolt" 
+                        className="w-5 h-5 object-contain"
+                      />
+                      <span>Deals</span>
+                    </Link>
+                  )}
 
                   <Link 
                     href="/background-removal"
@@ -1415,18 +1530,20 @@ export default function UniversalHeader() {
           <nav className="space-y-2">
             {!isAdminPage && (
               <>
-                <Link 
-                  href="/deals" 
-                  className={`w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center${router.pathname === '/deals' || router.asPath === '/deals' ? ' bg-purple-500 bg-opacity-20 border-l-4 border-purple-400' : ''}`} 
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
-                    alt="Bolt" 
-                    className="w-5 h-5 object-contain mr-3"
-                  />
-                  Deals
-                </Link>
+                {!isWholesale && (
+                  <Link 
+                    href="/deals" 
+                    className={`w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center${router.pathname === '/deals' || router.asPath === '/deals' ? ' bg-purple-500 bg-opacity-20 border-l-4 border-purple-400' : ''}`} 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
+                      alt="Bolt" 
+                      className="w-5 h-5 object-contain mr-3"
+                    />
+                    Deals
+                  </Link>
+                )}
 
                 <Link 
                   href="/background-removal" 
@@ -1467,10 +1584,56 @@ export default function UniversalHeader() {
       </div>
     </header>
 
-    {/* Logo Animation Styles - Desktop Only */}
+    {/* Logo Animation Styles */}
     <style jsx>{`
+      .logo-container {
+        position: relative;
+        display: inline-block;
+      }
+      
       .logo-hover {
         transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+      
+      /* Logo transition animations */
+      .logo-in {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+        animation: slideInFromRight 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+      
+      .logo-out {
+        opacity: 0;
+        transform: translateX(-30px) scale(0.8);
+        animation: slideOutToLeft 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+      
+      @keyframes slideInFromRight {
+        0% {
+          opacity: 0;
+          transform: translateX(30px) scale(0.8) rotateY(20deg);
+        }
+        60% {
+          transform: translateX(-5px) scale(1.05) rotateY(-5deg);
+        }
+        100% {
+          opacity: 1;
+          transform: translateX(0) scale(1) rotateY(0deg);
+        }
+      }
+      
+      @keyframes slideOutToLeft {
+        0% {
+          opacity: 1;
+          transform: translateX(0) scale(1) rotateY(0deg);
+        }
+        40% {
+          transform: translateX(5px) scale(0.95) rotateY(5deg);
+        }
+        100% {
+          opacity: 0;
+          transform: translateX(-30px) scale(0.8) rotateY(-20deg);
+        }
       }
       
       @media (min-width: 1024px) {
@@ -1479,17 +1642,17 @@ export default function UniversalHeader() {
           filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.6)) 
                   drop-shadow(0 0 40px rgba(168, 242, 106, 0.4))
                   drop-shadow(0 0 60px rgba(168, 85, 247, 0.3));
-          animation: logo-bounce 0.6s ease-in-out;
+        }
+        
+        /* Marketplace logo hover effect */
+        .logo-in.logo-hover:hover {
+          filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.6)) 
+                  drop-shadow(0 0 40px rgba(124, 58, 237, 0.4))
+                  drop-shadow(0 0 60px rgba(147, 51, 234, 0.3));
         }
       }
       
-      @keyframes logo-bounce {
-        0% { transform: scale(1.1) rotate(5deg) translateY(0px); }
-        25% { transform: scale(1.12) rotate(6deg) translateY(-3px); }
-        50% { transform: scale(1.15) rotate(4deg) translateY(-5px); }
-        75% { transform: scale(1.12) rotate(7deg) translateY(-2px); }
-        100% { transform: scale(1.1) rotate(5deg) translateY(0px); }
-      }
+
 
       /* Header Button Styles */
       .headerButton {
@@ -1529,6 +1692,22 @@ export default function UniversalHeader() {
       .primaryButton:hover {
         background: linear-gradient(135deg, #ffed4e, #ffd713);
         transform: scale(1.05);
+      }
+      
+      @keyframes holographicMove {
+        0% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+        100% {
+          background-position: 0% 50%;
+        }
+      }
+      
+      .holographic-button:hover {
+        box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset, 0 0 30px rgba(255, 107, 107, 0.3), 0 0 60px rgba(78, 205, 196, 0.2) !important;
       }
     `}</style>
     </>

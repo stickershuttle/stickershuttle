@@ -109,7 +109,7 @@ export default function CreatorsSpaceApply() {
                 <a href="#apply" className="px-8 py-4 rounded-lg font-bold text-white transition-all duration-300 hover:scale-105 inline-block" style={buttonStyle}>
                   Apply for a Space
                 </a>
-                <Link href="/marketplace" className="px-8 py-4 rounded-lg font-semibold text-white/90 border border-white/20 hover:bg-white/10 transition-all duration-300 inline-block">
+                <Link href="/marketspace" className="px-8 py-4 rounded-lg font-semibold text-white/90 border border-white/20 hover:bg-white/10 transition-all duration-300 inline-block">
                   Explore the Marketplace
                 </Link>
               </div>

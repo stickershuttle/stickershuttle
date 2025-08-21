@@ -1,9 +1,16 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { getSupabase } from '../lib/supabase';
+import { useQuery } from '@apollo/client';
+import { GET_USER_PROFILE } from '@/lib/profile-mutations';
 
 export default function UniversalFooter() {
   const [user, setUser] = useState<any>(null);
+  const { data: profileData } = useQuery(GET_USER_PROFILE, {
+    variables: { userId: user?.id || '' },
+    skip: !user?.id,
+  });
+  const isWholesale = !!profileData?.getUserProfile?.isWholesaleCustomer;
 
   useEffect(() => {
     const checkUser = async () => {
@@ -142,11 +149,13 @@ export default function UniversalFooter() {
                 Shop
               </h3>
               <ul className="space-y-1">
-                <li>
-                  <Link href="/deals" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
-                    ⚡ Deals
-                  </Link>
-                </li>
+                {!isWholesale && (
+                  <li>
+                    <Link href="/deals" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
+                      ⚡ Deals
+                    </Link>
+                  </li>
+                )}
                 <li>
                   <a href="/products" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
                     Start Your Order →

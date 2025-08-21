@@ -98,7 +98,7 @@ export default function PostDesign() {
     alert(`Design "${formData.title}" submitted successfully! Price: $${finalPrice}`);
     
     // Redirect back to marketplace
-    router.push('/marketplace');
+    router.push('/marketspace');
   };
 
   const marketplacePrice = calculateMarkupPrice(formData.basePrice, formData.material);

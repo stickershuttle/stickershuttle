@@ -88,9 +88,7 @@ const Custom404Page: NextPage = () => {
                   <Link href="/shipping-process" className="text-blue-300 hover:text-blue-200 transition-colors">
                     Shipping Info
                   </Link>
-                  <Link href="/deals" className="text-blue-300 hover:text-blue-200 transition-colors">
-                    Current Deals
-                  </Link>
+                  {/* Hide deals entry point for wholesale users via header/footer conditionals; removing direct link here */}
                 </div>
               </div>
 

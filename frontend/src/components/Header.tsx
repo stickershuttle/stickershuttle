@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useQuery } from '@apollo/client';
+import { GET_USER_PROFILE } from '@/lib/profile-mutations';
 import { useRouter } from 'next/router';
 import { getSupabase } from '../lib/supabase';
 
@@ -11,6 +13,11 @@ export default function Header() {
   const [loading, setLoading] = useState(true);
   const [dotCount, setDotCount] = useState<number>(1);
   const router = useRouter();
+  const { data: profileData } = useQuery(GET_USER_PROFILE, {
+    variables: { userId: user?.id || '' },
+    skip: !user?.id,
+  });
+  const isWholesale = !!profileData?.getUserProfile?.isWholesaleCustomer;
 
   useEffect(() => {
     checkUser();
@@ -394,17 +401,19 @@ export default function Header() {
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center gap-4 ml-auto">
             <nav className="flex items-center gap-4" style={{ letterSpacing: '-0.5px' }}>
-            <Link 
-              href="/deals"
-              className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105${router.pathname === '/deals' ? ' active' : ''}`}
-            >
-              <img 
-                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
-                alt="Bolt" 
-                className="w-4 h-4 object-contain inline-block mr-2"
-              />
-              Deals
-            </Link>
+            {!isWholesale && (
+              <Link 
+                href="/deals"
+                className={`headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105${router.pathname === '/deals' ? ' active' : ''}`}
+              >
+                <img 
+                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
+                  alt="Bolt" 
+                  className="w-4 h-4 object-contain inline-block mr-2"
+                />
+                Deals
+              </Link>
+            )}
             <button 
               className="headerButton px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105"
             >
@@ -669,14 +678,16 @@ export default function Header() {
 
           {/* Navigation Items */}
           <nav className="space-y-2">
-            <Link href="/deals" className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">
-              <img 
-                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
-                alt="Bolt" 
-                className="w-4 h-4 object-contain mr-3"
-              />
-              Deals
-            </Link>
+            {!isWholesale && (
+              <Link href="/deals" className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">
+                <img 
+                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/BoltIcon2_askpit.png" 
+                  alt="Bolt" 
+                  className="w-4 h-4 object-contain mr-3"
+                />
+                Deals
+              </Link>
+            )}
             <button className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center">
               <span className="mr-3">🚀</span>
               Shipping Process
