@@ -139,9 +139,9 @@ const StickerShuttlePro = () => {
             <div className="text-center">
               <div className="flex justify-center mb-6 pt-8">
                 <img 
-                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755752180/Asset_2_aze2bn.svg" 
+                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
                   alt="Sticker Shuttle Pro Logo" 
-                  className="h-24 md:h-32 lg:h-30 w-auto object-contain"
+                  className="h-18 md:h-32 lg:h-30 w-auto object-contain"
                 />
               </div>
               
@@ -157,12 +157,11 @@ const StickerShuttlePro = () => {
               </p>
               
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-                                  <button className="px-18 py-5 rounded-xl text-lg font-semibold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] flex items-center gap-2 animate-pulse-subtle"
+                                  <button className="px-18 py-5 rounded-xl text-lg font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] flex items-center gap-2 animate-pulse-subtle button-gradient"
                           style={{
-                            background: 'linear-gradient(135deg, rgba(64, 131, 240, 0.78) 0%, rgba(88, 152, 254, 0.45) 50%, rgba(59, 218, 246, 0.1) 100%)',
                             backdropFilter: 'blur(25px) saturate(180%)',
-                            border: '1px solid rgba(59, 130, 246, 0.4)',
-                            boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                            border: '1px solid rgba(61, 209, 249, 0.4)',
+                            boxShadow: 'rgba(61, 209, 249, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                           }}>
                     Join Pro
                     <ArrowRight className="w-5 h-5 transition-transform duration-300 hover:translate-x-1" />
@@ -321,12 +320,11 @@ const StickerShuttlePro = () => {
                 
                 {/* Join Pro Button */}
                 <div className="flex justify-center">
-                  <button className="px-12 py-5 rounded-xl text-xl font-semibold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] flex items-center gap-3 animate-pulse-subtle"
+                  <button className="px-12 py-5 rounded-xl text-xl font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] flex items-center gap-3 animate-pulse-subtle button-gradient"
                           style={{
-                            background: 'linear-gradient(135deg, rgba(64, 131, 240, 0.78) 0%, rgba(88, 152, 254, 0.45) 50%, rgba(59, 218, 246, 0.1) 100%)',
                             backdropFilter: 'blur(25px) saturate(180%)',
-                            border: '1px solid rgba(59, 130, 246, 0.4)',
-                            boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                            border: '1px solid rgba(61, 209, 249, 0.4)',
+                            boxShadow: 'rgba(61, 209, 249, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                           }}>
                     Join Pro
                     <ArrowRight className="w-6 h-6 transition-transform duration-300 hover:translate-x-1" />
@@ -385,12 +383,11 @@ const StickerShuttlePro = () => {
             
             {/* Join Pro Button */}
             <div className="flex justify-center mt-12">
-              <button className="px-12 py-5 rounded-xl text-xl font-semibold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] flex items-center gap-3 animate-pulse-subtle"
+              <button className="px-12 py-5 rounded-xl text-xl font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] flex items-center gap-3 animate-pulse-subtle button-gradient"
                       style={{
-                        background: 'linear-gradient(135deg, rgba(64, 131, 240, 0.78) 0%, rgba(88, 152, 254, 0.45) 50%, rgba(59, 218, 246, 0.1) 100%)',
                         backdropFilter: 'blur(25px) saturate(180%)',
-                        border: '1px solid rgba(59, 130, 246, 0.4)',
-                        boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                        border: '1px solid rgba(61, 209, 249, 0.4)',
+                        boxShadow: 'rgba(61, 209, 249, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                       }}>
                 Join Pro
                 <ArrowRight className="w-6 h-6 transition-transform duration-300 hover:translate-x-1" />
@@ -576,12 +573,20 @@ const StickerShuttlePro = () => {
         }
         
         .pro-gradient {
-          background: linear-gradient(45deg, #60a5fa, #3b82f6, #93c5fd, #dbeafe, #60a5fa);
+          background: linear-gradient(45deg, #3dd1f9, #2bb8d9, #4dd8ff, #7ee3ff, #3dd1f9);
           background-size: 300% 300%;
           background-clip: text;
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           animation: gradient-move 3s ease-in-out infinite;
+        }
+        
+        .button-gradient {
+          background: linear-gradient(45deg, #3dd1f9, #2bb8d9, #4dd8ff, #7ee3ff, #3dd1f9);
+          background-size: 300% 300%;
+          animation: gradient-move 3s ease-in-out infinite;
+          font-family: 'Rubik', sans-serif;
+          font-weight: bold;
         }
       `}</style>
     </>
