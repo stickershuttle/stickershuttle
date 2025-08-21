@@ -228,7 +228,7 @@ export default function UniversalFooter() {
           {/* Footer Bottom */}
           <div className="mt-12 pt-8" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
             <div className="flex flex-col md:flex-row items-center justify-between">
-              {/* Logo with v3.1 */}
+              {/* Logo with v3.5 */}
               <div className="mb-4 md:mb-0 flex items-center gap-3">
                 <img 
                   src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
@@ -236,7 +236,7 @@ export default function UniversalFooter() {
                   className="h-10 w-auto object-contain footer-logo-hover cursor-pointer"
                 />
                 <span className="holographic-v3-container text-sm px-3 py-1 rounded-full">
-                  <span className="holographic-v3-text">v3.1</span>
+                  <span className="holographic-v3-text">v3.5</span>
                 </span>
               </div>
               
