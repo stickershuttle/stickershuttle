@@ -43,7 +43,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
   const [selectedKissOption, setSelectedKissOption] = useState("1-4")
   const [sendProof, setSendProof] = useState(true)
   const [uploadLater, setUploadLater] = useState(false)
-  const [vibrancyBoost, setVibrancyBoost] = useState(false)
+
   // Use global rush order state from cart instead of local state
   const [totalPrice, setTotalPrice] = useState("")
   const [costPerSticker, setCostPerSticker] = useState("")
@@ -240,7 +240,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
       setTotalPrice("")
       setCostPerSticker("")
     }
-  }, [selectedSize, customWidth, customHeight, selectedQuantity, customQuantity, selectedKissOption, isRushOrder, vibrancyBoost])
+  }, [selectedSize, customWidth, customHeight, selectedQuantity, customQuantity, selectedKissOption, isRushOrder])
 
   useEffect(() => {
     console.log("Recalculating price due to size or quantity change")
@@ -382,7 +382,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
     return 24 // Default to 4" × 6"
   }
 
-  const calculatePrice = (qty: number, area: number, isRushOrderParam: boolean, vibrancyBoost: boolean = false) => {
+  const calculatePrice = (qty: number, area: number, isRushOrderParam: boolean) => {
     let totalPrice = 0
     let pricePerSticker = 0
 
@@ -410,13 +410,9 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
       let finalTotalPrice = realResult.totalPrice * kissOptionMultiplier;
       let finalPricePerSticker = realResult.finalPricePerSticker * kissOptionMultiplier;
       
-      // Apply 5% vibrancy boost if selected
-      if (vibrancyBoost) {
-        finalTotalPrice *= 1.05;
-        finalPricePerSticker *= 1.05;
-      }
       
-      console.log(`Real Pricing (Sheets) - Quantity: ${qty}, Area: ${area}, Kiss Option: ${selectedKissOption} (${kissOptionMultiplier}x), Vibrancy: ${vibrancyBoost}, Total: $${finalTotalPrice.toFixed(2)}, Per sheet: $${finalPricePerSticker.toFixed(2)}`);
+      
+              console.log(`Real Pricing (Sheets) - Quantity: ${qty}, Area: ${area}, Kiss Option: ${selectedKissOption} (${kissOptionMultiplier}x), Total: $${finalTotalPrice.toFixed(2)}, Per sheet: $${finalPricePerSticker.toFixed(2)}`);
       
       return {
         total: finalTotalPrice,
@@ -467,15 +463,11 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
       pricePerSticker *= 1.4
     }
 
-    // Apply 5% vibrancy boost if selected
-    if (vibrancyBoost) {
-      totalPrice *= 1.05
-      pricePerSticker *= 1.05
-    }
 
-    console.log(
-      `Legacy Pricing (Sheets) - Quantity: ${qty}, Area: ${area}, Kiss Option: ${selectedKissOption} (${kissOptionMultiplier}x), Vibrancy: ${vibrancyBoost}, Total price: $${totalPrice.toFixed(2)}, Price per sheet: $${pricePerSticker.toFixed(2)}`,
-    )
+
+          console.log(
+        `Legacy Pricing (Sheets) - Quantity: ${qty}, Area: ${area}, Kiss Option: ${selectedKissOption} (${kissOptionMultiplier}x), Total price: $${totalPrice.toFixed(2)}, Price per sheet: $${pricePerSticker.toFixed(2)}`,
+      )
 
     return {
       total: totalPrice,
@@ -649,7 +641,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
   const createCartItem = () => {
     const area = calculateArea(selectedSize, customWidth, customHeight);
     const quantity = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity);
-    const { total, perSheet } = calculatePrice(quantity, area, isRushOrder, vibrancyBoost);
+    const { total, perSheet } = calculatePrice(quantity, area, isRushOrder);
 
     return {
       id: generateCartItemId(),
@@ -690,7 +682,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                           selectedKissOption === "9-12" ? "9-12 Cuts" : selectedKissOption,
             priceImpact: 0
           },
-          vibrancy: { type: "addon" as const, value: vibrancyBoost, displayValue: vibrancyBoost ? "+25% Vibrancy" : "Standard", priceImpact: vibrancyBoost ? total * 0.05 : 0 },
+          
           proof: { type: "finish" as const, value: sendProof, displayValue: sendProof ? "Send Proof" : "No Proof", priceImpact: 0 },
           rush: { type: "finish" as const, value: isRushOrder, displayValue: isRushOrder ? "Rush Order" : "Standard", priceImpact: isRushOrder ? total * 0.4 : 0 },
           ...(postToInstagram && {
@@ -848,7 +840,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                       ${
                         selectedCut === cut
                           ? "bg-purple-500/20 text-purple-200 font-medium border-purple-400/50 button-selected animate-glow-purple"
-                          : "hover:bg-white/10 border-white/20 text-white/80"
+                          : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
                       }`}
                   >
                     <div className="flex items-center gap-3">
@@ -888,7 +880,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                       ${
                         selectedMaterial === material
                           ? "bg-green-500/20 text-green-200 font-medium border-green-400/50 button-selected animate-glow-green"
-                          : "hover:bg-white/10 border-white/20 text-white/80"
+                          : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
                       }`}
                   >
                     {material}
@@ -919,7 +911,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                       ${
                         selectedSize === size
                           ? "bg-purple-500/20 text-purple-200 font-medium border-purple-400/50 button-selected animate-glow-purple"
-                          : "hover:bg-white/10 border-white/20 text-white/80"
+                          : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
                       }`}
                   >
                     <span>{size}</span>
@@ -1145,7 +1137,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                                 : "bg-green-500/20 text-green-200 font-medium border-green-400/50 button-selected animate-glow-green"
                               : isGoldTier && hoveredGoldTier === numericAmount
                                 ? "bg-gradient-to-r from-yellow-500/20 via-amber-400/20 to-yellow-600/20 text-yellow-100 border-yellow-400/40 shadow-lg shadow-yellow-500/10"
-                                : "hover:bg-white/10 border-white/20 text-white/80"
+                                : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
                           }
                         `}
                       >
@@ -1577,72 +1569,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
             </div>
           </div>
 
-          {/* Vibrancy Enhancement Section */}
-          <div className="mb-6">
-            <div className="container-style p-6 transition-colors duration-200">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
-                <span className="text-purple-400">🎨</span>
-                Vibrancy Enhancement
-              </h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Standard */}
-                <button
-                  onClick={() => setVibrancyBoost(false)}
-                  className={`button-interactive relative text-left px-4 py-3 rounded-xl transition-all border backdrop-blur-md
-                    ${
-                      !vibrancyBoost
-                        ? "bg-gray-500/20 text-gray-200 font-medium button-selected"
-                        : "border-2 border-dashed border-gray-400/50 opacity-65 hover:border-gray-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
-                    }`}
-                  style={{
-                    border: !vibrancyBoost ? '1.5px solid rgba(107, 114, 128, 0.5)' : undefined
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">⚪</span>
-                    <span className="font-medium">Standard Colors</span>
-                  </div>
-                  {!vibrancyBoost && (
-                    <span className="absolute top-1 right-2 text-[10px] text-gray-300 font-medium">Selected</span>
-                  )}
-                </button>
 
-                {/* +25% Vibrancy */}
-                <button
-                  onClick={() => setVibrancyBoost(true)}
-                  className={`button-interactive relative text-left px-4 py-3 rounded-xl transition-all border backdrop-blur-md
-                    ${
-                      vibrancyBoost
-                        ? "bg-purple-500/20 text-purple-200 font-medium button-selected animate-glow-purple"
-                        : "border-2 border-dashed border-purple-400/50 opacity-65 hover:border-purple-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
-                    }`}
-                  style={{
-                    border: vibrancyBoost ? '1.5px solid rgba(168, 85, 247, 0.5)' : undefined
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">🎨</span>
-                    <span className="font-medium">+25% Vibrancy (+5%)</span>
-                  </div>
-                  {vibrancyBoost && (
-                    <span className="absolute top-1 right-2 text-[10px] text-purple-300 font-medium">Selected</span>
-                  )}
-                </button>
-              </div>
-
-              {/* Vibrancy Disclaimer */}
-              {vibrancyBoost && (
-                <div className="mt-3 p-3 rounded-lg text-xs text-white/70 leading-relaxed"
-                     style={{
-                       background: 'rgba(168, 85, 247, 0.1)',
-                       border: '1px solid rgba(168, 85, 247, 0.2)'
-                     }}>
-                  <span className="text-purple-300 font-medium">🎨 Note:</span> Vibrancy enhancement uses advanced color saturation techniques. Returns due to color accuracy differences are not eligible when this option is selected.
-                </div>
-              )}
-            </div>
-          </div>
 
           {/* Bottom Section */}
           <div className="mb-4 lg:mb-6">
@@ -1665,7 +1592,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
 
                   {!uploadedFile ? (
                     <div 
-                      className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative"
+                      className="border-[1.5px] border-solid border-gray-400/20 rounded-xl p-8 text-center hover:border-gray-400/30 transition-colors cursor-pointer backdrop-blur-md relative"
                       onDrop={handleDrop}
                       onDragOver={handleDragOver}
                       onClick={() => document.getElementById('file-input')?.click()}

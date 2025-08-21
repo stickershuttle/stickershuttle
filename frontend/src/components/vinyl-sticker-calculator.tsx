@@ -1002,7 +1002,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
                       ${
                         selectedCut === cut
                             ? "bg-purple-500/20 text-purple-200 font-medium button-selected animate-glow-purple"
-                            : "border-2 border-dashed border-purple-400/50 opacity-65 hover:border-purple-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
+                            : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
                       }`}
                       style={{
                         border: selectedCut === cut ? '1.5px solid rgba(168, 85, 247, 0.5)' : undefined
@@ -1034,7 +1034,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
                       ${
                         selectedMaterial === material
                             ? "bg-green-500/20 text-green-200 font-medium button-selected animate-glow-green"
-                            : "border-2 border-dashed border-green-400/50 opacity-65 hover:border-green-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
+                            : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
                       }`}
                       style={{
                         border: selectedMaterial === material ? '1.5px solid rgba(34, 197, 94, 0.5)' : undefined
@@ -1070,7 +1070,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
                       ${
                         selectedSize === size
                             ? "bg-purple-500/20 text-purple-200 font-medium button-selected animate-glow-purple"
-                            : "border-2 border-dashed border-purple-400/50 opacity-65 hover:border-purple-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
+                            : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
                       }`}
                       style={{
                         border: selectedSize === size ? '1.5px solid rgba(168, 85, 247, 0.5)' : undefined
@@ -1093,7 +1093,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
                   ${
                     selectedSize === "Custom size"
                       ? "bg-purple-500/20 text-purple-200 font-medium button-selected animate-glow-purple"
-                      : "border-2 border-dashed border-purple-400/50 opacity-65 hover:border-purple-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
+                      : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
                   }`}
                 style={{
                   border: selectedSize === "Custom size" ? '1.5px solid rgba(168, 85, 247, 0.5)' : undefined
@@ -1252,7 +1252,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
                                 : "bg-green-500/20 text-green-200 font-medium button-selected animate-glow-green"
                               : isGoldTier && hoveredGoldTier === numericAmount
                                 ? "bg-gradient-to-r from-yellow-500/20 via-amber-400/20 to-yellow-600/20 text-yellow-100 border-yellow-400/40 shadow-lg shadow-yellow-500/5"
-                                : "border-2 border-dashed border-green-400/50 opacity-65 hover:border-green-400/70 hover:bg-white/5 hover:opacity-80"
+                                : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80"
                           }
                         `}
                         style={{
@@ -1589,7 +1589,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
                       className={`group relative text-center p-3 rounded-xl transition-all duration-200 overflow-hidden ${
                         !sendProof
                           ? 'bg-red-500/20 text-red-200 font-medium button-selected animate-glow-red'
-                          : 'border-2 border-dashed border-red-400/50 opacity-65 hover:border-red-400/70 hover:bg-white/5 hover:opacity-80 text-white/70'
+                          : 'border-[1.5px] border-solid border-red-400/20 opacity-65 hover:border-red-400/30 hover:opacity-80 text-white/70'
                       }`}
                       style={{
                         border: !sendProof ? '1.5px solid rgba(239, 68, 68, 0.5)' : undefined
@@ -1609,7 +1609,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
                       className={`group relative text-center p-3 rounded-xl transition-all duration-200 overflow-hidden ${
                         isRushOrder
                           ? 'bg-orange-500/20 text-orange-200 font-medium button-selected animate-glow-orange'
-                          : 'border-2 border-dashed border-orange-400/50 opacity-65 hover:border-orange-400/70 hover:bg-white/5 hover:opacity-80 text-white/70'
+                          : 'border-[1.5px] border-solid border-orange-400/20 opacity-65 hover:border-orange-400/30 hover:opacity-80 text-white/70'
                       }`}
                       style={{
                         border: isRushOrder ? '1.5px solid rgba(249, 115, 22, 0.5)' : undefined
@@ -1629,7 +1629,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
                       className={`group relative text-center p-3 rounded-xl transition-all duration-200 overflow-hidden ${
                         vibrancyBoost
                           ? 'bg-purple-500/20 text-purple-200 font-medium button-selected animate-glow-purple'
-                          : 'border-2 border-dashed border-purple-400/50 opacity-65 hover:border-purple-400/70 hover:bg-white/5 hover:opacity-80 text-white/70'
+                          : 'border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70'
                       }`}
                       style={{
                         border: vibrancyBoost ? '1.5px solid rgba(168, 85, 247, 0.5)' : undefined,
@@ -1651,7 +1651,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
                       className={`group relative text-center p-3 rounded-xl transition-all duration-200 overflow-hidden ${
                         uploadLater
                           ? 'bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue'
-                          : 'border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70'
+                          : 'border-[1.5px] border-solid border-blue-400/20 opacity-65 hover:border-blue-400/30 hover:opacity-80 text-white/70'
                       } ${uploadedFile ? 'opacity-25 cursor-not-allowed' : ''}`}
                       style={{
                         border: uploadLater ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
@@ -1714,7 +1714,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
                     <div className={`p-3 rounded-xl backdrop-blur-md transition-all duration-200 flex flex-col flex-grow ${
                       additionalNotes 
                         ? '' 
-                                                  : 'border-2 border-dashed border-gray-400/50 opacity-65'
+                                                  : 'border-[1.5px] border-solid border-gray-400/20 opacity-65'
                     } hover:opacity-80`}
                          style={{
                            background: additionalNotes 
@@ -1794,7 +1794,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
 
                   {!uploadedFile ? (
                     <div 
-                      className={`border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative ${totalPrice ? 'animate-subtle-pulse' : ''}`}
+                      className={`border-[1.5px] border-solid border-gray-400/20 rounded-xl p-8 text-center hover:border-gray-400/30 transition-colors cursor-pointer backdrop-blur-md relative ${totalPrice ? 'animate-subtle-pulse' : ''}`}
                       onDrop={handleDrop}
                       onDragOver={handleDragOver}
                       onClick={() => document.getElementById('file-input')?.click()}

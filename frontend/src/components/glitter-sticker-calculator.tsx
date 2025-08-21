@@ -886,7 +886,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                       ${
                         selectedCut === cut
                           ? "bg-purple-500/20 text-purple-200 font-medium button-selected animate-glow-purple"
-                          : "border-2 border-dashed border-purple-400/50 opacity-65 hover:border-purple-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
+                          : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
                       }`}
                     style={{
                       border: selectedCut === cut ? '1.5px solid rgba(168, 85, 247, 0.5)' : undefined
@@ -918,7 +918,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                       ${
                         selectedMaterial === material
                           ? "bg-green-500/20 text-green-200 font-medium button-selected animate-glow-green"
-                          : "border-2 border-dashed border-green-400/50 opacity-65 hover:border-green-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
+                          : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
                       }`}
                     style={{
                       border: selectedMaterial === material ? '1.5px solid rgba(34, 197, 94, 0.5)' : undefined
@@ -941,12 +941,56 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                 <span role="img" aria-label="ruler" className="text-purple-400">
                   📏
                 </span>
-                Select a Size
+                Select a size
               </h2>
-              <div className="space-y-3">
-                {/* Custom Size Inputs - Show above popular presets when custom selected */}
+              
+              {/* Two-column grid for preset sizes */}
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                {['Small (2")', 'Medium (3")', 'Large (4")', 'X-Large (5")'].map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => handleSizeChange(size)}
+                    className={`button-interactive relative text-center px-3 py-4 rounded-xl flex items-center justify-center transition-all border backdrop-blur-md
+                      ${
+                        selectedSize === size
+                            ? "bg-purple-500/20 text-purple-200 font-medium button-selected animate-glow-purple"
+                            : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
+                      }`}
+                      style={{
+                        border: selectedSize === size ? '1.5px solid rgba(168, 85, 247, 0.5)' : undefined
+                      }}
+                  >
+                    <span className="text-sm font-medium">{size}</span>
+                    {size === 'Medium (3")' && (
+                      <span className="absolute top-1 right-1 text-[8px] text-purple-300 font-medium">
+                        Popular
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              
+              {/* Custom size option - separate from grid */}
+              <button
+                onClick={() => handleSizeChange("Custom size")}
+                className={`button-interactive relative w-full text-left px-4 py-3 rounded-xl flex items-center justify-between transition-all border backdrop-blur-md
+                  ${
+                    selectedSize === "Custom size"
+                      ? "bg-purple-500/20 text-purple-200 font-medium button-selected animate-glow-purple"
+                      : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
+                  }`}
+                style={{
+                  border: selectedSize === "Custom size" ? '1.5px solid rgba(168, 85, 247, 0.5)' : undefined
+                }}
+              >
+                <span>Custom size</span>
+              </button>
+              
+              {/* Custom Size Input and Popular Sizes - only show when custom size is selected */}
               {selectedSize === "Custom size" && (
-                  <div className="mb-4 space-y-3">
+                <div className="mt-3 space-y-4">
+                  {/* Custom Size Input Fields */}
+                  <div className="space-y-2">
                   <div className="flex gap-3">
                     <input
                       type="number"
@@ -967,81 +1011,38 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                       className="w-1/2 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
-                    
-                    {/* Popular Size Shortcuts */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => {
-                          handleCustomSizeChange("width", "5.5");
-                          handleCustomSizeChange("height", "5.5");
-                        }}
-                        className="px-3 py-2 text-xs rounded-lg border border-purple-400/30 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20 transition-colors"
-                      >
-                        5.5" × 5.5"
-                      </button>
-                      <button
-                        onClick={() => {
-                          handleCustomSizeChange("width", "11");
-                          handleCustomSizeChange("height", "3");
-                        }}
-                        className="px-3 py-2 text-xs rounded-lg border border-purple-400/30 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20 transition-colors"
-                      >
-                        11" × 3"
-                      </button>
-                      <button
-                        onClick={() => {
-                          handleCustomSizeChange("width", "3");
-                          handleCustomSizeChange("height", "2");
-                        }}
-                        className="px-3 py-2 text-xs rounded-lg border border-purple-400/30 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20 transition-colors"
-                      >
-                        3" × 2"
-                      </button>
-                      <button
-                        onClick={() => {
-                          handleCustomSizeChange("width", "4");
-                          handleCustomSizeChange("height", "3");
-                        }}
-                        className="px-3 py-2 text-xs rounded-lg border border-purple-400/30 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20 transition-colors"
-                      >
-                        4" × 3"
-                      </button>
-                    </div>
-                    
                   {showSizeWarning && (
                     <div className="text-xs text-orange-300 font-medium">
                       📏 Size must be between 0.5" and 14". Please enter a valid size.
                     </div>
                   )}
+                  </div>
+                  
+                  {/* Other Popular Sizes */}
+                  <div>
+                    <h3 className="text-xs font-semibold text-white/80 uppercase tracking-wider mb-2">Other popular sizes:</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { label: '5.5"', width: '5.5', height: '5.5' },
+                        { label: '11" × 3"', width: '11', height: '3' },
+                        { label: '3" × 2"', width: '3', height: '2' },
+                        { label: '4" × 3"', width: '4', height: '3' }
+                      ].map(({ label, width, height }) => (
+                        <button
+                          key={label}
+                          onClick={() => {
+                            handleCustomSizeChange("width", width);
+                            handleCustomSizeChange("height", height);
+                          }}
+                          className="px-3 py-2 text-xs rounded-lg border border-purple-400/30 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20 transition-colors"
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
-                
-                {/* Preset Sizes - 2-Column Grid */}
-                <div className="grid grid-cols-2 gap-3">
-                  {['Small (2")', 'Medium (3")', 'Large (4")', 'X-Large (5")', "Custom size"].map((size) => (
-                    <button
-                      key={size}
-                      onClick={() => handleSizeChange(size)}
-                      className={`button-interactive relative w-full text-left px-4 py-3 rounded-xl flex items-center justify-between transition-all border backdrop-blur-md
-                        ${
-                          selectedSize === size
-                            ? "bg-purple-500/20 text-purple-200 font-medium button-selected animate-glow-purple"
-                            : "border-2 border-dashed border-purple-400/50 opacity-65 hover:border-purple-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
-                        }`}
-                      style={{
-                        border: selectedSize === size ? '1.5px solid rgba(168, 85, 247, 0.5)' : undefined
-                      }}
-                    >
-                      <span className="text-sm font-medium">{size}</span>
-                      {size === 'Medium (3")' && (
-                        <span className="absolute top-1 right-1 text-[8px] text-purple-300 font-medium">
-                          Popular
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
 
             {/* White Options Section - Mobile Only */}
@@ -1059,7 +1060,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                     ${
                       selectedWhiteOption === "color-only"
                         ? "bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue"
-                        : "border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
+                        : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
                     }`}
                   style={{
                     border: selectedWhiteOption === "color-only" ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
@@ -1089,7 +1090,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                     ${
                       selectedWhiteOption === "partial-white"
                         ? "bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue"
-                        : "border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
+                        : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
                     }`}
                   style={{
                     border: selectedWhiteOption === "partial-white" ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
@@ -1119,7 +1120,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                     ${
                       selectedWhiteOption === "full-white"
                         ? "bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue"
-                        : "border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
+                        : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
                     }`}
                   style={{
                     border: selectedWhiteOption === "full-white" ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
@@ -1236,7 +1237,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                                 : "bg-green-500/20 text-green-200 font-medium button-selected animate-glow-green"
                               : isGoldTier && hoveredGoldTier === numericAmount
                                 ? "bg-gradient-to-r from-yellow-500/20 via-amber-400/20 to-yellow-600/20 text-yellow-100 shadow-lg shadow-yellow-500/10"
-                                : "border-2 border-dashed border-green-400/50 opacity-65 hover:border-green-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
+                                : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
                           }
                         `}
                         style={{
@@ -1581,7 +1582,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                     ${
                       selectedWhiteOption === "color-only"
                         ? "bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue"
-                        : "border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
+                        : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
                     }`}
                   style={{
                     border: selectedWhiteOption === "color-only" ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
@@ -1611,7 +1612,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                     ${
                       selectedWhiteOption === "partial-white"
                         ? "bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue"
-                        : "border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
+                        : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
                     }`}
                   style={{
                     border: selectedWhiteOption === "partial-white" ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
@@ -1641,7 +1642,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                     ${
                       selectedWhiteOption === "full-white"
                         ? "bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue"
-                        : "border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
+                        : "border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70"
                     }`}
                   style={{
                     border: selectedWhiteOption === "full-white" ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
@@ -1682,7 +1683,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                       className={`group relative text-center p-3 rounded-xl transition-all duration-200 overflow-hidden ${
                         !sendProof
                           ? 'bg-red-500/20 text-red-200 font-medium button-selected animate-glow-red'
-                          : 'border-2 border-dashed border-red-400/50 opacity-65 hover:border-red-400/70 hover:bg-white/5 hover:opacity-80 text-white/70'
+                          : 'border-[1.5px] border-solid border-red-400/20 opacity-65 hover:border-red-400/30 hover:opacity-80 text-white/70'
                       }`}
                       style={{
                         border: !sendProof ? '1.5px solid rgba(239, 68, 68, 0.5)' : undefined
@@ -1702,7 +1703,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                       className={`group relative text-center p-3 rounded-xl transition-all duration-200 overflow-hidden ${
                         isRushOrder
                           ? 'bg-orange-500/20 text-orange-200 font-medium button-selected animate-glow-orange'
-                          : 'border-2 border-dashed border-orange-400/50 opacity-65 hover:border-orange-400/70 hover:bg-white/5 hover:opacity-80 text-white/70'
+                          : 'border-[1.5px] border-solid border-orange-400/20 opacity-65 hover:border-orange-400/30 hover:opacity-80 text-white/70'
                       }`}
                       style={{
                         border: isRushOrder ? '1.5px solid rgba(249, 115, 22, 0.5)' : undefined
@@ -1722,7 +1723,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                       className={`group relative text-center p-3 rounded-xl transition-all duration-200 overflow-hidden ${
                         vibrancyBoost
                           ? 'bg-purple-500/20 text-purple-200 font-medium button-selected animate-glow-purple'
-                          : 'border-2 border-dashed border-purple-400/50 opacity-65 hover:border-purple-400/70 hover:bg-white/5 hover:opacity-80 text-white/70'
+                          : 'border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70'
                       }`}
                       style={{
                         border: vibrancyBoost ? '1.5px solid rgba(168, 85, 247, 0.5)' : undefined,
@@ -1744,7 +1745,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                       className={`group relative text-center p-3 rounded-xl transition-all duration-200 overflow-hidden ${
                         uploadLater
                           ? 'bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue'
-                          : 'border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70'
+                          : 'border-[1.5px] border-solid border-purple-400/20 opacity-65 hover:border-purple-400/30 hover:opacity-80 text-white/70'
                       } ${uploadedFile ? 'opacity-25 cursor-not-allowed' : ''}`}
                       style={{
                         border: uploadLater ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
@@ -1807,7 +1808,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                     <div className={`p-3 rounded-xl backdrop-blur-md transition-all duration-200 flex flex-col flex-grow ${
                       additionalNotes 
                         ? '' 
-                                                  : 'border-2 border-dashed border-gray-400/50 opacity-65'
+                                                  : 'border-[1.5px] border-solid border-gray-400/20 opacity-65'
                     } hover:opacity-80`}
                          style={{
                            background: additionalNotes 
@@ -1888,7 +1889,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
 
                   {!uploadedFile ? (
                     <div 
-                      className={`border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative ${totalPrice ? 'animate-subtle-pulse' : ''}`}
+                      className={`border-[1.5px] border-solid border-gray-400/20 rounded-xl p-8 text-center hover:border-gray-400/30 transition-colors cursor-pointer backdrop-blur-md relative ${totalPrice ? 'animate-subtle-pulse' : ''}`}
                       onDrop={handleDrop}
                       onDragOver={handleDragOver}
                       onClick={() => document.getElementById('file-input')?.click()}
@@ -2057,11 +2058,9 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                     </div>
                   )}
                 </div>
-                    </div>
-                      </div>
-                  </div>
-
-
+              </div>
+            </div>
+          </div>
 
           {/* Action Buttons */}
           <div className="space-y-3">
