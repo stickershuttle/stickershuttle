@@ -10,21 +10,73 @@ const OrderProgressTracker: React.FC<OrderProgressTrackerProps> = ({ order }) =>
     return order.items?.some((item: any) => 
       item.productId === 'sample-pack' || 
       item.sku === 'SP-001' ||
+      item.sku === 'SS-Sample' ||
       item.name?.toLowerCase().includes('sample pack') ||
       item.product?.id === 'sample-pack'
     ) || order._fullOrderData?.items?.some((item: any) => 
       item.productId === 'sample-pack' || 
       item.sku === 'SP-001' ||
+      item.sku === 'SS-Sample' ||
       item.name?.toLowerCase().includes('sample pack') ||
       item.product?.id === 'sample-pack'
     );
   };
 
+  // Helper function to check if order has ONLY sample packs (no custom items)
+  const isSamplePackOnlyOrder = (order: any) => {
+    const items = order.items || order._fullOrderData?.items || [];
+    return items.length > 0 && items.every((item: any) => 
+      item.productId === 'sample-pack' || 
+      item.sku === 'SP-001' ||
+      item.sku === 'SS-Sample' ||
+      item.name?.toLowerCase().includes('sample pack') ||
+      item.product?.id === 'sample-pack'
+    );
+  };
+
+  // Helper function to check if order contains Market Space items
+  const isMarketSpaceOrder = (order: any) => {
+    return order.items?.some((item: any) => {
+      const category = item.productCategory || item.product_category || '';
+      return category === 'marketplace' || 
+             category === 'marketplace-stickers' || 
+             category === 'marketplace-pack';
+    }) || order._fullOrderData?.items?.some((item: any) => {
+      const category = item.productCategory || item.product_category || '';
+      return category === 'marketplace' || 
+             category === 'marketplace-stickers' || 
+             category === 'marketplace-pack';
+    });
+  };
+
   // Get order progress based on status
   const getOrderProgress = (status: string, order?: any) => {
     const isSamplePack = order ? isSamplePackOrder(order) : false;
+    const isSamplePackOnly = order ? isSamplePackOnlyOrder(order) : false;
+    const isMarketSpace = order ? isMarketSpaceOrder(order) : false;
     
-    const steps = isSamplePack ? [
+    const steps = isMarketSpace ? [
+      { 
+        id: 'printing', 
+        label: 'Printing', 
+        icon: (
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" />
+          </svg>
+        ),
+        statuses: ['Processing', 'Order Received', 'In Production', 'Printing']
+      },
+      { 
+        id: 'shipped', 
+        label: 'Shipped', 
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          </svg>
+        ),
+        statuses: ['Shipped', 'In Transit']
+      }
+    ] : isSamplePackOnly ? [
       { 
         id: 'printing', 
         label: 'Printing', 
@@ -247,6 +299,18 @@ const OrderProgressTracker: React.FC<OrderProgressTrackerProps> = ({ order }) =>
               <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
             </svg>
             <span className="font-medium">This is a re-order and proofs are skipped and sent straight to production.</span>
+          </div>
+        </div>
+      )}
+
+      {/* Market Space Message */}
+      {isMarketSpaceOrder(order) && (
+        <div className="mt-4 pt-3 border-t border-white/10">
+          <div className="flex items-center justify-center gap-2 text-blue-300 text-sm">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+            </svg>
+            <span className="font-medium">Market Space stickers are shipped with USPS stamps and do not have tracking. Please be patient.</span>
           </div>
         </div>
       )}

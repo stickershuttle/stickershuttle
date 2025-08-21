@@ -12,6 +12,7 @@ export const GET_PROMOTIONAL_CONTAINERS = gql`
       price
       originalPrice
       collectionId
+      creatorId
       linkText
       backgroundImage
       backgroundGradient
@@ -36,6 +37,7 @@ export const UPDATE_PROMOTIONAL_CONTAINER = gql`
       price
       originalPrice
       collectionId
+      creatorId
       linkText
       backgroundImage
       backgroundGradient

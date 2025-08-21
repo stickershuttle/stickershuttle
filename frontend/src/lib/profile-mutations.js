@@ -246,8 +246,8 @@ export const GET_CREATOR_BY_USER_ID = gql`
 
 // Get creator sales statistics
 export const GET_CREATOR_SALES_STATS = gql`
-  query GetCreatorSalesStats($creatorId: ID!) {
-    getCreatorSalesStats(creatorId: $creatorId) {
+  query GetCreatorSalesStats($creatorId: ID!, $dateRange: String) {
+    getCreatorSalesStats(creatorId: $creatorId, dateRange: $dateRange) {
       totalSales
       totalRevenue
       totalProducts
@@ -266,7 +266,16 @@ export const GET_CREATOR_SALES_STATS = gql`
         price
         soldAt
         orderNumber
+        shippingCity
       }
+      quantityBreakdown {
+        quantity
+        orderCount
+        totalSold
+        revenue
+        totalProfit
+      }
+      customFivePackCount
     }
   }
 `; 

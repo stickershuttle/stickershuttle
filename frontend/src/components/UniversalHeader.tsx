@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import { getSupabase } from '@/lib/supabase';
 import { useQuery } from '@apollo/client';
 import { GET_USER_CREDIT_BALANCE } from '@/lib/credit-mutations';
-import { GET_USER_PROFILE } from '@/lib/profile-mutations';
+import { GET_USER_PROFILE, GET_CREATOR_BY_USER_ID } from '@/lib/profile-mutations';
 import HeaderAlerts from './HeaderAlerts';
 import CartIndicator from './CartIndicator';
 
@@ -33,16 +33,35 @@ export default function UniversalHeader() {
   const isAdminPage = router.pathname.startsWith('/admin');
   
   // Check if we're on the marketspace page or a marketspace product page
-  const isMarketspacePage = router.pathname === '/marketspace' || router.pathname.startsWith('/marketspace/');
+  const isOnMarketspaceURL = router.pathname === '/marketspace' || 
+                            router.pathname.startsWith('/marketspace/') || 
+                            router.pathname === '/creators-space-apply';
+
+  // Check if user is a creator
+  const { data: creatorData, loading: creatorLoading } = useQuery(GET_CREATOR_BY_USER_ID, {
+    variables: { userId: user?.id || '' },
+    skip: !user?.id,
+  });
+
+  const isCreator = creatorData?.getCreatorByUserId?.isActive || false;
+  const isUserAdmin = user && ADMIN_EMAILS.includes(user.email || '');
+  
+  // Only show marketspace elements if we have completed the creator check OR user is admin
+  const hasMarketspaceAccess = user && (isUserAdmin || (!creatorLoading && isCreator));
+  
+  // Removed debug logging - issue resolved
+  
+  // Show marketspace elements if on marketspace URL AND user has access
+  const isMarketspacePage = isOnMarketspaceURL && hasMarketspaceAccess;
 
   // Sync marketspace search with URL query
   useEffect(() => {
-    if (isMarketspacePage && router.query.search) {
+    if (isOnMarketspaceURL && router.query.search) {
       setMarketspaceSearch(router.query.search as string);
-    } else if (isMarketspacePage && !router.query.search) {
+    } else if (isOnMarketspaceURL && !router.query.search) {
       setMarketspaceSearch('');
     }
-  }, [router.query.search, isMarketspacePage]);
+  }, [router.query.search, isOnMarketspaceURL]);
   
   // Handle order search
   const handleOrderSearch = (e: React.FormEvent) => {
@@ -292,17 +311,10 @@ export default function UniversalHeader() {
     };
   }, [isAdminPage]);
 
-  // Update CSS custom property to account for honeymoon banner
+  // Update CSS custom property for header height
   useEffect(() => {
-    const currentAlertsHeight = parseInt(
-      getComputedStyle(document.documentElement).getPropertyValue('--header-alerts-height').replace('px', '') || '0'
-    );
-    const totalHeaderHeight = currentAlertsHeight + 36 + 80; // alerts + banner + header
-    document.documentElement.style.setProperty('--total-header-height', `${totalHeaderHeight}px`);
-    
-    return () => {
-      document.documentElement.style.setProperty('--total-header-height', '80px');
-    };
+    document.documentElement.style.setProperty('--total-header-height', '80px');
+    document.documentElement.style.setProperty('--header-alerts-height', '0px');
   }, []);
 
   // Determine visibility for authentication UI elements with better logic
@@ -311,26 +323,28 @@ export default function UniversalHeader() {
 
   return (
     <>
-    <HeaderAlerts />
+    {false && !isAdminPage && !isMarketspacePage && <HeaderAlerts />}
     
-    {/* Honeymoon Notice Banner */}
-    <Link href="/blog/ciao-bella-were-off-to-italy" className="w-full fixed z-50 text-center pt-3 pb-4 sm:pb-3 px-3 text-white font-medium block hover:brightness-110 transition-all duration-200 cursor-pointer" style={{ 
-      background: 'linear-gradient(135deg, rgb(147, 51, 234), rgb(168, 85, 247), rgb(196, 181, 253))',
-      top: 'var(--header-alerts-height, 0px)',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
-    }}>
-      <div className="text-xs sm:text-sm leading-tight">
-        <div className="sm:hidden">
-          <div>🚨 <span className="relative inline-block">ATTN<svg className="absolute -bottom-1 left-0 w-full h-2" viewBox="0 0 70 8" fill="none"><path d="M0 6c10-2 20-2 30 0s20 2 30 0c5-1 8-1 10 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.8"/></svg></span>: We'll be closed Sept. 4th-17th</div>
-          <div>for our Honeymoon! Read more →</div>
+    {/* Honeymoon Notice Banner - Hidden */}
+    {false && !isAdminPage && !isMarketspacePage && (
+      <Link href="/blog/ciao-bella-were-off-to-italy" className="w-full fixed z-50 text-center pt-3 pb-4 sm:pb-3 px-3 text-white font-medium block hover:brightness-110 transition-all duration-200 cursor-pointer" style={{ 
+        background: 'linear-gradient(135deg, rgb(147, 51, 234), rgb(168, 85, 247), rgb(196, 181, 253))',
+        top: 'var(--header-alerts-height, 0px)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+      }}>
+        <div className="text-xs sm:text-sm leading-tight">
+          <div className="sm:hidden">
+            <div>🚨 <span className="relative inline-block">ATTN<svg className="absolute -bottom-1 left-0 w-full h-2" viewBox="0 0 70 8" fill="none"><path d="M0 6c10-2 20-2 30 0s20 2 30 0c5-1 8-1 10 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.8"/></svg></span>: We'll be closed Sept. 4th-17th</div>
+            <div>for our Honeymoon! Read more →</div>
+          </div>
+          <div className="hidden sm:block">
+            🚨 <span className="relative inline-block">ATTN<svg className="absolute -bottom-1 left-0 w-full h-2" viewBox="0 0 70 8" fill="none"><path d="M0 6c10-2 20-2 30 0s20 2 30 0c5-1 8-1 10 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.8"/></svg></span>: We'll be closed Sept. 4th-17th for our Honeymoon! Read more →
+          </div>
         </div>
-        <div className="hidden sm:block">
-          🚨 <span className="relative inline-block">ATTN<svg className="absolute -bottom-1 left-0 w-full h-2" viewBox="0 0 70 8" fill="none"><path d="M0 6c10-2 20-2 30 0s20 2 30 0c5-1 8-1 10 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.8"/></svg></span>: We'll be closed Sept. 4th-17th for our Honeymoon! Read more →
-        </div>
-      </div>
-    </Link>
+      </Link>
+    )}
     
-    <header className={`w-full fixed z-50 ${!isAdminPage ? 'pb-[5px]' : ''} top-[calc(var(--header-alerts-height,0px)+52px)] sm:top-[calc(var(--header-alerts-height,0px)+44px)]`} style={{ backgroundColor: '#030140' }}>
+    <header className={`w-full fixed z-50 ${!isAdminPage ? 'pb-[5px]' : ''} top-0`} style={{ backgroundColor: '#030140' }}>
               <div className={isAdminPage ? "w-full py-4 px-8" : "w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto py-4 px-4"}>
         <div className="flex items-center justify-between relative" style={{ paddingTop: '2px' }}>
           {/* Mobile/Tablet Left Side - Avatar or Login Icons */}
@@ -788,7 +802,7 @@ export default function UniversalHeader() {
                     </Link>
 
                     {/* Creators Space - Only show for authorized users */}
-                    {user && user.email === 'justin@stickershuttle.com' && (
+                    {user && (isUserAdmin || (!creatorLoading && isCreator)) && (
                       <Link 
                         href="/marketspace" 
                         className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
@@ -839,26 +853,14 @@ export default function UniversalHeader() {
                       </Link>
                     )}
 
-                    <Link 
-                      href="/background-removal"
-                      className={`px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2${router.pathname === '/background-removal' || router.asPath === '/background-removal' ? ' active' : ''}`}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                        backdropFilter: 'blur(12px)'
-                      }}
-                    >
-                      <span className="text-lg">🪄</span>
-                      Background Removal
-                    </Link>
+
                   </>
                 )}
 
 
 
                 {/* Marketspace - Only show for authorized users when NOT on marketspace */}
-                {user && user.email === 'justin@stickershuttle.com' && !isMarketspacePage && (
+                {user && (isUserAdmin || (!creatorLoading && isCreator)) && !isMarketspacePage && (
                   <Link 
                     href="/marketspace"
                     className={`rounded-lg transition-all duration-200 transform hover:scale-105 flex items-center${(router.pathname === '/marketspace' || router.pathname.startsWith('/marketspace/') || router.asPath === '/marketspace') ? ' active' : ''}`}
@@ -1098,14 +1100,7 @@ export default function UniversalHeader() {
                           </Link>
                         )}
 
-                        <Link 
-                          href="/background-removal"
-                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
-                          onClick={() => setShowProfileDropdown(false)}
-                        >
-                          <span className="text-lg">🪄</span>
-                          <span>Background Removal</span>
-                        </Link>
+
 
                         <hr className="border-white/10 my-2" />
 
@@ -1326,14 +1321,7 @@ export default function UniversalHeader() {
                     </Link>
                   )}
 
-                  <Link 
-                    href="/background-removal"
-                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <span className="text-lg">🪄</span>
-                    <span>Background Removal</span>
-                  </Link>
+
                 </>
               )}
 
@@ -1545,14 +1533,7 @@ export default function UniversalHeader() {
                   </Link>
                 )}
 
-                <Link 
-                  href="/background-removal" 
-                  className={`w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center${router.pathname === '/background-removal' || router.asPath === '/background-removal' ? ' bg-purple-500 bg-opacity-20 border-l-4 border-purple-400' : ''}`} 
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <span className="text-lg mr-3">🪄</span>
-                  Background Removal
-                </Link>
+
               </>
             )}
             

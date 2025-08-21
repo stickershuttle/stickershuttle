@@ -79,6 +79,7 @@ function createSuccessResponse(message, data = null) {
 const uploadRoutes = require('./upload-routes');
 const supabaseClient = require('./supabase-client');
 const stripeClient = require('./stripe-client');
+const stripeConnectClient = require('./stripe-connect-client');
 const stripeWebhookHandlers = require('./stripe-webhook-handlers');
 const easyPostClient = require('./easypost-client');
 const EasyPostTrackingEnhancer = require('./easypost-tracking-enhancer');
@@ -886,9 +887,11 @@ const typeDefs = gql`
     getAllUsers: [User!]!
     getUserProfile(userId: ID!): UserProfile
     
-    # Creator queries
-    getCreatorByUserId(userId: ID!): Creator
-    getCreatorSalesStats(creatorId: ID!): CreatorSalesStats
+      # Creator queries
+  getCreatorByUserId(userId: ID!): Creator
+  getCreatorSalesStats(creatorId: ID!, dateRange: String): CreatorSalesStats
+  getCreatorPayouts(creatorId: ID!, limit: Int, offset: Int): CreatorPayoutsResult!
+  getCreatorEarnings(creatorId: ID!, limit: Int, offset: Int): CreatorEarningsResult!
     
     # Admin wholesale queries
     getPendingWholesaleApplications: [UserProfile!]!
@@ -1015,8 +1018,20 @@ const typeDefs = gql`
     # Tax exemption mutations
     updateTaxExemption(userId: ID!, input: TaxExemptionInput!): UserProfileResult!
     
-    # Creator management mutations
-    updateCreatorStatus(userId: ID!, isCreator: Boolean!): CreatorResult!
+      # Creator management mutations
+  updateCreatorStatus(userId: ID!, isCreator: Boolean!): CreatorResult!
+  
+  # Stripe Connect mutations
+  createStripeConnectAccount(creatorId: ID!): StripeConnectAccountResult!
+  completeStripeConnectOnboarding(creatorId: ID!, accountId: String!): StripeConnectAccountResult!
+  refreshStripeConnectAccount(creatorId: ID!): StripeConnectAccountResult!
+  
+  # Admin creator payment mutations
+  retryFailedCreatorPayments(orderId: ID!): CreatorPaymentRetryResult!
+  updateCreatorCommissionRate(creatorId: ID!, commissionRate: Float!): CreatorResult!
+  
+  # Recovery mutation for orphaned Stripe accounts
+  reconnectStripeAccount(creatorId: ID!, accountId: String!): StripeConnectAccountResult!
     
     # Wholesale client management mutations
     createWholesaleClient(input: CreateWholesaleClientInput!): WholesaleClientResult!
@@ -1186,6 +1201,21 @@ const typeDefs = gql`
     email: String!
     isActive: Boolean!
     totalProducts: Int!
+    stripeAccountId: String
+    stripeAccountStatus: String
+    stripeOnboardingUrl: String
+    stripeDashboardUrl: String
+    stripeChargesEnabled: Boolean
+    stripePayoutsEnabled: Boolean
+    stripeRequirementsPastDue: [String!]
+    stripeRequirementsCurrentlyDue: [String!]
+    stripeRequirementsEventuallyDue: [String!]
+    stripeRequirementsDisabledReason: String
+    commissionRate: Float
+    payoutSchedule: String
+    lastPayoutDate: String
+    totalPayouts: Float
+    pendingPayouts: Float
     createdAt: String!
     updatedAt: String!
   }
@@ -1212,6 +1242,15 @@ const typeDefs = gql`
     price: Float!
     soldAt: String!
     orderNumber: String!
+    shippingCity: String
+  }
+
+  type QuantityBreakdown {
+    quantity: Int!
+    orderCount: Int!
+    totalSold: Int!
+    revenue: Float!
+    totalProfit: Float!
   }
 
   type CreatorSalesStats {
@@ -1220,6 +1259,88 @@ const typeDefs = gql`
     totalProducts: Int!
     soldProducts: [SoldProduct!]!
     recentSales: [RecentSale!]!
+    quantityBreakdown: [QuantityBreakdown!]!
+    customFivePackCount: Int!
+  }
+
+  # Stripe Connect Types
+  type StripeConnectAccountResult {
+    success: Boolean!
+    message: String
+    creator: Creator
+    onboardingUrl: String
+    dashboardUrl: String
+    error: String
+  }
+
+  type CreatorPayout {
+    id: ID!
+    creatorId: ID!
+    stripePayoutId: String!
+    stripeAccountId: String!
+    amount: Float!
+    currency: String!
+    status: String!
+    arrivalDate: String
+    description: String
+    failureCode: String
+    failureMessage: String
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  type CreatorPayoutsResult {
+    success: Boolean!
+    payouts: [CreatorPayout!]!
+    totalCount: Int!
+    totalAmount: Float!
+    error: String
+  }
+
+  type CreatorEarning {
+    id: ID!
+    creatorId: ID!
+    orderId: ID!
+    marketplaceProductId: ID
+    stripePaymentIntentId: String
+    stripeTransferId: String
+    grossAmount: Float!
+    commissionRate: Float!
+    platformFee: Float!
+    creatorEarnings: Float!
+    stripeFee: Float!
+    netEarnings: Float!
+    currency: String!
+    status: String!
+    transferredAt: String
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  type CreatorEarningsResult {
+    success: Boolean!
+    earnings: [CreatorEarning!]!
+    totalCount: Int!
+    totalEarnings: Float!
+    pendingEarnings: Float!
+    error: String
+  }
+
+  type CreatorPaymentRetryResult {
+    success: Boolean!
+    retriedCreators: Int!
+    results: [CreatorPaymentRetryItem!]!
+    message: String
+    error: String
+  }
+
+  type CreatorPaymentRetryItem {
+    success: Boolean!
+    creatorId: ID!
+    creatorName: String!
+    transferId: String
+    amount: Float
+    error: String
   }
 
   type WholesaleApprovalResult {
@@ -2364,6 +2485,7 @@ const typeDefs = gql`
     price: String
     originalPrice: String
     collectionId: ID
+    creatorId: ID
     linkText: String
     backgroundImage: String
     backgroundGradient: String
@@ -2381,6 +2503,7 @@ const typeDefs = gql`
     price: String
     originalPrice: String
     collectionId: ID
+    creatorId: ID
     linkText: String
     backgroundImage: String
     backgroundGradient: String
@@ -4266,15 +4389,154 @@ const resolvers = {
       }
     },
 
-    getCreatorSalesStats: async (_, { creatorId }) => {
+    getCreatorPayouts: async (_, { creatorId, limit = 50, offset = 0 }) => {
       try {
-        console.log('📊 Fetching creator sales stats for:', creatorId);
+        console.log('💰 Fetching creator payouts for:', creatorId);
         
         if (!supabaseClient.isReady()) {
           throw new Error('Creator service is currently unavailable');
         }
 
         const client = supabaseClient.getServiceClient();
+        
+        // Fetch payouts with pagination
+        const { data: payouts, error: payoutsError, count } = await client
+          .from('creator_payouts')
+          .select('*', { count: 'exact' })
+          .eq('creator_id', creatorId)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + limit - 1);
+
+        if (payoutsError) {
+          throw new Error(`Failed to fetch creator payouts: ${payoutsError.message}`);
+        }
+
+        // Calculate total amount
+        const { data: totalData, error: totalError } = await client
+          .from('creator_payouts')
+          .select('amount')
+          .eq('creator_id', creatorId)
+          .eq('status', 'paid');
+
+        const totalAmount = totalData?.reduce((sum, payout) => sum + parseFloat(payout.amount || 0), 0) || 0;
+
+        return {
+          success: true,
+          payouts: payouts || [],
+          totalCount: count || 0,
+          totalAmount,
+          error: null
+        };
+
+      } catch (error) {
+        console.error('❌ Error fetching creator payouts:', error);
+        return {
+          success: false,
+          payouts: [],
+          totalCount: 0,
+          totalAmount: 0,
+          error: error.message
+        };
+      }
+    },
+
+    getCreatorEarnings: async (_, { creatorId, limit = 50, offset = 0 }) => {
+      try {
+        console.log('💵 Fetching creator earnings for:', creatorId);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Creator service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Fetch earnings with pagination
+        const { data: earnings, error: earningsError, count } = await client
+          .from('creator_earnings')
+          .select('*', { count: 'exact' })
+          .eq('creator_id', creatorId)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + limit - 1);
+
+        if (earningsError) {
+          throw new Error(`Failed to fetch creator earnings: ${earningsError.message}`);
+        }
+
+        // Calculate totals
+        const { data: totalData, error: totalError } = await client
+          .from('creator_earnings')
+          .select('net_earnings, status')
+          .eq('creator_id', creatorId);
+
+        const totalEarnings = totalData?.filter(e => e.status === 'transferred')
+          .reduce((sum, earning) => sum + parseFloat(earning.net_earnings || 0), 0) || 0;
+        
+        const pendingEarnings = totalData?.filter(e => e.status === 'pending')
+          .reduce((sum, earning) => sum + parseFloat(earning.net_earnings || 0), 0) || 0;
+
+        return {
+          success: true,
+          earnings: earnings || [],
+          totalCount: count || 0,
+          totalEarnings,
+          pendingEarnings,
+          error: null
+        };
+
+      } catch (error) {
+        console.error('❌ Error fetching creator earnings:', error);
+        return {
+          success: false,
+          earnings: [],
+          totalCount: 0,
+          totalEarnings: 0,
+          pendingEarnings: 0,
+          error: error.message
+        };
+      }
+    },
+
+    getCreatorSalesStats: async (_, { creatorId, dateRange = 'all' }) => {
+      try {
+        console.log('📊 Fetching creator sales stats for:', creatorId, 'dateRange:', dateRange);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Creator service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Calculate date range filter
+        const getDateRange = (range) => {
+          const now = new Date();
+          let startDate, endDate = now.toISOString();
+          
+          switch (range) {
+            case 'today':
+              startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+              break;
+            case 'last7days':
+              startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+              break;
+            case 'monthtodate':
+              startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+              break;
+            case 'lastmonth':
+              const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+              startDate = lastMonth.toISOString();
+              endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString();
+              break;
+            case 'yeartodate':
+              startDate = new Date(now.getFullYear(), 0, 1).toISOString();
+              break;
+            default: // 'all'
+              return null;
+          }
+          
+          return { startDate, endDate };
+        };
+
+        const dateFilter = getDateRange(dateRange);
         
         // 1) Get creator's marketplace products (active)
         const { data: products, error: productsError } = await client
@@ -4297,18 +4559,29 @@ const resolvers = {
             totalRevenue: 0.0,
             totalProducts,
             soldProducts: [],
-            recentSales: []
+            recentSales: [],
+            quantityBreakdown: [],
+            customFivePackCount: 0
           };
         }
 
         // Build quick lookup for product metadata
         const productMetaById = new Map((products || []).map(p => [p.id, p]));
 
-        // 2) Get all paid orders (ids and summary info)
-        const { data: paidOrders, error: paidOrdersError } = await client
+        // 2) Get all paid orders (ids and summary info) with date filtering
+        let ordersQuery = client
           .from('orders_main')
-          .select('id, order_number, order_created_at, created_at, financial_status')
+          .select('id, order_number, order_created_at, created_at, financial_status, shipping_address')
           .eq('financial_status', 'paid');
+
+        // Apply date filter if specified
+        if (dateFilter) {
+          ordersQuery = ordersQuery
+            .gte('order_created_at', dateFilter.startDate)
+            .lte('order_created_at', dateFilter.endDate);
+        }
+
+        const { data: paidOrders, error: paidOrdersError } = await ordersQuery;
 
         if (paidOrdersError) {
           throw new Error(`Failed to fetch paid orders: ${paidOrdersError.message}`);
@@ -4323,7 +4596,9 @@ const resolvers = {
             totalRevenue: 0.0,
             totalProducts,
             soldProducts: [],
-            recentSales: []
+            recentSales: [],
+            quantityBreakdown: [],
+            customFivePackCount: 0
           };
         }
 
@@ -4333,7 +4608,7 @@ const resolvers = {
           .select('id, order_id, product_id, product_name, quantity, unit_price, total_price, created_at, product_category')
           .in('product_id', productIds)
           .in('order_id', paidOrderIds)
-          .in('product_category', ['marketplace', 'marketplace-stickers']);
+          .in('product_category', ['marketplace', 'marketplace-stickers', 'marketplace-pack']);
 
         if (itemsError) {
           throw new Error(`Failed to fetch order items: ${itemsError.message}`);
@@ -4341,16 +4616,100 @@ const resolvers = {
 
         const creatorItems = items || [];
 
-        // 4) Aggregate totals
+        // 4) Aggregate totals and quantity breakdown
         let totalSales = 0;
         let totalRevenue = 0;
         const soldByProduct = new Map();
+        
+        // Cost calculation function (same as creator payment processor)
+        const calculateCosts = (quantity, totalRevenue, size = '4"') => {
+          let materialShippingCost;
+          let fulfillmentCost;
+
+          // Size-based sticker costs
+          const stickerCostPerUnit = {
+            '3"': 0.35,
+            '4"': 0.40,
+            '5"': 0.45
+          };
+          
+          const costPerSticker = stickerCostPerUnit[size] || stickerCostPerUnit['4"'];
+          let stickerCost = quantity * costPerSticker;
+
+          if (quantity === 1) {
+            materialShippingCost = 1.35;
+            fulfillmentCost = 0.25;
+          } else if (quantity <= 5) {
+            materialShippingCost = 1.46;
+            fulfillmentCost = 0.26;
+          } else if (quantity <= 10) {
+            materialShippingCost = 1.61;
+            fulfillmentCost = 0.27;
+          } else if (quantity <= 25) {
+            materialShippingCost = 5.45;
+            fulfillmentCost = 0.30;
+          } else {
+            materialShippingCost = 5.45;
+            fulfillmentCost = 0.30;
+          }
+
+          const stripeFee = totalRevenue > 0 ? (totalRevenue * 0.029) + 0.30 : 0;
+          const totalCosts = materialShippingCost + stickerCost + fulfillmentCost + stripeFee;
+          
+          return {
+            materialShippingCost,
+            stickerCost,
+            fulfillmentCost,
+            stripeFee,
+            totalCosts
+          };
+        };
+
+        // Track quantity breakdowns (1, 5, 10, 25+)
+        const quantityBreakdowns = new Map([
+          [1, { quantity: 1, orderCount: 0, totalSold: 0, revenue: 0, totalProfit: 0 }],
+          [5, { quantity: 5, orderCount: 0, totalSold: 0, revenue: 0, totalProfit: 0 }],
+          [10, { quantity: 10, orderCount: 0, totalSold: 0, revenue: 0, totalProfit: 0 }],
+          [25, { quantity: 25, orderCount: 0, totalSold: 0, revenue: 0, totalProfit: 0 }]
+        ]);
+        
+        // Track custom 5-pack orders (marketplace-pack category)
+        let customFivePackCount = 0;
 
         for (const item of creatorItems) {
           const quantity = Number(item.quantity) || 0;
           const lineTotal = Number(item.total_price) || 0;
           totalSales += quantity;
           totalRevenue += lineTotal;
+
+          // Check if this is a custom 5-pack (marketplace-pack category)
+          if (item.product_category === 'marketplace-pack') {
+            customFivePackCount += 1;
+          }
+
+          // Categorize by quantity tier
+          let quantityTier;
+          if (quantity === 1) {
+            quantityTier = 1;
+          } else if (quantity === 5) {
+            quantityTier = 5;
+          } else if (quantity === 10) {
+            quantityTier = 10;
+          } else if (quantity >= 25) {
+            quantityTier = 25;
+          }
+
+          if (quantityTier && quantityBreakdowns.has(quantityTier)) {
+            const breakdown = quantityBreakdowns.get(quantityTier);
+            breakdown.orderCount += 1;
+            breakdown.totalSold += quantity;
+            breakdown.revenue += lineTotal;
+            
+            // Calculate profit for this item (revenue - costs)
+            const costs = calculateCosts(quantity, lineTotal);
+            const itemProfit = Math.max(0, lineTotal - costs.totalCosts);
+            breakdown.totalProfit += itemProfit;
+          }
 
           const existing = soldByProduct.get(item.product_id) || {
             id: item.product_id,
@@ -4372,13 +4731,28 @@ const resolvers = {
           .map((item) => {
             const orderMeta = paidOrderIdToMeta.get(item.order_id) || {};
             const soldAt = orderMeta.order_created_at || orderMeta.created_at || item.created_at;
+            
+            // Extract city from shipping address
+            let shippingCity = null;
+            if (orderMeta.shipping_address) {
+              try {
+                const shippingAddr = typeof orderMeta.shipping_address === 'string' 
+                  ? JSON.parse(orderMeta.shipping_address) 
+                  : orderMeta.shipping_address;
+                shippingCity = shippingAddr?.city || null;
+              } catch (e) {
+                console.warn('Failed to parse shipping address for order:', item.order_id);
+              }
+            }
+            
             return {
               id: String(item.id),
               productName: item.product_name,
               quantity: Number(item.quantity) || 0,
               price: Number(item.unit_price) || 0,
               soldAt: soldAt,
-              orderNumber: orderMeta.order_number || ''
+              orderNumber: orderMeta.order_number || '',
+              shippingCity: shippingCity
             };
           })
           .sort((a, b) => new Date(b.soldAt).getTime() - new Date(a.soldAt).getTime())
@@ -4398,7 +4772,9 @@ const resolvers = {
           totalRevenue: Number(totalRevenue.toFixed(2)),
           totalProducts,
           soldProducts: Array.from(soldByProduct.values()),
-          recentSales
+          recentSales,
+          quantityBreakdown: Array.from(quantityBreakdowns.values()),
+          customFivePackCount
         };
       } catch (error) {
         console.error('❌ Error in getCreatorSalesStats:', error);
@@ -5368,6 +5744,7 @@ const resolvers = {
           price: container.price,
           originalPrice: container.original_price,
           collectionId: container.collection_id ? String(container.collection_id) : null,
+          creatorId: container.creator_id ? String(container.creator_id) : null,
           linkText: container.link_text,
           backgroundImage: container.background_image,
           backgroundGradient: container.background_gradient,
@@ -5817,9 +6194,11 @@ const resolvers = {
         }
         
         // Check if this is a local pickup order
-        if (!currentOrder.shipping_method || !currentOrder.shipping_method.includes('Local Pickup')) {
-          throw new Error('This order is not a local pickup order');
-        }
+        // Note: Removed restriction to allow any order to be marked as ready for pickup
+        // when customers request to pick up instead of shipping
+        // if (!currentOrder.shipping_method || !currentOrder.shipping_method.includes('Local Pickup')) {
+        //   throw new Error('This order is not a local pickup order');
+        // }
         
         // Update the order status to ready for pickup
         const statusUpdate = {
@@ -7262,6 +7641,21 @@ const resolvers = {
               cartTotal: cartTotal.toFixed(2)
             });
             
+            // Check if cart contains market space products and calculate total quantity
+            const hasMarketplaceProducts = input.cartItems.some(item => 
+              item.productCategory === 'marketplace' || 
+              item.productCategory === 'marketplace-stickers' || 
+              item.productCategory === 'marketplace-pack'
+            );
+            
+            // Calculate total quantity of market space products
+            const marketplaceProductQuantity = input.cartItems.reduce((total, item) => {
+              const isMarketplaceItem = item.productCategory === 'marketplace' || 
+                                      item.productCategory === 'marketplace-stickers' || 
+                                      item.productCategory === 'marketplace-pack';
+              return total + (isMarketplaceItem ? item.quantity : 0);
+            }, 0);
+            
             const checkoutData = {
               lineItems: [
                 ...input.cartItems.map(item => {
@@ -7314,15 +7708,24 @@ const resolvers = {
                   if (isReorderItem) discountDescriptions.push('Reorder 10% Off');
                   const discountText = discountDescriptions.length > 0 ? ` (${discountDescriptions.join(' + ')})` : '';
                   
+                  // Check if this is a market space product
+                  const isMarketplaceProduct = item.productCategory === 'marketplace' || 
+                                             item.productCategory === 'marketplace-stickers' || 
+                                             item.productCategory === 'marketplace-pack';
+                  
+                  // Set description based on product type
+                  const configurationText = isMarketplaceProduct ? 'Market Space Product' : 'Custom Configuration';
+                  
                   const lineItem = {
                     name: item.productName,
-                    description: `${item.productName} - Custom Configuration${discountText}`,
+                    description: `${item.productName} - ${configurationText}${discountText}`,
                     unitPrice: discountedUnitPrice,
                     totalPrice: discountedTotalPrice,
                     quantity: item.quantity,
                     productId: item.productId,
                     sku: item.sku,
-                    calculatorSelections: item.calculatorSelections
+                    calculatorSelections: item.calculatorSelections,
+                    isMarketplaceProduct: isMarketplaceProduct
                   };
                   
                   console.log('📦 Final line item for Stripe:', {
@@ -7362,6 +7765,8 @@ const resolvers = {
               existingCustomerId: existingCustomerId, // Pass existing customer ID if available
               creditsToApply: actualCreditsApplied, // Pass actual credits applied
               creditTransactionId: creditTransactionId, // Pass credit transaction ID for tracking
+              hasMarketplaceProducts: hasMarketplaceProducts, // Pass market space product flag for shipping options
+              marketplaceProductQuantity: marketplaceProductQuantity, // Pass market space product quantity for shipping auto-selection
               // Generate detailed order note with all selections including white options
               orderNote: generateOrderNote(input.cartItems),
               cartMetadata: {
@@ -9604,6 +10009,421 @@ const resolvers = {
       }
     },
 
+    // Stripe Connect mutations
+    createStripeConnectAccount: async (_, { creatorId }) => {
+      try {
+        console.log('🔗 Creating Stripe Connect account for creator:', creatorId);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Creator service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get creator details
+        const { data: creator, error: creatorError } = await client
+          .from('creators')
+          .select('*')
+          .eq('id', creatorId)
+          .single();
+
+        if (creatorError || !creator) {
+          throw new Error('Creator not found');
+        }
+
+        // Check if already has Stripe account
+        if (creator.stripe_account_id) {
+          return {
+            success: false,
+            message: 'Creator already has a Stripe Connect account',
+            creator: creator,
+            error: 'Account already exists'
+          };
+        }
+
+        // Create Stripe Connect Express account
+        const account = await stripeConnectClient.createExpressAccount({
+          creatorId: creatorId,
+          creatorName: creator.creator_name,
+          email: creator.email,
+          country: 'US' // You might want to make this configurable
+        });
+
+        // Create account link for onboarding
+        const accountLink = await stripeConnectClient.createAccountLink(
+          account.id,
+          `${process.env.FRONTEND_URL}/account/dashboard?tab=creator&stripe_refresh=true`,
+          `${process.env.FRONTEND_URL}/account/dashboard?tab=creator&stripe_success=true`
+        );
+
+        // Update creator with Stripe account info
+        const { data: updatedCreator, error: updateError } = await client
+          .from('creators')
+          .update({
+            stripe_account_id: account.id,
+            stripe_account_status: 'pending',
+            stripe_onboarding_url: accountLink.url,
+            stripe_charges_enabled: account.charges_enabled,
+            stripe_payouts_enabled: account.payouts_enabled,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', creatorId)
+          .select('*')
+          .single();
+
+        if (updateError) {
+          console.error('❌ Failed to save Stripe account ID to database:', updateError);
+          // Even if database update fails, we still have the Stripe account
+          // Log the account ID so it can be manually reconnected
+          console.error('🚨 IMPORTANT: Stripe account created but not saved to DB. Account ID:', account.id);
+          throw new Error(`Failed to update creator: ${updateError.message}. Account ID: ${account.id}`);
+        }
+
+        console.log('✅ Stripe Connect account created successfully');
+        
+        return {
+          success: true,
+          message: 'Stripe Connect account created successfully. Please complete onboarding.',
+          creator: updatedCreator,
+          onboardingUrl: accountLink.url,
+          error: null
+        };
+
+      } catch (error) {
+        console.error('❌ Error creating Stripe Connect account:', error);
+        return {
+          success: false,
+          message: 'Failed to create Stripe Connect account',
+          creator: null,
+          onboardingUrl: null,
+          error: error.message
+        };
+      }
+    },
+
+    completeStripeConnectOnboarding: async (_, { creatorId, accountId }) => {
+      try {
+        console.log('✅ Completing Stripe Connect onboarding:', { creatorId, accountId });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Creator service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Retrieve account details from Stripe
+        const account = await stripeConnectClient.retrieveAccount(accountId);
+        
+        // Create dashboard link
+        const dashboardLink = await stripeConnectClient.createLoginLink(accountId);
+
+        // Update creator with latest account status
+        const { data: updatedCreator, error: updateError } = await client
+          .from('creators')
+          .update({
+            stripe_account_status: account.details_submitted ? 'active' : 'restricted',
+            stripe_dashboard_url: dashboardLink.url,
+            stripe_charges_enabled: account.charges_enabled,
+            stripe_payouts_enabled: account.payouts_enabled,
+            stripe_requirements_past_due: account.requirements?.past_due || [],
+            stripe_requirements_currently_due: account.requirements?.currently_due || [],
+            stripe_requirements_eventually_due: account.requirements?.eventually_due || [],
+            stripe_requirements_disabled_reason: account.requirements?.disabled_reason || null,
+            stripe_onboarding_url: null, // Clear onboarding URL
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', creatorId)
+          .eq('stripe_account_id', accountId)
+          .select('*')
+          .single();
+
+        if (updateError) {
+          throw new Error(`Failed to update creator: ${updateError.message}`);
+        }
+
+        return {
+          success: true,
+          message: account.details_submitted ? 'Onboarding completed successfully!' : 'Onboarding in progress',
+          creator: updatedCreator,
+          dashboardUrl: dashboardLink.url,
+          error: null
+        };
+
+      } catch (error) {
+        console.error('❌ Error completing Stripe Connect onboarding:', error);
+        return {
+          success: false,
+          message: 'Failed to complete onboarding',
+          creator: null,
+          dashboardUrl: null,
+          error: error.message
+        };
+      }
+    },
+
+    refreshStripeConnectAccount: async (_, { creatorId }) => {
+      try {
+        console.log('🔄 Refreshing Stripe Connect account for creator:', creatorId);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Creator service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get creator with Stripe account
+        const { data: creator, error: creatorError } = await client
+          .from('creators')
+          .select('*')
+          .eq('id', creatorId)
+          .single();
+
+        if (creatorError || !creator) {
+          throw new Error('Creator not found');
+        }
+
+        // If no stripe_account_id, this might be a case where the account was created but not properly saved
+        if (!creator.stripe_account_id) {
+          console.log('⚠️ No stripe_account_id found for creator, cannot refresh account status');
+          return {
+            success: false,
+            message: 'No Stripe Connect account found. Please set up your account first.',
+            creator: creator,
+            dashboardUrl: null,
+            error: 'No Stripe account ID found'
+          };
+        }
+
+        // Retrieve latest account details from Stripe
+        const account = await stripeConnectClient.retrieveAccount(creator.stripe_account_id);
+        
+        // Create new dashboard link
+        let dashboardUrl = null;
+        try {
+          const dashboardLink = await stripeConnectClient.createLoginLink(creator.stripe_account_id);
+          dashboardUrl = dashboardLink.url;
+        } catch (dashboardError) {
+          console.warn('Could not create dashboard link:', dashboardError);
+        }
+
+        // Update creator with latest account status
+        const { data: updatedCreator, error: updateError } = await client
+          .from('creators')
+          .update({
+            stripe_account_status: account.details_submitted ? 'active' : 'restricted',
+            stripe_dashboard_url: dashboardUrl,
+            stripe_charges_enabled: account.charges_enabled,
+            stripe_payouts_enabled: account.payouts_enabled,
+            stripe_requirements_past_due: account.requirements?.past_due || [],
+            stripe_requirements_currently_due: account.requirements?.currently_due || [],
+            stripe_requirements_eventually_due: account.requirements?.eventually_due || [],
+            stripe_requirements_disabled_reason: account.requirements?.disabled_reason || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', creatorId)
+          .select('*')
+          .single();
+
+        if (updateError) {
+          throw new Error(`Failed to update creator: ${updateError.message}`);
+        }
+
+        return {
+          success: true,
+          message: 'Account status refreshed successfully',
+          creator: updatedCreator,
+          dashboardUrl,
+          error: null
+        };
+
+      } catch (error) {
+        console.error('❌ Error refreshing Stripe Connect account:', error);
+        return {
+          success: false,
+          message: 'Failed to refresh account status',
+          creator: null,
+          dashboardUrl: null,
+          error: error.message
+        };
+      }
+    },
+
+    // Admin creator payment mutations
+    retryFailedCreatorPayments: async (_, { orderId }) => {
+      try {
+        console.log('🔄 Retrying failed creator payments for order:', orderId);
+        
+        const result = await creatorPaymentProcessor.retryFailedPayments(orderId);
+        
+        if (result.success) {
+          return {
+            success: true,
+            retriedCreators: result.retriedCreators,
+            results: result.results.map(r => ({
+              success: r.success,
+              creatorId: r.creatorId,
+              creatorName: r.creatorName,
+              transferId: r.transferId || null,
+              amount: r.amount || 0,
+              error: r.error || null
+            })),
+            message: `Successfully retried payments for ${result.retriedCreators} creators`,
+            error: null
+          };
+        } else {
+          return {
+            success: false,
+            retriedCreators: 0,
+            results: [],
+            message: null,
+            error: result.error
+          };
+        }
+
+      } catch (error) {
+        console.error('❌ Error retrying failed creator payments:', error);
+        return {
+          success: false,
+          retriedCreators: 0,
+          results: [],
+          message: null,
+          error: error.message
+        };
+      }
+    },
+
+    updateCreatorCommissionRate: async (_, { creatorId, commissionRate }) => {
+      try {
+        console.log('💰 Updating creator commission rate:', { creatorId, commissionRate });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Creator service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Validate commission rate (between 0 and 1)
+        if (commissionRate < 0 || commissionRate > 1) {
+          throw new Error('Commission rate must be between 0 and 1 (0% to 100%)');
+        }
+
+        // Update creator commission rate
+        const { data: updatedCreator, error: updateError } = await client
+          .from('creators')
+          .update({
+            commission_rate: commissionRate,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', creatorId)
+          .select('*')
+          .single();
+
+        if (updateError) {
+          throw new Error(`Failed to update creator: ${updateError.message}`);
+        }
+
+        console.log('✅ Creator commission rate updated successfully');
+        
+        return {
+          success: true,
+          message: `Commission rate updated to ${(commissionRate * 100).toFixed(1)}%`,
+          creator: updatedCreator
+        };
+
+      } catch (error) {
+        console.error('❌ Error updating creator commission rate:', error);
+        return {
+          success: false,
+          message: 'Failed to update commission rate',
+          creator: null
+        };
+      }
+    },
+
+    // Recovery mutation for orphaned Stripe accounts
+    reconnectStripeAccount: async (_, { creatorId, accountId }) => {
+      try {
+        console.log('🔗 Reconnecting Stripe account:', { creatorId, accountId });
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Creator service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get creator details
+        const { data: creator, error: creatorError } = await client
+          .from('creators')
+          .select('*')
+          .eq('id', creatorId)
+          .single();
+
+        if (creatorError || !creator) {
+          throw new Error('Creator not found');
+        }
+
+        // Verify the Stripe account exists and get its details
+        const account = await stripeConnectClient.retrieveAccount(accountId);
+        
+        if (!account) {
+          throw new Error('Stripe account not found');
+        }
+
+        // Create dashboard link
+        let dashboardUrl = null;
+        try {
+          const dashboardLink = await stripeConnectClient.createLoginLink(accountId);
+          dashboardUrl = dashboardLink.url;
+        } catch (dashboardError) {
+          console.warn('Could not create dashboard link:', dashboardError);
+        }
+
+        // Update creator with Stripe account info
+        const { data: updatedCreator, error: updateError } = await client
+          .from('creators')
+          .update({
+            stripe_account_id: accountId,
+            stripe_account_status: account.details_submitted ? 'active' : 'restricted',
+            stripe_dashboard_url: dashboardUrl,
+            stripe_charges_enabled: account.charges_enabled,
+            stripe_payouts_enabled: account.payouts_enabled,
+            stripe_requirements_past_due: account.requirements?.past_due || [],
+            stripe_requirements_currently_due: account.requirements?.currently_due || [],
+            stripe_requirements_eventually_due: account.requirements?.eventually_due || [],
+            stripe_requirements_disabled_reason: account.requirements?.disabled_reason || null,
+            stripe_onboarding_url: null, // Clear onboarding URL since account exists
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', creatorId)
+          .select('*')
+          .single();
+
+        if (updateError) {
+          throw new Error(`Failed to update creator: ${updateError.message}`);
+        }
+
+        console.log('✅ Stripe account reconnected successfully');
+        
+        return {
+          success: true,
+          message: account.details_submitted ? 'Stripe account reconnected successfully!' : 'Stripe account reconnected but needs additional setup',
+          creator: updatedCreator,
+          dashboardUrl,
+          error: null
+        };
+
+      } catch (error) {
+        console.error('❌ Error reconnecting Stripe account:', error);
+        return {
+          success: false,
+          message: 'Failed to reconnect Stripe account',
+          creator: null,
+          dashboardUrl: null,
+          error: error.message
+        };
+      }
+    },
+
     // Creator management mutations
     updateCreatorStatus: async (_, { userId, isCreator }) => {
       try {
@@ -11351,6 +12171,7 @@ const resolvers = {
         if (input.price !== undefined) updateData.price = input.price;
         if (input.originalPrice !== undefined) updateData.original_price = input.originalPrice;
         if (input.collectionId !== undefined) updateData.collection_id = input.collectionId;
+        if (input.creatorId !== undefined) updateData.creator_id = input.creatorId;
         if (input.linkText !== undefined) updateData.link_text = input.linkText;
         if (input.backgroundImage !== undefined) updateData.background_image = input.backgroundImage;
         if (input.backgroundGradient !== undefined) updateData.background_gradient = input.backgroundGradient;
@@ -11381,6 +12202,7 @@ const resolvers = {
           price: updatedContainer.price,
           originalPrice: updatedContainer.original_price,
           collectionId: updatedContainer.collection_id ? String(updatedContainer.collection_id) : null,
+          creatorId: updatedContainer.creator_id ? String(updatedContainer.creator_id) : null,
           linkText: updatedContainer.link_text,
           backgroundImage: updatedContainer.background_image,
           backgroundGradient: updatedContainer.background_gradient,

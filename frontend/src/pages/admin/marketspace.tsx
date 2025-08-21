@@ -86,6 +86,11 @@ export default function CreatorsSpaceAdmin() {
   });
 
   const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("recently_added");
+  const [viewMode, setViewMode] = useState<"card" | "row">("card");
+  const [showDescriptionModal, setShowDescriptionModal] = useState(false);
+  const [editingProductDescription, setEditingProductDescription] = useState<MarketplaceProduct | null>(null);
+  const [descriptionText, setDescriptionText] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [showCreatorModal, setShowCreatorModal] = useState(false);
@@ -618,6 +623,59 @@ export default function CreatorsSpaceAdmin() {
       setCreators(data || []);
     } catch (error) {
       console.error('Error fetching creators:', error);
+    }
+  };
+
+  // Sorting function
+  const sortProducts = (products: MarketplaceProduct[], sortBy: string) => {
+    const sorted = [...products];
+    switch (sortBy) {
+      case "alphabetical":
+        return sorted.sort((a, b) => a.title.localeCompare(b.title));
+      case "recently_added":
+        return sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      case "price_low_high":
+        return sorted.sort((a, b) => a.price - b.price);
+      case "price_high_low":
+        return sorted.sort((a, b) => b.price - a.price);
+      default:
+        return sorted;
+    }
+  };
+
+  // Description editing functions
+  const openDescriptionModal = (product: MarketplaceProduct) => {
+    setEditingProductDescription(product);
+    setDescriptionText(product.description || "");
+    setShowDescriptionModal(true);
+  };
+
+  const saveDescription = async () => {
+    if (!editingProductDescription) return;
+
+    try {
+      const { error } = await supabase
+        .from('marketplace_products')
+        .update({ description: descriptionText })
+        .eq('id', editingProductDescription.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setProducts(prev => prev.map(p => 
+        p.id === editingProductDescription.id 
+          ? { ...p, description: descriptionText }
+          : p
+      ));
+
+      setShowDescriptionModal(false);
+      setEditingProductDescription(null);
+      setDescriptionText("");
+      
+      alert("Description updated successfully!");
+    } catch (error) {
+      console.error('Error updating description:', error);
+      alert("Failed to update description");
     }
   };
 
@@ -1583,7 +1641,17 @@ Great for personalizing your gear or as a gift!`;
                           }`}
                         />
                       </button>
-                      <span className="text-white text-sm">Featured</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-white text-sm">Featured</span>
+                        <div className="group relative">
+                          <svg className="w-4 h-4 text-gray-400 hover:text-white cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                            Featured items appear in the "Most Popular" section when users browse collections
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1936,24 +2004,73 @@ Great for personalizing your gear or as a gift!`;
             </div>
           )}
 
-          {/* Filter - Only show for products tab or for creators */}
+          {/* Filter, Sort, and View Controls - Only show for products tab or for creators */}
           {(activeTab === 'products' || !isAdmin) && (
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-            <div className="flex items-center gap-4">
-              <label className="text-white text-sm font-medium">Filter by Shape:</label>
-              <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="dropdown-style px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                aria-label="Filter products by shape"
-              >
-                <option value="all" className="dropdown-option">All Shapes</option>
-                {categories.map((category) => (
-                  <option key={category} value={category} className="dropdown-option">
-                    {category}
-                  </option>
-                ))}
-              </select>
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-white text-sm font-medium">Filter by Shape:</label>
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  className="dropdown-style px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  aria-label="Filter products by shape"
+                >
+                  <option value="all" className="dropdown-option">All Shapes</option>
+                  {categories.map((category) => (
+                    <option key={category} value={category} className="dropdown-option">
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <label className="text-white text-sm font-medium">Sort by:</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="dropdown-style px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  aria-label="Sort products"
+                >
+                  <option value="recently_added" className="dropdown-option">Recently Added</option>
+                  <option value="alphabetical" className="dropdown-option">Alphabetical</option>
+                  <option value="price_low_high" className="dropdown-option">Price: Low to High</option>
+                  <option value="price_high_low" className="dropdown-option">Price: High to Low</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <label className="text-white text-sm font-medium">View:</label>
+              <div className="flex rounded-lg overflow-hidden border border-white/20">
+                <button
+                  onClick={() => setViewMode("card")}
+                  className={`px-3 py-2 text-sm font-medium transition-all duration-200 ${
+                    viewMode === "card" 
+                      ? 'bg-blue-500/30 text-blue-300' 
+                      : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'
+                  }`}
+                  title="Card View"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setViewMode("row")}
+                  className={`px-3 py-2 text-sm font-medium transition-all duration-200 ${
+                    viewMode === "row" 
+                      ? 'bg-blue-500/30 text-blue-300' 
+                      : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'
+                  }`}
+                  title="Row View"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
           )}
@@ -1964,8 +2081,12 @@ Great for personalizing your gear or as a gift!`;
         <div className="container-style rounded-2xl p-6">
           <h3 className="text-xl font-bold text-white mb-4">Products</h3>
           {products.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-12 gap-4">
-              {products.map((product) => (
+            <>
+              {viewMode === "card" ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-12 gap-4">
+                  {sortProducts(products.filter(product => 
+                    filterCategory === "all" || product.category === filterCategory
+                  ), sortBy).map((product) => (
                 <div key={product.id} className="container-style rounded-xl p-4 hover:scale-105 transition-all duration-200 group">
                   {/* Product Image */}
                   <div className="aspect-square rounded-lg overflow-hidden mb-3 bg-gray-800">
@@ -2013,8 +2134,11 @@ Great for personalizing your gear or as a gift!`;
                         {product.is_active ? 'Active' : 'Inactive'}
                       </span>
                       {product.is_featured && (
-                        <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs">
-                          ★
+                        <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs flex items-center gap-1" title="Appears in Most Popular section">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                          Most Popular
                         </span>
                       )}
                     </div>
@@ -2053,6 +2177,13 @@ Great for personalizing your gear or as a gift!`;
                       )}
 
                       <button
+                        onClick={() => openDescriptionModal(product)}
+                        className="px-2 py-1 bg-yellow-600/80 hover:bg-yellow-600 text-white rounded text-xs font-medium transition-all duration-200 hover:scale-105"
+                        title="Edit Description"
+                      >
+                        Description
+                      </button>
+                      <button
                         onClick={() => {
                           setDuplicateProduct(product);
                           setShowDuplicateModal(true);
@@ -2082,8 +2213,115 @@ Great for personalizing your gear or as a gift!`;
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+                  ))}
+                </div>
+              ) : (
+                // Row View
+                <div className="space-y-4">
+                  {sortProducts(products.filter(product => 
+                    filterCategory === "all" || product.category === filterCategory
+                  ), sortBy).map((product) => (
+                    <div key={product.id} className="container-style rounded-xl p-4 hover:scale-[1.02] transition-all duration-200 group">
+                      <div className="flex items-center gap-4">
+                        {/* Product Image */}
+                        <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-800 flex-shrink-0">
+                          <img
+                            src={product.default_image || product.images[0] || '/placeholder.png'}
+                            alt={product.title}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+
+                        {/* Product Info */}
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
+                          {/* Title & Creator */}
+                          <div className="md:col-span-2">
+                            <h3 className="text-white font-medium text-sm line-clamp-1 mb-1">
+                              {product.title}
+                            </h3>
+                            <p className="text-gray-400 text-xs">
+                              {product.creator?.creator_name || 'No Creator Assigned'}
+                            </p>
+                          </div>
+
+                          {/* Collection */}
+                          <div className="text-green-400 text-xs">
+                            {collections.length > 0 && (
+                              collections.find(c => c.id === product.collection_id)?.name || 'No Collection'
+                            )}
+                          </div>
+
+                          {/* Category */}
+                          <div>
+                            <span className="text-gray-300 text-xs px-2 py-1 bg-white/10 rounded">
+                              {product.category}
+                            </span>
+                          </div>
+
+                          {/* Price */}
+                          <div className="text-white font-semibold text-sm">
+                            ${product.price}
+                          </div>
+
+                          {/* Status & Actions */}
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              product.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                            }`}>
+                              {product.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                            {product.is_featured && (
+                              <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs" title="Featured">
+                                ⭐
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <button
+                            onClick={() => {
+                              handleEdit(product);
+                              setShowAddProduct(true);
+                            }}
+                            className="button-style px-2 py-1 text-white rounded text-xs font-medium transition-all duration-200 hover:scale-105"
+                            title="Edit"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => openDescriptionModal(product)}
+                            className="px-2 py-1 bg-yellow-600/80 hover:bg-yellow-600 text-white rounded text-xs font-medium transition-all duration-200 hover:scale-105"
+                            title="Edit Description"
+                          >
+                            Desc
+                          </button>
+                          <button
+                            onClick={() => toggleActive(product)}
+                            className={`px-2 py-1 rounded text-xs font-medium transition-all duration-200 hover:scale-105 ${
+                              product.is_active 
+                                ? 'bg-red-600/80 hover:bg-red-600 text-white' 
+                                : 'bg-green-600/80 hover:bg-green-600 text-white'
+                            }`}
+                            title={product.is_active ? 'Hide' : 'Show'}
+                          >
+                            {product.is_active ? 'Hide' : 'Show'}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(product.id)}
+                            className="px-2 py-1 bg-red-600/80 hover:bg-red-600 text-white rounded text-xs font-medium transition-all duration-200 hover:scale-105"
+                            title="Delete"
+                          >
+                            Del
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           ) : (
             // Empty State
             <div className="p-12 text-center">
@@ -3300,6 +3538,80 @@ Great for personalizing your gear or as a gift!`;
         </div>
       )}
 
+
+      {/* Description Editor Modal */}
+      {showDescriptionModal && editingProductDescription && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="container-style rounded-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-white">Edit Description</h3>
+              <button
+                onClick={() => {
+                  setShowDescriptionModal(false);
+                  setEditingProductDescription(null);
+                  setDescriptionText("");
+                }}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors"
+                aria-label="Close modal"
+              >
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-white font-medium mb-2">Product: {editingProductDescription.title}</p>
+              <div className="flex items-center gap-2 mb-4">
+                <img
+                  src={editingProductDescription.default_image || editingProductDescription.images[0] || '/placeholder.png'}
+                  alt={editingProductDescription.title}
+                  className="w-12 h-12 rounded-lg object-cover bg-gray-800"
+                />
+                <div>
+                  <p className="text-gray-400 text-sm">{editingProductDescription.creator?.creator_name || 'No Creator'}</p>
+                  <p className="text-green-400 text-xs">${editingProductDescription.price}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-white text-sm font-medium mb-2">
+                Description
+              </label>
+              <textarea
+                value={descriptionText}
+                onChange={(e) => setDescriptionText(e.target.value)}
+                className="w-full h-40 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                placeholder="Enter product description here... You can copy and paste text from anywhere."
+                autoFocus
+              />
+              <p className="text-gray-400 text-xs mt-2">
+                Tip: You can copy text from anywhere and paste it here using Ctrl+V (or Cmd+V on Mac)
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowDescriptionModal(false);
+                  setEditingProductDescription(null);
+                  setDescriptionText("");
+                }}
+                className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors border border-white/20"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveDescription}
+                className="button-style px-6 py-2 text-white rounded-lg font-medium transition-all duration-200 hover:scale-105"
+              >
+                Save Description
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </AdminLayout>
   );

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Layout from "@/components/Layout";
 import FloatingChatWidget from "@/components/FloatingChatWidget";
+import PageTransition from "@/components/PageTransition";
 import { useCart } from "@/components/CartContext";
 import { getSupabase } from "@/lib/supabase";
 import Link from "next/link";
@@ -10,6 +11,11 @@ import MarketplaceStickerCalculator from "@/components/marketspace-sticker-calcu
 import { loadRealPricingData, BasePriceRow, QuantityDiscountRow } from "@/utils/real-pricing";
 import { useQuery } from "@apollo/client";
 import { GET_CREATOR_BY_USER_ID } from "@/lib/profile-mutations";
+
+// Helper function to calculate creator earnings
+function calculateCreatorEarnings(price: number): number {
+  return price * 0.05; // 5% of the price as store credit
+}
 
 interface MarketplaceProduct {
   id: string;
@@ -75,6 +81,10 @@ export default function MarketplaceProductPage() {
 
   const supabase = getSupabase();
 
+  // Admin emails list - same as in marketspace page
+  const ADMIN_EMAILS = ['justin@stickershuttle.com'];
+  const isAdmin = user && ADMIN_EMAILS.includes(user.email || '');
+
   // Check if user is a creator
   const { data: creatorData } = useQuery(GET_CREATOR_BY_USER_ID, {
     variables: { userId: user?.id || '' },
@@ -90,6 +100,8 @@ export default function MarketplaceProductPage() {
     }
     checkUser();
   }, [id]);
+
+
 
   // Listen for profile updates to sync profile photos
   useEffect(() => {
@@ -482,21 +494,52 @@ export default function MarketplaceProductPage() {
           box-shadow: 0 0 20px rgba(34, 197, 94, 0.3), 0 8px 32px rgba(0, 0, 0, 0.3);
           backdrop-filter: blur(15px);
         }
+        
+        #mobile-sticky-cart {
+          position: fixed !important;
+          bottom: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          z-index: 9999 !important;
+          width: 100% !important;
+        }
+        
+        .mobile-container-bg {
+          background: rgba(255, 255, 255, 0.05);
+          box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset;
+          backdrop-filter: blur(12px);
+          border-radius: 0 0 16px 16px;
+        }
+        
+        @media (min-width: 768px) {
+          .mobile-container-bg {
+            background: transparent;
+            box-shadow: none;
+            backdrop-filter: none;
+            border-radius: 0;
+          }
+        }
       `}</style>
 
 
 
-      {/* Product Section */}
-      <section className="pt-[20px] pb-8">
-        <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+      <PageTransition>
+        {/* Product Section */}
+        <section className="pt-0 md:pt-[20px] pb-8">
+        <div className="w-full md:w-[95%] lg:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto md:px-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 md:gap-8 items-stretch">
             
             {/* Product Image */}
-            <div className="container-style p-6 md:p-8 h-full relative">
+            <div 
+              className="p-0 h-full relative mobile-container-bg"
+              style={{ 
+                border: 'none'
+              }}
+            >
               {/* Back Arrow - Top Left */}
               <Link 
                 href="/marketspace"
-                className="absolute top-4 left-4 z-20 flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 hover:scale-110"
+                className="absolute top-4 left-4 md:top-4 md:left-4 z-20 flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 hover:scale-110"
                 style={{
                   background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -509,7 +552,7 @@ export default function MarketplaceProductPage() {
                 </svg>
               </Link>
               
-              <div className="relative w-full aspect-square rounded-lg overflow-hidden">
+              <div className="relative w-full aspect-square md:rounded-lg overflow-hidden p-4 md:p-0">
                 {/* Background Image */}
                 <img
                   src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1754091658/BGSquare_eai516.png"
@@ -525,8 +568,9 @@ export default function MarketplaceProductPage() {
                     className="max-w-full max-h-full object-contain drop-shadow-lg animate-float"
                   />
                 </div>
+                {/* Featured pill hidden */}
                 {product.is_featured && (
-                  <div className="absolute top-2 left-2">
+                  <div className="absolute top-2 left-2 hidden">
                     <span className="px-2 py-1 bg-yellow-500/90 text-yellow-900 rounded-full text-sm font-semibold">
                       Featured
                     </span>
@@ -543,7 +587,7 @@ export default function MarketplaceProductPage() {
 
               {/* Thumbnail Images */}
               {product.images.length > 1 && (
-                <div className="grid grid-cols-4 gap-2 mt-4">
+                <div className="grid grid-cols-4 gap-2 mt-4 mx-4 md:mx-0">
                   {product.images.map((image, index) => (
                     <button
                       key={index}
@@ -567,8 +611,13 @@ export default function MarketplaceProductPage() {
             </div>
 
             {/* Product Details */}
-            <div className="container-style p-6 md:p-8">
-                            {/* Creator Info */}
+            <div className="container-style p-4 md:p-6 lg:p-8 mx-4 md:mx-0 mt-4 md:mt-0">
+              {/* Title */}
+              <h1 className="text-3xl md:text-4xl font-bold text-white mb-4" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif' }}>
+                {product.title}
+              </h1>
+
+              {/* Creator Info */}
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full overflow-hidden bg-purple-500/20 flex items-center justify-center">
                   {(product.creator?.profile_photo_url || product.creator?.user_profiles?.profile_photo_url) ? (
@@ -599,24 +648,30 @@ export default function MarketplaceProductPage() {
                 </div>
               </div>
 
-              {/* Category */}
+              {/* Category & Features */}
               <div className="mb-3">
-                <span className="px-3 py-1 bg-blue-600/20 text-blue-300 rounded-full text-sm">
-                  {product.category.charAt(0).toUpperCase() + product.category.slice(1)}
-                </span>
+                <div className="flex flex-wrap gap-2">
+                  <span className="px-3 py-1 bg-blue-600/20 text-blue-300 rounded-full text-sm">
+                    {product.category.charAt(0).toUpperCase() + product.category.slice(1)}
+                  </span>
+                  <span className="px-3 py-1 bg-green-600/20 text-green-300 rounded-full text-sm">
+                    Waterproof
+                  </span>
+                  <span className="px-3 py-1 bg-purple-600/20 text-purple-300 rounded-full text-sm">
+                    UV Resistant
+                  </span>
+                  <span className="px-3 py-1 bg-orange-600/20 text-orange-300 rounded-full text-sm">
+                    Durable
+                  </span>
+                </div>
               </div>
 
-              {/* Title */}
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-4" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif' }}>
-                {product.title}
-              </h1>
-
-              {/* Description */}
-              {product.short_description && (
+              {/* Description - Hidden for now */}
+              {/* {product.short_description && (
                 <p className="text-gray-300 text-lg mb-4">
                   {product.short_description}
                 </p>
-              )}
+              )} */}
 
 
 
@@ -631,33 +686,63 @@ export default function MarketplaceProductPage() {
                 <div className="grid grid-cols-3 gap-3 mb-4">
                   <button
                     onClick={() => setSelectedSize("3")}
-                    className={`button-interactive relative text-center px-4 py-3 rounded-xl flex items-center justify-center transition-all border backdrop-blur-md ${
+                    className={`button-interactive relative text-center px-4 py-4 rounded-xl flex flex-col items-center justify-center transition-all border backdrop-blur-md ${
                       selectedSize === "3" 
                         ? 'bg-purple-500/20 text-purple-200 font-medium border-purple-400/50 button-selected animate-glow-purple' 
                         : 'hover:bg-white/10 border-white/20 text-white/80'
                     }`}
                   >
-                    3"
+                    <div className="w-12 h-12 mb-2 rounded-lg overflow-hidden">
+                      <img
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750628951/StickerShuttle_Bottle_m6rxb5.webp"
+                        alt="Water bottle"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="text-xs font-medium mb-2">Medium (3")</div>
+                    <div className="text-xs text-gray-300 leading-tight px-1 hidden sm:block">
+                      Best for water bottles, laptops, and small areas.
+                    </div>
                   </button>
                   <button
                     onClick={() => setSelectedSize("4")}
-                    className={`button-interactive relative text-center px-4 py-3 rounded-xl flex items-center justify-center transition-all border backdrop-blur-md ${
+                    className={`button-interactive relative text-center px-4 py-4 rounded-xl flex flex-col items-center justify-center transition-all border backdrop-blur-md ${
                       selectedSize === "4" 
                         ? 'bg-purple-500/20 text-purple-200 font-medium border-purple-400/50 button-selected animate-glow-purple' 
                         : 'hover:bg-white/10 border-white/20 text-white/80'
                     }`}
                   >
-                    4"
+                    <div className="w-12 h-12 mb-2 rounded-lg overflow-hidden">
+                      <img
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750628956/StickerShuttle_Board_150b2de5-5194-4773-b983-0a4f746602a4_cox6gj.webp"
+                        alt="Skateboard"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="text-xs font-medium mb-2">Large (4")</div>
+                    <div className="text-xs text-gray-300 leading-tight px-1 hidden sm:block">
+                      Best for vehicles, skateboards, desks, and alike.
+                    </div>
                   </button>
                   <button
                     onClick={() => setSelectedSize("5")}
-                    className={`button-interactive relative text-center px-4 py-3 rounded-xl flex items-center justify-center transition-all border backdrop-blur-md ${
+                    className={`button-interactive relative text-center px-4 py-4 rounded-xl flex flex-col items-center justify-center transition-all border backdrop-blur-md ${
                       selectedSize === "5" 
                         ? 'bg-purple-500/20 text-purple-200 font-medium border-purple-400/50 button-selected animate-glow-purple' 
                         : 'hover:bg-white/10 border-white/20 text-white/80'
                     }`}
                   >
-                    5"
+                    <div className="w-12 h-12 mb-2 rounded-lg overflow-hidden">
+                      <img
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750628960/StickerShuttle_VisitMars_jhm6al.webp"
+                        alt="Cooler"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="text-xs font-medium mb-2">X-Large (5")</div>
+                    <div className="text-xs text-gray-300 leading-tight px-1 hidden sm:block">
+                      Best for coolers, fridges, vehicles, and alike.
+                    </div>
                   </button>
                 </div>
 
@@ -758,6 +843,16 @@ export default function MarketplaceProductPage() {
                               {discountText}
                             </span>
                           )}
+                          {/* Creator earnings message */}
+                          <div className="flex items-center text-yellow-200 text-sm mt-2">
+                            <span>+</span>
+                            <img 
+                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
+                              alt="Credits" 
+                              className="w-4 h-4 object-contain ml-0.5 mr-1.5"
+                            />
+                            <span>${calculateCreatorEarnings(totalPrice).toFixed(2)} in store credit</span>
+                          </div>
                         </div>
                         
                         {/* Show savings amount */}
@@ -804,8 +899,8 @@ export default function MarketplaceProductPage() {
 
 
 
-                {/* Product Details */}
-                {product.description && (
+                {/* Product Details - Hidden for now */}
+                {/* {product.description && (
                 <div className="border-t border-white/10 pt-4">
                   <h3 className="text-lg font-bold text-white mb-4">
                     About This Design
@@ -814,7 +909,7 @@ export default function MarketplaceProductPage() {
                       {product.description}
                     </div>
                   </div>
-                )}
+                )} */}
 
               {/* Tags */}
               {product.tags.length > 0 && (
@@ -838,33 +933,6 @@ export default function MarketplaceProductPage() {
       </section>
       {/* Spacer so content isn't hidden behind mobile sticky bar */}
       <div className="h-24 md:hidden" />
-
-      {/* Mobile Sticky Add to Cart Bar */}
-      <div 
-        className="fixed bottom-0 left-0 right-0 md:hidden z-50"
-        style={{ backgroundColor: '#100e4a' }}
-      >
-        <div className="w-[95%] mx-auto px-4 py-7">
-          <button
-            onClick={handleAddToCart}
-            disabled={isAddingToCart || (product.stock_quantity !== -1 && product.stock_quantity === 0)}
-            className="primaryButton w-full py-4 px-6 font-bold text-lg rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {(() => {
-              const basePrice = product.size_pricing?.[selectedSize] || product.price;
-              let discountMultiplier = 1;
-              if (quantity === 5) discountMultiplier = 0.5;
-              else if (quantity === 10) discountMultiplier = 0.4;
-              else if (quantity === 25) discountMultiplier = 0.3;
-              const totalPrice = (basePrice * discountMultiplier * quantity);
-              
-              return isAddingToCart 
-                ? 'Adding to Cart...'
-                : `Add to cart • $${totalPrice.toFixed(2)}`;
-            })()}
-          </button>
-        </div>
-      </div>
 
 
 
@@ -926,9 +994,82 @@ export default function MarketplaceProductPage() {
           </div>
         </div>
       </section>
+      </PageTransition>
+
+      {/* Access Control Check */}
+      {(() => {
+        if (userLoading || (user && !creatorData)) {
+          return (
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                <p className="text-white text-lg">Loading Creators Space Product...</p>
+              </div>
+            </div>
+          );
+        }
+
+        // Check if user has access
+        const hasAccess = user && (ADMIN_EMAILS.includes(user.email || '') || creatorData?.getCreatorByUserId?.isActive);
+        
+        if (!hasAccess) {
+          return (
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <h1 className="text-3xl font-bold text-white mb-4">Access Denied</h1>
+                <p className="text-gray-300 text-lg mb-8">You don't have permission to view this page.</p>
+                <button 
+                  onClick={() => router.push('/')}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Go Home
+                </button>
+              </div>
+            </div>
+          );
+        }
+
+        return null; // Continue with normal render
+      })()}
 
       {/* Floating Chat Widget */}
       <FloatingChatWidget />
+
+      {/* Mobile Sticky Add to Cart Bar */}
+      <div 
+        id="mobile-sticky-cart"
+        className="md:hidden"
+        style={{ 
+          backgroundColor: '#100e4a',
+          position: 'fixed',
+          bottom: '0',
+          left: '0',
+          right: '0',
+          zIndex: '9999',
+          width: '100%'
+        }}
+      >
+        <div className="w-[95%] mx-auto px-4 py-7">
+          <button
+            onClick={handleAddToCart}
+            disabled={isAddingToCart || (product.stock_quantity !== -1 && product.stock_quantity === 0)}
+            className="button-style w-full py-4 px-6 font-bold text-lg rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {(() => {
+              const basePrice = product.size_pricing?.[selectedSize] || product.price;
+              let discountMultiplier = 1;
+              if (quantity === 5) discountMultiplier = 0.5;
+              else if (quantity === 10) discountMultiplier = 0.4;
+              else if (quantity === 25) discountMultiplier = 0.3;
+              const totalPrice = (basePrice * discountMultiplier * quantity);
+              
+              return isAddingToCart 
+                ? 'Adding to Cart...'
+                : `Add to cart • $${totalPrice.toFixed(2)}`;
+            })()}
+          </button>
+        </div>
+      </div>
     </Layout>
   );
 } 

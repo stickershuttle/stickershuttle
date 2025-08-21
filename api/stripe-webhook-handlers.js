@@ -20,6 +20,7 @@ const express = require('express');
 const stripeClient = require('./stripe-client');
 const supabaseClient = require('./supabase-client');
 const notificationHelpers = require('./notification-helpers');
+const creatorPaymentProcessor = require('./creator-payment-processor');
 const { discountManager } = require('./discount-manager');
 const { createGuestAccount, emailExists } = require('./guest-account-manager');
 const serverAnalytics = require('./business-analytics');
@@ -145,6 +146,27 @@ router.post('/', async (req, res) => {
         
       case 'charge.refunded':
         await handleChargeRefunded(event.data.object);
+        break;
+        
+      // Stripe Connect events
+      case 'account.updated':
+        await handleAccountUpdated(event.data.object);
+        break;
+        
+      case 'account.application.deauthorized':
+        await handleAccountDeauthorized(event.data.object);
+        break;
+        
+      case 'payout.created':
+        await handlePayoutCreated(event.data.object);
+        break;
+        
+      case 'payout.updated':
+        await handlePayoutUpdated(event.data.object);
+        break;
+        
+      case 'transfer.created':
+        await handleTransferCreated(event.data.object);
         break;
         
       default:
@@ -282,13 +304,31 @@ async function handleCheckoutSessionCompleted(session) {
       shippingMethodName = 'UPS 2nd Day Air';
       isExpressShipping = true;
       console.log('✅ Detected UPS 2nd Day Air from $20 shipping cost');
+    } else if (shippingCostAmount === 800) { // $8.00 in cents
+      shippingMethodName = 'UPS Ground (Tracking Included)';
+      isExpressShipping = false;
+      console.log('✅ Detected UPS Ground upgrade from $8 shipping cost');
+    } else if (shippingCostAmount === 400) { // $4.00 in cents
+      shippingMethodName = 'USPS First-Class (Tracking Included)';
+      isExpressShipping = false;
+      console.log('✅ Detected USPS First-Class from $4 shipping cost');
     } else if (shippingCostAmount === 0) {
-      // Check if it's local pickup or UPS Ground based on display_name
+      // Check if it's local pickup, USPS Stamp, or UPS Ground based on display_name
       if (shippingOption && shippingOption.display_name) {
         if (shippingOption.display_name.includes('Local Pickup')) {
           shippingMethodName = 'Local Pickup (Denver, CO)';
           isExpressShipping = false;
           console.log('✅ Detected Local Pickup from display_name');
+        } else if (shippingOption.display_name.includes('USPS Stamp')) {
+          shippingMethodName = 'USPS Stamp (No Tracking)';
+          isExpressShipping = false;
+          console.log('✅ Detected USPS Stamp from display_name');
+        } else if (shippingOption.display_name.includes('USPS First-Class')) {
+          // Handle both standard and recommended First-Class
+          shippingMethodName = shippingOption.display_name.includes('Recommended') ? 
+            'USPS First-Class (Recommended for 10+ Items)' : 'USPS First-Class (Tracking Included)';
+          isExpressShipping = false;
+          console.log('✅ Detected USPS First-Class from display_name:', shippingMethodName);
         } else {
           shippingMethodName = 'UPS Ground';
           isExpressShipping = false;
@@ -951,6 +991,22 @@ async function handleCheckoutSessionCompleted(session) {
         }
       }
 
+      // Process creator payments for marketplace products
+      try {
+        console.log('💸 Processing creator payments...');
+        const creatorPaymentResult = await creatorPaymentProcessor.processCreatorPayments(
+          updatedOrder.id,
+          fullSession.payment_intent
+        );
+        
+        if (creatorPaymentResult.success && creatorPaymentResult.processedCreators > 0) {
+          console.log(`✅ Processed payments for ${creatorPaymentResult.processedCreators} creators`);
+        }
+      } catch (creatorPaymentError) {
+        console.error('❌ Error processing creator payments:', creatorPaymentError);
+        // Don't fail the order if creator payments fail - they can be retried later
+      }
+
       // Send email notification for order status change
       try {
         console.log('📧 Attempting to send email notification...');
@@ -1439,6 +1495,24 @@ async function handleCheckoutSessionCompleted(session) {
         }
       }
 
+      // Process creator payments for marketplace products (new order)
+      if (order?.id) {
+        try {
+          console.log('💸 Processing creator payments for new order...');
+          const creatorPaymentResult = await creatorPaymentProcessor.processCreatorPayments(
+            order.id,
+            fullSession.payment_intent
+          );
+          
+          if (creatorPaymentResult.success && creatorPaymentResult.processedCreators > 0) {
+            console.log(`✅ Processed payments for ${creatorPaymentResult.processedCreators} creators (new order)`);
+          }
+        } catch (creatorPaymentError) {
+          console.error('❌ Error processing creator payments for new order:', creatorPaymentError);
+          // Don't fail the order if creator payments fail - they can be retried later
+        }
+      }
+
       // Send email notification for new order
       if (order?.id) {
         try {
@@ -1465,8 +1539,39 @@ async function handleCheckoutSessionCompleted(session) {
             orderStatus: orderForEmail.order_status
           });
           
+          // Check if this is a Market Space order
+          const isMarketSpaceOrder = (order) => {
+            if (!order.items && !order.order_items) return false;
+            const items = order.items || order.order_items || [];
+            if (!Array.isArray(items)) return false;
+            
+            return items.some(item => {
+              const category = item.product_category || item.productCategory;
+              return category === 'marketplace' || 
+                     category === 'marketplace-stickers' || 
+                     category === 'marketplace-pack';
+            });
+          };
+
           // Send customer notification (enhanced for first-time customers)
-          const emailResult = await emailNotifications.sendOrderStatusNotificationEnhanced(orderForEmail, order.order_status || 'Building Proof');
+          // For Market Space orders, skip proof process and go directly to "Printing" status
+          const initialStatus = isMarketSpaceOrder(orderForEmail) ? 'Printing' : (order.order_status || 'Building Proof');
+          
+          // Update order status in database if it's a Market Space order
+          if (isMarketSpaceOrder(orderForEmail) && order.order_status !== 'Printing') {
+            try {
+              const supabaseClient = require('./supabase-client');
+              await supabaseClient.updateOrderStatus(order.id, { 
+                orderStatus: 'Printing',
+                proof_status: 'printing' // Skip proof process
+              });
+              console.log(`✅ Updated Market Space order ${order.order_number} status to Printing`);
+            } catch (statusError) {
+              console.error(`❌ Failed to update Market Space order status:`, statusError);
+            }
+          }
+          
+          const emailResult = await emailNotifications.sendOrderStatusNotificationEnhanced(orderForEmail, initialStatus);
           
           if (emailResult.success) {
             console.log('✅ New order customer email notification sent successfully');
@@ -1791,6 +1896,220 @@ async function handleAdditionalPaymentCompleted(session, originalOrderId, fullSe
     
   } catch (error) {
     console.error('❌ Error processing additional payment:', error);
+  }
+}
+
+// Stripe Connect webhook handlers
+async function handleAccountUpdated(account) {
+  try {
+    console.log('🔄 Processing account.updated webhook:', account.id);
+    
+    if (!supabase.isReady()) {
+      console.error('❌ Supabase not ready for account update');
+      return;
+    }
+
+    const client = supabase.getServiceClient();
+    
+    // Find creator by Stripe account ID
+    const { data: creator, error: findError } = await client
+      .from('creators')
+      .select('*')
+      .eq('stripe_account_id', account.id)
+      .single();
+
+    if (findError || !creator) {
+      console.warn('⚠️ Creator not found for account:', account.id);
+      return;
+    }
+
+    // Update creator with latest account status
+    const { error: updateError } = await client
+      .from('creators')
+      .update({
+        stripe_account_status: account.details_submitted ? 'active' : 'restricted',
+        stripe_charges_enabled: account.charges_enabled,
+        stripe_payouts_enabled: account.payouts_enabled,
+        stripe_requirements_past_due: account.requirements?.past_due || [],
+        stripe_requirements_currently_due: account.requirements?.currently_due || [],
+        stripe_requirements_eventually_due: account.requirements?.eventually_due || [],
+        stripe_requirements_disabled_reason: account.requirements?.disabled_reason || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', creator.id);
+
+    if (updateError) {
+      throw new Error(`Failed to update creator: ${updateError.message}`);
+    }
+
+    console.log('✅ Creator account status updated successfully');
+
+  } catch (error) {
+    console.error('❌ Error handling account.updated:', error);
+  }
+}
+
+async function handleAccountDeauthorized(account) {
+  try {
+    console.log('🚫 Processing account.application.deauthorized webhook:', account.id);
+    
+    if (!supabase.isReady()) {
+      console.error('❌ Supabase not ready for account deauthorization');
+      return;
+    }
+
+    const client = supabase.getServiceClient();
+    
+    // Find creator by Stripe account ID and deactivate
+    const { error: updateError } = await client
+      .from('creators')
+      .update({
+        stripe_account_status: 'deauthorized',
+        stripe_charges_enabled: false,
+        stripe_payouts_enabled: false,
+        stripe_onboarding_url: null,
+        stripe_dashboard_url: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('stripe_account_id', account.id);
+
+    if (updateError) {
+      throw new Error(`Failed to deauthorize creator: ${updateError.message}`);
+    }
+
+    console.log('✅ Creator account deauthorized successfully');
+
+  } catch (error) {
+    console.error('❌ Error handling account.application.deauthorized:', error);
+  }
+}
+
+async function handlePayoutCreated(payout) {
+  try {
+    console.log('💰 Processing payout.created webhook:', payout.id);
+    
+    if (!supabase.isReady()) {
+      console.error('❌ Supabase not ready for payout creation');
+      return;
+    }
+
+    const client = supabase.getServiceClient();
+    
+    // Find creator by Stripe account ID
+    const { data: creator, error: findError } = await client
+      .from('creators')
+      .select('*')
+      .eq('stripe_account_id', payout.destination)
+      .single();
+
+    if (findError || !creator) {
+      console.warn('⚠️ Creator not found for payout destination:', payout.destination);
+      return;
+    }
+
+    // Insert payout record
+    const { error: insertError } = await client
+      .from('creator_payouts')
+      .insert({
+        creator_id: creator.id,
+        stripe_payout_id: payout.id,
+        stripe_account_id: payout.destination,
+        amount: payout.amount / 100, // Convert from cents
+        currency: payout.currency,
+        status: payout.status,
+        arrival_date: payout.arrival_date ? new Date(payout.arrival_date * 1000).toISOString() : null,
+        description: payout.description || `Payout to ${creator.creator_name}`
+      });
+
+    if (insertError) {
+      throw new Error(`Failed to insert payout: ${insertError.message}`);
+    }
+
+    console.log('✅ Payout record created successfully');
+
+  } catch (error) {
+    console.error('❌ Error handling payout.created:', error);
+  }
+}
+
+async function handlePayoutUpdated(payout) {
+  try {
+    console.log('💰 Processing payout.updated webhook:', payout.id);
+    
+    if (!supabase.isReady()) {
+      console.error('❌ Supabase not ready for payout update');
+      return;
+    }
+
+    const client = supabase.getServiceClient();
+    
+    // Update payout record
+    const updateData = {
+      status: payout.status,
+      arrival_date: payout.arrival_date ? new Date(payout.arrival_date * 1000).toISOString() : null,
+      updated_at: new Date().toISOString()
+    };
+
+    // Add failure details if payout failed
+    if (payout.status === 'failed') {
+      updateData.failure_code = payout.failure_code;
+      updateData.failure_message = payout.failure_message;
+    }
+
+    const { error: updateError } = await client
+      .from('creator_payouts')
+      .update(updateData)
+      .eq('stripe_payout_id', payout.id);
+
+    if (updateError) {
+      throw new Error(`Failed to update payout: ${updateError.message}`);
+    }
+
+    console.log('✅ Payout record updated successfully');
+
+  } catch (error) {
+    console.error('❌ Error handling payout.updated:', error);
+  }
+}
+
+async function handleTransferCreated(transfer) {
+  try {
+    console.log('💸 Processing transfer.created webhook:', transfer.id);
+    
+    if (!supabase.isReady()) {
+      console.error('❌ Supabase not ready for transfer creation');
+      return;
+    }
+
+    const client = supabase.getServiceClient();
+    
+    // Check if this is a creator transfer (has creator metadata)
+    if (!transfer.metadata || !transfer.metadata.creator_id) {
+      console.log('ℹ️ Transfer is not for a creator, skipping');
+      return;
+    }
+
+    // Update creator earnings record with transfer ID
+    const { error: updateError } = await client
+      .from('creator_earnings')
+      .update({
+        stripe_transfer_id: transfer.id,
+        status: 'transferred',
+        transferred_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('creator_id', transfer.metadata.creator_id)
+      .eq('order_id', transfer.metadata.order_id)
+      .is('stripe_transfer_id', null); // Only update if not already set
+
+    if (updateError) {
+      console.warn('⚠️ Could not update creator earnings:', updateError.message);
+    } else {
+      console.log('✅ Creator earnings updated with transfer ID');
+    }
+
+  } catch (error) {
+    console.error('❌ Error handling transfer.created:', error);
   }
 }
 

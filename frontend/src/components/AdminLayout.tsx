@@ -1,9 +1,31 @@
-import { ReactNode, useState, useEffect } from "react";
+import React, { ReactNode, useState, useEffect } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import UniversalHeader from "./UniversalHeader";
 import { useRouter } from "next/router";
 import { AdminContext } from "@/hooks/useAdminContext";
+import { useQuery, gql } from '@apollo/client';
+
+// GraphQL query to get all orders for outstanding count
+const GET_ALL_ORDERS = gql`
+  query GetAllOrders {
+    getAllOrders {
+      id
+      orderStatus
+      fulfillmentStatus
+      financialStatus
+      trackingNumber
+      proof_status
+      items {
+        id
+        productName
+        productCategory
+        sku
+        quantity
+      }
+    }
+  }
+`;
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -18,6 +40,11 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
   const [breadcrumbKey, setBreadcrumbKey] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
+  
+  // Fetch orders data for outstanding count
+  const { data: ordersData } = useQuery(GET_ALL_ORDERS, {
+    errorPolicy: 'ignore' // Don't break the layout if orders query fails
+  });
   
   // Ensure we only render breadcrumbs on client side to avoid hydration mismatch
   useEffect(() => {
@@ -34,6 +61,96 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
     setIsMobileMenuOpen(false);
     setShowQuickActions(false);
   }, [router.asPath]);
+  
+  // Helper function to check if an item is a sample pack
+  const isSamplePackItem = (item: any) => {
+    return item.productId === 'sample-pack' || 
+           item.sku === 'SP-001' ||
+           item.sku === 'SS-Sample' ||
+           item.productName?.toLowerCase().includes('sample pack') ||
+           item.productCategory?.toLowerCase().includes('sample');
+  };
+
+  // Helper function to check if an order contains sample packs
+  const isSamplePackOrder = (order: any) => {
+    return order.items?.some((item: any) => isSamplePackItem(item));
+  };
+
+  // Helper function to check if an order has ONLY sample packs (no custom items)
+  const isSamplePackOnlyOrder = (order: any) => {
+    return order.items?.length > 0 && order.items?.every((item: any) => isSamplePackItem(item));
+  };
+
+  // Helper function to check if an order has custom items that need proofs
+  const hasCustomItemsNeedingProofs = (order: any) => {
+    return order.items?.some((item: any) => !isSamplePackItem(item));
+  };
+
+  // Get proof status (updated logic for mixed orders)
+  const getProofStatus = (order: any) => {
+    // Check if this is a sample pack ONLY order (skip proof system)
+    if (isSamplePackOnlyOrder(order)) {
+      if (order.orderStatus === 'Assume Delivered' || order.fulfillmentStatus === 'fulfilled') {
+        return 'Delivered';
+      }
+      if (order.orderStatus === 'Shipped' || order.proof_status === 'shipped' || (order.fulfillmentStatus === 'partial' && order.trackingNumber)) {
+        return 'Shipped';
+      }
+      // Default sample pack only status is packaging
+      return 'Packaging';
+    }
+
+    // Regular orders (non-sample pack) - existing proof system
+    // Check for orders that skip proofs and go directly to printing
+    if (order.orderStatus === 'Printing') {
+      return 'Printing';
+    }
+    // Check the actual proof_status from the database
+    if (order.proof_status === 'awaiting_approval') {
+      return 'Proof Sent';
+    }
+    if (order.proof_status === 'approved') {
+      // Check if label has been created
+      if (order.trackingNumber && !order.proof_status?.includes('shipped')) {
+        return 'Label Printed';
+      }
+      return 'Printing';
+    }
+    if (order.proof_status === 'label_printed') {
+      return 'Label Printed';
+    }
+    if (order.proof_status === 'shipped' || (order.fulfillmentStatus === 'partial' && order.trackingNumber)) {
+      return 'Shipped';
+    }
+    if (order.proof_status === 'delivered' || order.orderStatus === 'Delivered' || order.fulfillmentStatus === 'fulfilled') {
+      return 'Delivered';
+    }
+    if (order.orderStatus === 'Out for Delivery' || order.fulfillmentStatus === 'out_for_delivery') {
+      return 'Out for Delivery';
+    }
+    if (order.proof_status === 'changes_requested') {
+      return 'Changes Requested';
+    }
+    // Default to building proof
+    return 'Building Proof';
+  };
+
+  // Calculate outstanding orders count
+  const outstandingOrdersCount = React.useMemo(() => {
+    if (!ordersData?.getAllOrders) return 0;
+    
+    const paidOrders = ordersData.getAllOrders.filter((order: any) => 
+      order.financialStatus === 'paid'
+    );
+    
+    const outstandingOrders = paidOrders.filter((order: any) => {
+      const status = getProofStatus(order);
+      // Orders are outstanding if they're not in these final states
+      return !['Shipped', 'Delivered', 'Out for Delivery', 'Label Printed'].includes(status);
+    });
+    
+    return outstandingOrders.length;
+  }, [ordersData]);
   
   // Get breadcrumb data based on current route
   const getBreadcrumbs = () => {
@@ -272,11 +389,8 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
         <div 
           className="hidden xl:block fixed left-0 right-0 z-10 px-6 py-3"
           style={{
-            top: 'calc(4rem + var(--header-alerts-height, 0px) + 44px)',
-            backgroundColor: 'rgba(3, 1, 64, 0.95)',
-            backdropFilter: 'blur(10px)',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-            marginTop: '8px'
+            top: 'calc(4rem + var(--header-alerts-height, 0px) + 8px)',
+            marginTop: '10px'
           }}
         >
           <nav key={breadcrumbKey} className="flex items-center gap-2 text-sm">
@@ -303,7 +417,7 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
           </nav>
         </div>
         
-        <main className="pt-20 xl:pt-32 min-h-screen xl:flex">
+        <main className="pt-20 xl:pt-24 min-h-screen xl:flex">
           {/* Desktop Sidebar */}
           <div
             className="hidden xl:block w-56 fixed left-0 h-screen pt-8 pr-4"
@@ -355,6 +469,11 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
                     Orders
+                    {outstandingOrdersCount > 0 && (
+                      <span className="ml-2 text-sm font-bold text-sky-400">
+                        {outstandingOrdersCount}
+                      </span>
+                    )}
                   </a>
                   
                   {/* Orders Submenu - Always visible when on orders pages */}
@@ -632,9 +751,9 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
                   }}
                 >
                   <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.58-5.84a14.98 14.98 0 012.58-5.84M8.35 14.37H12a4.01 4.01 0 001.1-.17" />
                   </svg>
-                  Creators Space
+                  Market Space
                 </a>
 
                 {/* Shared Carts */}

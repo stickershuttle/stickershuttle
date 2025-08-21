@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { useRouter } from "next/router";
 import SEOHead from "./SEOHead";
 import UniversalHeader from "./UniversalHeader";
 import UniversalFooter from "./UniversalFooter";
@@ -24,6 +25,13 @@ export default function Layout({
   structuredData,
   preconnect
 }: LayoutProps) {
+  const router = useRouter();
+  
+  // Check if we're on the marketspace page or a marketspace product page
+  const isMarketspacePage = router.pathname === '/marketspace' || 
+                           router.pathname.startsWith('/marketspace/') || 
+                           router.pathname === '/creators-space-apply';
+  
   return (
     <>
       <SEOHead 
@@ -38,7 +46,7 @@ export default function Layout({
       
       <div className="min-h-screen text-white relative" style={{ backgroundColor: '#030140', fontFamily: 'Inter, sans-serif' }}>
         <UniversalHeader />
-        <main className="pt-[calc(4rem+var(--header-alerts-height,0px)+52px)] sm:pt-[calc(4rem+var(--header-alerts-height,0px)+44px)]">
+        <main className={isMarketspacePage ? "pt-16" : "pt-16"}>
           {children}
         </main>
         <UniversalFooter />

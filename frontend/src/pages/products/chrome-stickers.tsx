@@ -308,7 +308,8 @@ export default function ChromeStickers() {
       <section className="py-4">
         <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
           
-          {/* Honeymoon Closure Warning */}
+          {/* Honeymoon Closure Warning - Hidden */}
+          {false && (
           <div className="mb-6 p-4 rounded-lg border" style={{
             background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.8))',
             borderColor: 'rgba(239, 68, 68, 0.6)',
@@ -331,6 +332,7 @@ export default function ChromeStickers() {
               </div>
             </div>
           </div>
+          )}
 
           {pricingError && (
             <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg text-yellow-200 text-sm">

@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
+import { createPortal } from 'react-dom';
 import { useRouter } from "next/router";
 import Layout from "@/components/Layout";
 import FloatingChatWidget from "@/components/FloatingChatWidget";
+import PageTransition from "@/components/PageTransition";
 import { getSupabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useQuery, useMutation } from "@apollo/client";
@@ -53,6 +55,7 @@ interface PromotionalContainer {
   price?: string;
   originalPrice?: string;
   collectionId?: string;
+  creatorId?: string;
   linkText?: string;
   backgroundImage?: string;
   backgroundGradient?: string;
@@ -63,9 +66,53 @@ interface PromotionalContainer {
   updatedAt: string;
 }
 
+// Helper function to calculate creator earnings using cost-based structure with size support
+function calculateCreatorEarnings(price: number, quantity: number = 1, size: string = '4"'): number {
+  // Same cost structure as backend
+  let materialShippingCost: number;
+  let fulfillmentCost: number;
+
+  // Size-based sticker costs
+  const stickerCostPerUnit: { [key: string]: number } = {
+    '3"': 0.35, // Lower cost for smaller stickers
+    '4"': 0.40, // Standard cost
+    '5"': 0.45  // Higher cost for larger stickers
+  };
+  
+  const costPerSticker = stickerCostPerUnit[size] || stickerCostPerUnit['4"'];
+  let stickerCost = quantity * costPerSticker;
+
+  if (quantity === 1) {
+    materialShippingCost = 1.35;
+    fulfillmentCost = 0.25;
+  } else if (quantity <= 5) {
+    materialShippingCost = 1.46;
+    fulfillmentCost = 0.26;
+  } else if (quantity <= 10) {
+    materialShippingCost = 1.61;
+    fulfillmentCost = 0.27;
+  } else if (quantity <= 25) {
+    materialShippingCost = 5.45; // upgrades to tracking
+    fulfillmentCost = 0.30;
+  } else {
+    // For larger quantities, use the 25+ tier costs
+    materialShippingCost = 5.45;
+    fulfillmentCost = 0.30;
+  }
+
+  // Calculate Stripe processing fee: 2.9% + $0.30
+  const stripeFee = price > 0 ? (price * 0.029) + 0.30 : 0;
+
+  const totalCosts = materialShippingCost + stickerCost + fulfillmentCost + stripeFee;
+  
+  // Creator earnings = Revenue - All Costs
+  return Math.max(0, price - totalCosts);
+}
+
 // Simple Product Card Component
 function ProductCard({ product, buildPackMode = false, selected, onToggleSelect, onAddToCart, getPriceOverride }: { product: MarketplaceProduct, buildPackMode?: boolean, selected?: boolean, onToggleSelect?: (id: string) => void, onAddToCart?: (product: MarketplaceProduct) => void, getPriceOverride?: (product: MarketplaceProduct) => number }) {
   const displayPrice = getPriceOverride ? getPriceOverride(product) : product.price;
+  const creatorEarnings = calculateCreatorEarnings(displayPrice);
   
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -161,16 +208,29 @@ function ProductCard({ product, buildPackMode = false, selected, onToggleSelect,
           )}
           
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                {!buildPackMode && (
+                  <span className="text-white font-bold text-base">
+                    ${displayPrice.toFixed(2)}
+                  </span>
+                )}
+                {product.original_price && product.original_price > displayPrice && (
+                  <span className="text-gray-400 text-xs line-through">
+                    ${product.original_price}
+                  </span>
+                )}
+              </div>
               {!buildPackMode && (
-                <span className="text-white font-bold text-base">
-                  ${displayPrice.toFixed(2)}
-                </span>
-              )}
-              {product.original_price && product.original_price > displayPrice && (
-                <span className="text-gray-400 text-xs line-through">
-                  ${product.original_price}
-                </span>
+                <div className="flex items-center text-yellow-200 text-xs">
+                  <span>+</span>
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
+                    alt="Credits" 
+                    className="w-3 h-3 object-contain ml-0.5 mr-1.5"
+                  />
+                  <span>${creatorEarnings.toFixed(2)} in store credit</span>
+                </div>
               )}
             </div>
             
@@ -243,16 +303,29 @@ function ProductCard({ product, buildPackMode = false, selected, onToggleSelect,
             )}
             
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  {!buildPackMode && (
+                    <span className="text-white font-bold text-base">
+                      ${displayPrice.toFixed(2)}
+                    </span>
+                  )}
+                  {product.original_price && product.original_price > displayPrice && (
+                    <span className="text-gray-400 text-xs line-through">
+                      ${product.original_price}
+                    </span>
+                  )}
+                </div>
                 {!buildPackMode && (
-                  <span className="text-white font-bold text-base">
-                    ${displayPrice.toFixed(2)}
-                  </span>
-                )}
-                {product.original_price && product.original_price > displayPrice && (
-                  <span className="text-gray-400 text-xs line-through">
-                    ${product.original_price}
-                  </span>
+                  <div className="flex items-center text-yellow-200 text-xs">
+                    <span>+</span>
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
+                      alt="Credits" 
+                      className="w-3 h-3 object-contain ml-0.5 mr-1.5"
+                    />
+                    <span>${creatorEarnings.toFixed(2)} in store credit</span>
+                  </div>
                 )}
               </div>
               
@@ -300,6 +373,7 @@ function ProductCard({ product, buildPackMode = false, selected, onToggleSelect,
 export default function Marketplace() {
   const { addToCart } = useCart();
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
+  const [allProducts, setAllProducts] = useState<MarketplaceProduct[]>([]); // Unfiltered products for backgrounds
   const [loading, setLoading] = useState(true);
   const [selectedCategories, setSelectedCategories] = useState<string[]>(["all"]);
   const [showSaleItems, setShowSaleItems] = useState<boolean>(false);
@@ -311,11 +385,14 @@ export default function Marketplace() {
   const [selectedCreatorId, setSelectedCreatorId] = useState<string | null>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [collections, setCollections] = useState<any[]>([]);
+  const [collectionPreviews, setCollectionPreviews] = useState<{[key: string]: string}>({});
   const [allCreators, setAllCreators] = useState<any[]>([]);
+  const [featuredProducts, setFeaturedProducts] = useState<MarketplaceProduct[]>([]);
   const [categoryCounts, setCategoryCounts] = useState<{[key: string]: number}>({});
   const [buildPackMode, setBuildPackMode] = useState<boolean>(false);
   const [selectedPackIds, setSelectedPackIds] = useState<string[]>([]);
   const [selectedPackProducts, setSelectedPackProducts] = useState<MarketplaceProduct[]>([]);
+  const [selectedPackSize, setSelectedPackSize] = useState<string>('4"');
   const [editingContainer, setEditingContainer] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<PromotionalContainer>>({});
   
@@ -360,6 +437,18 @@ export default function Marketplace() {
     const singleStickerPrice = basePrice * 2.955; // Multiplier to get exactly $3.99 from $1.35
     
     return Math.round(singleStickerPrice * 100) / 100; // Round to 2 decimal places
+  };
+
+  // Get pack price based on selected size
+  const getPackPrice = (): number => {
+    switch (selectedPackSize) {
+      case '3"':
+        return 9.98;
+      case '5"':
+        return 14.98;
+      default: // 4"
+        return 12.48;
+    }
   };
 
   // Handle adding marketplace product to cart
@@ -520,6 +609,8 @@ export default function Marketplace() {
     checkUser();
   }, []);
 
+
+
   // Listen for profile updates to sync profile photos
   useEffect(() => {
     const handleProfileUpdate = (event: any) => {
@@ -585,12 +676,94 @@ export default function Marketplace() {
     }
   }, [router.isReady, router.query]);
 
+  // Fetch all products without filters for background generation
+  const fetchAllProducts = async () => {
+    try {
+      console.log('🚀 Starting fetchAllProducts...');
+      
+      // Try the simplest query first - just products without relationships
+      let { data, error } = await supabase
+        .from('marketplace_products')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      console.log('📊 fetchAllProducts result:', { error, dataLength: data?.length });
+
+      if (error) {
+        console.error('❌ Error with marketplace_products, trying with creators relationship:', error);
+        // Fallback: try with creators relationship
+        const result = await supabase
+          .from('marketplace_products')
+          .select(`
+            *,
+            creators (
+              id,
+              user_id,
+              creator_name
+            )
+          `)
+          .eq('is_active', true)
+          .order('created_at', { ascending: false });
+        
+        data = result.data;
+        error = result.error;
+        console.log('📊 fetchAllProducts fallback result:', { error, dataLength: data?.length });
+      }
+
+      if (error) throw error;
+
+      // Transform the data (creators relationship might not exist, that's ok for backgrounds)
+      const transformedProducts = (data || []).map((product: any) => ({
+        ...product,
+        creator: product.creators
+      }));
+
+      setAllProducts(transformedProducts);
+      console.log('📦 Loaded all products for backgrounds:', transformedProducts.length);
+      // Log collection IDs in all products
+      const collectionIds = [...new Set(transformedProducts.map((p: MarketplaceProduct) => p.collection_id).filter(Boolean))];
+      console.log('📋 Available collection IDs in all products:', collectionIds);
+      
+      // Log some sample products for debugging
+      if (transformedProducts.length > 0) {
+        console.log('📋 Sample products:', transformedProducts.slice(0, 3).map((p: MarketplaceProduct) => ({
+          id: p.id,
+          title: p.title,
+          collection_id: p.collection_id,
+          default_image: p.default_image
+        })));
+      }
+    } catch (error) {
+      console.error('❌ Error fetching all products:', error);
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
+    fetchAllProducts(); // Fetch all products for backgrounds
     fetchCollections();
     fetchCreators();
     fetchCategoryCounts();
   }, []);
+
+  // Log when allProducts changes
+  useEffect(() => {
+    if (allProducts.length > 0) {
+      console.log('🎨 All products loaded, ready for backgrounds:', allProducts.length);
+      console.log('🎯 Products with collections:', allProducts.filter((p: MarketplaceProduct) => p.collection_id).length);
+      console.log('🔍 Collection IDs found in allProducts:', [...new Set(allProducts.map((p: MarketplaceProduct) => p.collection_id).filter(Boolean))]);
+      
+      // Log some sample products with their collection IDs
+      const productsWithCollections = allProducts.filter((p: MarketplaceProduct) => p.collection_id);
+      console.log('📋 Sample products with collections:', productsWithCollections.slice(0, 3).map((p: MarketplaceProduct) => ({
+        id: p.id,
+        title: p.title,
+        collection_id: p.collection_id,
+        default_image: p.default_image
+      })));
+    }
+  }, [allProducts]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -667,10 +840,13 @@ export default function Marketplace() {
             query = query.order('price', { ascending: false });
             break;
           case "popular":
-            query = query.order('views_count', { ascending: false });
+            query = query.order('views_count', { ascending: false }).order('title', { ascending: true });
             break;
           case "featured":
             query = query.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
+            break;
+          case "alphabetical":
+            query = query.order('title', { ascending: true });
             break;
           default:
             query = query.order('created_at', { ascending: false });
@@ -721,6 +897,15 @@ export default function Marketplace() {
     fetchProducts();
   }, [selectedCategories, showSaleItems, searchQuery, sortBy, selectedCreatorId, selectedCollectionId, buildPackMode, currentPage]);
 
+  // Fetch featured products when collection changes
+  useEffect(() => {
+    if (selectedCollectionId) {
+      fetchFeaturedProducts(selectedCollectionId);
+    } else {
+      setFeaturedProducts([]);
+    }
+  }, [selectedCollectionId]);
+
   const fetchCollections = async () => {
     try {
       console.log('🔍 Fetching collections...');
@@ -745,10 +930,130 @@ export default function Marketplace() {
 
       if (result.error) throw result.error;
       console.log('✅ Collections loaded:', result.data);
+      console.log('📋 Collection IDs:', result.data?.map((c: any) => `${c.name}: ${c.id}`));
       setCollections(result.data || []);
+      
+      // Fetch preview images for each collection
+      if (result.data && result.data.length > 0) {
+        const previews: {[key: string]: string} = {};
+        
+        console.log('🔍 Fetching preview images for collections...');
+        
+        for (const collection of result.data) {
+          console.log(`🔎 Looking for products in collection "${collection.name}" (ID: ${collection.id})`);
+          
+          // Try marketspace_products first (new table)
+          let { data: productData, error: productError } = await supabase
+            .from('marketspace_products')
+            .select('default_image, images, collection_id')
+            .eq('collection_id', collection.id)
+            .eq('is_active', true)
+            .limit(1)
+            .single();
+          
+          // If not found, try marketplace_products (old table)
+          if (!productData) {
+            console.log(`  📦 No products in marketspace_products, trying marketplace_products...`);
+            const oldResult = await supabase
+              .from('marketplace_products')
+              .select('default_image, images, collection_id')
+              .eq('collection_id', collection.id)
+              .eq('is_active', true)
+              .limit(1)
+              .single();
+            
+            if (oldResult.data) {
+              productData = oldResult.data;
+              console.log(`  ✅ Found in marketplace_products!`);
+            } else {
+              console.log(`  ❌ Not found in marketplace_products either`);
+            }
+          } else {
+            console.log(`  ✅ Found in marketspace_products! Collection ID in product:`, productData.collection_id);
+          }
+          
+          if (productData) {
+            const imageUrl = productData.default_image || productData.images?.[0] || '';
+            if (imageUrl) {
+              previews[collection.id] = imageUrl;
+              console.log(`  🖼️ Using preview image:`, imageUrl);
+            } else {
+              console.log(`  ⚠️ Product found but no images available`);
+            }
+          } else {
+            console.log(`  ❌ No products found for collection ${collection.name} (${collection.id})`);
+          }
+        }
+        
+        console.log('📸 Collection previews loaded:', Object.keys(previews).length, 'previews for', result.data.length, 'collections');
+        setCollectionPreviews(previews);
+      }
     } catch (err) {
       console.error('Error fetching collections:', err);
       setCollections([]);
+    }
+  };
+
+  const fetchFeaturedProducts = async (collectionId: string) => {
+    try {
+      console.log('🌟 Fetching featured products for collection:', collectionId);
+      
+      const { data, error } = await supabase
+        .from('marketplace_products')
+        .select(`
+          *,
+          creators (
+            id,
+            creator_name,
+            user_id,
+            profile_photo_url
+          )
+        `)
+        .eq('collection_id', collectionId)
+        .eq('is_featured', true)
+        .eq('is_active', true)
+        .order('views_count', { ascending: false })
+        .order('sold_quantity', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      // Process creator profiles like in fetchProducts
+      const processedProducts = await Promise.all((data || []).map(async (product: any) => {
+        if (product.creators?.user_id) {
+          try {
+            const { data: profileData } = await supabase
+              .from('user_profiles')
+              .select('first_name, last_name, profile_photo_url')
+              .eq('user_id', product.creators.user_id)
+              .single();
+            
+            return {
+              ...product,
+              creator: {
+                ...product.creators,
+                user_profiles: profileData
+              }
+            };
+          } catch (profileError) {
+            return {
+              ...product,
+              creator: product.creators
+            };
+          }
+        } else {
+          return {
+            ...product,
+            creator: product.creators
+          };
+        }
+      }));
+      
+      console.log('✅ Featured products loaded:', processedProducts.length);
+      setFeaturedProducts(processedProducts);
+    } catch (err) {
+      console.error('Error fetching featured products:', err);
+      setFeaturedProducts([]);
     }
   };
 
@@ -834,9 +1139,9 @@ export default function Marketplace() {
     const next = !buildPackMode;
     setBuildPackMode(next);
     setSelectedPackIds([]);
+    setSelectedPackSize('4"'); // Reset to default 4" size
     if (next) {
       setSelectedCategories(["all"]);
-      setShowSaleItems(false);
       setSearchQuery("");
       setSortBy("random");
       setSelectedCreatorId(null);
@@ -865,20 +1170,23 @@ export default function Marketplace() {
   const handleAddPackToCart = () => {
     if (selectedPackIds.length !== 5) return;
     const selectedProducts = selectedPackProducts;
+    const packPrice = getPackPrice();
     
     const packCartItem = {
       id: generateCartItemId(),
       product: {
         id: `marketplace-pack-${Date.now()}`,
         sku: `MARKETPLACE-PACK-${Date.now()}`,
-        name: 'Sticker Pack (5) - Build Your Pack',
+        name: `Custom 5-Pack`,
         category: "marketplace-pack" as const,
-        description: 'Custom sticker pack with 5 selected designs from the marketplace',
-        shortDescription: 'Custom 5-design sticker pack',
-        basePrice: 12.99,
+        description: `Custom 5-pack of stickers in ${selectedPackSize} size`,
+        shortDescription: `Custom 5-Pack (${selectedPackSize})`,
+        basePrice: packPrice,
         pricingModel: "per-unit" as const,
         images: selectedProducts.map(p => p.default_image || p.images?.[0]).filter(Boolean),
         defaultImage: selectedProducts[0]?.default_image || selectedProducts[0]?.images?.[0] || '/placeholder.png',
+        // Store all pack images for display
+        packImages: selectedProducts.map(p => p.default_image || p.images?.[0]).filter(Boolean),
         features: [],
         attributes: [],
         customizable: false,
@@ -894,40 +1202,50 @@ export default function Marketplace() {
             id: p.id, 
             title: p.title, 
             image: p.default_image || p.images?.[0] 
-          }))
+          })),
+          packSize: selectedPackSize
         },
-        totalPrice: 12.99,
-        unitPrice: 12.99,
+        totalPrice: packPrice,
+        unitPrice: packPrice,
         quantity: 1,
-        notes: `Pack contains: ${selectedProducts.map(p => p.title).join(', ')}`,
+        notes: `Pack contains: ${selectedProducts.map(p => p.title).join(', ')} - Size: ${selectedPackSize}`,
         uploadedFiles: [],
         isRushOrder: false,
       },
       quantity: 1,
-      unitPrice: 12.99,
-      totalPrice: 12.99,
+      unitPrice: packPrice,
+      totalPrice: packPrice,
       addedAt: new Date().toISOString(),
     };
 
     addToCart(packCartItem);
-    alert('Sticker pack added to cart!');
     setBuildPackMode(false);
     setSelectedPackIds([]);
     setSelectedPackProducts([]);
+    setSelectedPackSize('4"'); // Reset to default size
+    
+    // Redirect to cart page
+    router.push('/cart');
   };
 
   // Generate scattered sticker background from collection products
   const generateScatteredBackground = (collectionId: string) => {
     if (!collectionId) return null;
     
+    // Use allProducts for backgrounds to ensure we have all collection items
+    if (allProducts.length === 0) {
+      console.log('⏳ All products not loaded yet, skipping background generation');
+      return null;
+    }
+    
     // Debug logging
     console.log('🔍 generateScatteredBackground called with collectionId:', collectionId);
-    console.log('📦 Total products available:', products.length);
-    console.log('📦 Products with collection_id:', products.filter(p => p.collection_id).length);
-    console.log('📦 All collection IDs in products:', [...new Set(products.map(p => p.collection_id).filter(Boolean))]);
+    console.log('📦 Total all products available:', allProducts.length);
+    console.log('📦 Products with collection_id:', allProducts.filter(p => p.collection_id).length);
+    console.log('📦 All collection IDs in all products:', [...new Set(allProducts.map(p => p.collection_id).filter(Boolean))]);
     
-    // Get products from the selected collection
-    const collectionProducts = products.filter(p => p.collection_id === collectionId);
+    // Get products from the selected collection using the unfiltered allProducts array
+    const collectionProducts = allProducts.filter(p => p.collection_id === collectionId);
     console.log('🎯 Products found for collection', collectionId, ':', collectionProducts.length);
     
     if (collectionProducts.length === 0) {
@@ -935,22 +1253,34 @@ export default function Marketplace() {
       return null;
     }
     
-    // Use only products from this specific collection, up to 6 maximum
-    const backgroundProducts = collectionProducts.slice(0, Math.min(6, collectionProducts.length));
-    console.log('✅ Using', backgroundProducts.length, 'products for scattered background');
+    // Use ALL products from this specific collection if less than 6, otherwise randomly select 6
+    const maxStickers = 6;
+    let backgroundProducts;
     
-    // Generate positions - avoid left third (33%), spread out more with slight overlaps
+    if (collectionProducts.length <= maxStickers) {
+      // Use all available products if we have 6 or fewer
+      backgroundProducts = collectionProducts;
+    } else {
+      // Randomly select 6 products if we have more than 6
+      const shuffled = [...collectionProducts].sort(() => Math.random() - 0.5);
+      backgroundProducts = shuffled.slice(0, maxStickers);
+    }
+    
+    console.log('✅ Using', backgroundProducts.length, 'products for scattered background (out of', collectionProducts.length, 'available)');
+    
+    // Generate positions - moved further right, avoiding left half of container
     const scatteredStickers = backgroundProducts.map((product, index) => {
       const positions = [
-        { top: '8%', right: '30%', rotation: -15 },
-        { top: '35%', right: '20%', rotation: 20 },
-        { top: '60%', right: '35%', rotation: -12 },
-        { bottom: '20%', right: '25%', rotation: 18 },
-        { bottom: '45%', right: '10%', rotation: -25 },
-        { top: '25%', right: '5%', rotation: 28 }
+        { top: '8%', right: '15%', rotation: -15 },
+        { top: '35%', right: '5%', rotation: 20 },
+        { top: '60%', right: '20%', rotation: -12 },
+        { bottom: '20%', right: '10%', rotation: 18 },
+        { bottom: '45%', right: '2%', rotation: -25 },
+        { top: '25%', right: '25%', rotation: 28 }
       ];
       
-      const position = positions[index % positions.length];
+      // Use the actual index to ensure all positions are used when we have fewer than 6 items
+      const position = positions[index];
       return {
         ...product,
         ...position
@@ -958,6 +1288,25 @@ export default function Marketplace() {
     });
     
     return scatteredStickers;
+  };
+
+  // Get creator info for a collection or direct creator assignment
+  const getCollectionCreator = (collectionId: string, creatorId?: string) => {
+    // If a specific creator is selected, find them in allCreators
+    if (creatorId) {
+      const selectedCreator = allCreators.find(c => c.id === creatorId);
+      if (selectedCreator) return selectedCreator;
+    }
+    
+    // Fallback to finding creator from collection products
+    if (!collectionId || allProducts.length === 0) return null;
+    
+    // Find the first product in this collection that has creator info
+    const collectionProduct = allProducts.find(p => 
+      p.collection_id === collectionId && p.creator
+    );
+    
+    return collectionProduct?.creator || null;
   };
 
   // Get collection link URL
@@ -976,6 +1325,7 @@ export default function Marketplace() {
   const handleCollectionClick = (collectionId: string) => {
     if (collectionId) {
       setSelectedCollectionId(collectionId);
+      setSortBy("popular");
       scrollToTop();
     }
   };
@@ -1005,6 +1355,7 @@ export default function Marketplace() {
             price: editForm.price,
             originalPrice: editForm.originalPrice,
             collectionId: editForm.collectionId,
+            creatorId: editForm.creatorId,
             linkText: editForm.linkText,
             backgroundImage: editForm.backgroundImage,
             backgroundGradient: editForm.backgroundGradient,
@@ -1127,6 +1478,18 @@ export default function Marketplace() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Scroll to explore stickers section for pagination
+  const scrollToExploreStickers = () => {
+    const exploreSection = document.querySelector('[data-section="explore-stickers"]') || 
+                          document.querySelector('[data-section="recently-added"]');
+    if (exploreSection) {
+      exploreSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      // Fallback to scrolling to top if section not found
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   const toggleCategory = (categoryValue: string) => {
     let newCategories: string[] = [];
     
@@ -1159,20 +1522,21 @@ export default function Marketplace() {
     scrollToTop();
   };
 
-  if (userLoading) {
+  if (userLoading || (user && !creatorData)) {
     return (
       <Layout title="Market Space - Sticker Shuttle">
         <div className="flex items-center justify-center h-64">
-          <div className="text-white">Loading account...</div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-white text-lg">Loading Creators Space...</p>
+          </div>
         </div>
       </Layout>
     );
   }
 
   // Allow access for admin or active creators
-  const hasAccess = user && (user.email === 'justin@stickershuttle.com' || isCreator);
-  
-
+  const hasAccess = user && (ADMIN_EMAILS.includes(user.email || '') || creatorData?.getCreatorByUserId?.isActive);
   
   if (!hasAccess) {
     return (
@@ -1264,103 +1628,85 @@ export default function Marketplace() {
 
 
 
-      {/* Main Content with Sidebar */}
-      <section className="pt-[20px] pb-8">
+      <PageTransition>
+        {/* Main Content with Sidebar */}
+        <section className="pt-[20px] pb-8">
         <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
-          {/* Mobile Filter Toggle Button */}
-          <div className="lg:hidden mb-6">
-            <button
-              onClick={() => setShowMobileFilters(!showMobileFilters)}
-              className="w-full flex items-center justify-between p-4 rounded-xl transition-all duration-200"
-              style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                backdropFilter: 'blur(12px)'
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
-                </svg>
-                <span className="text-white font-semibold">Filters & Categories</span>
-              <div className="flex items-center gap-2">
-                  {(!selectedCategories.includes("all") || showSaleItems || selectedCreatorId || selectedCollectionId) && (
-                    <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs">
-                      {selectedCategories.filter(cat => cat !== "all").length + (showSaleItems ? 1 : 0) + (selectedCreatorId ? 1 : 0) + (selectedCollectionId ? 1 : 0)} active
-                    </span>
-                  )}
-                </div>
-              </div>
-              <svg 
-                className={`w-5 h-5 text-white transition-transform duration-200 ${showMobileFilters ? 'rotate-180' : ''}`} 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          </div>
+          
 
           <div className="flex flex-col lg:flex-row gap-4 lg:gap-2">
             
             {/* Left Sidebar - Enhanced Filters */}
             <aside className={`lg:w-72 flex-shrink-0 ${showMobileFilters ? 'block' : 'hidden lg:block'}`}>
               <div className="rounded-xl p-6 space-y-4 sticky top-24" style={{
-                background: '#210d54',
+                background: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
                 boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
                 backdropFilter: 'blur(12px)'
               }}>
 
-                {/* Build a Pack CTA */}
-                <button
-                  onClick={() => {
-                    const next = !buildPackMode;
-                    setBuildPackMode(next);
-                    setSelectedPackIds([]);
-                    setSelectedPackProducts([]);
-                    if (next) {
-                      setSelectedCategories(["all"]);
-                      setShowSaleItems(false);
-                      setSearchQuery("");
-                      setSortBy("random");
-                      setSelectedCreatorId(null);
-                      setSelectedCollectionId(null);
-                    }
-                  }}
-                  className="w-full text-center px-4 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-[1.015] relative overflow-hidden holographic-button"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.01)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    boxShadow: '2px 2px 0px rgba(0, 0, 0, 0.75), rgba(255, 255, 255, 0.33) 0px 1px 0px inset',
-                    backdropFilter: 'blur(12px)'
-                  }}
-                >
-                  {/* Holographic moving gradient overlay */}
-                  <div 
-                    className="absolute inset-0 opacity-30"
-                    style={{
-                      background: 'linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57, #ff9ff3, #54a0ff)',
-                      backgroundSize: '400% 400%',
-                      animation: 'holographicMove 3s ease-in-out infinite'
-                    }}
-                  ></div>
-                  <span className="inline-flex items-center justify-center relative z-10 text-white">
-                    {buildPackMode && (
-                      <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                    {buildPackMode ? 'Back to Marketplace' : 'Build a 5-Pack'}
+
+
+                {/* Build a Pack Button - Desktop only */}
+                <div className="hidden lg:block mb-6">
+                  <div className="relative">
+                    {/* 50% OFF Pill - Positioned like a bow at top right */}
                     {!buildPackMode && (
-                      <svg className="w-4 h-4 ml-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
+                      <div className="absolute -top-3 -right-3 z-30 transform rotate-12">
+                        <span className="inline-flex items-center justify-center text-xs bg-red-500 text-white px-2 py-1 rounded-full font-bold shadow-lg">
+                          50% OFF
+                        </span>
+                      </div>
                     )}
-                  </span>
-                </button>
+                    
+                    <button
+                      onClick={() => {
+                        const next = !buildPackMode;
+                        setBuildPackMode(next);
+                        setSelectedPackIds([]);
+                        setSelectedPackProducts([]);
+                        setSelectedPackSize('4"'); // Reset to default size
+                        if (next) {
+                          setSelectedCategories(["all"]);
+                          setSearchQuery("");
+                          setSortBy("random");
+                          setSelectedCreatorId(null);
+                          setSelectedCollectionId(null);
+                        }
+                      }}
+                      className="w-full text-center px-4 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-[1.015] relative overflow-hidden holographic-button"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.01)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        boxShadow: '2px 2px 0px rgba(0, 0, 0, 0.75), rgba(255, 255, 255, 0.33) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
+                      }}
+                    >
+                      {/* Holographic moving gradient overlay */}
+                      <div 
+                        className="absolute inset-0 opacity-30"
+                        style={{
+                          background: 'linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57, #ff9ff3, #54a0ff)',
+                          backgroundSize: '400% 400%',
+                          animation: 'holographicMove 3s ease-in-out infinite'
+                        }}
+                      ></div>
+                      <span className="inline-flex items-center justify-center relative z-10 text-white">
+                        {buildPackMode && (
+                          <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                        {buildPackMode ? 'Back to Marketplace' : 'Build a 5-Pack'}
+                        {!buildPackMode && (
+                          <svg className="w-4 h-4 ml-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </span>
+                    </button>
+                  </div>
+                </div>
 
                 {/* Filter Header */}
                 <div className="flex items-center gap-3 pb-4 border-b border-white/10">
@@ -1382,7 +1728,6 @@ export default function Marketplace() {
                     <button
                       onClick={() => {
                         setSelectedCategories(["all"]);
-                        setShowSaleItems(false);
                         setSearchQuery("");
                         setSortBy("random");
                         setSelectedCreatorId(null);
@@ -1396,59 +1741,50 @@ export default function Marketplace() {
                 </div>
 
                 
-
-                {/* Sale Items Filter */}
-                <div>
-                  <button
-                    onClick={() => {
-                      setShowSaleItems(!showSaleItems);
-                      scrollToTop();
-                    }}
-                    className={`w-full relative text-left p-3 rounded-xl transition-all duration-200 overflow-hidden ${
-                      showSaleItems
-                        ? ''
-                        : 'border-2 border-dashed border-orange-400/50'
-                    } ${!showSaleItems ? 'hover:border-orange-400/70 hover:bg-white/5' : ''}`}
-                    style={{
-                      background: showSaleItems 
-                        ? 'linear-gradient(135deg, #EA580C 0%, #C2410C 100%)'
-                        : 'transparent'
-                    }}
-                  >
-                    {/* Background Pattern */}
-                    <div className="absolute inset-0 opacity-20">
-                      <div className="absolute top-2 right-2 text-white/30 text-4xl">
-                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                {/* Pack Size Selection - Only show in build pack mode */}
+                {buildPackMode && (
+                  <div className="mb-6">
+                    <label className="block text-sm font-semibold text-white mb-3">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4m-4 0l5.657 5.657M20 8V4m0 0h-4m4 0l-5.657 5.657" />
                         </svg>
+                        Pack Size
                       </div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="relative z-10">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`text-sm ${showSaleItems ? 'text-white/90' : 'text-white/60'}`}>
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                            </svg>
-                          </div>
-                          <span className={`font-semibold text-sm ${showSaleItems ? 'text-white' : 'text-white/80'}`}>
-                            Sale Items
+                    </label>
+                    <div className="flex items-center gap-3">
+                      {[
+                        { size: '3"', price: 9.98 },
+                        { size: '4"', price: 12.48 },
+                        { size: '5"', price: 14.98 }
+                      ].map((sizeOption) => (
+                        <button
+                          key={sizeOption.size}
+                          onClick={() => setSelectedPackSize(sizeOption.size)}
+                          className={`px-4 py-2 rounded-lg border-2 transition-all duration-200 flex items-center justify-center font-medium ${
+                            selectedPackSize === sizeOption.size
+                              ? 'border-yellow-400/80 scale-105 shadow-md shadow-yellow-400/15'
+                              : 'border-white/30 opacity-75 hover:opacity-100 hover:border-white/50'
+                          }`}
+                          style={{
+                            background: selectedPackSize === sizeOption.size
+                              ? 'rgba(255, 215, 0, 0.15)'
+                              : 'rgba(255, 255, 255, 0.05)',
+                            backdropFilter: 'blur(12px)'
+                          }}
+                        >
+                          <span className={`text-sm ${
+                            selectedPackSize === sizeOption.size
+                              ? 'text-yellow-200'
+                              : 'text-white/80'
+                          }`}>
+                            {sizeOption.size} - ${sizeOption.price}
                           </span>
-                        </div>
-                        {showSaleItems && (
-                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                      <p className={`text-xs mt-1 ${showSaleItems ? 'text-white/70' : 'text-white/50'}`}>
-                        Special offers & discounts
-                      </p>
+                        </button>
+                      ))}
                     </div>
-                  </button>
-                </div>
+                  </div>
+                )}
 
                 {/* Category Filter */}
                 <div>
@@ -1644,7 +1980,7 @@ export default function Marketplace() {
                   <label className="block text-sm font-semibold text-white mb-2">
                     <div className="flex items-center gap-2">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                       </svg>
                       Browse by Collection
                     </div>
@@ -1655,11 +1991,17 @@ export default function Marketplace() {
                     ) : (
                       collections.map((collection: any) => {
                         const isSelected = selectedCollectionId === collection.id;
+                        // Get preview image from collectionPreviews state
+                        const previewImage = collectionPreviews[collection.id] || collection.image_url;
+                        
                         return (
                           <button
                             key={collection.id}
                             onClick={() => {
                               setSelectedCollectionId(isSelected ? null : collection.id);
+                              if (!isSelected) {
+                                setSortBy("popular");
+                              }
                               scrollToTop();
                             }}
                             className={`w-full group relative text-left p-3 rounded-xl transition-all duration-200 overflow-hidden ${
@@ -1670,14 +2012,21 @@ export default function Marketplace() {
                           >
                             <div className="relative z-10">
                               <div className="flex items-center gap-3 mb-1">
-                                {collection.image_url ? (
-                                  <div className="w-8 h-8 rounded-md overflow-hidden">
-                                    <img src={collection.image_url} alt={collection.name} className="w-full h-full object-cover" />
+                                {previewImage ? (
+                                  <div className="w-8 h-8 flex items-center justify-center">
+                                    <img 
+                                      src={previewImage} 
+                                      alt={collection.name} 
+                                      className="max-w-full max-h-full object-contain" 
+                                      style={{ 
+                                        filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))' 
+                                      }}
+                                    />
                                   </div>
                                 ) : (
                                   <div className="w-8 h-8 rounded-md bg-green-500/20 flex items-center justify-center">
                                     <svg className="w-4 h-4 text-green-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                                     </svg>
                                   </div>
                                 )}
@@ -1764,9 +2113,70 @@ export default function Marketplace() {
             </aside>
 
             {/* Main Content - Products */}
-            <main className="flex-1 min-w-0 space-y-8 lg:pl-4 lg:pt-2">
+            <main className="flex-1 min-w-0 space-y-4 lg:pl-4 lg:pt-2">
+              
+              {/* Build a Pack CTA - Mobile only */}
+              <div className="max-w-md mx-auto lg:hidden">
+                <div className="relative">
+                  {/* 50% OFF Pill - Positioned like a bow at top right */}
+                  {!buildPackMode && (
+                    <div className="absolute -top-3 -right-3 z-30 transform rotate-12">
+                      <span className="inline-flex items-center justify-center text-xs bg-red-500 text-white px-2 py-1 rounded-full font-bold shadow-lg">
+                        50% OFF
+                      </span>
+                    </div>
+                  )}
+                  
+                  <button
+                    onClick={() => {
+                      const next = !buildPackMode;
+                      setBuildPackMode(next);
+                      setSelectedPackIds([]);
+                      setSelectedPackProducts([]);
+                      setSelectedPackSize('4"'); // Reset to default size
+                      if (next) {
+                        setSelectedCategories(["all"]);
+                        setSearchQuery("");
+                        setSortBy("random");
+                        setSelectedCreatorId(null);
+                        setSelectedCollectionId(null);
+                      }
+                    }}
+                    className="w-full text-center px-4 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-[1.015] relative overflow-hidden holographic-button"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.01)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      boxShadow: '2px 2px 0px rgba(0, 0, 0, 0.75), rgba(255, 255, 255, 0.33) 0px 1px 0px inset',
+                      backdropFilter: 'blur(12px)'
+                    }}
+                  >
+                    {/* Holographic moving gradient overlay */}
+                    <div 
+                      className="absolute inset-0 opacity-30"
+                      style={{
+                        background: 'linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57, #ff9ff3, #54a0ff)',
+                        backgroundSize: '400% 400%',
+                        animation: 'holographicMove 3s ease-in-out infinite'
+                      }}
+                    ></div>
+                    <span className="inline-flex items-center justify-center relative z-10 text-white">
+                      {buildPackMode && (
+                        <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                      {buildPackMode ? 'Back to Marketplace' : 'Build a 5-Pack'}
+                      {!buildPackMode && (
+                        <svg className="w-4 h-4 ml-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </span>
+                  </button>
+                </div>
+              </div>
               {/* Show promotional sections only when "All Shapes" is selected, no sale filter, no search, no creator/collection selected, and not in build pack mode */}
-              {selectedCategories.includes("all") && !showSaleItems && !searchQuery.trim() && !selectedCreatorId && !selectedCollectionId && !buildPackMode && (
+              {selectedCategories.includes("all") && !searchQuery.trim() && !selectedCreatorId && !selectedCollectionId && !buildPackMode && (
                 <>
                   {/* Dynamic Promotional Containers */}
                   {containersLoading ? (
@@ -1776,14 +2186,17 @@ export default function Marketplace() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 items-start">
-                      {promotionalContainers.map((container: PromotionalContainer) => {
+                      {promotionalContainers.map((container: PromotionalContainer, index: number) => {
                         console.log('🎨 Rendering promotional container:', {
                           id: container.id,
                           title: container.title,
-                          collectionId: container.collectionId
+                          collectionId: container.collectionId,
+                          allProductsCount: allProducts.length,
+                          hasProducts: allProducts.length > 0,
+                          collectionProductsCount: allProducts.filter(p => p.collection_id === container.collectionId).length
                         });
                         return (
-                        <div key={container.id} className="relative">
+                        <div key={container.id} className={`relative ${index > 0 ? 'hidden md:block' : ''}`}>
                           {/* Admin Edit Button */}
                           {isAdmin && (
                             <button
@@ -1806,7 +2219,7 @@ export default function Marketplace() {
                           {/* Container */}
                           <div 
                             onClick={() => handleCollectionClick(container.collectionId || '')}
-                            className="rounded-xl p-6 sm:p-8 cursor-pointer transition-all duration-200 hover:scale-[1.025] group h-44 sm:h-48 relative overflow-hidden"
+                            className="rounded-xl p-6 sm:p-8 cursor-pointer transition-all duration-200 hover:scale-[1.025] group h-52 sm:h-56 relative overflow-hidden"
                               style={{
                                 backgroundImage: container.backgroundImage ? `url(${container.backgroundImage})` : undefined,
                                 backgroundSize: 'cover',
@@ -1816,7 +2229,9 @@ export default function Marketplace() {
                             >
                               {/* Scattered Stickers Background */}
                               {container.collectionId && (() => {
+                                console.log('🎨 Rendering scattered background for container:', container.collectionId, 'allProducts:', allProducts.length);
                                 const scatteredStickers = generateScatteredBackground(container.collectionId);
+                                console.log('🖼️ Generated stickers:', scatteredStickers?.length || 0);
                                 return scatteredStickers ? (
                                   <div className="absolute inset-0 rounded-xl overflow-hidden">
                                     {scatteredStickers.map((sticker, index) => (
@@ -1838,7 +2253,7 @@ export default function Marketplace() {
                                           alt=""
                                           className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
                                           style={{ 
-                                            filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.1)) drop-shadow(0 0 0 1px rgba(200, 200, 200, 0.67))'
+                                            filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2)) drop-shadow(0 2px 4px rgba(0,0,0,0.2)) drop-shadow(0 1px 1px rgba(0,0,0,0.4))'
                                           }}
                                         />
                                       </div>
@@ -1872,27 +2287,75 @@ export default function Marketplace() {
                                   mixBlendMode: 'multiply'
                                 }}
                               ></div>
-                              <div className="relative z-10 text-left h-full flex flex-col justify-between">
-                                <div>
-                                  {container.badgeText && (
-                                    <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium mb-3 ${
-                                      container.badgeColor === 'pink' ? 'bg-pink-400/20 text-pink-300' :
-                                      container.badgeColor === 'green' ? 'bg-green-400/20 text-green-300' :
-                                      container.badgeColor === 'yellow' ? 'bg-yellow-400/20 text-yellow-300' :
-                                      'bg-blue-400/20 text-blue-300'
-                                    }`}>
-                                      {container.badgeText}
+                              <div className="relative z-10 text-left h-full flex flex-col justify-start px-0 pt-0 space-y-2">
+                                {/* Badge */}
+                                {container.badgeText && (
+                                  <div className={`inline-flex px-2 py-0.5 rounded-full text-sm font-medium w-fit ${
+                                    container.badgeColor === 'pink' ? 'bg-pink-400/20 text-pink-300' :
+                                    container.badgeColor === 'green' ? 'bg-green-400/20 text-green-300' :
+                                    container.badgeColor === 'yellow' ? 'bg-yellow-400/20 text-yellow-300' :
+                                    'bg-blue-400/20 text-blue-300'
+                                  }`}>
+                                    {container.badgeText}
+                                  </div>
+                                )}
+                                
+                                {/* Title */}
+                                <h3 className="text-2xl font-bold text-white group-hover:text-indigo-200 transition-colors">
+                                  {container.title}
+                                </h3>
+                                
+                                {/* Creator Info */}
+                                {(container.collectionId || container.creatorId) && (() => {
+                                  const creator = getCollectionCreator(container.collectionId || '', container.creatorId);
+                                  if (!creator) return null;
+                                  
+                                  const displayName = creator.creator_name || (
+                                    creator.user_profiles?.first_name && creator.user_profiles?.last_name
+                                      ? `${creator.user_profiles.first_name} ${creator.user_profiles.last_name}`
+                                      : 'Creator'
+                                  );
+                                  
+                                  const profilePhotoUrl = creator.profile_photo_url || creator.user_profiles?.profile_photo_url;
+                                  
+                                  return (
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-5 h-5 rounded-full overflow-hidden bg-white/10 flex items-center justify-center">
+                                        {profilePhotoUrl ? (
+                                          <img
+                                            src={profilePhotoUrl}
+                                            alt={`${displayName} avatar`}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                              e.currentTarget.style.display = 'none';
+                                              const parent = e.currentTarget.parentElement;
+                                              if (parent) {
+                                                parent.innerHTML = displayName.charAt(0).toUpperCase();
+                                                parent.className = parent.className.replace('bg-white/10', 'bg-gradient-to-br from-purple-500 to-pink-500');
+                                              }
+                                            }}
+                                          />
+                                        ) : (
+                                          <span className="text-white text-xs font-semibold">
+                                            {displayName.charAt(0).toUpperCase()}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-white/80 text-sm">
+                                        by {displayName}
+                                      </span>
                                     </div>
-                                  )}
-                                  <h3 className="text-2xl font-bold text-white group-hover:text-indigo-200 transition-colors mb-1">
-                                    {container.title}
-                                  </h3>
-                                  {container.subtitle && (
-                                    <p className="text-gray-200 text-sm mb-1">
-                                      {container.subtitle}
-                                    </p>
-                                  )}
-                                </div>
+                                  );
+                                })()}
+                                
+                                {/* Subtitle */}
+                                {container.subtitle && (
+                                  <p className="text-gray-200 text-sm">
+                                    {container.subtitle}
+                                  </p>
+                                )}
+                                
+                                {/* Price and Button Row */}
                                 <div className="flex items-center justify-between">
                                   <div className="text-white">
                                     {container.price && (
@@ -1904,7 +2367,7 @@ export default function Marketplace() {
                                   </div>
                                   {container.linkText && (
                                     <div 
-                                      className="inline-block px-3 py-1.5 text-indigo-200 text-sm font-medium group-hover:text-indigo-100 transition-colors"
+                                      className="inline-block px-3 py-1.5 text-white text-sm font-medium group-hover:text-gray-100 transition-colors"
                                       style={{
                                         background: 'rgba(255, 255, 255, 0.05)',
                                         border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -1925,22 +2388,88 @@ export default function Marketplace() {
                     </div>
                   )}
 
-                  {/* Recently Added Section */}
+                                    {/* Mobile Filter Toggle Button */}
+                  <div className="lg:hidden mb-4">
+                    <div className="max-w-2xl mx-auto flex justify-start">
+                      <button
+                        onClick={() => setShowMobileFilters(!showMobileFilters)}
+                        className="relative p-2 transition-all duration-200 hover:scale-110"
+                      >
+                        <svg className="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
+                        </svg>
+                        {/* Mobile notification dot */}
+                        {(!selectedCategories.includes("all") || selectedCreatorId || selectedCollectionId) && (
+                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                            <span className="text-white text-xs font-bold">
+                              {selectedCategories.filter(cat => cat !== "all").length + (selectedCreatorId ? 1 : 0) + (selectedCollectionId ? 1 : 0)}
+                            </span>
+                          </div>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Search Bar - Mobile only */}
+                  <div className="mb-4 lg:hidden">
+                    <div className="max-w-2xl mx-auto">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Search all stickers..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="w-full px-4 py-3 pl-12 rounded-lg text-white placeholder-white/60 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                            backdropFilter: 'blur(12px)'
+                          }}
+                        />
+                        <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
+                          <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                        </div>
+                        {searchQuery && (
+                          <button
+                            onClick={() => setSearchQuery('')}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white transition-colors"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Recently Added Section - Without Title */}
                   {products.length > 0 && (
-                    <div data-section="recently-added">
-                      <h2 className="text-2xl font-bold text-white mb-6">
-                        Recently Added
-                      </h2>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4 mb-8">
+                    <div data-section="recently-added" className="mb-8">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4">
                         {products
                           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) // Sort by most recent
                           .slice(0, 6) // Take first 6
                           .map((product) => (
-                            <ProductCard key={`recent-${product.id}`} product={product} onAddToCart={handleAddMarketplaceProductToCart} getPriceOverride={getMarketplaceProductPrice} />
-                          ))}
+                            <ProductCard 
+                              key={`recent-${product.id}`} 
+                              product={product} 
+                              buildPackMode={buildPackMode} 
+                              selected={selectedPackIds.includes(product.id)} 
+                              onToggleSelect={togglePackSelection} 
+                              onAddToCart={handleAddMarketplaceProductToCart} 
+                              getPriceOverride={getMarketplaceProductPrice} 
+                            />
+                          ))
+                        }
                       </div>
                     </div>
                   )}
+
+
 
                   {/* Featured Creators Section */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-8">
@@ -2038,7 +2567,7 @@ export default function Marketplace() {
               )}
 
               {/* Explore Stickers Section - Always show when filtering */}
-              <div>
+              <div data-section="explore-stickers">
                 <div className="flex items-center gap-4 mb-4">
                   {/* Back Button - Show when any filters are active */}
                   {(!selectedCategories.includes("all") || showSaleItems || searchQuery.trim() || selectedCreatorId || selectedCollectionId) && !buildPackMode && (
@@ -2073,8 +2602,7 @@ export default function Marketplace() {
                   )}
                   
                   <h2 className="text-2xl font-bold text-white">
-                    {buildPackMode ? "Build Your Pack - Select 5 Stickers" :
-                     (!selectedCategories.includes("all") || showSaleItems || searchQuery.trim() || selectedCreatorId || selectedCollectionId) ? 
+                    {(!selectedCategories.includes("all") || showSaleItems || searchQuery.trim() || selectedCreatorId || selectedCollectionId) ? 
                       (searchQuery.trim() ? `Search Results for "${searchQuery}"` :
                         selectedCreatorId ? (() => {
                          const creator = allCreators.find(c => c.id === selectedCreatorId);
@@ -2093,21 +2621,285 @@ export default function Marketplace() {
                          categories.find(cat => cat.value === selectedCategories[0])?.label || "Filtered Stickers" :
                          "Filtered Stickers"
                       ) : 
-                      "Explore Stickers"
+                      ""
                     }
                   </h2>
-                </div>
-                
-                <div className="flex items-center justify-between mb-4">
                   {buildPackMode && (
-                    <button
-                      disabled={selectedPackIds.length !== 5}
-                      onClick={handleAddPackToCart}
-                      className={`px-5 py-3 rounded-lg font-semibold transition-all ${selectedPackIds.length === 5 ? 'primaryButton transform hover:scale-105 duration-200' : 'bg-transparent border border-white/20 text-white/90'}`}
-                    >
-                      Add Pack to Cart ({selectedPackIds.length}/5)
-                    </button>
+                     <>
+                       {/* Desktop Layout - Inline with content */}
+                       <div className="hidden lg:flex items-center justify-start mt-4">
+                         {/* Build Pack Add to Cart Button - Inline with content */}
+                         <div className="flex items-center gap-3">
+                           {/* Selected Sticker Thumbnails */}
+                           {selectedPackProducts.map((product, index) => (
+                             <div
+                     key={product.id}
+                     className={`relative w-12 h-12 rounded-lg border-2 transition-all duration-300 ${
+                                 selectedPackIds.length === 5 
+                                   ? 'border-yellow-400/80 scale-110 shadow-lg shadow-yellow-400/30' 
+                                   : 'border-white/20'
+                               }`}
+                               style={{
+                                 background: selectedPackIds.length === 5 
+                                   ? 'rgba(255, 215, 0, 0.1)' 
+                                   : 'rgba(255, 255, 255, 0.05)',
+                                 backdropFilter: 'blur(12px)'
+                               }}
+                             >
+                               <img 
+                                 src={product.default_image} 
+                                 alt={product.title}
+                                 className="w-full h-full object-cover"
+                               />
+                               {/* Remove button */}
+                     <button
+                       onClick={() => togglePackSelection(product.id)}
+                       className="absolute -top-3 -right-3 w-6 h-6 bg-red-500 rounded-full text-white text-sm flex items-center justify-center hover:bg-red-600 transition-colors z-10"
+                     >
+                       ×
+                     </button>
+                               
+                               {/* Success indicator when 5 selected */}
+                               {selectedPackIds.length === 5 && (
+                                 <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
+                                   <svg className="w-6 h-6 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                   </svg>
+                                 </div>
                   )}
+                </div>
+                           ))}
+                           
+                           {/* Placeholder thumbnails for remaining slots */}
+                           {Array.from({ length: 5 - selectedPackIds.length }, (_, index) => (
+                             <div 
+                               key={`placeholder-${index}`}
+                               className="w-12 h-12 rounded-lg border-2 border-dashed border-white/20 flex items-center justify-center"
+                               style={{
+                                 background: 'rgba(255, 255, 255, 0.02)',
+                                 backdropFilter: 'blur(12px)'
+                               }}
+                             >
+                               <svg className="w-5 h-5 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                               </svg>
+                             </div>
+                           ))}
+                           
+                           {/* Size Selection Buttons */}
+                 <div className="flex items-center gap-2 ml-4 mr-4">
+                   {[
+                     { size: '3"', price: 9.98 },
+                     { size: '4"', price: 12.48 },
+                     { size: '5"', price: 14.98 }
+                   ].map((sizeOption) => (
+                     <button
+                       key={sizeOption.size}
+                       onClick={() => setSelectedPackSize(sizeOption.size)}
+                       className={`w-16 h-12 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${
+                         selectedPackSize === sizeOption.size
+                           ? 'border-yellow-400/80 scale-110 shadow-md shadow-yellow-400/15'
+                           : 'border-dashed border-white/30 opacity-65'
+                       }`}
+                       style={{
+                         background: selectedPackSize === sizeOption.size
+                           ? 'rgba(255, 215, 0, 0.1)'
+                           : 'rgba(255, 255, 255, 0.02)',
+                         backdropFilter: 'blur(12px)'
+                       }}
+                     >
+                       <span className={`text-xs font-medium ${
+                         selectedPackSize === sizeOption.size
+                           ? 'text-yellow-200'
+                           : 'text-white/65'
+                       }`}>
+                         {sizeOption.size}
+                       </span>
+                     </button>
+                   ))}
+                 </div>
+
+                 {/* Add to Cart Button */}
+                 <button
+                   disabled={selectedPackIds.length !== 5}
+                   onClick={handleAddPackToCart}
+                   className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap transform hover:scale-105 ${
+                     selectedPackIds.length === 5
+                       ? ''
+                       : 'opacity-50 cursor-not-allowed'
+                   }`}
+                   style={{
+                     backgroundColor: selectedPackIds.length === 5 ? '#ffd713' : '#ffd713',
+                     color: '#030140',
+                     border: '1px solid rgba(255, 255, 255, 0.2)',
+                     boxShadow: selectedPackIds.length === 5 
+                       ? '3px 3px 0px #cfaf13, 0 0 20px rgba(255, 215, 0, 0.4)' 
+                       : '3px 3px 0px #cfaf13'
+                   }}
+                 >
+                   {selectedPackIds.length === 5 ? (
+                      <>
+                        🎉 Add to Cart - ${getPackPrice()} (5/5)
+                        <span className="ml-2 text-xs bg-red-500 text-white px-2 py-1 rounded inline-flex items-center">
+                          50% OFF
+                        </span>
+                        <span className="ml-2 text-xs text-gray-400 line-through inline-flex items-center">
+                          was $24.95
+                        </span>
+                      </>
+                    ) : (
+                      `Add to Cart (${selectedPackIds.length}/5)`
+                    )}
+                 </button>
+                         </div>
+                       </div>
+
+                       {/* Mobile Layout - Portal to body for proper fixed positioning */}
+                       {typeof window !== 'undefined' && createPortal(
+                         <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[9999] p-4" style={{
+                           background: 'rgba(3, 1, 64, 0.95)',
+                           backdropFilter: 'blur(20px)',
+                           borderTop: '1px solid rgba(255, 255, 255, 0.15)',
+                           position: 'fixed',
+                           bottom: '0',
+                           left: '0',
+                           right: '0'
+                         }}>
+                           <div className="flex flex-col gap-3">
+                             {/* Top Row: Selected Sticker Thumbnails */}
+                             <div className="flex items-center justify-center gap-2">
+                               {selectedPackProducts.map((product, index) => (
+                                 <div
+                                   key={product.id}
+                                   className={`relative w-10 h-10 rounded-lg border-2 transition-all duration-300 ${
+                                     selectedPackIds.length === 5 
+                                       ? 'border-yellow-400/80 scale-110 shadow-lg shadow-yellow-400/30' 
+                                       : 'border-white/20'
+                                   }`}
+                                   style={{
+                                     background: selectedPackIds.length === 5 
+                                       ? 'rgba(255, 215, 0, 0.1)' 
+                                       : 'rgba(255, 255, 255, 0.05)',
+                                     backdropFilter: 'blur(12px)'
+                                   }}
+                                 >
+                                   <img 
+                                     src={product.default_image} 
+                                     alt={product.title}
+                                     className="w-full h-full object-cover"
+                                   />
+                                   {/* Remove button */}
+                                   <button
+                                     onClick={() => togglePackSelection(product.id)}
+                                     className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center hover:bg-red-600 transition-colors z-10"
+                                   >
+                                     ×
+                                   </button>
+                                   
+                                   {/* Success indicator when 5 selected */}
+                                   {selectedPackIds.length === 5 && (
+                                     <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
+                                       <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                       </svg>
+                                     </div>
+                                   )}
+                                 </div>
+                               ))}
+                               
+                               {/* Placeholder thumbnails for remaining slots */}
+                               {Array.from({ length: 5 - selectedPackIds.length }, (_, index) => (
+                                 <div 
+                                   key={`placeholder-${index}`}
+                                   className="w-10 h-10 rounded-lg border-2 border-dashed border-white/20 flex items-center justify-center"
+                                   style={{
+                                     background: 'rgba(255, 255, 255, 0.02)',
+                                     backdropFilter: 'blur(12px)'
+                                   }}
+                                 >
+                                   <svg className="w-4 h-4 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                   </svg>
+                                 </div>
+                               ))}
+                             </div>
+
+                             {/* Bottom Row: Size Selection and Add to Cart */}
+                             <div className="flex items-center justify-between gap-3">
+                               {/* Size Selection Buttons */}
+                               <div className="flex items-center gap-1">
+                                 {[
+                                   { size: '3"', price: 9.98 },
+                                   { size: '4"', price: 12.48 },
+                                   { size: '5"', price: 14.98 }
+                                 ].map((sizeOption) => (
+                                   <button
+                                     key={sizeOption.size}
+                                     onClick={() => setSelectedPackSize(sizeOption.size)}
+                                     className={`w-10 h-8 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${
+                                       selectedPackSize === sizeOption.size
+                                         ? 'border-yellow-400/80 scale-110 shadow-md shadow-yellow-400/15'
+                                         : 'border-dashed border-white/30 opacity-65'
+                                     }`}
+                                     style={{
+                                       background: selectedPackSize === sizeOption.size
+                                         ? 'rgba(255, 215, 0, 0.1)'
+                                         : 'rgba(255, 255, 255, 0.02)',
+                                       backdropFilter: 'blur(12px)'
+                                     }}
+                                   >
+                                     <span className={`text-xs font-medium ${
+                                       selectedPackSize === sizeOption.size
+                                         ? 'text-yellow-200'
+                                         : 'text-white/65'
+                                     }`}>
+                                       {sizeOption.size}
+                                     </span>
+                                   </button>
+                                 ))}
+                               </div>
+
+                               {/* Add to Cart Button */}
+                               <button
+                                 disabled={selectedPackIds.length !== 5}
+                                 onClick={handleAddPackToCart}
+                                 className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-all duration-200 whitespace-nowrap transform hover:scale-105 ${
+                                   selectedPackIds.length === 5
+                                     ? ''
+                                     : 'opacity-50 cursor-not-allowed'
+                                 }`}
+                                 style={{
+                                   backgroundColor: selectedPackIds.length === 5 ? '#ffd713' : '#ffd713',
+                                   color: '#030140',
+                                   border: '1px solid rgba(255, 255, 255, 0.2)',
+                                   boxShadow: selectedPackIds.length === 5 
+                                     ? '3px 3px 0px #cfaf13, 0 0 20px rgba(255, 215, 0, 0.4)' 
+                                     : '3px 3px 0px #cfaf13'
+                                 }}
+                               >
+                                 {selectedPackIds.length === 5 ? (
+                                   <div className="flex flex-col items-center">
+                                     <div className="flex items-center">
+                                       🎉 Add to Cart - ${getPackPrice()} (5/5)
+                                       <span className="ml-2 text-xs bg-red-500 text-white px-2 py-1 rounded">
+                                         50% OFF
+                                       </span>
+                                     </div>
+                                     <span className="text-xs text-gray-600 line-through">
+                                       was $24.95
+                                     </span>
+                                   </div>
+                                 ) : (
+                                   `Add to Cart (${selectedPackIds.length}/5)`
+                                 )}
+                               </button>
+                             </div>
+                           </div>
+                         </div>,
+                         document.body
+                       )}
+                     </>
+                   )}
                 </div>
                 {loading ? (
                   <LoadingGrid count={12} />
@@ -2134,6 +2926,42 @@ export default function Marketplace() {
             {buildPackMode && (
               <></>
             )}
+            
+            {/* Most Popular Section - Show when a collection is selected */}
+            {selectedCollectionId && !buildPackMode && featuredProducts.length > 0 && (
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                  <svg className="w-6 h-6 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                  Most Popular
+                  <span className="text-sm font-normal text-gray-400">
+                    ({featuredProducts.length} {featuredProducts.length === 1 ? 'item' : 'items'})
+                  </span>
+                </h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4 mb-8">
+                  {featuredProducts.map((product) => (
+                    <ProductCard 
+                      key={`featured-${product.id}`} 
+                      product={product} 
+                      buildPackMode={buildPackMode} 
+                      selected={selectedPackIds.includes(product.id)} 
+                      onToggleSelect={togglePackSelection} 
+                      onAddToCart={handleAddMarketplaceProductToCart} 
+                      getPriceOverride={getMarketplaceProductPrice} 
+                    />
+                  ))}
+                </div>
+                
+                {/* Divider */}
+                <div className="border-t border-white/10 mb-8">
+                  <h3 className="text-xl font-semibold text-white mt-8 mb-6">
+                    All Items in Collection
+                  </h3>
+                </div>
+              </div>
+            )}
+            
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4">
 {(() => {
                 // In build pack mode with filters active, show selected items first regardless of filter match
@@ -2164,8 +2992,12 @@ export default function Marketplace() {
                 // Normal sorting for other cases
                 const sortedProducts = products
                   .sort((a, b) => {
+                    // When filtering by collection, sort alphabetically by title
+                    if (selectedCollectionId) {
+                      return a.title.localeCompare(b.title);
+                    }
                     // When filtering by category, sale items, searching, or creator, sort by most recent first
-                    if (!selectedCategories.includes("all") || showSaleItems || searchQuery.trim() || selectedCreatorId || selectedCollectionId) {
+                    if (!selectedCategories.includes("all") || showSaleItems || searchQuery.trim() || selectedCreatorId) {
                       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
                     }
                     // Otherwise use the selected sort order
@@ -2204,7 +3036,7 @@ export default function Marketplace() {
                         <button
                           onClick={() => {
                             setCurrentPage(Math.max(1, currentPage - 1));
-                            scrollToTop();
+                            scrollToExploreStickers();
                           }}
                           disabled={currentPage === 1}
                           className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors"
@@ -2232,7 +3064,7 @@ export default function Marketplace() {
                                   key={1}
                                   onClick={() => {
                                     setCurrentPage(1);
-                                    scrollToTop();
+                                    scrollToExploreStickers();
                                   }}
                                   className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
                                 >
@@ -2251,7 +3083,7 @@ export default function Marketplace() {
                                   key={i}
                                   onClick={() => {
                                     setCurrentPage(i);
-                                    scrollToTop();
+                                    scrollToExploreStickers();
                                   }}
                                   className={`px-3 py-2 rounded-lg transition-colors ${
                                     i === currentPage
@@ -2274,7 +3106,7 @@ export default function Marketplace() {
                                   key={totalPages}
                                   onClick={() => {
                                     setCurrentPage(totalPages);
-                                    scrollToTop();
+                                    scrollToExploreStickers();
                                   }}
                                   className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
                                 >
@@ -2292,7 +3124,7 @@ export default function Marketplace() {
                           onClick={() => {
                             const totalPages = getTotalPages(products);
                             setCurrentPage(Math.min(totalPages, currentPage + 1));
-                            scrollToTop();
+                            scrollToExploreStickers();
                           }}
                           disabled={currentPage >= getTotalPages(products)}
                           className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors"
@@ -2420,8 +3252,8 @@ export default function Marketplace() {
                 </div>
               </div>
 
-              {/* Collection and Link Text */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Collection, Creator, and Link Text */}
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-white mb-2">Collection</label>
                   <select
@@ -2437,6 +3269,30 @@ export default function Marketplace() {
                         {collection.name}
                       </option>
                     ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">Creator Override</label>
+                  <select
+                    value={editForm.creatorId || ''}
+                    onChange={(e) => setEditForm({...editForm, creatorId: e.target.value || undefined})}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    title="Select creator"
+                    aria-label="Select creator"
+                  >
+                    <option value="">Auto (from collection)</option>
+                    {allCreators.map((creator: any) => {
+                      const displayName = creator.creator_name || (
+                        creator.user_profiles?.first_name && creator.user_profiles?.last_name
+                          ? `${creator.user_profiles.first_name} ${creator.user_profiles.last_name}`
+                          : 'Creator'
+                      );
+                      return (
+                        <option key={creator.id} value={creator.id}>
+                          {displayName}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
                 <div>
@@ -2542,6 +3398,11 @@ export default function Marketplace() {
           </div>
         </div>
       )}
+      </PageTransition>
+
+
+
+
 
       {/* Floating Chat Widget */}
       <FloatingChatWidget />

@@ -22,8 +22,24 @@ const waitForRateLimit = async () => {
   lastEmailSent = Date.now();
 };
 
+// Helper function to check if order contains Market Space items
+const isMarketSpaceOrder = (orderData) => {
+  if (!orderData.items && !orderData.order_items) return false;
+  const items = orderData.items || orderData.order_items || [];
+  if (!Array.isArray(items)) return false;
+  
+  return items.some(item => {
+    const category = item.product_category || item.productCategory;
+    return category === 'marketplace' || 
+           category === 'marketplace-stickers' || 
+           category === 'marketplace-pack';
+  });
+};
+
 // Email templates
 const getOrderStatusEmailTemplate = (orderData, newStatus) => {
+  const isMarketSpace = isMarketSpaceOrder(orderData);
+  
   const statusMessages = {
     'Building Proof': {
       subject: `✏️ We're creating your proof for order #${orderData.orderNumber}`,
@@ -42,14 +58,18 @@ const getOrderStatusEmailTemplate = (orderData, newStatus) => {
     'Printing': {
       subject: `🖨️ Your order is now printing - Order #${orderData.orderNumber}`,
       title: 'The printing process has begun!',
-      message: 'Great news! Your stickers are now being printed, watch out for tracking information!',
+      message: isMarketSpace 
+        ? 'Great news! Your Market Space stickers are now being printed and will ship within 24 hours!'
+        : 'Great news! Your stickers are now being printed, watch out for tracking information!',
       emoji: '🖨️',
       color: '#10B981'
     },
     'Shipped': {
       subject: `📦 Your order is on the way! - Order #${orderData.orderNumber}`,
       title: 'Look how far we\'ve come in such a short time...',
-      message: 'Your stickers are on their way to you! Use the tracking information below to monitor delivery.',
+      message: isMarketSpace
+        ? 'Your Market Space stickers have been shipped via USPS stamps and will arrive in 5-10 business days. Please note that this shipment does not include tracking.'
+        : 'Your stickers are on their way to you! Use the tracking information below to monitor delivery.',
       emoji: '📦',
       color: '#8B5CF6'
     },

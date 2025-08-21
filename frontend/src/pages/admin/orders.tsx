@@ -150,6 +150,7 @@ const ADMIN_EMAILS = ['justin@stickershuttle.com']; // Add all admin emails here
 // Helper function to check if an item is a sample pack
 const isSamplePackItem = (item: any) => {
   return item.productId === 'sample-pack' || 
+         item.sku === 'SP-001' ||
          item.sku === 'SS-Sample' ||
          item.productName?.toLowerCase().includes('sample pack') ||
          item.productCategory?.toLowerCase().includes('sample');
@@ -158,6 +159,16 @@ const isSamplePackItem = (item: any) => {
 // Helper function to check if an order contains sample packs
 const isSamplePackOrder = (order: Order) => {
   return order.items?.some(item => isSamplePackItem(item));
+};
+
+// Helper function to check if an order has ONLY sample packs (no custom items)
+const isSamplePackOnlyOrder = (order: Order) => {
+  return order.items?.length > 0 && order.items?.every(item => isSamplePackItem(item));
+};
+
+// Helper function to check if an order has custom items that need proofs
+const hasCustomItemsNeedingProofs = (order: Order) => {
+  return order.items?.some(item => !isSamplePackItem(item));
 };
 
 // Helper function to get product image with sample pack support
@@ -266,6 +277,7 @@ export default function AdminOrders() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [orderTab, setOrderTab] = useState<'all' | 'marketspace'>('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'status' | 'total'>('date');
@@ -293,6 +305,7 @@ export default function AdminOrders() {
   const [ordersWithLabels, setOrdersWithLabels] = useState<Set<string>>(new Set());
   const [orderLabelUrls, setOrderLabelUrls] = useState<Map<string, string>>(new Map());
   const [customerProfiles, setCustomerProfiles] = useState<{[key: string]: any}>({});
+
   
   // Shipping address editing states
   const [editingShippingAddress, setEditingShippingAddress] = useState<Order | null>(null);
@@ -323,6 +336,8 @@ export default function AdminOrders() {
   useEffect(() => {
     setCurrentPage(1);
   }, [filterStatus, searchTerm, sortColumn, sortDirection]);
+
+
 
   // Helper function to select an order and update URL
   const selectOrder = (order: Order) => {
@@ -521,6 +536,17 @@ export default function AdminOrders() {
     checkAdmin();
   }, []); // Remove router dependency to prevent loops
 
+  // Helper function to check if order contains Market Space items
+  const isMarketSpaceOrder = (order: Order) => {
+    if (!order.items || !Array.isArray(order.items)) return false;
+    return order.items.some(item => {
+      const category = item.productCategory || '';
+      return category === 'marketplace' || 
+             category === 'marketplace-stickers' || 
+             category === 'marketplace-pack';
+    });
+  };
+
   // Filter and sort orders
   const allFilteredOrders = React.useMemo(() => {
     if (!data?.getAllOrders) return [];
@@ -529,6 +555,13 @@ export default function AdminOrders() {
 
     // Filter to only show paid orders
     orders = orders.filter(order => order.financialStatus === 'paid');
+
+    // Apply Market Space tab filter
+    if (orderTab === 'marketspace') {
+      orders = orders.filter(order => isMarketSpaceOrder(order));
+    } else if (orderTab === 'all') {
+      orders = orders.filter(order => !isMarketSpaceOrder(order));
+    }
 
     // Apply status filter
     if (filterStatus !== 'all') {
@@ -604,7 +637,7 @@ export default function AdminOrders() {
     });
 
     return orders;
-  }, [data, filterStatus, searchTerm, sortBy, sortOrder]);
+  }, [data, orderTab, filterStatus, searchTerm, sortBy, sortOrder]);
 
   // Calculate pagination values
   const totalOrders = allFilteredOrders.length;
@@ -1305,17 +1338,17 @@ export default function AdminOrders() {
     };
   };
 
-  // Get proof status (updated with shipping statuses)
+  // Get proof status (updated with shipping statuses and mixed order logic)
   const getProofStatus = (order: Order) => {
-    // Check if this is a sample pack order (skip proof system)
-    if (isSamplePackOrder(order)) {
+    // Check if this is a sample pack ONLY order (skip proof system)
+    if (isSamplePackOnlyOrder(order)) {
       if (order.orderStatus === 'Assume Delivered' || order.fulfillmentStatus === 'fulfilled') {
         return 'Delivered';
       }
       if (order.orderStatus === 'Shipped' || order.proof_status === 'shipped' || (order.fulfillmentStatus === 'partial' && order.trackingNumber)) {
         return 'Shipped';
       }
-      // Default sample pack status is packaging
+      // Default sample pack only status is packaging
       return 'Packaging';
     }
 
@@ -2317,228 +2350,68 @@ export default function AdminOrders() {
           }
         }
       `}</style>
-      <div className="min-h-screen" style={{ backgroundColor: '#030140' }}>
-        {/* Main Content */}
-        <div className="pt-8 pb-8">
+             <div className="min-h-screen" style={{ backgroundColor: '#030140' }}>
+         {/* Main Content */}
+         <div className="pt-2 pb-8">
           <div className="w-full pl-2 pr-8"> {/* Reduced left padding, keep right padding */}
             {!selectedOrder ? (
               // Orders List View
               <>
                 {/* Time Filter Buttons/Dropdown */}
-                <div className="mb-6">
+                <div className="mb-3">
                   {/* Desktop Filter Buttons */}
-                  <div className="hidden lg:flex flex-wrap gap-2 justify-center lg:justify-start">
-                    <button
-                      onClick={() => setTimeFilter('1')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                        timeFilter === '1'
-                          ? 'text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
+                  <div className="hidden lg:flex justify-center lg:justify-start">
+                    <div 
+                      className="inline-flex rounded-lg p-1"
                       style={{
-                        background: timeFilter === '1' 
-                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: `1px solid ${timeFilter === '1' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                        boxShadow: timeFilter === '1' 
-                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        backdropFilter: 'blur(12px)'
                       }}
                     >
-                      Today
-                    </button>
-                    <button
-                      onClick={() => setTimeFilter('yesterday')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                        timeFilter === 'yesterday'
-                          ? 'text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      style={{
-                        background: timeFilter === 'yesterday' 
-                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: `1px solid ${timeFilter === 'yesterday' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                        boxShadow: timeFilter === 'yesterday' 
-                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
-                      }}
-                    >
-                      Yesterday
-                    </button>
-                    <button
-                      onClick={() => setTimeFilter('2daysago')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                        timeFilter === '2daysago'
-                          ? 'text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      style={{
-                        background: timeFilter === '2daysago' 
-                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: `1px solid ${timeFilter === '2daysago' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                        boxShadow: timeFilter === '2daysago' 
-                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
-                      }}
-                    >
-                      2 Days Ago
-                    </button>
-                    <button
-                      onClick={() => setTimeFilter('7')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                        timeFilter === '7'
-                          ? 'text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      style={{
-                        background: timeFilter === '7' 
-                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: `1px solid ${timeFilter === '7' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                        boxShadow: timeFilter === '7' 
-                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
-                      }}
-                    >
-                      Last 7 days
-                    </button>
-                    <button
-                      onClick={() => setTimeFilter('mtd')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                        timeFilter === 'mtd'
-                          ? 'text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      style={{
-                        background: timeFilter === 'mtd' 
-                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: `1px solid ${timeFilter === 'mtd' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                        boxShadow: timeFilter === 'mtd' 
-                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
-                      }}
-                    >
-                      Month to date
-                    </button>
-                    <button
-                      onClick={() => setTimeFilter('ytd')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                        timeFilter === 'ytd'
-                          ? 'text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      style={{
-                        background: timeFilter === 'ytd' 
-                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: `1px solid ${timeFilter === 'ytd' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                        boxShadow: timeFilter === 'ytd' 
-                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
-                      }}
-                    >
-                      Year to date
-                    </button>
-                    <button
-                      onClick={() => setTimeFilter('30')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                        timeFilter === '30'
-                          ? 'text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      style={{
-                        background: timeFilter === '30' 
-                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: `1px solid ${timeFilter === '30' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                        boxShadow: timeFilter === '30' 
-                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
-                      }}
-                    >
-                      Last 30 days
-                    </button>
-                    <button
-                      onClick={() => setTimeFilter('90')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                        timeFilter === '90'
-                          ? 'text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      style={{
-                        background: timeFilter === '90' 
-                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: `1px solid ${timeFilter === '90' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                        boxShadow: timeFilter === '90' 
-                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
-                      }}
-                    >
-                      Last 90 days
-                    </button>
-                    <button
-                      onClick={() => setTimeFilter('365')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                        timeFilter === '365'
-                          ? 'text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      style={{
-                        background: timeFilter === '365' 
-                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: `1px solid ${timeFilter === '365' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                        boxShadow: timeFilter === '365' 
-                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
-                      }}
-                    >
-                      Last year
-                    </button>
-                    <button
-                      onClick={() => {
-                        setTimeFilter('custom');
-                        // Set default dates if not already set
-                        if (!customStartDate || !customEndDate) {
-                          const today = new Date();
-                          const lastWeek = new Date();
-                          lastWeek.setDate(today.getDate() - 7);
-                          setCustomStartDate(lastWeek.toISOString().split('T')[0]);
-                          setCustomEndDate(today.toISOString().split('T')[0]);
-                        }
-                      }}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                        timeFilter === 'custom'
-                          ? 'text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      style={{
-                        background: timeFilter === 'custom' 
-                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: `1px solid ${timeFilter === 'custom' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                        boxShadow: timeFilter === 'custom' 
-                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
-                      }}
-                    >
-                      Custom Range
-                    </button>
+                      <button
+                        onClick={() => setTimeFilter('1')}
+                        className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                          timeFilter === '1'
+                            ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Today
+                      </button>
+                      <button
+                        onClick={() => setTimeFilter('yesterday')}
+                        className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                          timeFilter === 'yesterday'
+                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Yesterday
+                      </button>
+                      <button
+                        onClick={() => setTimeFilter('7')}
+                        className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                          timeFilter === '7'
+                            ? 'bg-green-500/20 text-green-300 border border-green-500/40'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        7 Days
+                      </button>
+                      <button
+                        onClick={() => setTimeFilter('mtd')}
+                        className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                          timeFilter === 'mtd'
+                            ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        MTD
+                      </button>
+                    </div>
                   </div>
+
 
                   {/* Custom Date Range Selector */}
                   {timeFilter === 'custom' && (
@@ -2582,7 +2455,7 @@ export default function AdminOrders() {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Mobile Filter Dropdown */}
                   <div className="lg:hidden relative">
                     <select
@@ -2671,7 +2544,7 @@ export default function AdminOrders() {
                 </div>
 
                 {/* Analytics Cards - Mobile: 2x2 Grid, Desktop: 1x4 Grid */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-4 mb-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-4 mb-2">
                     <div 
                       className="p-2 lg:p-4 rounded-lg transition-all hover:scale-105 cursor-pointer"
                       style={{
@@ -2777,6 +2650,8 @@ export default function AdminOrders() {
                     </div>
                   </div>
 
+
+
                 {/* Mobile/Tablet Filters */}
                 <div className="xl:hidden mb-3">
                   <div 
@@ -2788,38 +2663,84 @@ export default function AdminOrders() {
                       backdropFilter: 'blur(12px)',
                     }}
                   >
-                    {/* Filter pills */}
+                    {/* Market Space Tab Switcher */}
+                    <div className="mb-3">
+                      <div className="flex justify-center">
+                        <div 
+                          className="inline-flex rounded-lg p-1"
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            backdropFilter: 'blur(12px)'
+                          }}
+                        >
+                          <button
+                            onClick={() => setOrderTab('all')}
+                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                              orderTab === 'all'
+                                ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                                : 'text-gray-400 hover:text-white'
+                            }`}
+                          >
+                            Custom Orders
+                          </button>
+                          <button
+                            onClick={() => setOrderTab('marketspace')}
+                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                              orderTab === 'marketspace'
+                                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                                : 'text-gray-400 hover:text-white'
+                            }`}
+                          >
+                            Market Space
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Main Filter Tabs */}
+                    <div 
+                      className="inline-flex rounded-lg p-1 mb-3"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        backdropFilter: 'blur(12px)'
+                      }}
+                    >
+                      <button
+                        onClick={() => setFilterStatus('all')}
+                        className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                          filterStatus === 'all'
+                            ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        All
+                      </button>
+                      <button
+                        onClick={() => setFilterStatus('building')}
+                        className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                          filterStatus === 'building'
+                            ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Building
+                      </button>
+                      <button
+                        onClick={() => setFilterStatus('awaiting')}
+                        className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                          filterStatus === 'awaiting'
+                            ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Proof Sent
+                      </button>
+                    </div>
+
+                    {/* Additional Filter Pills */}
                     <div className="flex gap-2 overflow-x-auto pb-2 filter-pills-container">
-                    <button 
-                      onClick={() => setFilterStatus('all')}
-                      className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
-                        filterStatus === 'all' 
-                          ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' 
-                          : 'bg-transparent text-gray-400 border-gray-600'
-                      }`}
-                    >
-                      All
-                    </button>
-                    <button 
-                      onClick={() => setFilterStatus('building')}
-                      className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
-                        filterStatus === 'building' 
-                          ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' 
-                          : 'bg-transparent text-gray-400 border-gray-600'
-                      }`}
-                    >
-                      Building
-                    </button>
-                    <button 
-                      onClick={() => setFilterStatus('awaiting')}
-                      className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
-                        filterStatus === 'awaiting' 
-                          ? 'bg-orange-500/20 text-orange-300 border-orange-500/40' 
-                          : 'bg-transparent text-gray-400 border-gray-600'
-                      }`}
-                    >
-                      Proof Sent
-                    </button>
                     <button 
                       onClick={() => setFilterStatus('changes-requested')}
                       className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
@@ -2895,144 +2816,133 @@ export default function AdminOrders() {
                 </div>
 
                 {/* Desktop Compact Filters */}
-                <div className="hidden xl:flex justify-end items-center gap-3 mb-3">
-                  {/* Status Filter Buttons */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setFilterStatus('all')}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                        filterStatus === 'all'
-                          ? 'text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
+                <div className="hidden xl:flex justify-between items-center gap-3 mb-3">
+                  {/* Market Space Tab Switcher */}
+                  <div className="flex justify-start">
+                    <div 
+                      className="inline-flex rounded-lg p-1"
                       style={{
-                        background: filterStatus === 'all' 
-                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: `1px solid ${filterStatus === 'all' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                        boxShadow: filterStatus === 'all' 
-                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        backdropFilter: 'blur(12px)'
                       }}
                     >
-                      All
-                    </button>
-                    <button
-                      onClick={() => setFilterStatus('building')}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                        filterStatus === 'building'
-                          ? 'text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      style={{
-                        background: filterStatus === 'building' 
-                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: `1px solid ${filterStatus === 'building' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                        boxShadow: filterStatus === 'building' 
-                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
-                      }}
-                    >
-                      Building
-                    </button>
-                    <button
-                      onClick={() => setFilterStatus('awaiting')}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                        filterStatus === 'awaiting'
-                          ? 'text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      style={{
-                        background: filterStatus === 'awaiting' 
-                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: `1px solid ${filterStatus === 'awaiting' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                        boxShadow: filterStatus === 'awaiting' 
-                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
-                      }}
-                    >
-                      Proof Sent
-                    </button>
-                    <button
-                      onClick={() => setFilterStatus('changes-requested')}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                        filterStatus === 'changes-requested'
-                          ? 'text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      style={{
-                        background: filterStatus === 'changes-requested' 
-                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: `1px solid ${filterStatus === 'changes-requested' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                        boxShadow: filterStatus === 'changes-requested' 
-                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
-                      }}
-                    >
-                      Changes Requested
-                    </button>
-                    <button
-                      onClick={() => setFilterStatus('printing')}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                        filterStatus === 'printing'
-                          ? 'text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      style={{
-                        background: filterStatus === 'printing' 
-                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: `1px solid ${filterStatus === 'printing' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                        boxShadow: filterStatus === 'printing' 
-                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
-                      }}
-                    >
-                      Printing
-                    </button>
-                    <button
-                      onClick={() => setFilterStatus('shipped')}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                        filterStatus === 'shipped'
-                          ? 'text-white'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      style={{
-                        background: filterStatus === 'shipped' 
-                          ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)'
-                          : 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: `1px solid ${filterStatus === 'shipped' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                        boxShadow: filterStatus === 'shipped' 
-                          ? 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                          : 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
-                      }}
-                    >
-                      Shipped
-                    </button>
+                      <button
+                        onClick={() => setOrderTab('all')}
+                        className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                          orderTab === 'all'
+                            ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Custom Orders
+                      </button>
+                      <button
+                        onClick={() => setOrderTab('marketspace')}
+                        className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                          orderTab === 'marketspace'
+                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Market Space
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Search Input */}
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search orders..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="bg-transparent border border-white/20 rounded-xl px-4 py-2 pl-10 text-white text-sm placeholder-white/60 focus:outline-none focus:border-purple-400 transition-all"
-                      style={{ minWidth: '200px' }}
-                    />
-                    <svg className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
+                  <div className="flex items-center gap-3">
+                    {/* Status Filter Tabs */}
+                    <div 
+                      className="inline-flex rounded-lg p-1"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        backdropFilter: 'blur(12px)'
+                      }}
+                    >
+                      <button
+                        onClick={() => setFilterStatus('all')}
+                        className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                          filterStatus === 'all'
+                            ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        All
+                      </button>
+                      <button
+                        onClick={() => setFilterStatus('building')}
+                        className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                          filterStatus === 'building'
+                            ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Building
+                      </button>
+                      <button
+                        onClick={() => setFilterStatus('awaiting')}
+                        className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                          filterStatus === 'awaiting'
+                            ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Proof Sent
+                      </button>
+                      <button
+                        onClick={() => setFilterStatus('changes-requested')}
+                        className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                          filterStatus === 'changes-requested'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Changes
+                      </button>
+                      <button
+                        onClick={() => setFilterStatus('printing')}
+                        className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                          filterStatus === 'printing'
+                            ? 'bg-green-500/20 text-green-300 border border-green-500/40'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Printing
+                      </button>
+                      <button
+                        onClick={() => setFilterStatus('shipped')}
+                        className={`px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                          filterStatus === 'shipped'
+                            ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Shipped
+                      </button>
+                    </div>
+
+                    {/* Search Input */}
+                    <div 
+                      className="relative rounded-lg p-1"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        backdropFilter: 'blur(12px)'
+                      }}
+                    >
+                      <input
+                        type="text"
+                        placeholder="Search orders..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="bg-transparent border-none rounded-md px-4 py-2 pl-10 text-white text-sm placeholder-white/60 focus:outline-none transition-all"
+                        style={{ minWidth: '200px' }}
+                      />
+                      <svg className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
                   </div>
                 </div>
 
@@ -3510,6 +3420,11 @@ export default function AdminOrders() {
                                     {order.is_rush_order && (
                                       <span className="px-2 py-0.5 text-xs font-bold bg-orange-500/20 text-orange-300 rounded-full border border-orange-400/30">
                                         ⚡ RUSH
+                                      </span>
+                                    )}
+                                    {order.is_blind_shipment && (
+                                      <span className="px-2 py-0.5 text-xs font-bold bg-purple-500/20 text-purple-300 rounded-full border border-purple-400/30">
+                                        🎭 BLIND
                                       </span>
                                     )}
                                   </div>
@@ -4430,7 +4345,7 @@ export default function AdminOrders() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                           </svg>
                           Order Items
-                          {!isSamplePackOrder(selectedOrder) && selectedOrder.items.length > 1 && (
+                          {!isSamplePackOnlyOrder(selectedOrder) && selectedOrder.items.length > 1 && (
                             <span className="text-sm text-purple-400 font-normal">
                               • Drag proofs onto items
                             </span>
@@ -4720,8 +4635,8 @@ export default function AdminOrders() {
                             </div>
                           );
 
-                          // For non-sample pack orders, wrap with drag-and-drop functionality
-                          if (!isSamplePackOrder(selectedOrder)) {
+                          // For non-sample pack only orders, wrap with drag-and-drop functionality
+                          if (!isSamplePackOnlyOrder(selectedOrder)) {
                             return (
                               <ItemSpecificProofUpload
                                 key={idx}
@@ -4751,8 +4666,8 @@ export default function AdminOrders() {
 
                       {/* Order Summary Actions */}
                       <div className="grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-gray-700 border-opacity-30">
-                        {/* Left Column - Proof Actions (Hide for sample packs) */}
-                        {!isSamplePackOrder(selectedOrder) ? (
+                        {/* Left Column - Proof Actions (Hide for sample pack only orders) */}
+                        {!isSamplePackOnlyOrder(selectedOrder) ? (
                           <>
                             {/* Customer requested changes - Show alert */}
                             {selectedOrder.proof_status === 'changes_requested' && (
@@ -4938,8 +4853,8 @@ export default function AdminOrders() {
                           </button>
                         )}
 
-                        {/* Always show tracking for sample packs */}
-                        {isSamplePackOrder(selectedOrder) && (
+                        {/* Always show tracking for sample pack only orders */}
+                        {isSamplePackOnlyOrder(selectedOrder) && (
                           <>
                             {selectedOrder.trackingNumber ? (
                               <button
@@ -4977,8 +4892,8 @@ export default function AdminOrders() {
                       </div>
                     </div>
 
-                    {/* Proof Management System - Hide if proofs are approved OR if it's a sample pack */}
-                    {!isSamplePackOrder(selectedOrder) && selectedOrder.proof_status !== 'approved' && (
+                    {/* Proof Management System - Hide if proofs are approved OR if it's a sample pack ONLY order */}
+                    {!isSamplePackOnlyOrder(selectedOrder) && selectedOrder.proof_status !== 'approved' && (
                       <div className="glass-container p-6">
                         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                           <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -5000,8 +4915,8 @@ export default function AdminOrders() {
                       </div>
                     )}
 
-                    {/* Approved Proofs Display - Show when proofs are approved (not for sample packs) */}
-                    {!isSamplePackOrder(selectedOrder) && selectedOrder.proof_status === 'approved' && selectedOrder.proofs && selectedOrder.proofs.filter((p: any) => p.status === 'approved').length > 0 && (
+                    {/* Approved Proofs Display - Show when proofs are approved (not for sample pack only orders) */}
+                    {!isSamplePackOnlyOrder(selectedOrder) && selectedOrder.proof_status === 'approved' && selectedOrder.proofs && selectedOrder.proofs.filter((p: any) => p.status === 'approved').length > 0 && (
                       <div className="glass-container p-6">
                         <div className="flex items-center gap-3 mb-6">
                           <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
@@ -5075,8 +4990,8 @@ export default function AdminOrders() {
                       </div>
                     )}
 
-                    {/* Approved Proofs Display - Collapsible - Desktop Only - Show when proof status is not approved but has approved proofs (not for sample packs) */}
-                    {!isSamplePackOrder(selectedOrder) && selectedOrder.proof_status !== 'approved' && selectedOrder.proofs && selectedOrder.proofs.filter((p: any) => p.status === 'approved').length > 0 && (
+                    {/* Approved Proofs Display - Collapsible - Desktop Only - Show when proof status is not approved but has approved proofs (not for sample pack only orders) */}
+                    {!isSamplePackOnlyOrder(selectedOrder) && selectedOrder.proof_status !== 'approved' && selectedOrder.proofs && selectedOrder.proofs.filter((p: any) => p.status === 'approved').length > 0 && (
                       <div className="hidden xl:block">
                         <details className="glass-container p-6">
                         <summary className="flex items-center justify-between cursor-pointer -m-6 p-6">
@@ -5154,8 +5069,8 @@ export default function AdminOrders() {
                       </div>
                       )}
 
-                    {/* Archived Proofs Display - Collapsible - Show superseded/rejected proofs (not for sample packs) */}
-                    {!isSamplePackOrder(selectedOrder) && selectedOrder.proofs && selectedOrder.proofs.filter((p: any) => p.status === 'archived' || p.status === 'rejected' || p.status === 'superseded').length > 0 && (
+                    {/* Archived Proofs Display - Collapsible - Show superseded/rejected proofs (not for sample pack only orders) */}
+                    {!isSamplePackOnlyOrder(selectedOrder) && selectedOrder.proofs && selectedOrder.proofs.filter((p: any) => p.status === 'archived' || p.status === 'rejected' || p.status === 'superseded').length > 0 && (
                       <details className="glass-container p-6">
                         <summary className="flex items-center justify-between cursor-pointer -m-6 p-6">
                           <div className="flex items-center gap-3">
@@ -5350,6 +5265,35 @@ export default function AdminOrders() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                                 </svg>
                                 Mark as Shipped
+                              </button>
+                            )}
+
+                            {/* Mark as Ready for Pickup Button - Show for all orders if not already ready or delivered */}
+                            {selectedOrder.orderStatus !== 'Ready for Pickup' && selectedOrder.orderStatus !== 'Delivered' && 
+                             selectedOrder.fulfillmentStatus !== 'fulfilled' && (
+                              <button
+                                onClick={() => handleMarkAsReadyForPickup(selectedOrder.id)}
+                                disabled={markingReadyForPickup}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-lg text-white transition-all cursor-pointer hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.4) 0%, rgba(16, 185, 129, 0.25) 50%, rgba(16, 185, 129, 0.1) 100%)',
+                                  backdropFilter: 'blur(25px) saturate(180%)',
+                                  border: '1px solid rgba(16, 185, 129, 0.4)'
+                                }}
+                              >
+                                {markingReadyForPickup ? (
+                                  <>
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    Marking as Ready...
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                    </svg>
+                                    Mark as Ready for Pickup
+                                  </>
+                                )}
                               </button>
                             )}
 

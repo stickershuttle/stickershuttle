@@ -3095,6 +3095,42 @@ function Dashboard() {
                 {/* Stats - Grid Layout */}
                 <div className="grid grid-cols-1 gap-3">
 
+                  {/* Creator - Only show if user is a creator */}
+                  {creatorData?.getCreatorByUserId?.isActive && (
+                    <button 
+                      onClick={() => updateCurrentView('creator')}
+                      className={`block p-3 lg:p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden rounded-2xl ${
+                        currentView === 'creator' ? '' : ''
+                      }`}
+                      style={currentView === 'creator' ? {
+                        background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.4) 0%, rgba(168, 85, 247, 0.25) 50%, rgba(168, 85, 247, 0.1) 100%)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: '1px solid rgba(168, 85, 247, 0.4)',
+                        boxShadow: '0 4px 16px rgba(168, 85, 247, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                      } : {
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
+                      }}
+                    >
+                      <div className="flex items-center gap-2 lg:gap-3">
+                        <div className="p-1.5 lg:p-2 rounded-lg bg-transparent">
+                          <img 
+                            src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755176111/MarketspaceLogo_y4s7os.svg" 
+                            alt="Marketspace" 
+                            className="w-5 lg:w-7 h-5 lg:h-7 object-contain"
+                            style={{ filter: 'drop-shadow(0 4px 12px rgba(168, 85, 247, 0.15))' }}
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-semibold text-white text-xs lg:text-sm truncate">Creator</h4>
+                          <p className="text-xs text-gray-300">{creatorData?.getCreatorByUserId?.totalProducts || 0} products</p>
+                        </div>
+                      </div>
+                    </button>
+                  )}
+
                   <button 
                     onClick={() => updateCurrentView('all-orders')}
                     className={`block p-3 lg:p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden rounded-2xl ${
@@ -3219,40 +3255,6 @@ function Dashboard() {
                         <div className="min-w-0">
                           <h4 className="font-semibold text-white text-xs lg:text-sm truncate">Clients</h4>
                           <p className="text-xs text-gray-300">0 clients</p>
-                        </div>
-                      </div>
-                    </button>
-                  )}
-
-                  {/* Creator - Only show if user is a creator */}
-                  {creatorData?.getCreatorByUserId?.isActive && (
-                    <button 
-                      onClick={() => updateCurrentView('creator')}
-                      className={`block p-3 lg:p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 text-left w-full relative overflow-hidden rounded-2xl ${
-                        currentView === 'creator' ? '' : ''
-                      }`}
-                      style={currentView === 'creator' ? {
-                        background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.4) 0%, rgba(168, 85, 247, 0.25) 50%, rgba(168, 85, 247, 0.1) 100%)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: '1px solid rgba(168, 85, 247, 0.4)',
-                        boxShadow: '0 4px 16px rgba(168, 85, 247, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                      } : {
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                        backdropFilter: 'blur(12px)'
-                      }}
-                    >
-                      <div className="flex items-center gap-2 lg:gap-3">
-                        <div className="p-1.5 lg:p-2 rounded-lg bg-transparent">
-                          <svg className="w-5 lg:w-7 h-5 lg:h-7" fill="currentColor" viewBox="0 0 24 24"
-                               style={{ color: '#a855f7', filter: 'drop-shadow(0 4px 12px rgba(168, 85, 247, 0.15))' }}>
-                            <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-                          </svg>
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="font-semibold text-white text-xs lg:text-sm truncate">Creator</h4>
-                          <p className="text-xs text-gray-300">{creatorData?.getCreatorByUserId?.totalProducts || 0} products</p>
                         </div>
                       </div>
                     </button>

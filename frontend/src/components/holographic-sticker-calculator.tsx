@@ -43,6 +43,7 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
   const [selectedWhiteOption, setSelectedWhiteOption] = useState("color-only")
   const [sendProof, setSendProof] = useState(true)
   const [uploadLater, setUploadLater] = useState(false)
+  const [vibrancyBoost, setVibrancyBoost] = useState(false)
   // Use global rush order state from cart instead of local state
   const [totalPrice, setTotalPrice] = useState("")
   const [costPerSticker, setCostPerSticker] = useState("")
@@ -244,7 +245,7 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
     console.log(`Quantity: ${quantity}`)
 
     if (area > 0 && quantity >= 15) {
-      const { total, perSticker } = calculatePrice(quantity, area, isRushOrder)
+      const { total, perSticker } = calculatePrice(quantity, area, isRushOrder, vibrancyBoost)
       console.log(`Total Price: $${total.toFixed(2)}`)
       console.log(`Price Per Sticker: $${perSticker.toFixed(2)}`)
       setTotalPrice(`$${total.toFixed(2)}`)
@@ -254,7 +255,7 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
       setTotalPrice("")
       setCostPerSticker("")
     }
-  }, [selectedSize, customWidth, customHeight, selectedQuantity, customQuantity, selectedWhiteOption, isRushOrder])
+  }, [selectedSize, customWidth, customHeight, selectedQuantity, customQuantity, selectedWhiteOption, isRushOrder, vibrancyBoost])
 
   useEffect(() => {
     console.log("Recalculating price due to size or quantity change")
@@ -398,7 +399,7 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
     return area
   }
 
-  const calculatePrice = (qty: number, area: number, isRushOrderParam: boolean) => {
+  const calculatePrice = (qty: number, area: number, isRushOrderParam: boolean, vibrancyBoost: boolean = false) => {
     let totalPrice = 0
     let pricePerSticker = 0
 
@@ -424,10 +425,16 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
       
       // Apply 15% price increase for holographic stickers
       const holographicMultiplier = 1.15;
-      const adjustedTotal = realResult.totalPrice * whiteOptionMultiplier * holographicMultiplier;
-      const adjustedPerSticker = realResult.finalPricePerSticker * whiteOptionMultiplier * holographicMultiplier;
+      let adjustedTotal = realResult.totalPrice * whiteOptionMultiplier * holographicMultiplier;
+      let adjustedPerSticker = realResult.finalPricePerSticker * whiteOptionMultiplier * holographicMultiplier;
       
-      console.log(`Real Pricing - Quantity: ${qty}, Area: ${area}, White Option: ${selectedWhiteOption} (${whiteOptionMultiplier}x), Total: $${adjustedTotal.toFixed(2)}, Per sticker: $${adjustedPerSticker.toFixed(2)}`);
+      // Apply 5% vibrancy boost if selected
+      if (vibrancyBoost) {
+        adjustedTotal *= 1.05;
+        adjustedPerSticker *= 1.05;
+      }
+      
+      console.log(`Real Pricing - Quantity: ${qty}, Area: ${area}, White Option: ${selectedWhiteOption} (${whiteOptionMultiplier}x), Vibrancy: ${vibrancyBoost}, Total: $${adjustedTotal.toFixed(2)}, Per sticker: $${adjustedPerSticker.toFixed(2)}`);
       
       return {
         total: adjustedTotal,
@@ -479,8 +486,14 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
       pricePerSticker *= 1.4
     }
 
+    // Apply 5% vibrancy boost if selected
+    if (vibrancyBoost) {
+      totalPrice *= 1.05
+      pricePerSticker *= 1.05
+    }
+
     console.log(
-      `Legacy Pricing - Quantity: ${qty}, Area: ${area}, White Option: ${selectedWhiteOption} (${whiteOptionMultiplier}x), Total price: $${totalPrice.toFixed(2)}, Price per sticker: $${pricePerSticker.toFixed(2)}`,
+      `Legacy Pricing - Quantity: ${qty}, Area: ${area}, White Option: ${selectedWhiteOption} (${whiteOptionMultiplier}x), Vibrancy: ${vibrancyBoost}, Total price: $${totalPrice.toFixed(2)}, Price per sticker: $${pricePerSticker.toFixed(2)}`,
     )
 
     return {
@@ -588,8 +601,6 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
         sendProof,
         uploadLater,
         rushOrder: isRushOrder,
-        postToInstagram,
-        instagramHandle: instagramHandle || undefined,
         totalPrice: totalPrice || undefined,
         costPerSticker: costPerSticker || undefined,
         calculatedArea: area > 0 ? area : undefined
@@ -676,7 +687,7 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
   const createCartItem = () => {
     const area = calculateArea(selectedSize, customWidth, customHeight);
     const quantity = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity);
-    const { total, perSticker } = calculatePrice(quantity, area, isRushOrder);
+    const { total, perSticker } = calculatePrice(quantity, area, isRushOrder, vibrancyBoost);
 
     return {
       id: generateCartItemId(),
@@ -709,31 +720,24 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
             displayValue: selectedSize === "Custom size" ? `${customWidth}"x${customHeight}"` : selectedSize,
             priceImpact: 0 
           },
-          whiteOption: { 
+                    whiteOption: { 
             type: "white-base" as const, 
             value: selectedWhiteOption, 
             displayValue: selectedWhiteOption === "color-only" ? "Color Only" : 
                          selectedWhiteOption === "partial-white" ? "Partial White Ink" : 
                          selectedWhiteOption === "full-white" ? "Full White Ink" : selectedWhiteOption, 
-            priceImpact: 0 
+            priceImpact: 0
           },
+          vibrancy: { type: "addon" as const, value: vibrancyBoost, displayValue: vibrancyBoost ? "+25% Vibrancy" : "Standard", priceImpact: vibrancyBoost ? total * 0.05 : 0 },
           proof: { type: "finish" as const, value: sendProof, displayValue: sendProof ? "Send Proof" : "No Proof", priceImpact: 0 },
           rush: { type: "finish" as const, value: isRushOrder, displayValue: isRushOrder ? "Rush Order" : "Standard", priceImpact: isRushOrder ? total * 0.4 : 0 },
-          ...(postToInstagram && {
-            instagram: { 
-              type: "finish" as const, 
-              value: instagramHandle, 
-              displayValue: instagramHandle ? `@${instagramHandle}` : "Instagram Opt-in", 
-              priceImpact: 0 
-            }
-          })
+
         },
         totalPrice: total,
         customFiles: uploadedFile ? [uploadedFile.secure_url] : [],
         notes: additionalNotes.trim(),
-        instagramOptIn: postToInstagram,
+        instagramOptIn: false, // No longer about posting, just collecting handle
         additionalInfo: {
-          instagramHandle: postToInstagram ? instagramHandle : undefined,
           uploadLater: uploadLater
         }
       },
@@ -792,6 +796,31 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
     50% { transform: translateY(-3px); }
   }
   
+  @keyframes subtle-pulse {
+    0%, 100% { 
+      box-shadow: 0 0 0 0 rgba(147, 51, 234, 0);
+    }
+    50% { 
+      box-shadow: 0 0 20px 2px rgba(147, 51, 234, 0.15);
+    }
+  }
+  
+  @keyframes bounce-toward-upload {
+    0%, 100% { 
+      transform: translate(0, 0) rotate(45deg);
+    }
+    50% { 
+      transform: translate(8px, 8px) rotate(45deg);
+    }
+  }
+  
+  .animate-subtle-pulse {
+    animation: subtle-pulse 3s ease-in-out infinite;
+  }
+  
+  .animate-bounce-toward-upload {
+    animation: bounce-toward-upload 1.5s ease-in-out infinite;
+  }
 
   
   .animate-bounce-in {
@@ -803,27 +832,27 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
   }
   
   .animate-glow-purple {
-    box-shadow: 0 0 15px rgba(168, 85, 247, 0.4), 0 0 25px rgba(168, 85, 247, 0.2);
+    box-shadow: 0 0 7px rgba(168, 85, 247, 0.2), 0 0 12px rgba(168, 85, 247, 0.1);
   }
   
   .animate-glow-green {
-    box-shadow: 0 0 15px rgba(34, 197, 94, 0.4), 0 0 25px rgba(34, 197, 94, 0.2);
+    box-shadow: 0 0 7px rgba(34, 197, 94, 0.2), 0 0 12px rgba(34, 197, 94, 0.1);
   }
   
   .animate-glow-yellow {
-    box-shadow: 0 0 15px rgba(234, 179, 8, 0.4), 0 0 25px rgba(234, 179, 8, 0.2);
+    box-shadow: 0 0 7px rgba(234, 179, 8, 0.2), 0 0 12px rgba(234, 179, 8, 0.1);
   }
   
   .animate-glow-red {
-    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4), 0 0 25px rgba(239, 68, 68, 0.2);
+    box-shadow: 0 0 7px rgba(239, 68, 68, 0.2), 0 0 12px rgba(239, 68, 68, 0.1);
   }
 
   .animate-glow-blue {
-    box-shadow: 0 0 15px rgba(59, 130, 246, 0.4), 0 0 25px rgba(59, 130, 246, 0.2);
+    box-shadow: 0 0 7px rgba(59, 130, 246, 0.2), 0 0 12px rgba(59, 130, 246, 0.1);
   }
   
   .animate-glow-orange {
-    box-shadow: 0 0 15px rgba(249, 115, 22, 0.4), 0 0 25px rgba(249, 115, 22, 0.2);
+    box-shadow: 0 0 7px rgba(249, 115, 22, 0.2), 0 0 12px rgba(249, 115, 22, 0.1);
   }
 
   .container-style {
@@ -873,13 +902,16 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                     className={`button-interactive relative w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 transition-all border backdrop-blur-md
                       ${
                         selectedCut === cut
-                          ? "bg-purple-500/20 text-purple-200 font-medium border-purple-400/50 button-selected animate-glow-purple"
-                          : "hover:bg-white/10 border-white/20 text-white/80"
+                          ? "bg-purple-500/20 text-purple-200 font-medium button-selected animate-glow-purple"
+                          : "border-2 border-dashed border-purple-400/50 opacity-65 hover:border-purple-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
                       }`}
+                    style={{
+                      border: selectedCut === cut ? '1.5px solid rgba(168, 85, 247, 0.5)' : undefined
+                    }}
                   >
                     {cut}
                     {cut === "Custom Shape" && (
-                      <span className="absolute top-1 right-2 text-[10px] text-purple-300 font-medium">Most Popular</span>
+                      <span className="absolute top-1 right-2 text-[10px] text-purple-300 font-medium">Popular</span>
                     )}
                   </button>
                 ))}
@@ -895,21 +927,24 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                 Material
               </h2>
               <div className="space-y-3">
-                {["Matte", "Gloss", "Shimmer Gloss"].map((material) => (
+                {["Matte", "Gloss"].map((material) => (
                   <button
                     key={material}
                     onClick={() => setSelectedMaterial(material)}
                     className={`button-interactive relative w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 transition-all border backdrop-blur-md
                       ${
                         selectedMaterial === material
-                          ? "bg-green-500/20 text-green-200 font-medium border-green-400/50 button-selected animate-glow-green"
-                          : "hover:bg-white/10 border-white/20 text-white/80"
+                          ? "bg-green-500/20 text-green-200 font-medium button-selected animate-glow-green"
+                          : "border-2 border-dashed border-green-400/50 opacity-65 hover:border-green-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
                       }`}
+                    style={{
+                      border: selectedMaterial === material ? '1.5px solid rgba(34, 197, 94, 0.5)' : undefined
+                    }}
                   >
                     {material}
                     {material === "Matte" && (
                       <span className="absolute top-1 right-2 text-[10px] text-green-300 font-medium">
-                        Most Popular
+                        Popular
                       </span>
                     )}
                   </button>
@@ -925,27 +960,106 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                 </span>
                 Select a size
               </h2>
-              <div className="space-y-3">
-                {['Small (2")', 'Medium (3")', 'Large (4")', 'X-Large (5")', "Custom size"].map((size) => (
+              
+              {/* Two-column size grid for preset sizes */}
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                {['Small (2")', 'Medium (3")', 'Large (4")', 'X-Large (5")'].map((size) => (
                   <button
                     key={size}
                     onClick={() => handleSizeChange(size)}
-                    className={`button-interactive relative w-full text-left px-4 py-3 rounded-xl flex items-center justify-between transition-all border backdrop-blur-md
+                    className={`button-interactive relative text-center px-3 py-4 rounded-xl flex items-center justify-center transition-all border backdrop-blur-md
                       ${
                         selectedSize === size
-                          ? "bg-purple-500/20 text-purple-200 font-medium border-purple-400/50 button-selected animate-glow-purple"
-                          : "hover:bg-white/10 border-white/20 text-white/80"
+                          ? "bg-purple-500/20 text-purple-200 font-medium button-selected animate-glow-purple"
+                          : "border-2 border-dashed border-purple-400/50 opacity-65 hover:border-purple-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
                       }`}
+                    style={{
+                      border: selectedSize === size ? '1.5px solid rgba(168, 85, 247, 0.5)' : undefined
+                    }}
                   >
-                    <span>{size}</span>
+                    <span className="text-sm font-medium">{size}</span>
                     {size === 'Medium (3")' && (
-                      <span className="absolute top-1 right-2 text-[10px] text-purple-300 font-medium">
-                        Most Popular
+                      <span className="absolute top-1 right-1 text-[8px] text-purple-300 font-medium">
+                        Popular
                       </span>
                     )}
                   </button>
                 ))}
               </div>
+              
+              {/* Custom size option - separate from grid */}
+              <button
+                onClick={() => handleSizeChange("Custom size")}
+                className={`button-interactive relative w-full text-left px-4 py-3 rounded-xl flex items-center justify-between transition-all border backdrop-blur-md
+                  ${
+                    selectedSize === "Custom size"
+                      ? "bg-purple-500/20 text-purple-200 font-medium button-selected animate-glow-purple"
+                      : "border-2 border-dashed border-purple-400/50 opacity-65 hover:border-purple-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
+                  }`}
+                style={{
+                  border: selectedSize === "Custom size" ? '1.5px solid rgba(168, 85, 247, 0.5)' : undefined
+                }}
+              >
+                <span>Custom size</span>
+              </button>
+              
+              {/* Custom Size Input and Popular Sizes - only show when custom size is selected */}
+              {selectedSize === "Custom size" && (
+                <div className="mt-3 space-y-4">
+                  {/* Custom Size Input Fields */}
+                  <div className="space-y-2">
+                    <div className="flex gap-3">
+                      <input
+                        type="number"
+                        placeholder="W"
+                        value={customWidth}
+                        onChange={(e) => handleCustomSizeChange("width", e.target.value)}
+                        max={user?.email === 'justin@stickershuttle.com' ? "50" : "14"}
+                        step="0.1"
+                        className="w-1/2 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <input
+                        type="number"
+                        placeholder="H"
+                        value={customHeight}
+                        onChange={(e) => handleCustomSizeChange("height", e.target.value)}
+                        max={user?.email === 'justin@stickershuttle.com' ? "50" : "14"}
+                        step="0.1"
+                        className="w-1/2 px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/60 focus:outline-none focus:border-purple-400 backdrop-blur-md button-interactive [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                    {showSizeWarning && (
+                      <div className="text-xs text-orange-300 font-medium">
+                        📏 Size must be between 0.5" and {user?.email === 'justin@stickershuttle.com' ? "50" : "14"}". Please enter a valid size.
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Other Popular Sizes */}
+                  <div>
+                    <h3 className="text-xs font-semibold text-white/80 uppercase tracking-wider mb-2">Other popular sizes:</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { label: '5.5"', width: '5.5', height: '5.5' },
+                        { label: '11" × 3"', width: '11', height: '3' },
+                        { label: '3" × 2"', width: '3', height: '2' },
+                        { label: '4" × 3"', width: '4', height: '3' }
+                      ].map(({ label, width, height }) => (
+                        <button
+                          key={label}
+                          onClick={() => {
+                            setCustomWidth(width);
+                            setCustomHeight(height);
+                          }}
+                          className="button-interactive px-3 py-2 rounded-lg text-xs font-medium transition-all border backdrop-blur-md text-center hover:bg-white/10 border-white/20 text-white/80"
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
               {selectedSize === "Custom size" && (
                 <div className="mt-3 space-y-2">
                   <div className="flex gap-3">
@@ -991,9 +1105,12 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                   className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
                     ${
                       selectedWhiteOption === "color-only"
-                        ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
-                        : "hover:bg-white/10 border-white/20 text-white/80"
+                        ? "bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue"
+                        : "border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
                     }`}
+                  style={{
+                    border: selectedWhiteOption === "color-only" ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
+                  }}
                 >
                   <div className="flex items-center mb-2">
                     <div className="text-2xl mr-3">🎨</div>
@@ -1018,9 +1135,12 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                   className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
                     ${
                       selectedWhiteOption === "partial-white"
-                        ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
-                        : "hover:bg-white/10 border-white/20 text-white/80"
+                        ? "bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue"
+                        : "border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
                     }`}
+                  style={{
+                    border: selectedWhiteOption === "partial-white" ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
+                  }}
                 >
                   <div className="flex items-center mb-2">
                     <div className="text-2xl mr-3">👩‍🦳</div>
@@ -1045,9 +1165,12 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                   className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
                     ${
                       selectedWhiteOption === "full-white"
-                        ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
-                        : "hover:bg-white/10 border-white/20 text-white/80"
+                        ? "bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue"
+                        : "border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
                     }`}
+                  style={{
+                    border: selectedWhiteOption === "full-white" ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
+                  }}
                 >
                   <div className="flex items-center mb-2">
                     <div className="text-2xl mr-3">⚪</div>
@@ -1156,13 +1279,17 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                           ${
                             isSelected
                               ? isGoldTier
-                                ? "bg-gradient-to-r from-yellow-500/30 via-amber-400/30 to-yellow-600/30 text-yellow-100 font-medium border-yellow-400/60 button-selected shadow-lg shadow-yellow-500/20"
-                                : "bg-green-500/20 text-green-200 font-medium border-green-400/50 button-selected animate-glow-green"
+                                ? "bg-gradient-to-r from-yellow-500/30 via-amber-400/30 to-yellow-600/30 text-yellow-100 font-medium button-selected shadow-lg shadow-yellow-500/20"
+                                : "bg-green-500/20 text-green-200 font-medium button-selected animate-glow-green"
                               : isGoldTier && hoveredGoldTier === numericAmount
                                 ? "bg-gradient-to-r from-yellow-500/20 via-amber-400/20 to-yellow-600/20 text-yellow-100 border-yellow-400/40 shadow-lg shadow-yellow-500/10"
-                                : "hover:bg-white/10 border-white/20 text-white/80"
+                                : "border-2 border-dashed border-green-400/50 opacity-65 hover:border-green-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
                           }
                         `}
+                        style={{
+                          border: isSelected && !isGoldTier ? '1.5px solid rgba(34, 197, 94, 0.5)' : 
+                                  isSelected && isGoldTier ? '1.5px solid rgba(234, 179, 8, 0.6)' : undefined
+                        }}
                       >
                         <div className="flex items-center gap-3">
                           <span className="font-medium">{amount}</span>
@@ -1500,9 +1627,12 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                   className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
                     ${
                       selectedWhiteOption === "color-only"
-                        ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
-                        : "hover:bg-white/10 border-white/20 text-white/80"
+                        ? "bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue"
+                        : "border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
                     }`}
+                  style={{
+                    border: selectedWhiteOption === "color-only" ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
+                  }}
                 >
                   <div className="flex items-center mb-2">
                     <div className="text-2xl mr-3">🎨</div>
@@ -1527,9 +1657,12 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                   className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
                     ${
                       selectedWhiteOption === "partial-white"
-                        ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
-                        : "hover:bg-white/10 border-white/20 text-white/80"
+                        ? "bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue"
+                        : "border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
                     }`}
+                  style={{
+                    border: selectedWhiteOption === "partial-white" ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
+                  }}
                 >
                   <div className="flex items-center mb-2">
                     <div className="text-2xl mr-3">👩‍🦳</div>
@@ -1554,9 +1687,12 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                   className={`button-interactive relative text-left px-4 py-4 rounded-xl transition-all border backdrop-blur-md
                     ${
                       selectedWhiteOption === "full-white"
-                        ? "bg-blue-500/20 text-blue-200 font-medium border-blue-400/50 button-selected animate-glow-blue"
-                        : "hover:bg-white/10 border-white/20 text-white/80"
+                        ? "bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue"
+                        : "border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70"
                     }`}
+                  style={{
+                    border: selectedWhiteOption === "full-white" ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
+                  }}
                 >
                   <div className="flex items-center mb-2">
                     <div className="text-2xl mr-3">⚪</div>
@@ -1580,13 +1716,215 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
             </div>
           </div>
 
+
+
           {/* Bottom Section */}
           <div className="mb-4 lg:mb-6">
             {/* Single Wide Container for Artwork Upload, Additional Instructions, and Proof Options */}
-            <div className="container-style p-4 lg:p-6 transition-colors duration-200">
+              <div id="upload" className="container-style p-4 lg:p-6 transition-colors duration-200">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left Column - Artwork Upload & Additional Instructions */}
-                <div>
+                {/* Left Column - Options */}
+                <div className="space-y-4 flex flex-col">
+                  {/* Four Column Option Containers */}
+                  <div className="grid grid-cols-4 gap-3">
+                    {/* Skip Proofing */}
+                    <button
+                      onClick={() => setSendProof(!sendProof)}
+                      className={`group relative text-center p-3 rounded-xl transition-all duration-200 overflow-hidden ${
+                        !sendProof
+                          ? 'bg-red-500/20 text-red-200 font-medium button-selected animate-glow-red'
+                          : 'border-2 border-dashed border-red-400/50 opacity-65 hover:border-red-400/70 hover:bg-white/5 hover:opacity-80 text-white/70'
+                      }`}
+                      style={{
+                        border: !sendProof ? '1.5px solid rgba(239, 68, 68, 0.5)' : undefined
+                      }}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <span className="text-xl">❌</span>
+                        <span className={`text-xs font-medium ${!sendProof ? 'text-red-200' : 'text-white/60'}`}>
+                          Skip proofing
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Rush Order */}
+                    <button
+                      onClick={() => updateAllItemsRushOrder(!isRushOrder)}
+                      className={`group relative text-center p-3 rounded-xl transition-all duration-200 overflow-hidden ${
+                        isRushOrder
+                          ? 'bg-orange-500/20 text-orange-200 font-medium button-selected animate-glow-orange'
+                          : 'border-2 border-dashed border-orange-400/50 opacity-65 hover:border-orange-400/70 hover:bg-white/5 hover:opacity-80 text-white/70'
+                      }`}
+                      style={{
+                        border: isRushOrder ? '1.5px solid rgba(249, 115, 22, 0.5)' : undefined
+                      }}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <span className="text-xl">🚀</span>
+                        <span className={`text-xs font-medium ${isRushOrder ? 'text-orange-200' : 'text-white/60'}`}>
+                          Rush order
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* +25% Vibrancy */}
+                    <button
+                      onClick={() => setVibrancyBoost(!vibrancyBoost)}
+                      className={`group relative text-center p-3 rounded-xl transition-all duration-200 overflow-hidden ${
+                        vibrancyBoost
+                          ? 'bg-purple-500/20 text-purple-200 font-medium button-selected animate-glow-purple'
+                          : 'border-2 border-dashed border-purple-400/50 opacity-65 hover:border-purple-400/70 hover:bg-white/5 hover:opacity-80 text-white/70'
+                      }`}
+                      style={{
+                        border: vibrancyBoost ? '1.5px solid rgba(168, 85, 247, 0.5)' : undefined,
+                        backdropFilter: 'blur(12px)'
+                      }}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <span className="text-xl">🎨</span>
+                        <span className={`text-xs font-medium ${vibrancyBoost ? 'text-purple-200' : 'text-white/60'}`}>
+                          +25% Vibrancy
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Upload Later */}
+                    <button
+                      onClick={() => setUploadLater(!uploadLater)}
+                      disabled={!!uploadedFile}
+                      className={`group relative text-center p-3 rounded-xl transition-all duration-200 overflow-hidden ${
+                        uploadLater
+                          ? 'bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue'
+                          : 'border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70'
+                      } ${uploadedFile ? 'opacity-25 cursor-not-allowed' : ''}`}
+                      style={{
+                        border: uploadLater ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
+                      }}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <span className="text-xl">📤</span>
+                        <span className={`text-xs font-medium ${uploadLater ? 'text-blue-200' : uploadedFile ? 'text-white/30' : 'text-white/60'}`}>
+                          Upload later
+                        </span>
+                      </div>
+                    </button>
+                  </div>
+                  
+                  {/* Rush Order Disclaimer */}
+                  {isRushOrder && (
+                    <div className="mt-3 space-y-2">
+                      <div className="text-xs text-orange-300 font-medium flex items-center gap-2">
+                        <span>⚡</span>
+                        <span>Rush order is now active for ALL items in your cart (+40% to each item)</span>
+                      </div>
+                      <div className="text-xs text-white/70 leading-relaxed">
+                        *Rush Orders are prioritized in our production queue and completed within 24 hours. Orders under 3,000 stickers are usually completed on time. If you have a tight deadline or specific concerns, feel free to contact us.
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Vibrancy Boost Disclaimer */}
+                  {vibrancyBoost && (
+                    <div className="mt-3 space-y-2">
+                      <div className="text-xs text-purple-300 font-medium flex items-center gap-2">
+                        <span>🎨</span>
+                        <span>+25% Vibrancy enhancement is active (+5% to total price)</span>
+                      </div>
+                      <div className="text-xs text-white/70 leading-relaxed">
+                        *Vibrancy enhancement uses advanced color saturation techniques to make colors more vivid and vibrant. Returns due to color accuracy differences are not eligible when this option is selected.
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Skip Proofing Info */}
+                  {!sendProof && (
+                    <div className="text-sm text-red-200/80">
+                      <p>Your order will proceed directly to production without proof approval. This speeds up delivery time.</p>
+                    </div>
+                  )}
+                  
+                  {/* Upload Later Info */}
+                  {uploadLater && !uploadedFile && (
+                    <div className="text-sm text-blue-200/80 flex items-center">
+                      <span role="img" aria-label="caution" className="mr-2">
+                        ⚠️
+                      </span>
+                      Note: Please try to have your artwork submitted within 48hrs of placing an order.
+                    </div>
+                  )}
+
+                  {/* Additional Instructions Section */}
+                  <div className="flex-grow flex flex-col">
+                    <div className={`p-3 rounded-xl backdrop-blur-md transition-all duration-200 flex flex-col flex-grow ${
+                      additionalNotes 
+                        ? '' 
+                                                  : 'border-2 border-dashed border-gray-400/50 opacity-65'
+                    } hover:opacity-80`}
+                         style={{
+                           background: additionalNotes 
+                             ? 'rgba(255, 255, 255, 0.05)' 
+                             : 'transparent',
+                           border: additionalNotes 
+                             ? '1px solid rgba(255, 255, 255, 0.1)' 
+                             : undefined,
+                           boxShadow: additionalNotes 
+                             ? 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
+                             : undefined,
+                           backdropFilter: additionalNotes ? 'blur(12px)' : 'blur(12px)'
+                         }}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-lg">✏️</span>
+                        <span className={`text-sm font-medium ${additionalNotes ? 'text-white' : 'text-white/60'}`}>
+                          Additional Instructions (optional)
+                        </span>
+                      </div>
+                      <textarea
+                        value={additionalNotes}
+                        onChange={(e) => {
+                          setAdditionalNotes(e.target.value);
+                          // Auto-expand functionality
+                          setTimeout(() => {
+                            e.target.style.height = 'auto';
+                            e.target.style.height = Math.max(50, e.target.scrollHeight) + 'px';
+                          }, 0);
+                        }}
+                        className="w-full flex-grow rounded-xl border-0 p-3 resize-none bg-transparent text-white placeholder-white/60 focus:outline-none transition-all appearance-none overflow-hidden"
+                        placeholder={isMobile ? "Enter any special requests or instructions..." : "Enter any special requests or instructions here..."}
+                        style={{ 
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'none',
+                          minHeight: '50px',
+                          lineHeight: '1.4'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column - Artwork Upload */}
+                <div className="relative">
+      
+                  
+                  {/* Arrow pointing to upload - only show when pricing is calculated and no file uploaded */}
+                  {totalPrice && !uploadedFile && (
+                    <div className="absolute -top-8 -left-8 z-10 animate-bounce-toward-upload">
+                      <div className="flex items-center gap-1 text-purple-300">
+                        <svg 
+                          className="w-10 h-10" 
+                          fill="none" 
+                          viewBox="0 0 24 24" 
+                          stroke="currentColor"
+                        >
+                          <path 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round" 
+                            strokeWidth={2.5} 
+                            d="M17 8l4 4m0 0l-4 4m4-4H3" 
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
       
                   
                   {/* Hidden file input - always present */}
@@ -1601,7 +1939,7 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
 
                   {!uploadedFile ? (
                     <div 
-                      className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative"
+                      className={`border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-purple-400 transition-colors cursor-pointer backdrop-blur-md relative ${totalPrice ? 'animate-subtle-pulse' : ''}`}
                       onDrop={handleDrop}
                       onDragOver={handleDragOver}
                       onClick={() => document.getElementById('file-input')?.click()}
@@ -1639,7 +1977,10 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                       )}
                     </div>
                   ) : (
-                    <div className="border border-green-400/50 rounded-xl p-4 bg-green-500/10 backdrop-blur-md">
+                    <div className="rounded-xl p-8 bg-green-500/20 backdrop-blur-md animate-glow-green"
+                         style={{
+                           border: '1.5px solid rgba(34, 197, 94, 0.5)'
+                         }}>
                       {/* Responsive Layout: Vertical on mobile, Horizontal on desktop */}
                       <div className="flex flex-col md:flex-row gap-4 items-start">
                         {/* Image Preview - Full width on mobile, fixed size on desktop */}
@@ -1734,243 +2075,14 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                     </div>
                   )}
                   
-                  {!uploadedFile && (
-                    <div className="mt-4 flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
-                         style={{
-                           background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
-                           border: '1px solid rgba(147, 51, 234, 0.4)',
-                           backdropFilter: 'blur(12px)'
-                         }}>
-                      <button
-                        onClick={() => setUploadLater(!uploadLater)}
-                        disabled={!!uploadedFile}
-                        title={uploadLater ? "Disable upload later" : "Enable upload later"}
-                        className={`w-12 h-6 rounded-full transition-colors ${
-                          uploadLater ? 'bg-purple-500' : 'bg-white/20'
-                        } ${uploadedFile ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                          uploadLater ? 'translate-x-7' : 'translate-x-1'
-                        }`} />
-                      </button>
-                      <label className={`text-sm font-medium ${uploadedFile ? 'text-white/50' : 'text-purple-200'}`}>
-                        Upload Artwork Later
-                      </label>
-                    </div>
-                  )}
-                  {uploadLater && !uploadedFile && (
-                    <div className="mt-2 text-white/80 text-sm italic flex items-center">
-                      <span role="img" aria-label="caution" className="mr-1">
-                        ⚠️
-                      </span>
-                      Note: Please try to have your artwork submitted within 48hrs of placing an order.
-                    </div>
-                  )}
                 </div>
 
-                {/* Right Column - Options */}
-                <div className="space-y-4">
-                  {/* Proof Options */}
-                  <div>
 
-                    
-                    {/* Proof Toggle */}
-                    <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
-                         style={{
-                           background: sendProof 
-                             ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(34, 197, 94, 0.15) 50%, rgba(34, 197, 94, 0.05) 100%)'
-                             : 'linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(239, 68, 68, 0.15) 50%, rgba(239, 68, 68, 0.05) 100%)',
-                           border: sendProof 
-                             ? '1px solid rgba(34, 197, 94, 0.4)'
-                             : '1px solid rgba(239, 68, 68, 0.4)',
-                           backdropFilter: 'blur(12px)'
-                         }}>
-                      <button
-                        onClick={() => setSendProof(!sendProof)}
-                        title={sendProof ? "Don't send proof" : "Send free proof"}
-                        className={`w-12 h-6 rounded-full transition-colors ${
-                          sendProof ? 'bg-green-500' : 'bg-red-500'
-                        }`}
-                      >
-                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                          sendProof ? 'translate-x-7' : 'translate-x-1'
-                        }`} />
-                      </button>
-                      <label className={`text-sm font-medium ${sendProof ? 'text-green-200' : 'text-red-200'}`}>
-                        {sendProof ? '✅ Send FREE Proof' : '❌ Don\'t Send Proof'}
-                      </label>
-                    </div>
-                    
-                    {!sendProof && (
-                      <div className="mt-4 text-sm text-red-200/80">
-                        <p>Your order will proceed directly to production without proof approval. This speeds up delivery time.</p>
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Rush Order Toggle */}
-                  <div>
-                    <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium relative"
-                         style={{
-                           background: isRushOrder 
-                             ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(239, 68, 68, 0.15) 50%, rgba(239, 68, 68, 0.05) 100%)'
-                             : 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.15) 50%, rgba(59, 130, 246, 0.05) 100%)',
-                           border: isRushOrder 
-                             ? '1px solid rgba(239, 68, 68, 0.4)'
-                             : '1px solid rgba(59, 130, 246, 0.4)',
-                           backdropFilter: 'blur(12px)'
-                         }}>
-                      <button
-                        onClick={() => updateAllItemsRushOrder(!isRushOrder)}
-                        title={isRushOrder ? "Disable rush order for all cart items" : "Enable rush order for all cart items"}
-                        className={`w-12 h-6 rounded-full transition-colors ${
-                          isRushOrder ? 'bg-red-500' : 'bg-blue-500'
-                        }`}
-                      >
-                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                          isRushOrder ? 'translate-x-7' : 'translate-x-1'
-                        }`} />
-                      </button>
-                      <div className="flex-1">
-                        <label className={`text-sm font-medium ${isRushOrder ? 'text-red-200' : 'text-blue-200'}`}>
-                          {isRushOrder ? '🚀 Rush Order (+40%)' : '🕒 Standard Production Time'}
-                        </label>
-                        {isRushOrder && (
-                          <div className="text-xs text-orange-200 mt-1 font-medium">
-                            🛒 Applied to entire cart
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Rush Order Disclaimer - right under rush order toggle */}
-                    {isRushOrder && (
-                      <div className="mt-3 space-y-2">
-                        <div className="text-xs text-orange-300 font-medium flex items-center gap-2">
-                          <span>⚡</span>
-                          <span>Rush order is now active for ALL items in your cart (+40% to each item)</span>
-                        </div>
-                        <div className="text-xs text-white/70 leading-relaxed">
-                          *Rush Orders are prioritized in our production queue and completed within 24 hours. Orders under 3,000 stickers are usually completed on time. If you have a tight deadline or specific concerns, feel free to contact us.
-                        </div>
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Instagram Post Option */}
-                  <div>
-                    <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
-                         style={{
-                           background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
-                           border: '1px solid rgba(147, 51, 234, 0.4)',
-                           backdropFilter: 'blur(12px)'
-                         }}>
-                      <button
-                        onClick={() => setPostToInstagram(!postToInstagram)}
-                        title={postToInstagram ? "Disable Instagram posting" : "Enable Instagram posting"}
-                        className={`w-12 h-6 rounded-full transition-colors ${
-                          postToInstagram ? 'bg-purple-500' : 'bg-white/20'
-                        }`}
-                      >
-                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                          postToInstagram ? 'translate-x-7' : 'translate-x-1'
-                        }`} />
-                      </button>
-                      <Instagram className="h-5 w-5 text-purple-400" />
-                      <label className="text-sm font-medium text-purple-200">
-                        Post this order to Instagram
-                      </label>
-                      <div className="relative info-tooltip-container">
-                        <span 
-                          className="text-purple-300 cursor-pointer text-sm font-medium select-none hover:text-purple-200 transition-colors"
-                          onClick={() => setShowInfoTooltip(!showInfoTooltip)}
-                        >
-                          ⓘ
-                        </span>
-                        {showInfoTooltip && (
-                          <div className="absolute right-0 sm:left-1/2 sm:-translate-x-1/2 bottom-full mb-2 z-50 w-72 sm:w-64">
-                            <div className="text-white text-xs rounded-lg px-3 py-2 whitespace-normal" style={{
-                              background: 'rgba(30, 41, 59, 0.95)',
-                              border: '1px solid rgba(255, 255, 255, 0.2)',
-                              boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                              backdropFilter: 'blur(12px)'
-                            }}>
-                              We may still post your order on Instagram even if not selected, put in the notes below if you explicitly don't want us to post your order.
-                              <div className="absolute top-full right-4 sm:left-1/2 sm:-translate-x-1/2 border-4 border-transparent border-t-slate-700"></div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Instagram handle input - right under Instagram toggle */}
-                    {postToInstagram && (
-                      <div className="mt-3 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-white text-xl">@</span>
-                          <div className="flex-grow p-3 rounded-lg backdrop-blur-md"
-                               style={{
-                                 background: 'rgba(255, 255, 255, 0.05)',
-                                 border: '1px solid rgba(255, 255, 255, 0.1)',
-                                 boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
-                               }}>
-                            <input
-                              type="text"
-                              placeholder="Enter your Instagram handle"
-                              value={instagramHandle}
-                              onChange={(e) => setInstagramHandle(e.target.value)}
-                              className="w-full bg-transparent text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-purple-400/50 transition-all border-0"
-                            />
-                          </div>
-                        </div>
-                        <div className="text-xs text-white/70 italic">
-                          You are opting in to let Sticker Shuttle post and tag you in the making of your stickers on their Instagram.
-                        </div>
-                        <div className="text-xs">
-                          <a 
-                            href="https://www.instagram.com/stickershuttle/" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-purple-300 hover:text-purple-200 underline"
-                          >
-                            Follow @stickershuttle • 24.9k followers
-                          </a>
-                        </div>
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Additional Instructions Section - moved here */}
-                  <div>
-                    <div className="p-3 rounded-xl backdrop-blur-md"
-                         style={{
-                           background: 'rgba(255, 255, 255, 0.05)',
-                           border: '1px solid rgba(255, 255, 255, 0.1)',
-                           boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset'
-                         }}>
-                      <textarea
-                        value={additionalNotes}
-                        onChange={(e) => {
-                          setAdditionalNotes(e.target.value);
-                          // Auto-expand functionality
-                          setTimeout(() => {
-                            e.target.style.height = 'auto';
-                            e.target.style.height = Math.max(50, e.target.scrollHeight) + 'px';
-                          }, 0);
-                        }}
-                        className="w-full min-h-[50px] rounded-xl border-0 p-3 resize-none bg-transparent text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-purple-400/50 transition-all appearance-none overflow-hidden"
-                        placeholder={isMobile ? "Additional instructions here..." : "Enter any additional instructions here..."}
-                        style={{ 
-                          WebkitAppearance: 'none',
-                          MozAppearance: 'none',
-                          height: additionalNotes ? 'auto' : '50px',
-                          minHeight: '50px',
-                          lineHeight: '1.4'
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
+
+
               </div>
             </div>
           </div>

@@ -174,9 +174,149 @@ class StripeClient {
         sessionConfig.customer_email = orderData.customerEmail;
       }
 
-      const session = await this.stripe.checkout.sessions.create({
-        ...sessionConfig,
-        shipping_options: [
+      // Determine shipping options based on product type
+      let shippingOptions;
+      
+      if (orderData.hasMarketplaceProducts) {
+        // Market Space products: Auto-select USPS First-Class for 10+ items
+        const marketplaceQty = orderData.marketplaceProductQuantity || 0;
+        const shouldAutoSelectFirstClass = marketplaceQty >= 10;
+        
+        console.log(`🏪 Market Space products detected - using market space shipping options (${marketplaceQty} items${shouldAutoSelectFirstClass ? ', auto-selecting First-Class' : ''})`);
+        
+        if (shouldAutoSelectFirstClass) {
+          // For 10+ items: Put USPS First-Class first (auto-selected), then other options
+          shippingOptions = [
+            {
+              shipping_rate_data: {
+                type: 'fixed_amount',
+                fixed_amount: {
+                  amount: 400, // $4.00
+                  currency: 'usd',
+                },
+                display_name: 'USPS First-Class (Recommended for 10+ Items)',
+                delivery_estimate: {
+                  minimum: {
+                    unit: 'business_day',
+                    value: 1,
+                  },
+                  maximum: {
+                    unit: 'business_day',
+                    value: 3,
+                  },
+                },
+              },
+            },
+            {
+              shipping_rate_data: {
+                type: 'fixed_amount',
+                fixed_amount: {
+                  amount: 0, // Free shipping
+                  currency: 'usd',
+                },
+                display_name: 'USPS Stamp (No Tracking)',
+                delivery_estimate: {
+                  minimum: {
+                    unit: 'business_day',
+                    value: 3,
+                  },
+                  maximum: {
+                    unit: 'business_day',
+                    value: 7,
+                  },
+                },
+              },
+            },
+            {
+              shipping_rate_data: {
+                type: 'fixed_amount',
+                fixed_amount: {
+                  amount: 800, // $8.00 upgrade
+                  currency: 'usd',
+                },
+                display_name: 'UPS Ground (Tracking Included)',
+                delivery_estimate: {
+                  minimum: {
+                    unit: 'business_day',
+                    value: 2,
+                  },
+                  maximum: {
+                    unit: 'business_day',
+                    value: 5,
+                  },
+                },
+              },
+            },
+          ];
+        } else {
+          // For <10 items: Standard order with free USPS Stamp first
+          shippingOptions = [
+            {
+              shipping_rate_data: {
+                type: 'fixed_amount',
+                fixed_amount: {
+                  amount: 0, // Free shipping
+                  currency: 'usd',
+                },
+                display_name: 'USPS Stamp (No Tracking)',
+                delivery_estimate: {
+                  minimum: {
+                    unit: 'business_day',
+                    value: 3,
+                  },
+                  maximum: {
+                    unit: 'business_day',
+                    value: 7,
+                  },
+                },
+              },
+            },
+            {
+              shipping_rate_data: {
+                type: 'fixed_amount',
+                fixed_amount: {
+                  amount: 400, // $4.00
+                  currency: 'usd',
+                },
+                display_name: 'USPS First-Class (Tracking Included)',
+                delivery_estimate: {
+                  minimum: {
+                    unit: 'business_day',
+                    value: 1,
+                  },
+                  maximum: {
+                    unit: 'business_day',
+                    value: 3,
+                  },
+                },
+              },
+            },
+            {
+              shipping_rate_data: {
+                type: 'fixed_amount',
+                fixed_amount: {
+                  amount: 800, // $8.00 upgrade
+                  currency: 'usd',
+                },
+                display_name: 'UPS Ground (Tracking Included)',
+                delivery_estimate: {
+                  minimum: {
+                    unit: 'business_day',
+                    value: 2,
+                  },
+                  maximum: {
+                    unit: 'business_day',
+                    value: 5,
+                  },
+                },
+              },
+            },
+          ];
+        }
+      } else {
+        // Custom products: Standard shipping options
+        console.log('🎨 Custom products detected - using standard shipping options');
+        shippingOptions = [
           {
             shipping_rate_data: {
               type: 'fixed_amount',
@@ -257,7 +397,12 @@ class StripeClient {
               },
             },
           },
-        ],
+        ];
+      }
+
+      const session = await this.stripe.checkout.sessions.create({
+        ...sessionConfig,
+        shipping_options: shippingOptions,
       });
 
       return {

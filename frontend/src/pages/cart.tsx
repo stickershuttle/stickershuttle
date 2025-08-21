@@ -30,7 +30,12 @@ const MATERIAL_OPTIONS = ["Matte", "Gloss", "Shimmer Gloss"];
 const SIZE_OPTIONS = ['Small (2")', 'Medium (3")', 'Large (4")', 'X-Large (5")', "Custom size"];
 
 // Helper function to get emoji for option type
-const getOptionEmoji = (type: string, value: any) => {
+const getOptionEmoji = (type: string, value: any, key?: string) => {
+  // Special case for vibrancy - always use paint palette emoji
+  if (key === 'vibrancy') {
+    return "🎨";
+  }
+  
   switch (type) {
     case "shape":
       return "✂️";
@@ -40,6 +45,8 @@ const getOptionEmoji = (type: string, value: any) => {
       return "📏";
     case "white-base":
       return "⚪";
+    case "addon":
+      return "🎨";
     default:
       return "";
   }
@@ -65,8 +72,19 @@ const getItemTypeName = (productCategory: string, quantity: number): string => {
   }
 };
 
+// Helper function to check if a product is a market space product
+const isMarketplaceProduct = (category: string): boolean => {
+  return category === 'marketplace' || category === 'marketplace-stickers' || category === 'marketplace-pack';
+};
+
 // Calculate area from size string
 const calculateAreaFromSize = (sizeString: string, customWidth?: string, customHeight?: string): number => {
+  // Debug: Test regex pattern with various formats
+  if (sizeString.includes('x')) {
+    const testMatch = sizeString.match(/(\d*\.?\d+)\s*["']?\s*x\s*(\d*\.?\d+)/i);
+    console.log(`Cart: Regex test for "${sizeString}" - Match:`, testMatch);
+  }
+  
   // Defensive check for undefined or null sizeString
   if (!sizeString) {
     console.warn('calculateAreaFromSize: sizeString is undefined, using default Medium size');
@@ -74,20 +92,22 @@ const calculateAreaFromSize = (sizeString: string, customWidth?: string, customH
   }
   
   // Handle custom sizes with provided width/height parameters
-  if (sizeString.includes("Custom") && customWidth && customHeight) {
+  if ((sizeString.includes("Custom") || sizeString.includes("Custom size")) && customWidth && customHeight) {
     const w = parseFloat(customWidth) || 0;
     const h = parseFloat(customHeight) || 0;
-    return calculateSquareInches(w, h);
+    const area = calculateSquareInches(w, h);
+    console.log(`Cart: Custom size parsed - Width: ${w}", Height: ${h}", Area: ${area.toFixed(2)} sq inches`);
+    return area;
   }
   
-  // Handle stored custom sizes in format "1.5\"x2\"" or "1.5x2"
+  // Handle stored custom sizes in format "1.5\"x2\"" or "1.5x2" or ".9x1.2"
   if (sizeString.includes('x') && !sizeString.includes('Small') && !sizeString.includes('Medium') && !sizeString.includes('Large')) {
-    const match = sizeString.match(/(\d+(?:\.\d+)?)\s*["']?\s*x\s*(\d+(?:\.\d+)?)/i);
+    const match = sizeString.match(/(\d*\.?\d+)\s*["']?\s*x\s*(\d*\.?\d+)/i);
     if (match) {
       const w = parseFloat(match[1]) || 0;
       const h = parseFloat(match[2]) || 0;
       const area = w * h;
-      // Parsed custom size
+      console.log(`Cart: Stored custom size parsed - Width: ${w}", Height: ${h}", Area: ${area.toFixed(2)} sq inches`);
       return area;
     }
   }
@@ -141,7 +161,7 @@ const calculateItemPricing = (
   }
 
   // Marketplace items: trust stored unit/total price from product page
-  if (item.product.category === 'marketplace' || item.product.category === 'marketplace-stickers') {
+  if (isMarketplaceProduct(item.product.category)) {
     return {
       total: (typeof item.unitPrice === 'number' ? item.unitPrice : 0) * quantity,
       perSticker: typeof item.unitPrice === 'number' ? item.unitPrice : 0,
@@ -170,15 +190,21 @@ const calculateItemPricing = (
     });
   }
   
-  const area = calculateAreaFromSize(
-    item.customization.selections?.size?.displayValue || "Medium (3\")",
-    item.customization.selections?.size?.value?.includes('x') ? 
-      item.customization.selections.size.value.split('x')[0].replace('"', '') : undefined,
-    item.customization.selections?.size?.value?.includes('x') ? 
-      item.customization.selections.size.value.split('x')[1].replace('"', '') : undefined
-  );
+  // Debug logging for size data
+  const sizeDisplayValue = item.customization.selections?.size?.displayValue || "Medium (3\")";
+  const sizeValue = item.customization.selections?.size?.value;
+  const customW = sizeValue?.includes('x') ? sizeValue.split('x')[0].replace(/"/g, '') : undefined;
+  const customH = sizeValue?.includes('x') ? sizeValue.split('x')[1].replace(/"/g, '') : undefined;
+  
+  console.log(`Cart: Size data - Display: "${sizeDisplayValue}", Value: "${sizeValue}", Custom W: "${customW}", Custom H: "${customH}"`);
+  console.log(`Cart: Parsed dimensions - W: ${customW} (type: ${typeof customW}), H: ${customH} (type: ${typeof customH})`);
+  
+  const area = calculateAreaFromSize(sizeDisplayValue, customW, customH);
+  
+  console.log(`Cart: Calculated area: ${area.toFixed(2)} sq inches`);
 
   const rushOrder = item.customization.selections?.rush?.value === true;
+  const vibrancyBoost = item.customization.selections?.vibrancy?.value === true;
   
   // Get white option pricing modifier for holographic stickers
   const whiteOptionModifiers = {
@@ -198,6 +224,8 @@ const calculateItemPricing = (
   }
 
   if (pricingData && pricingData.basePricing && pricingData.quantityDiscounts) {
+    console.log(`Cart: Using real pricing data - Area: ${area.toFixed(2)}, Quantity: ${quantity}, Rush: ${rushOrder}`);
+    
     const realResult = calculateRealPrice(
       pricingData.basePricing,
       pricingData.quantityDiscounts,
@@ -241,8 +269,16 @@ const calculateItemPricing = (
     }
     
     // Apply white option modifier and specialty sticker price increase
-    const adjustedTotal = realResult.totalPrice * whiteOptionMultiplier * specialtyMultiplier;
-    const adjustedPerSticker = realResult.finalPricePerSticker * whiteOptionMultiplier * specialtyMultiplier;
+    let adjustedTotal = realResult.totalPrice * whiteOptionMultiplier * specialtyMultiplier;
+    let adjustedPerSticker = realResult.finalPricePerSticker * whiteOptionMultiplier * specialtyMultiplier;
+    
+    // Apply 5% vibrancy boost if selected
+    if (vibrancyBoost) {
+      adjustedTotal *= 1.05;
+      adjustedPerSticker *= 1.05;
+    }
+    
+    console.log(`Cart: Final pricing - Total: $${adjustedTotal.toFixed(2)}, Per Sticker: $${adjustedPerSticker.toFixed(2)}, Area: ${area.toFixed(2)}`);
     
     return {
       total: adjustedTotal,
@@ -253,6 +289,7 @@ const calculateItemPricing = (
   }
 
   // Fallback legacy pricing
+  console.log(`Cart: Using legacy pricing fallback - Area: ${area.toFixed(2)}`);
   const basePrice = 1.36;
   const baseArea = 9;
   const scaledBasePrice = basePrice * (area / baseArea);
@@ -288,9 +325,17 @@ const calculateItemPricing = (
     pricePerSticker *= 1.4;
   }
 
+  // Apply 5% vibrancy boost if selected
+  if (vibrancyBoost) {
+    totalPrice *= 1.05;
+    pricePerSticker *= 1.05;
+  }
+
   // Calculate discount percentage for legacy pricing
   const discount = quantity > 50 ? Math.round((1 - discountMultiplier) * 100) : 0;
 
+  console.log(`Cart: Legacy pricing result - Total: $${totalPrice.toFixed(2)}, Per Sticker: $${pricePerSticker.toFixed(2)}, Area: ${area.toFixed(2)}`);
+  
   return {
     total: totalPrice,
     perSticker: pricePerSticker,
@@ -423,6 +468,7 @@ const formatOptionName = (type: string, key?: string, productCategory?: string) 
   // Handle special field names
   if (key === 'kissOption') return "Kiss Cut Options";
   if (key === 'whiteOption') return "White Ink";
+  if (key === 'vibrancy') return "Add-on";
   
   switch (type) {
     case "shape":
@@ -434,6 +480,8 @@ const formatOptionName = (type: string, key?: string, productCategory?: string) 
       return "Size";
     case "white-base":
       return "White Ink";
+    case "addon":
+      return "Add-on";
     default:
       // Handle hyphenated names (like "size-preset")
       return type.split("-")
@@ -667,6 +715,53 @@ export default function CartPage() {
     updateCartItemQuantity(itemId, newQuantity, pricing.perSticker, pricing.total);
   };
 
+  // Handle marketplace quantity change with discounts
+  const handleMarketplaceQuantityChange = (itemId: string, newQuantity: number) => {
+    if (newQuantity < 1) return;
+    
+    const item = updatedCart.find(item => item.id === itemId);
+    if (!item) return;
+
+    // Get the original base price (without previous discounts)
+    const originalBasePrice = item.product.basePrice;
+    
+    // Calculate quantity-based discount
+    let discountMultiplier = 1;
+    if (newQuantity === 5) {
+      discountMultiplier = 0.5; // 50% off
+    } else if (newQuantity === 10) {
+      discountMultiplier = 0.4; // 60% off
+    } else if (newQuantity === 25) {
+      discountMultiplier = 0.3; // 70% off
+    }
+    
+    const discountedUnitPrice = originalBasePrice * discountMultiplier;
+    const totalPrice = discountedUnitPrice * newQuantity;
+
+    // Update the product name to include discount info
+    const discountText = newQuantity === 5 ? ' - 50% OFF' : 
+                        newQuantity === 10 ? ' - 60% OFF' : 
+                        newQuantity === 25 ? ' - 70% OFF' : '';
+    
+    // Remove existing discount text and add new one
+    const baseName = item.product.name.replace(/ - \d+% OFF$/, '');
+    const updatedName = `${baseName}${discountText}`;
+
+    const updatedItem = {
+      ...item,
+      quantity: newQuantity,
+      unitPrice: discountedUnitPrice,
+      totalPrice: totalPrice,
+      product: {
+        ...item.product,
+        name: updatedName,
+        basePrice: discountedUnitPrice
+      }
+    };
+
+    updateCartItemQuantity(itemId, newQuantity, discountedUnitPrice, totalPrice);
+  };
+
   // Handle proof preference change
   const handleProofChange = (itemId: string, sendProof: boolean) => {
     const item = updatedCart.find(item => item.id === itemId);
@@ -726,7 +821,8 @@ export default function CartPage() {
     // Map option types to selection keys and types
     const optionMapping: { [key: string]: { key: string, type: string } } = {
       'shape': { key: 'shape', type: 'shape' },
-      'material': { key: 'material', type: 'finish' }
+      'material': { key: 'material', type: 'finish' },
+      'addon': { key: 'vibrancy', type: 'addon' }
       // Removed size mapping - sizes should not be swappable
     };
 
@@ -747,6 +843,22 @@ export default function CartPage() {
     
     if (!mapping) return;
 
+    // Special handling for vibrancy addon
+    let selectionValue = newValue;
+    let selectionDisplayValue = newValue;
+    let selectionPriceImpact = 0;
+    
+    if (optionType === 'addon' && mapping.key === 'vibrancy') {
+      if (newValue === '+25% Vibrancy') {
+        selectionValue = true;
+        selectionDisplayValue = '+25% Vibrancy';
+        // Price impact will be calculated during pricing recalculation
+      } else if (newValue === 'Standard') {
+        selectionValue = false;
+        selectionDisplayValue = 'Standard';
+      }
+    }
+
     const updatedItem = {
       ...item,
       customization: {
@@ -755,9 +867,9 @@ export default function CartPage() {
           ...item.customization.selections,
           [mapping.key]: {
             type: mapping.type as any,
-            value: newValue,
-            displayValue: newValue,
-            priceImpact: 0
+            value: selectionValue,
+            displayValue: selectionDisplayValue,
+            priceImpact: selectionPriceImpact
           }
         }
       }
@@ -839,6 +951,8 @@ export default function CartPage() {
         return SHAPE_OPTIONS;
       case 'material':
         return MATERIAL_OPTIONS;
+      case 'addon':
+        return ['+25% Vibrancy', 'Standard'];
       // Removed size case - sizes should not be swappable
       default:
         return [];
@@ -1231,29 +1345,7 @@ export default function CartPage() {
             <h1 className="text-3xl font-bold text-white">Your Cart</h1>
           </div>
 
-          {/* Honeymoon Closure Warning */}
-          <div className="mb-6 p-4 rounded-lg border" style={{
-            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.8))',
-            borderColor: 'rgba(239, 68, 68, 0.6)',
-            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
-          }}>
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 mt-0.5">
-                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-white font-semibold text-sm mb-1">Important Notice</h3>
-                <p className="text-white text-sm leading-relaxed">
-                All orders in August will be fulfilled. We will be closed from <strong>Sept. 4th-17th</strong>. Any orders during that time will be fulfilled when we return. For emergency orders, please text us (303) 219-0518.{' '}
-                  <Link href="/blog/ciao-bella-were-off-to-italy" className="underline hover:no-underline transition-all duration-200 font-medium">
-                    Read more →
-                  </Link>
-                </p>
-              </div>
-            </div>
-          </div>
+
           
           {updatedCart.length === 0 ? (
             <>
@@ -1612,6 +1704,26 @@ export default function CartPage() {
                                 <div className="text-sm text-gray-300 font-medium">Additional Cost</div>
                               </div>
                             </div>
+                          ) : item.product.category === 'marketplace-pack' && item.customization.options?.packItems ? (
+                            /* Pack Display - Show all 5 designs in a square layout */
+                            <div className="aspect-square rounded-xl overflow-hidden bg-gray-800/50 p-2">
+                              <div className="grid grid-cols-3 grid-rows-3 gap-1 h-full">
+                                {item.customization.options.packItems.slice(0, 5).map((packItem, index) => (
+                                  <div 
+                                    key={index} 
+                                    className={`relative bg-gray-700/50 rounded overflow-hidden ${
+                                      index === 0 ? 'col-span-2 row-span-2' : ''
+                                    }`}
+                                  >
+                                    <img
+                                      src={packItem.image || '/placeholder.png'}
+                                      alt={packItem.title}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           ) : (item.customization.customFiles?.[0] || item.product.defaultImage || item.product.images?.[0] || item.product.name === 'Sample Pack by Sticker Shuttle') ? (
                             <div className="aspect-square rounded-xl overflow-hidden bg-gray-800/50 p-4">
                               <AIFileImage
@@ -1724,8 +1836,8 @@ export default function CartPage() {
                             </div>
                           )}
 
-                          {/* Product Specifications */}
-                          {item.product.name !== 'Additional Cost' && (
+                          {/* Product Specifications - Hide for market space products */}
+                          {item.product.name !== 'Additional Cost' && !isMarketplaceProduct(item.product.category) && (
                           <div className="mb-6">
                             <h4 className="text-xs font-semibold text-purple-400 uppercase tracking-wider mb-4">Product Specifications</h4>
                             
@@ -1752,6 +1864,7 @@ export default function CartPage() {
                                     case 'cut': return 'shape';
                                     case 'material': return 'material';
                                     case 'finish': return 'material';
+                                    case 'vibrancy': return 'addon';
                                     default: return null;
                                   }
                                 };
@@ -1764,7 +1877,7 @@ export default function CartPage() {
                                 return (
                                   <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
                                     <div className="flex items-center gap-2">
-                                      <span className="text-lg">{getOptionEmoji(sel.type || '', sel.value)}</span>
+                                      <span className="text-lg">{getOptionEmoji(sel.type || '', sel.value, key)}</span>
                                       <span className="text-xs font-medium text-gray-400 uppercase">{formatOptionName(sel.type || '', key, item.product.category)}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -1906,79 +2019,180 @@ export default function CartPage() {
                             <div className="mb-6">
                               <h4 className="text-xs font-semibold text-green-400 uppercase tracking-wider mb-4">Quantity</h4>
                               
-                              <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => {
-                                      const increment = getQuantityIncrement(item.quantity, item);
-                                      const newQty = Math.max(1, item.quantity - increment);
-                                      handleQuantityChange(item.id, newQty);
-                                    }}
-                                    className="w-10 h-10 flex items-center justify-center text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                    style={{
-                                      background: 'rgba(255, 255, 255, 0.05)',
-                                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                                      backdropFilter: 'blur(12px)'
-                                    }}
-                                    disabled={item.quantity <= 1}
-                                    aria-label="Decrease quantity"
-                                  >
-                                    −
-                                  </button>
-                                  <div 
-                                    className="px-4 py-2 rounded-lg min-w-[80px] text-center"
-                                    style={{
-                                      background: 'rgba(255, 255, 255, 0.05)',
-                                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                                      backdropFilter: 'blur(12px)'
-                                    }}
-                                  >
-                                    <input
-                                      id={`quantity-${item.id}`}
-                                      type="number"
-                                      min="1"
-                                      value={item.quantity}
-                                      onChange={(e) => {
-                                        const newQty = parseInt(e.target.value) || 1;
+                              {/* Market Space Product - Quantity Selector */}
+                              {isMarketplaceProduct(item.product.category) ? (
+                                item.product.category === 'marketplace-pack' ? (
+                                  /* Pack Items - Simple Up/Down Buttons */
+                                  <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => {
+                                          const newQty = Math.max(1, item.quantity - 1);
+                                          handleMarketplaceQuantityChange(item.id, newQty);
+                                        }}
+                                        className="w-10 h-10 flex items-center justify-center text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        style={{
+                                          background: 'rgba(255, 255, 255, 0.05)',
+                                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                                          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                                          backdropFilter: 'blur(12px)'
+                                        }}
+                                        disabled={item.quantity <= 1}
+                                        aria-label="Decrease quantity"
+                                      >
+                                        −
+                                      </button>
+                                      <div 
+                                        className="px-4 py-2 rounded-lg min-w-[80px] text-center"
+                                        style={{
+                                          background: 'rgba(255, 255, 255, 0.05)',
+                                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                                          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                                          backdropFilter: 'blur(12px)'
+                                        }}
+                                      >
+                                        <span className="text-white text-lg font-semibold">{item.quantity}</span>
+                                      </div>
+                                      <button
+                                        onClick={() => {
+                                          const newQty = item.quantity + 1;
+                                          handleMarketplaceQuantityChange(item.id, newQty);
+                                        }}
+                                        className="w-10 h-10 flex items-center justify-center text-white rounded-lg transition-colors"
+                                        style={{
+                                          background: 'rgba(255, 255, 255, 0.05)',
+                                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                                          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                                          backdropFilter: 'blur(12px)'
+                                        }}
+                                        aria-label="Increase quantity"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  /* Regular Marketplace Items - Quantity Discount Options */
+                                  <div className="space-y-3">
+                                    {[1, 5, 10, 25].map((qty) => {
+                                      const getDiscountText = (quantity: number) => {
+                                        if (quantity === 5) return '50% OFF';
+                                        if (quantity === 10) return '60% OFF';
+                                        if (quantity === 25) return '70% OFF';
+                                        return 'Full Price';
+                                      };
+
+                                      const isSelected = item.quantity === qty;
+                                      
+                                      return (
+                                        <button
+                                          key={qty}
+                                          onClick={() => handleMarketplaceQuantityChange(item.id, qty)}
+                                          className={`w-full text-left px-4 py-3 rounded-xl flex items-center justify-between transition-all border backdrop-blur-md ${
+                                            isSelected
+                                              ? 'bg-green-500/20 text-green-200 font-medium border-green-400/50' 
+                                              : 'hover:bg-white/10 border-white/20 text-white/80'
+                                          }`}
+                                          style={{
+                                            background: isSelected 
+                                              ? 'rgba(34, 197, 94, 0.2)' 
+                                              : 'rgba(255, 255, 255, 0.05)',
+                                            border: isSelected 
+                                              ? '1px solid rgba(34, 197, 94, 0.5)' 
+                                              : '1px solid rgba(255, 255, 255, 0.1)',
+                                            boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                                            backdropFilter: 'blur(12px)'
+                                          }}
+                                        >
+                                          <span className={isSelected ? 'text-green-200' : 'text-white'}>{qty}</span>
+                                          <span className={`text-xs px-2 py-1 rounded ${
+                                            qty > 1 
+                                              ? 'bg-green-500/20 text-green-300' 
+                                              : 'text-gray-400'
+                                          }`}>
+                                            {getDiscountText(qty)}
+                                          </span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )
+                              ) : (
+                                /* Regular Product - Standard Quantity Controls */
+                                <div className="flex items-center gap-4">
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => {
+                                        const increment = getQuantityIncrement(item.quantity, item);
+                                        const newQty = Math.max(1, item.quantity - increment);
                                         handleQuantityChange(item.id, newQty);
                                       }}
-                                      className="w-full text-center bg-transparent text-white text-lg font-semibold no-spinner border-none outline-none"
-                                      aria-label={`Quantity for ${item.product.name}`}
-                                    />
+                                      className="w-10 h-10 flex items-center justify-center text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                      style={{
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                                        backdropFilter: 'blur(12px)'
+                                      }}
+                                      disabled={item.quantity <= 1}
+                                      aria-label="Decrease quantity"
+                                    >
+                                      −
+                                    </button>
+                                    <div 
+                                      className="px-4 py-2 rounded-lg min-w-[80px] text-center"
+                                      style={{
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                                        backdropFilter: 'blur(12px)'
+                                      }}
+                                    >
+                                      <input
+                                        id={`quantity-${item.id}`}
+                                        type="number"
+                                        min="1"
+                                        value={item.quantity}
+                                        onChange={(e) => {
+                                          const newQty = parseInt(e.target.value) || 1;
+                                          handleQuantityChange(item.id, newQty);
+                                        }}
+                                        className="w-full text-center bg-transparent text-white text-lg font-semibold no-spinner border-none outline-none"
+                                        aria-label={`Quantity for ${item.product.name}`}
+                                      />
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        const increment = getQuantityIncrement(item.quantity, item);
+                                        handleQuantityChange(item.id, item.quantity + increment);
+                                      }}
+                                      className="w-10 h-10 flex items-center justify-center text-white rounded-lg transition-colors"
+                                      style={{
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                                        backdropFilter: 'blur(12px)'
+                                      }}
+                                      aria-label="Increase quantity"
+                                    >
+                                      +
+                                    </button>
                                   </div>
-                                  <button
-                                    onClick={() => {
-                                      const increment = getQuantityIncrement(item.quantity, item);
-                                      handleQuantityChange(item.id, item.quantity + increment);
-                                    }}
-                                    className="w-10 h-10 flex items-center justify-center text-white rounded-lg transition-colors"
-                                    style={{
-                                      background: 'rgba(255, 255, 255, 0.05)',
-                                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                                      backdropFilter: 'blur(12px)'
-                                    }}
-                                    aria-label="Increase quantity"
-                                  >
-                                    +
-                                  </button>
+                                  
+                                  {/* Discount Badge */}
+                                  {(() => {
+                                    const pricing = calculateItemPricing(item, item.quantity, pricingData);
+                                    if (pricing.discountPercentage > 0) {
+                                      return (
+                                        <span className="text-green-300 text-sm font-medium">
+                                          {pricing.discountPercentage}% off
+                                        </span>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
                                 </div>
-                                
-                                {/* Discount Badge */}
-                                {(() => {
-                                  const pricing = calculateItemPricing(item, item.quantity, pricingData);
-                                  if (pricing.discountPercentage > 0) {
-                                    return (
-                                      <span className="text-green-300 text-sm font-medium">
-                                        {pricing.discountPercentage}% off
-                                      </span>
-                                    );
-                                  }
-                                  return null;
-                                })()}
-                              </div>
+                              )}
                             </div>
                           )}
 
@@ -2975,6 +3189,7 @@ export default function CartPage() {
               const currentSelection = currentItem?.customization.selections?.[
                 activeDropdown.type === 'shape' ? 'shape' :
                 activeDropdown.type === 'material' ? 'material' :
+                activeDropdown.type === 'addon' ? 'vibrancy' :
                 'size-preset'
               ];
               

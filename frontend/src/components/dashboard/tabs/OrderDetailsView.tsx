@@ -3,6 +3,8 @@ import AIFileImage from '../../AIFileImage';
 // import OrderItemFileUpload from '../../OrderItemFileUpload';
 import OrderProgressTracker from '../../OrderProgressTracker';
 import useInvoiceGenerator, { InvoiceData } from '../../InvoiceGenerator';
+import { useMutation } from '@apollo/client';
+import { MARK_ORDER_READY_FOR_PICKUP } from '../../../lib/order-mutations';
 
 interface OrderDetailsViewProps {
   selectedOrderForInvoice: any;
@@ -67,6 +69,28 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
   refreshOrders,
   orders,
 }) => {
+  // Mutation for marking order as ready for pickup
+  const [markOrderReadyForPickup, { loading: markingReadyForPickup }] = useMutation(MARK_ORDER_READY_FOR_PICKUP);
+
+  // Handle mark as ready for pickup
+  const handleMarkAsReadyForPickup = async (orderId: string) => {
+    try {
+      await markOrderReadyForPickup({
+        variables: { orderId: orderId }
+      });
+      
+      // Refresh orders to update status
+      refreshOrders();
+      
+      // Show success message
+      alert('Order marked as ready for pickup! Customer will receive an email notification with pickup instructions.');
+      
+    } catch (error) {
+      console.error('Error marking order as ready for pickup:', error);
+      alert('Failed to mark order as ready for pickup. Please try again.');
+    }
+  };
+
   // Helper function to check if an order contains deal items
   const isOrderFromDeal = (order: any) => {
     // First check: Search the entire order JSON for deal indicators
@@ -212,6 +236,28 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
             }}
           >
             📦 Track Order
+          </button>
+          <button
+            onClick={() => handleMarkAsReadyForPickup(selectedOrderForInvoice.id)}
+            disabled={markingReadyForPickup || selectedOrderForInvoice.orderStatus === 'Ready for Pickup' || selectedOrderForInvoice.orderStatus === 'Delivered'}
+            className="px-4 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: (markingReadyForPickup || selectedOrderForInvoice.orderStatus === 'Ready for Pickup' || selectedOrderForInvoice.orderStatus === 'Delivered')
+                ? 'rgba(107, 114, 128, 0.5)'
+                : 'linear-gradient(135deg, rgba(16, 185, 129, 0.4) 0%, rgba(16, 185, 129, 0.25) 50%, rgba(16, 185, 129, 0.1) 100%)',
+              backdropFilter: 'blur(25px) saturate(180%)',
+              border: (markingReadyForPickup || selectedOrderForInvoice.orderStatus === 'Ready for Pickup' || selectedOrderForInvoice.orderStatus === 'Delivered')
+                ? '1px solid rgba(107, 114, 128, 0.3)'
+                : '1px solid rgba(16, 185, 129, 0.4)',
+              boxShadow: (markingReadyForPickup || selectedOrderForInvoice.orderStatus === 'Ready for Pickup' || selectedOrderForInvoice.orderStatus === 'Delivered')
+                ? 'none'
+                : 'rgba(16, 185, 129, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+              color: (markingReadyForPickup || selectedOrderForInvoice.orderStatus === 'Ready for Pickup' || selectedOrderForInvoice.orderStatus === 'Delivered')
+                ? 'rgba(156, 163, 175, 0.8)'
+                : 'white'
+            }}
+          >
+            {markingReadyForPickup ? '🔄 Processing...' : '🏪 Ready for Pickup'}
           </button>
           <button
             onClick={() => handleReorder(selectedOrderForInvoice.id)}
@@ -369,6 +415,16 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
           const displayValue = typeof value === 'object' ? value.displayValue || value.value : value;
           if (!displayValue) return null;
           
+          // Special handling for vibrancy option
+          if (key === 'vibrancy' && value.value === true) {
+            return (
+              <div key={key} className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">🎨 Vibrancy:</span>
+                <span className="text-xs text-purple-300 font-medium">+25% Enhanced</span>
+              </div>
+            );
+          }
+          
           return (
             <div key={key} className="flex items-center gap-2">
               <span className="text-xs text-gray-400 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
@@ -428,9 +484,12 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
                             const updatedHasProofData = sendProofMatch || noProofMatch || hasProofData;
                             const updatedProofValue = sendProofMatch ? true : noProofMatch ? false : proofValue;
                             
+    // Vibrancy information
+                            const vibrancyBoost = selections.vibrancy?.value || false;
+    
     // Show this section only if there's relevant data
                             const showSection = itemData.customerNotes || instagramHandle || instagramOptIn || itemData.customerReplacementFile || 
-      rushOrder || updatedHasProofData || selections.customText || selections.customNotes;
+      rushOrder || updatedHasProofData || selections.customText || selections.customNotes || vibrancyBoost;
                             
                             return showSection ? (
       <div className="mt-2 p-2 rounded" style={{
@@ -463,6 +522,12 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
               <span className={`text-xs ${updatedProofValue ? 'text-green-400' : 'text-red-400'}`}>
                 {updatedProofValue ? 'Send Proof' : 'Skip Proof'}
                                     </span>
+                                  </div>
+                                )}
+                                {vibrancyBoost && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400">🎨 Vibrancy:</span>
+              <span className="text-xs text-purple-400 font-medium">+25% Enhanced</span>
                                   </div>
                                 )}
           {selections.customText && (

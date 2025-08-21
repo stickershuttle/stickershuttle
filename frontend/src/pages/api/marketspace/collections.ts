@@ -1,6 +1,41 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 
+// Helper function to check if user is authorized (admin or creator)
+async function isAuthorized(req: NextApiRequest, supabase: any): Promise<boolean> {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return false;
+    }
+
+    const token = authHeader.substring(7);
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      return false;
+    }
+
+    // Check if user is admin
+    if (user.email === 'justin@stickershuttle.com') {
+      return true;
+    }
+
+    // Check if user is a creator
+    const { data: creatorData } = await supabase
+      .from('creators')
+      .select('is_active')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single();
+
+    return !!creatorData?.is_active;
+  } catch (error) {
+    console.error('Authorization check failed:', error);
+    return false;
+  }
+}
+
 // Server-only Supabase client using service role for RLS-protected writes
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
@@ -27,6 +62,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST') {
+      // Check authorization for creating collections
+      if (!(await isAuthorized(req, supabase))) {
+        return res.status(401).json({ error: { message: 'Unauthorized' } });
+      }
+
       const { name } = req.body as { name?: string };
       if (!name || !name.trim()) return res.status(400).json({ error: { message: 'Name is required' } });
 
@@ -41,6 +81,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'DELETE') {
+      // Check authorization for deleting collections
+      if (!(await isAuthorized(req, supabase))) {
+        return res.status(401).json({ error: { message: 'Unauthorized' } });
+      }
+
       const { id } = req.query as { id?: string };
       if (!id) return res.status(400).json({ error: { message: 'Collection ID is required' } });
 

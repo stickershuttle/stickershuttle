@@ -31,7 +31,12 @@ const MATERIAL_OPTIONS = ["Matte", "Gloss", "Shimmer Gloss"];
 const SIZE_OPTIONS = ['Small (2")', 'Medium (3")', 'Large (4")', 'X-Large (5")', "Custom size"];
 
 // Helper function to get emoji for option type
-const getOptionEmoji = (type: string, value: any) => {
+const getOptionEmoji = (type: string, value: any, key?: string) => {
+  // Special case for vibrancy - always use paint palette emoji
+  if (key === 'vibrancy') {
+    return "🎨";
+  }
+  
   switch (type) {
     case "shape":
       return "✂️";
@@ -41,6 +46,8 @@ const getOptionEmoji = (type: string, value: any) => {
       return "📏";
     case "white-base":
       return "⚪";
+    case "addon":
+      return "🎨";
     default:
       return "";
   }
@@ -66,8 +73,19 @@ const getItemTypeName = (productCategory: string, quantity: number): string => {
   }
 };
 
+// Helper function to check if a product is a market space product
+const isMarketplaceProduct = (category: string): boolean => {
+  return category === 'marketplace' || category === 'marketplace-stickers' || category === 'marketplace-pack';
+};
+
 // Calculate area from size string
 const calculateAreaFromSize = (sizeString: string, customWidth?: string, customHeight?: string): number => {
+  // Debug: Test regex pattern with various formats
+  if (sizeString.includes('x')) {
+    const testMatch = sizeString.match(/(\d*\.?\d+)\s*["']?\s*x\s*(\d*\.?\d+)/i);
+    console.log(`Shared Cart: Regex test for "${sizeString}" - Match:`, testMatch);
+  }
+  
   // Defensive check for undefined or null sizeString
   if (!sizeString) {
     console.warn('calculateAreaFromSize: sizeString is undefined, using default Medium size');
@@ -75,20 +93,22 @@ const calculateAreaFromSize = (sizeString: string, customWidth?: string, customH
   }
   
   // Handle custom sizes with provided width/height parameters
-  if (sizeString.includes("Custom") && customWidth && customHeight) {
+  if ((sizeString.includes("Custom") || sizeString.includes("Custom size")) && customWidth && customHeight) {
     const w = parseFloat(customWidth) || 0;
     const h = parseFloat(customHeight) || 0;
-    return calculateSquareInches(w, h);
+    const area = calculateSquareInches(w, h);
+    console.log(`Shared Cart: Custom size parsed - Width: ${w}", Height: ${h}", Area: ${area.toFixed(2)} sq inches`);
+    return area;
   }
   
-  // Handle stored custom sizes in format "1.5\"x2\"" or "1.5x2"
-  if (sizeString.includes('x') && !sizeString.includes('Small') && !sizeString.includes('Medium') && !sizeString.includes('Large')) {
-    const match = sizeString.match(/(\d+(?:\.\d+)?)\s*["']?\s*x\s*(\d+(?:\.\d+)?)/i);
+  // Handle stored custom sizes in format "1.5\"x2\"" or "1.5x2" or ".9x1.2"
+  if (sizeString.includes('x') && !sizeString.includes('Medium') && !sizeString.includes('Large')) {
+    const match = sizeString.match(/(\d*\.?\d+)\s*["']?\s*x\s*(\d*\.?\d+)/i);
     if (match) {
       const w = parseFloat(match[1]) || 0;
       const h = parseFloat(match[2]) || 0;
       const area = w * h;
-      console.log(`Cart: Parsed custom size ${sizeString} as ${w}" x ${h}" = ${area} sq inches`);
+      console.log(`Shared Cart: Parsed custom size ${sizeString} as ${w}" x ${h}" = ${area} sq inches`);
       return area;
     }
   }
@@ -161,15 +181,21 @@ const calculateItemPricing = (
     });
   }
   
-  const area = calculateAreaFromSize(
-    item.customization.selections?.size?.displayValue || "Medium (3\")",
-    item.customization.selections?.size?.value?.includes('x') ? 
-      item.customization.selections.size.value.split('x')[0].replace('"', '') : undefined,
-    item.customization.selections?.size?.value?.includes('x') ? 
-      item.customization.selections.size.value.split('x')[1].replace('"', '') : undefined
-  );
+  // Debug logging for size data
+  const sizeDisplayValue = item.customization.selections?.size?.displayValue || "Medium (3\")";
+  const sizeValue = item.customization.selections?.size?.value;
+  const customW = sizeValue?.includes('x') ? sizeValue.split('x')[0].replace(/"/g, '') : undefined;
+  const customH = sizeValue?.includes('x') ? sizeValue.split('x')[1].replace(/"/g, '') : undefined;
+  
+  console.log(`Shared Cart: Size data - Display: "${sizeDisplayValue}", Value: "${sizeValue}", Custom W: "${customW}", Custom H: "${customH}"`);
+  console.log(`Shared Cart: Parsed dimensions - W: ${customW} (type: ${typeof customW}), H: ${customH} (type: ${typeof customH})`);
+  
+  const area = calculateAreaFromSize(sizeDisplayValue, customW, customH);
+  
+  console.log(`Shared Cart: Calculated area: ${area.toFixed(2)} sq inches`);
 
   const rushOrder = item.customization.selections?.rush?.value === true;
+  const vibrancyBoost = item.customization.selections?.vibrancy?.value === true;
   
   // Get white option pricing modifier for holographic stickers
   const whiteOptionModifiers = {
@@ -189,6 +215,8 @@ const calculateItemPricing = (
   }
 
   if (pricingData && pricingData.basePricing && pricingData.quantityDiscounts) {
+    console.log(`Shared Cart: Using real pricing data - Area: ${area.toFixed(2)}, Quantity: ${quantity}, Rush: ${rushOrder}`);
+    
     const realResult = calculateRealPrice(
       pricingData.basePricing,
       pricingData.quantityDiscounts,
@@ -232,8 +260,16 @@ const calculateItemPricing = (
     }
     
     // Apply white option modifier and specialty sticker price increase
-    const adjustedTotal = realResult.totalPrice * whiteOptionMultiplier * specialtyMultiplier;
-    const adjustedPerSticker = realResult.finalPricePerSticker * whiteOptionMultiplier * specialtyMultiplier;
+    let adjustedTotal = realResult.totalPrice * whiteOptionMultiplier * specialtyMultiplier;
+    let adjustedPerSticker = realResult.finalPricePerSticker * whiteOptionMultiplier * specialtyMultiplier;
+    
+    // Apply 5% vibrancy boost if selected
+    if (vibrancyBoost) {
+      adjustedTotal *= 1.05;
+      adjustedPerSticker *= 1.05;
+    }
+    
+    console.log(`Shared Cart: Final pricing - Total: $${adjustedTotal.toFixed(2)}, Per Sticker: $${adjustedPerSticker.toFixed(2)}, Area: ${area.toFixed(2)}`);
     
     return {
       total: adjustedTotal,
@@ -244,6 +280,7 @@ const calculateItemPricing = (
   }
 
   // Fallback legacy pricing
+  console.log(`Shared Cart: Using legacy pricing fallback - Area: ${area.toFixed(2)}`);
   const basePrice = 1.36;
   const baseArea = 9;
   const scaledBasePrice = basePrice * (area / baseArea);
@@ -279,9 +316,17 @@ const calculateItemPricing = (
     pricePerSticker *= 1.4;
   }
 
+  // Apply 5% vibrancy boost if selected
+  if (vibrancyBoost) {
+    totalPrice *= 1.05;
+    pricePerSticker *= 1.05;
+  }
+
   // Calculate discount percentage for legacy pricing
   const discount = quantity > 50 ? Math.round((1 - discountMultiplier) * 100) : 0;
 
+  console.log(`Shared Cart: Legacy pricing result - Total: $${totalPrice.toFixed(2)}, Per Sticker: $${pricePerSticker.toFixed(2)}, Area: ${area.toFixed(2)}`);
+  
   return {
     total: totalPrice,
     perSticker: pricePerSticker,
@@ -416,6 +461,8 @@ const formatOptionName = (type: string, productCategory?: string) => {
       return "Size";
     case "white-base":
       return "White Option";
+    case "addon":
+      return "Add-on";
     default:
       // Handle hyphenated names (like "size-preset")
       return type.split("-")
@@ -739,7 +786,8 @@ export default function SharedCartPage() {
     // Map option types to selection keys and types
     const optionMapping: { [key: string]: { key: string, type: string } } = {
       'shape': { key: 'shape', type: 'shape' },
-      'material': { key: 'material', type: 'finish' }
+      'material': { key: 'material', type: 'finish' },
+      'addon': { key: 'vibrancy', type: 'addon' }
       // Removed size mapping - sizes should not be swappable
     };
 
@@ -760,6 +808,22 @@ export default function SharedCartPage() {
     
     if (!mapping) return;
 
+    // Special handling for vibrancy addon
+    let selectionValue = newValue;
+    let selectionDisplayValue = newValue;
+    let selectionPriceImpact = 0;
+    
+    if (optionType === 'addon' && mapping.key === 'vibrancy') {
+      if (newValue === '+25% Vibrancy') {
+        selectionValue = true;
+        selectionDisplayValue = '+25% Vibrancy';
+        // Price impact will be calculated during pricing recalculation
+      } else if (newValue === 'Standard') {
+        selectionValue = false;
+        selectionDisplayValue = 'Standard';
+      }
+    }
+
     const updatedItem = {
       ...item,
       customization: {
@@ -768,9 +832,9 @@ export default function SharedCartPage() {
           ...item.customization.selections,
           [mapping.key]: {
             type: mapping.type as any,
-            value: newValue,
-            displayValue: newValue,
-            priceImpact: 0
+            value: selectionValue,
+            displayValue: selectionDisplayValue,
+            priceImpact: selectionPriceImpact
           }
         }
       }
@@ -852,6 +916,8 @@ export default function SharedCartPage() {
         return SHAPE_OPTIONS;
       case 'material':
         return MATERIAL_OPTIONS;
+      case 'addon':
+        return ['+25% Vibrancy', 'Standard'];
       // Removed size case - sizes should not be swappable
       default:
         return [];
@@ -1796,7 +1862,8 @@ export default function SharedCartPage() {
                             </div>
                           )}
 
-                          {/* Product Specifications */}
+                          {/* Product Specifications - Hide for market space products */}
+                          {!isMarketplaceProduct(item.product.category) && (
                           <div className="mb-6">
                             <h4 className="text-xs font-semibold text-purple-400 uppercase tracking-wider mb-4">Product Specifications</h4>
                             
@@ -1821,6 +1888,7 @@ export default function SharedCartPage() {
                                     case 'cut': return 'shape';
                                     case 'material': return 'material';
                                     case 'finish': return 'material';
+                                    case 'vibrancy': return 'addon';
                                     default: return null;
                                   }
                                 };
@@ -1833,7 +1901,7 @@ export default function SharedCartPage() {
                                 return (
                                   <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
                                     <div className="flex items-center gap-2">
-                                      <span className="text-lg">{getOptionEmoji(sel.type || '', sel.value)}</span>
+                                      <span className="text-lg">{getOptionEmoji(sel.type || '', sel.value, key)}</span>
                                       <span className="text-xs font-medium text-gray-400 uppercase">{formatOptionName(sel.type || '', item.product.category)}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -1968,6 +2036,7 @@ export default function SharedCartPage() {
                               )}
                             </div>
                           </div>
+                          )}
 
                           {/* Quantity Section */}
                           {!item.customization.isDeal && (
@@ -3015,6 +3084,7 @@ export default function SharedCartPage() {
               const currentSelection = currentItem?.customization.selections?.[
                 activeDropdown.type === 'shape' ? 'shape' :
                 activeDropdown.type === 'material' ? 'material' :
+                activeDropdown.type === 'addon' ? 'vibrancy' :
                 'size-preset'
               ];
               

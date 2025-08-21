@@ -9,6 +9,7 @@ export type ProductCategory =
   | 'vinyl-banners'
   | 'deals'             // Added for preset deals
   | 'marketplace'       // Added for marketplace products
+  | 'marketplace-stickers' // Added for marketplace sticker products
   | 'marketplace-pack'; // Added for marketplace packs
 
 // Size definitions for products
@@ -32,7 +33,8 @@ export type AttributeType =
   | 'size-preset'    // Preset size options with custom option
   | 'size-custom'    // Custom size inputs
   | 'quantity'       // Quantity selector
-  | 'file-upload';   // File upload requirement
+  | 'file-upload'    // File upload requirement
+  | 'addon';         // Add-on enhancements (vibrancy, etc.)
 
 // Individual Attribute Definitions
 export interface AttributeOption {
