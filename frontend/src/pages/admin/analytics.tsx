@@ -95,14 +95,7 @@ export default function AdminAnalytics() {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState('30d');
-  const [showMarketingDropdown, setShowMarketingDropdown] = useState(false);
-  const [showShippingDropdown, setShowShippingDropdown] = useState(false);
   const [viewMode, setViewMode] = useState<'overview' | 'monthly'>('overview');
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    return now.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
-  });
   const [cardVisibility, setCardVisibility] = useState({
     monthlyRevenue: true,
     monthlyOrders: true,
@@ -117,11 +110,12 @@ export default function AdminAnalytics() {
     existingCustomers: true
   });
 
+  // Always fetch 1 year of data for comprehensive monthly analysis
   const { data: analyticsData, loading: analyticsLoading } = useQuery(GET_ANALYTICS_DATA, {
-    variables: { timeRange }
+    variables: { timeRange: '1y' }
   });
 
-  const toggleCardVisibility = (cardKey: string) => {
+  const toggleCardVisibility = (cardKey: keyof typeof cardVisibility) => {
     setCardVisibility(prev => ({
       ...prev,
       [cardKey]: !prev[cardKey]
@@ -217,17 +211,13 @@ export default function AdminAnalytics() {
     return Object.values(monthlyData).sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
   };
 
-  // Get available months from the data
-  const getAvailableMonths = () => {
+  // Get current month's data for overview
+  const getCurrentMonthData = () => {
     const monthlyData = generateMonthlyData(data?.dailySales || []);
-    return monthlyData.map(month => month.month);
-  };
-
-  // Get selected month's data
-  const getSelectedMonthData = () => {
-    const monthlyData = generateMonthlyData(data?.dailySales || []);
-    return monthlyData.find(month => month.month === selectedMonth) || {
-      month: selectedMonth,
+    const now = new Date();
+    const currentMonthKey = now.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+    return monthlyData.find(month => month.month === currentMonthKey) || {
+      month: currentMonthKey,
       revenue: 0,
       orders: 0
     };
@@ -325,7 +315,7 @@ export default function AdminAnalytics() {
                         : 'none'
                     }}
                   >
-                    Overview
+                    Overview + Monthly
                   </button>
                   <button
                     onClick={() => setViewMode('monthly')}
@@ -345,53 +335,19 @@ export default function AdminAnalytics() {
                         : 'none'
                     }}
                   >
-                    Monthly Stats
+                    Monthly Focus
                   </button>
                 </div>
               </div>
               
               <div className="flex items-center gap-3">
-                {/* Month Selector - Only show in overview mode */}
-                {viewMode === 'overview' && (
-                  <select
-                    aria-label="Select month"
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="bg-transparent border border-white/20 rounded-lg px-3 md:px-4 py-2 text-white text-xs md:text-sm font-medium focus:outline-none focus:border-purple-400 transition-all cursor-pointer hover:scale-105"
-                    style={{
-                      backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                      backgroundRepeat: 'no-repeat',
-                      backgroundPosition: 'right 8px center',
-                      backgroundSize: '16px',
-                      paddingRight: '32px'
-                    }}
-                  >
-                    {getAvailableMonths().map(month => (
-                      <option key={month} value={month} style={{ backgroundColor: '#030140' }}>
-                        {month}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                
-                <select
-                  aria-label="Select time range"
-                  value={timeRange}
-                  onChange={(e) => setTimeRange(e.target.value)}
-                  className="bg-transparent border border-white/20 rounded-lg px-3 md:px-4 py-2 text-white text-xs md:text-sm font-medium focus:outline-none focus:border-purple-400 transition-all cursor-pointer hover:scale-105"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 8px center',
-                    backgroundSize: '16px',
-                    paddingRight: '32px'
-                  }}
-                >
-                  <option value="7d" style={{ backgroundColor: '#030140' }}>Last 7 days</option>
-                  <option value="30d" style={{ backgroundColor: '#030140' }}>Last 30 days</option>
-                  <option value="90d" style={{ backgroundColor: '#030140' }}>Last 90 days</option>
-                  <option value="1y" style={{ backgroundColor: '#030140' }}>Last year</option>
-                </select>
+                {/* Info text showing we're always showing 1 year of data */}
+                <div className="text-sm text-gray-400 bg-white/5 px-3 py-2 rounded-lg border border-white/10">
+                  <svg className="w-4 h-4 inline mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {viewMode === 'overview' ? 'Overview with monthly breakdown' : 'Monthly performance focus'}
+                </div>
               </div>
             </div>
 
@@ -411,7 +367,7 @@ export default function AdminAnalytics() {
                             <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <span className="text-xs text-gray-400 uppercase tracking-wider">{selectedMonth} Revenue</span>
+                            <span className="text-xs text-gray-400 uppercase tracking-wider">Current Month Revenue</span>
                           </div>
                           <button
                             onClick={() => toggleCardVisibility('monthlyRevenue')}
@@ -433,7 +389,7 @@ export default function AdminAnalytics() {
                         <div className="flex items-end justify-between">
                           <div>
                             <p className="text-lg md:text-2xl font-bold transition-all duration-200 hover:scale-105" style={{ color: '#86efac' }}>
-                              {formatCurrency(getSelectedMonthData().revenue)}
+                              {formatCurrency(getCurrentMonthData().revenue)}
                             </p>
                             <p className="text-xs mt-1 text-gray-400">
                               Monthly total
@@ -448,7 +404,7 @@ export default function AdminAnalytics() {
                             <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                             </svg>
-                            <span className="text-xs text-gray-400 uppercase tracking-wider">{selectedMonth} Orders</span>
+                            <span className="text-xs text-gray-400 uppercase tracking-wider">Current Month Orders</span>
                           </div>
                           <button
                             onClick={() => toggleCardVisibility('monthlyOrders')}
@@ -470,10 +426,10 @@ export default function AdminAnalytics() {
                         <div className="flex items-end justify-between">
                           <div>
                             <p className="text-lg md:text-2xl font-bold text-white transition-all duration-200 hover:scale-105">
-                              {getSelectedMonthData().orders}
+                              {getCurrentMonthData().orders}
                             </p>
                             <p className="text-xs mt-1" style={{ color: '#c084fc' }}>
-                              {formatCurrency(getSelectedMonthData().orders > 0 ? getSelectedMonthData().revenue / getSelectedMonthData().orders : 0)} AOV
+                              {formatCurrency(getCurrentMonthData().orders > 0 ? getCurrentMonthData().revenue / getCurrentMonthData().orders : 0)} AOV
                             </p>
                           </div>
                         </div>
@@ -824,6 +780,84 @@ export default function AdminAnalytics() {
                       </div>
                     </div>
 
+                {/* Monthly Breakdown Chart - Always visible in overview */}
+                <div className="glass-container p-6 mb-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">Monthly Revenue Overview</h3>
+                  <div className="h-[400px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={generateMonthlyData(data?.dailySales || [])}>
+                        <defs>
+                          <linearGradient id="monthlyRevenueOverview" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid 
+                          strokeDasharray="0" 
+                          stroke={CHART_COLORS.grid} 
+                          vertical={false}
+                        />
+                        <XAxis 
+                          dataKey="month" 
+                          stroke={CHART_COLORS.axis}
+                          style={{ fontSize: '11px' }}
+                          tick={{ fill: CHART_COLORS.text }}
+                          axisLine={{ stroke: CHART_COLORS.grid }}
+                          tickLine={false}
+                        />
+                        <YAxis 
+                          yAxisId="revenue"
+                          stroke={CHART_COLORS.axis}
+                          tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                          style={{ fontSize: '11px' }}
+                          tick={{ fill: CHART_COLORS.text }}
+                          axisLine={{ stroke: CHART_COLORS.grid }}
+                          tickLine={false}
+                        />
+                        <YAxis 
+                          yAxisId="orders"
+                          orientation="right"
+                          stroke={CHART_COLORS.secondary}
+                          style={{ fontSize: '11px' }}
+                          tick={{ fill: CHART_COLORS.text }}
+                          axisLine={{ stroke: CHART_COLORS.grid }}
+                          tickLine={false}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: CHART_COLORS.tooltip.background,
+                            border: `1px solid ${CHART_COLORS.tooltip.border}`,
+                            borderRadius: '12px',
+                            backdropFilter: 'blur(12px)',
+                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
+                          }}
+                          labelStyle={{ color: CHART_COLORS.text, marginBottom: '4px' }}
+                          itemStyle={{ color: '#fff' }}
+                          formatter={(value: number, name: string) => [
+                            name === 'revenue' ? formatCurrency(value) : value,
+                            name === 'revenue' ? 'Revenue' : 'Orders'
+                          ]}
+                        />
+                        <Area 
+                          yAxisId="revenue"
+                          type="monotone" 
+                          dataKey="revenue" 
+                          stroke={CHART_COLORS.primary}
+                          strokeWidth={3}
+                          fillOpacity={1} 
+                          fill="url(#monthlyRevenueOverview)"
+                        />
+                        <Bar 
+                          yAxisId="orders"
+                          dataKey="orders" 
+                          fill={CHART_COLORS.secondary}
+                          opacity={0.7}
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
                 {/* Charts Grid - Stack on mobile */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6">
                   {/* Daily Sales Chart */}
@@ -1033,6 +1067,45 @@ export default function AdminAnalytics() {
                   </div>
                 </div>
 
+                {/* Monthly Performance Table - Always visible in overview */}
+                <div className="glass-container p-6 mb-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">Monthly Performance Summary</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-white/10">
+                          <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Month</th>
+                          <th className="text-right py-3 px-4 text-sm font-medium text-gray-400">Revenue</th>
+                          <th className="text-right py-3 px-4 text-sm font-medium text-gray-400">Orders</th>
+                          <th className="text-right py-3 px-4 text-sm font-medium text-gray-400">Avg Order</th>
+                          <th className="text-right py-3 px-4 text-sm font-medium text-gray-400">Growth</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {generateMonthlyData(data?.dailySales || []).map((month, index) => {
+                          const prevMonth = generateMonthlyData(data?.dailySales || [])[index - 1];
+                          const growth = prevMonth ? ((month.revenue - prevMonth.revenue) / prevMonth.revenue) * 100 : 0;
+                          return (
+                            <tr key={month.month} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                              <td className="py-3 px-4 text-white font-medium">{month.month}</td>
+                              <td className="py-3 px-4 text-right text-green-400 font-semibold">
+                                {formatCurrency(month.revenue)}
+                              </td>
+                              <td className="py-3 px-4 text-right text-white">{month.orders}</td>
+                              <td className="py-3 px-4 text-right text-blue-400">
+                                {formatCurrency(month.orders > 0 ? month.revenue / month.orders : 0)}
+                              </td>
+                              <td className={`py-3 px-4 text-right font-medium ${growth > 0 ? 'text-green-400' : growth < 0 ? 'text-red-400' : 'text-gray-400'}`}>
+                                {index === 0 ? '-' : `${growth > 0 ? '+' : ''}${growth.toFixed(1)}%`}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
                     {/* Customer Analytics Table */}
                     <div className="glass-container p-4 md:p-6 transition-all duration-200">
                       <div className="flex items-center justify-between mb-4">
@@ -1182,7 +1255,7 @@ export default function AdminAnalytics() {
                       </div>
 
                       {/* Monthly Breakdown Chart */}
-                      {timeRange === '1y' && (
+                      {(
                         <div className="glass-container p-6 mb-6">
                           <h3 className="text-lg font-semibold text-white mb-4">Monthly Revenue Breakdown</h3>
                           <div className="h-[400px]">

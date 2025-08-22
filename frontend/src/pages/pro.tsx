@@ -174,46 +174,101 @@ const StickerShuttlePro = () => {
               </div>
               
               {/* Value Proposition */}
-              <i className="text-gray-300">Save $1,294 per year with Pro membership</i>
+              <i className="text-gray-300">Save <b>$1,294 per year</b> with Pro membership</i>
               
               {/* Benefits List */}
               <div className="mt-8 flex justify-center">
                 <ul className="space-y-2 text-gray-300" style={{ fontFamily: 'Rubik, sans-serif' }}>
-                  <li className="flex items-center justify-center">
-                    <span className="text-xl mr-3 flex-shrink-0">🏷️</span>
-                    <span><span style={{ fontWeight: 'bold' }}>100 custom stickers</span> monthly (normally $87)</span>
+                  {/* Main Benefits Section Header */}
+                  <li className="flex items-center justify-center mb-4">
+                    <span className="text-sm font-medium text-green-300 uppercase tracking-wide">What's Included?</span>
                   </li>
+                  
                   <li className="flex items-center justify-center">
                     <span className="text-xl mr-3 flex-shrink-0">📦</span>
-                    <span><span style={{ fontWeight: 'bold' }}>FREE 2-Day Air</span> shipping on custom orders</span>
+                    <span><span style={{ fontWeight: 'bold' }}>100 custom stickers</span> monthly <span className="line-through text-red-400" style={{ fontFamily: 'Rubik, sans-serif', fontWeight: 'bold' }}>$87</span></span>
                   </li>
+                  
+                  {/* Divider */}
+                  <div className="flex justify-center">
+                    <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
+                  </div>
+                  
                   <li className="flex items-center justify-center">
-                    <span className="text-xl mr-3 flex-shrink-0">☝️</span>
-                    <span><span style={{ fontWeight: 'bold' }}>Priority printing</span> - jump to the front of the line</span>
+                    <span className="text-xl mr-3 flex-shrink-0">✈️</span>
+                    <span><span style={{ fontWeight: 'bold' }}>2-Day Air</span> shipping on custom orders <span className="line-through text-red-400" style={{ fontFamily: 'Rubik, sans-serif', fontWeight: 'bold' }}>$20</span></span>
                   </li>
+                  
+                  {/* Divider */}
+                  <div className="flex justify-center">
+                    <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
+                  </div>
+                  
+                  <li className="flex items-center justify-center">
+                    <span className="text-xl mr-3 flex-shrink-0">🎫</span>
+                    <span><span style={{ fontWeight: 'bold' }}>Fast Pass</span> - faster printing time&#160;</span> <span className="line-through text-red-400" style={{ fontFamily: 'Rubik, sans-serif', fontWeight: 'bold' }}>40% fee</span>
+                  </li>
+                  
+                  {/* Divider */}
+                  <div className="flex justify-center">
+                    <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
+                  </div>
+                  
+                  <li className="flex items-center justify-center mb-8">
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
+                      alt="Coin Icon" 
+                      className="w-5 h-5 mr-3 flex-shrink-0"
+                    />
+                    <span><span style={{ fontWeight: 'bold' }}>Earn 5% back</span> on custom  orders</span>
+                  </li>
+                  
+                  {/* Additional Benefits Section Header */}
+                  <li className="flex items-center justify-center mb-4">
+                    <span className="text-sm font-medium text-blue-300 uppercase tracking-wide">+ Additional Benefits</span>
+                  </li>
+                  
                   <li className="flex items-center justify-center">
                     <span className="text-xl mr-3 flex-shrink-0">🤫</span>
-                    <span><span style={{ fontWeight: 'bold' }}>Access to</span> Pro only deals & discounts</span>
+                    <span><span style={{ fontWeight: 'bold' }}>Access to Pro only</span> deals & discounts</span>
                   </li>
+                  
+                  {/* Divider */}
+                  <div className="flex justify-center">
+                    <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
+                  </div>
+                  
                   <li className="flex items-center justify-center">
                     <span className="text-xl mr-3 flex-shrink-0">🤝</span>
                     <span><span style={{ fontWeight: 'bold' }}>15% off</span> everything in the Marketspace</span>
                   </li>
 
-                  <li className="flex items-center justify-center">
+                  {/* Divider */}
+                  <div className="flex justify-center">
+                    <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
+                  </div>
+
+                  <li className="flex items-center justify-center mb-8">
                     <span className="text-xl mr-3 flex-shrink-0">💬</span>
                     <span><span style={{ fontWeight: 'bold' }}>Exclusive text support</span> for instant help</span>
                   </li>
                   
+                  
                   {/* Bonus Section */}
-                  <li className="flex items-center justify-center">
-                    <span className="text-sm font-medium text-blue-300 uppercase tracking-wide">Limited-Time Bonuses</span>
+                  <li className="flex items-center justify-center mb-4">
+                    <span className="text-sm font-medium text-yellow-300 uppercase tracking-wide">++ Limited-Time Bonuses</span>
                   </li>
                   
                   <li className="flex items-center justify-center">
                     <span className="text-xl mr-3 flex-shrink-0">🎁</span>
                     <span><span style={{ fontWeight: 'bold' }}>FREE 30-Day Small Business Challenge</span></span>
                   </li>
+                  
+                  {/* Divider */}
+                  <div className="flex justify-center">
+                    <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
+                  </div>
+                  
                   <li className="flex items-center justify-center">
                     <span className="text-xl mr-3 flex-shrink-0">🎁</span>
                     <span><span style={{ fontWeight: 'bold' }}>150+ Exclusive Customizable Designs</span></span>
@@ -389,6 +444,10 @@ const StickerShuttlePro = () => {
             
             <div className="space-y-6" style={{ backgroundColor: '#030140' }}>
               {[
+                {
+                  question: "Do you design the stickers for me?",
+                  answer: "No, you upload your own designs, logo, whatever you want and we ship it to you monthly. You can change your design within a specific window."
+                },
                 {
                   question: "How do the 100 monthly stickers work?",
                   answer: "Every month, you'll receive 100 custom premium vinyl stickers. You have the option to change the designs within a dedicated window. These are high-quality, weather-resistant stickers perfect for any use."
