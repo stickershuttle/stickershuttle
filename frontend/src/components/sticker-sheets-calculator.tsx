@@ -821,26 +821,26 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
 
 `}</style>
               
-              {/* Honeymoon Alert Banner */}
-              <div className="mb-4">
-                <div 
-                  className="px-4 py-3 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-[1.002] flex items-center justify-center gap-2 text-center"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
-                    border: '1px solid rgba(239, 68, 68, 0.4)',
-                    boxShadow: '0 8px 32px rgba(239, 68, 68, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
-                    backdropFilter: 'blur(12px)',
-                  }}
-                >
-                  <span className="text-red-300 text-sm md:text-base">
-                    🚨<b>ATTN: We will be temporarily closed from Sept. 4-17th</b>...<u> <a href="/blog/ciao-bella-were-off-to-italy" className="text-red-300 hover:text-red-200 transition-colors duration-200">Read more 🡒 </a></u>
-                  </span>
-                </div>
-              </div>
-              
               <div className="">
-          {/* Main Container */}
-        <div className="rounded-3xl">
+                {/* Honeymoon Alert Banner */}
+                <div className="mb-4">
+                  <div 
+                    className="px-4 py-3 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-[1.002] flex items-center justify-center gap-2 text-center"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
+                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                      boxShadow: '0 8px 32px rgba(239, 68, 68, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+                      backdropFilter: 'blur(12px)',
+                    }}
+                  >
+                    <span className="text-red-300 text-sm md:text-base">
+                      🚨<b>ATTN: We will be temporarily closed from Sept. 4-17th</b>...<u> <a href="/blog/ciao-bella-were-off-to-italy" className="text-red-300 hover:text-red-200 transition-colors duration-200">Read more 🡒 </a></u>
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Main Container */}
+                <div className="rounded-3xl">
           {/* Top Section */}
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-18 gap-4 lg:gap-6 mb-4 lg:mb-6">
             {/* Cut Selection */}
