@@ -65,27 +65,37 @@ class CreatorPaymentProcessor {
 
       const client = supabaseClient.getServiceClient();
       
-      // Get order details with items
+      // Get order details
       const { data: order, error: orderError } = await client
         .from('orders_main')
-        .select(`
-          *,
-          order_items (
-            id,
-            product_id,
-            product_name,
-            quantity,
-            unit_price,
-            total_price,
-            calculator_selections
-          )
-        `)
+        .select('*')
         .eq('id', orderId)
         .single();
 
       if (orderError || !order) {
         throw new Error(`Order not found: ${orderError?.message}`);
       }
+
+      // Get order items separately to avoid schema cache issues
+      const { data: orderItems, error: itemsError } = await client
+        .from('order_items')
+        .select(`
+          id,
+          product_id,
+          product_name,
+          quantity,
+          unit_price,
+          total_price,
+          calculator_selections
+        `)
+        .eq('order_id', orderId);
+
+      if (itemsError) {
+        throw new Error(`Failed to fetch order items: ${itemsError.message}`);
+      }
+
+      // Add items to order object
+      order.order_items = orderItems || [];
 
       // Filter marketplace products and group by creator
       const creatorEarnings = new Map();

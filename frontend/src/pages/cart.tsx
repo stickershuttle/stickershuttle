@@ -2392,8 +2392,12 @@ export default function CartPage() {
                     {(() => {
                       if (!user) return null;
                       
+                      // Calculate credits based on the discounted price (after wholesale discount) 
+                      // rather than the final total (which includes credits and fees)
+                      const baseForCredits = afterDiscounts;
+                      
                       const creditEarnings = calculateCreditEarningsWithLimit(
-                        finalTotal,
+                        baseForCredits,
                         userCredits,
                         creditRateDecimal
                       );

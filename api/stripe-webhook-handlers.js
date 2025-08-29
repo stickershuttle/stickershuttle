@@ -280,7 +280,26 @@ async function handleCheckoutSessionCompleted(session) {
     
     // Get customer info and shipping address
     const customer = fullSession.customer_details || {};
-    const shippingAddress = fullSession.shipping_details?.address || fullSession.customer_details?.address || {};
+    const shippingDetails = fullSession.shipping_details || {};
+    const shippingAddress = shippingDetails.address || fullSession.customer_details?.address || {};
+    
+    console.log('👤 Customer details from Stripe:', {
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
+      hasShippingAddress: !!shippingAddress.line1
+    });
+    
+    console.log('📦 Shipping details from Stripe:', {
+      shippingName: shippingDetails.name,
+      shippingPhone: shippingDetails.phone,
+      shippingAddress: {
+        line1: shippingAddress.line1,
+        city: shippingAddress.city,
+        state: shippingAddress.state,
+        postal_code: shippingAddress.postal_code
+      }
+    });
     
     // Enhanced shipping method detection
     console.log('🚚 Processing shipping method detection...');
@@ -658,20 +677,20 @@ async function handleCheckoutSessionCompleted(session) {
         subtotal_price: (fullSession.amount_subtotal / 100).toFixed(2),
         total_tax: ((fullSession.amount_total - fullSession.amount_subtotal) / 100).toFixed(2),
         total_price: (fullSession.amount_total / 100).toFixed(2),
-        // Add customer information from Stripe
-        customer_first_name: customer.name?.split(' ')[0] || '',
-        customer_last_name: customer.name?.split(' ').slice(1).join(' ') || '',
-        customer_email: customer.email,
-        customer_phone: customer.phone,
-        // Update shipping address from Stripe if provided
-        shipping_address: {
+        // Use shipping recipient name for fulfillment, customer info for billing/contact
+        customer_first_name: shippingDetails.name?.split(' ')[0] || customer.name?.split(' ')[0] || existingOrder.customer_first_name || '',
+        customer_last_name: shippingDetails.name?.split(' ').slice(1).join(' ') || customer.name?.split(' ').slice(1).join(' ') || existingOrder.customer_last_name || '',
+        customer_email: customer.email || existingOrder.customer_email,
+        customer_phone: shippingDetails.phone || customer.phone || existingOrder.customer_phone,
+        // Update shipping address from Stripe if provided, fallback to existing
+        shipping_address: shippingAddress.line1 ? {
           line1: shippingAddress.line1,
           line2: shippingAddress.line2,
           city: shippingAddress.city,
           state: shippingAddress.state,
           postal_code: shippingAddress.postal_code,
           country: shippingAddress.country,
-        },
+        } : existingOrder.shipping_address,
         shipping_method: shippingMethodName,
         is_express_shipping: isExpressShipping,
         is_rush_order: isRushOrder,
@@ -702,12 +721,19 @@ async function handleCheckoutSessionCompleted(session) {
           p_tax: parseFloat(((fullSession.amount_total - fullSession.amount_subtotal) / 100).toFixed(2)),
           p_total: parseFloat((fullSession.amount_total / 100).toFixed(2)),
           p_proof_status: proofStatus || null,
-          p_shipping_address: JSON.stringify(updateData.shipping_address),
+          p_shipping_address: JSON.stringify(shippingAddress.line1 ? {
+            line1: shippingAddress.line1,
+            line2: shippingAddress.line2,
+            city: shippingAddress.city,
+            state: shippingAddress.state,
+            postal_code: shippingAddress.postal_code,
+            country: shippingAddress.country,
+          } : existingOrder.shipping_address),
           p_customer_data: JSON.stringify({
-            first_name: customer.name?.split(' ')[0] || '',
-            last_name: customer.name?.split(' ').slice(1).join(' ') || '',
-            email: customer.email,
-            phone: customer.phone
+            first_name: shippingDetails.name?.split(' ')[0] || customer.name?.split(' ')[0] || existingOrder.customer_first_name || '',
+            last_name: shippingDetails.name?.split(' ').slice(1).join(' ') || customer.name?.split(' ').slice(1).join(' ') || existingOrder.customer_last_name || '',
+            email: customer.email || existingOrder.customer_email,
+            phone: shippingDetails.phone || customer.phone || existingOrder.customer_phone
           })
         });
         
@@ -1309,17 +1335,24 @@ async function handleCheckoutSessionCompleted(session) {
       total_tax: ((fullSession.amount_total - fullSession.amount_subtotal) / 100).toFixed(2),
       total_price: (fullSession.amount_total / 100).toFixed(2),
       currency: fullSession.currency.toUpperCase(),
-      customer_first_name: customer.name?.split(' ')[0] || '',
-      customer_last_name: customer.name?.split(' ').slice(1).join(' ') || '',
-      customer_email: customer.email,
-      customer_phone: customer.phone,
-      shipping_address: {
+      customer_first_name: shippingDetails.name?.split(' ')[0] || customer.name?.split(' ')[0] || metadata.customerFirstName || '',
+      customer_last_name: shippingDetails.name?.split(' ').slice(1).join(' ') || customer.name?.split(' ').slice(1).join(' ') || metadata.customerLastName || '',
+      customer_email: customer.email || metadata.customerEmail,
+      customer_phone: shippingDetails.phone || customer.phone || metadata.customerPhone,
+      shipping_address: shippingAddress.line1 ? {
         line1: shippingAddress.line1,
         line2: shippingAddress.line2,
         city: shippingAddress.city,
         state: shippingAddress.state,
         postal_code: shippingAddress.postal_code,
         country: shippingAddress.country,
+      } : {
+        line1: metadata.shippingLine1 || '',
+        line2: metadata.shippingLine2 || '',
+        city: metadata.shippingCity || '',
+        state: metadata.shippingState || '',
+        postal_code: metadata.shippingZip || '',
+        country: metadata.shippingCountry || 'US',
       },
       billing_address: fullSession.customer_details?.address || shippingAddress,
       shipping_method: shippingMethodName,

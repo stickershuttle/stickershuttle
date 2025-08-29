@@ -17,10 +17,16 @@ function calculateCreatorEarnings(price: number): number {
   return price * 0.05; // 5% of the price as store credit
 }
 
-// Helper function to calculate store credit based on original order value (before discounts)
+// Helper function to calculate store credit based on discounted order value (after quantity discounts)
 function calculateStoreCredit(basePrice: number, quantity: number): number {
-  const originalOrderValue = basePrice * quantity;
-  return originalOrderValue * 0.05; // 5% of original order value
+  // Calculate quantity-based discount
+  let discountMultiplier = 1;
+  if (quantity === 5) discountMultiplier = 0.5; // 50% off
+  else if (quantity === 10) discountMultiplier = 0.4; // 60% off
+  else if (quantity === 25) discountMultiplier = 0.3; // 70% off
+  
+  const discountedOrderValue = basePrice * discountMultiplier * quantity;
+  return discountedOrderValue * 0.05; // 5% of discounted order value
 }
 
 interface MarketplaceProduct {
@@ -857,7 +863,7 @@ export default function MarketplaceProductPage() {
                               alt="Credits" 
                               className="w-4 h-4 object-contain ml-0.5 mr-1.5"
                             />
-                            <span>${calculateStoreCredit(basePrice, quantity).toFixed(2)} in store credit</span>
+                            <span>${(totalPrice * 0.05).toFixed(2)} in store credit</span>
                           </div>
                         </div>
                         

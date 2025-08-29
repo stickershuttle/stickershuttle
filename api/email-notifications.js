@@ -36,6 +36,126 @@ const isMarketSpaceOrder = (orderData) => {
   });
 };
 
+// Retail-focused email template for marketplace orders
+const getMarketplaceOrderEmailTemplate = (orderData, newStatus) => {
+  const statusMessages = {
+    'Printing': {
+      subject: `🎉 Your Market Space stickers are being printed! - Order #${orderData.orderNumber}`,
+      title: 'Your order is being printed!',
+              message: 'Great news! Your Market Space stickers are now being printed and will ship within 24 hours via USPS stamps.',
+      emoji: '🖨️',
+      color: '#10B981'
+    },
+    'Shipped': {
+      subject: `📦 Your Market Space stickers are on the way! - Order #${orderData.orderNumber}`,
+      title: 'Your stickers are on the way!',
+              message: 'Your Market Space stickers have been shipped via USPS stamps and will arrive in 5-10 business days. Please note that this shipment does not include tracking, but rest assured your stickers are on their way to you!',
+      emoji: '📦',
+      color: '#8B5CF6'
+    },
+    'Delivered': {
+      subject: `✅ Your Market Space stickers have arrived! - Order #${orderData.orderNumber}`,
+      title: 'Your stickers have arrived!',
+      message: 'Your Market Space stickers have been delivered! We hope you love them. Don\'t forget to share them with the world and tag us @stickershuttle or the creator!',
+      emoji: '✅',
+      color: '#059669'
+    }
+  };
+
+  const statusInfo = statusMessages[newStatus] || {
+    subject: `Order Update - Order #${orderData.orderNumber}`,
+    title: 'Order Status Updated',
+    message: `Your Market Space order status has been updated to: ${newStatus}`,
+    emoji: '📢',
+    color: '#6B7280'
+  };
+
+  return {
+    subject: statusInfo.subject,
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${statusInfo.subject}</title>
+</head>
+<body style="margin: 0; padding: 20px; background-color: #ffffff; color: #1a1a1a; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; min-height: 100vh;">
+  <div style="max-width: 600px; margin: 0 auto; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 16px; overflow: hidden;">
+    
+    <!-- Header -->
+    <div style="background: #f1f3f5; border-bottom: 1px solid #e9ecef; padding: 30px 20px; text-align: center;">
+      <h1 style="margin: 0; font-size: 22px; font-weight: 600; color: #1a1a1a;">
+        ${statusInfo.emoji} ${statusInfo.title}
+      </h1>
+      <p style="margin: 10px 0 0 0; font-size: 16px; font-weight: 400; color: #4b5563;">
+        Market Space Order #${orderData.orderNumber}
+      </p>
+    </div>
+
+    <!-- Main Content -->
+    <div style="padding: 30px 20px;">
+      <div style="background: #ffffff; border: 1px solid #e9ecef; border-left: 4px solid ${statusInfo.color}; padding: 20px; margin-bottom: 30px; border-radius: 12px;">
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; font-weight: 400; color: #1a1a1a;">
+          ${statusInfo.message}
+        </p>
+      </div>
+
+      <!-- Marketplace Benefits -->
+      ${newStatus === 'Printing' ? `
+      <div style="background: #ffffff; border: 1px solid #e9ecef; padding: 20px; margin-bottom: 30px; border-radius: 12px;">
+        <h3 style="margin: 0 0 15px 0; font-size: 18px; font-weight: 600; color: #1a1a1a;">Why Market Space Orders are Faster:</h3>
+        <ul style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.8; color: #4b5563;">
+          <li>✅ Pre-designed artwork - no proofs needed</li>
+          <li>🚀 Ready to print immediately</li>
+          <li>📦 Ships within 24 hours</li>
+          <li>💰 Great value for quality stickers</li>
+        </ul>
+      </div>
+      ` : ''}
+
+      <!-- Action Buttons -->
+      <div style="text-align: center; margin-bottom: 30px;">
+        <a href="${FRONTEND_URL}/account/dashboard" style="display: inline-block; background-color: #3B82F6; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+          View Order Details
+        </a>
+        <a href="${FRONTEND_URL}/marketspace" style="display: inline-block; background-color: #10B981; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 12px; font-weight: 600; margin: 0 10px 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+          Shop More Designs
+        </a>
+      </div>
+
+      <!-- Support Section -->
+      <div style="border-top: 1px solid #e9ecef; padding-top: 20px; text-align: center;">
+        <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 400; color: #4b5563;">
+          Questions about your marketplace order?
+        </p>
+        <a href="${FRONTEND_URL}/contact-us" style="color: #3b82f6; text-decoration: none; font-weight: 600; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+          Contact Support
+        </a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background: #f1f3f5; border-top: 1px solid #e9ecef; padding: 20px; text-align: center;">
+      <!-- Logo -->
+      <div style="margin-bottom: 15px;">
+        <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751567428/LogoDarktGreyStickerShuttle_lpvvnc.png" alt="Sticker Shuttle" style="height: 40px; width: auto;" />
+      </div>
+      
+      <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 400; color: #4b5563;">
+        Thank you for choosing Sticker Shuttle Marketplace!
+      </p>
+      <p style="margin: 0; font-size: 12px; font-weight: 400; color: #6b7280;">
+        This email was sent to ${orderData.customerEmail} regarding marketplace order #${orderData.orderNumber}
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+    `
+  };
+};
+
 // Email templates
 const getOrderStatusEmailTemplate = (orderData, newStatus) => {
   const isMarketSpace = isMarketSpaceOrder(orderData);
@@ -270,7 +390,19 @@ const sendOrderStatusNotification = async (orderData, newStatus) => {
       return { success: false, error: 'No customer email' };
     }
 
-    const template = getOrderStatusEmailTemplate(normalizedOrderData, newStatus);
+    // Check if this is a Market Space order and if it's a "Delivered" status
+    const isMarketSpace = isMarketSpaceOrder(normalizedOrderData);
+    
+    // Skip "Delivered" emails for Market Space orders without tracking (USPS stamps)
+    if (isMarketSpace && newStatus === 'Delivered' && !normalizedOrderData.trackingNumber && !normalizedOrderData.trackingUrl) {
+      console.log(`📦 Skipping "Delivered" email for Market Space order ${normalizedOrderData.orderNumber} - no tracking (USPS stamps)`);
+      return { success: true, message: 'Delivered email skipped for Market Space order without tracking' };
+    }
+
+    // Send appropriate order status notification based on order type
+    const template = isMarketSpace 
+      ? getMarketplaceOrderEmailTemplate(normalizedOrderData, newStatus)
+      : getOrderStatusEmailTemplate(normalizedOrderData, newStatus);
     const result = await sendEmail(normalizedOrderData.customerEmail, template.subject, template.html);
     
     if (result.success) {
@@ -994,6 +1126,15 @@ const sendOrderStatusNotificationEnhanced = async (orderData, newStatus) => {
       return { success: false, error: 'No customer email' };
     }
 
+    // Check if this is a Market Space order and if it's a "Delivered" status
+    const isMarketSpace = isMarketSpaceOrder(normalizedOrderData);
+    
+    // Skip "Delivered" emails for Market Space orders without tracking (USPS stamps)
+    if (isMarketSpace && newStatus === 'Delivered' && !normalizedOrderData.trackingNumber && !normalizedOrderData.trackingUrl) {
+      console.log(`📦 Skipping "Delivered" email for Market Space order ${normalizedOrderData.orderNumber} - no tracking (USPS stamps)`);
+      return { success: true, message: 'Delivered email skipped for Market Space order without tracking' };
+    }
+
     // Check if this is a first-time customer when the order is paid
     if (newStatus === 'paid' || newStatus === 'Building Proof') {
       const isFirstTime = await isFirstTimeCustomer(normalizedOrderData.customerEmail);
@@ -1032,8 +1173,10 @@ const sendOrderStatusNotificationEnhanced = async (orderData, newStatus) => {
       }
     }
 
-    // Send standard order status notification
-    const template = getOrderStatusEmailTemplate(normalizedOrderData, newStatus);
+    // Send appropriate order status notification based on order type
+    const template = isMarketSpace 
+      ? getMarketplaceOrderEmailTemplate(normalizedOrderData, newStatus)
+      : getOrderStatusEmailTemplate(normalizedOrderData, newStatus);
     const result = await sendEmail(normalizedOrderData.customerEmail, template.subject, template.html);
     
     if (result.success) {
@@ -2213,5 +2356,7 @@ module.exports = {
   scheduleFirstOrderThankYou,
   isFirstTimeCustomer,
   sendPickupReadyNotification,
-  sendPickupCompletedNotification
+  sendPickupCompletedNotification,
+  getMarketplaceOrderEmailTemplate,
+  isMarketSpaceOrder
 }; 

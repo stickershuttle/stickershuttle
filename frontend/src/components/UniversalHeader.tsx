@@ -861,7 +861,8 @@ export default function UniversalHeader() {
                 {/* Show deals and background removal only when NOT on marketplace */}
                 {!isMarketspacePage && (
                   <>
-                    {!isWholesale && (
+                    {/* Deals button - Hidden but preserved for future use */}
+                    {false && !isWholesale && (
                       <Link 
                         href="/deals"
                         className={`px-4 py-2 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2${router.pathname === '/deals' || router.asPath === '/deals' ? ' active' : ''}`}
@@ -1113,7 +1114,8 @@ export default function UniversalHeader() {
 
                         <hr className="border-white/10 my-2" />
 
-                        {!isWholesale && (
+                        {/* Deals button - Hidden but preserved for future use */}
+                        {false && !isWholesale && (
                           <Link 
                             href="/deals"
                             className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
@@ -1334,7 +1336,8 @@ export default function UniversalHeader() {
 
               {!isAdminPage && (
                 <>
-                  {!isWholesale && (
+                  {/* Deals button - Hidden but preserved for future use */}
+                  {false && !isWholesale && (
                     <Link 
                       href="/deals"
                       className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
@@ -1554,7 +1557,8 @@ export default function UniversalHeader() {
           <nav className="space-y-2">
             {!isAdminPage && (
               <>
-                {!isWholesale && (
+                {/* Deals button - Hidden but preserved for future use */}
+                {false && !isWholesale && (
                   <Link 
                     href="/deals" 
                     className={`w-full text-left px-4 py-3 rounded-lg text-white hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-all duration-200 flex items-center${router.pathname === '/deals' || router.asPath === '/deals' ? ' bg-purple-500 bg-opacity-20 border-l-4 border-purple-400' : ''}`} 

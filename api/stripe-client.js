@@ -150,12 +150,21 @@ class StripeClient {
           creditsApplied: orderData.cartMetadata?.creditsApplied || '0.00',
           totalAmount: orderData.cartMetadata?.totalAmount || '0.00',
           isTaxExempt: isTaxExempt.toString(),
+          // Customer information as fallback
+          customerFirstName: orderData.customerFirstName || '',
+          customerLastName: orderData.customerLastName || '',
+          customerEmail: orderData.customerEmail || '',
+          customerPhone: orderData.customerPhone || '',
           // Additional payment fields
           isAdditionalPayment: orderData.cartMetadata?.isAdditionalPayment?.toString() || 'false',
           originalOrderId: orderData.cartMetadata?.originalOrderId || ''
         },
         shipping_address_collection: {
           allowed_countries: ['US', 'CA'], // Add more countries as needed
+        },
+        // Enable phone number collection to get customer names
+        phone_number_collection: {
+          enabled: true
         },
         // Enable automatic tax calculation
         automatic_tax: {

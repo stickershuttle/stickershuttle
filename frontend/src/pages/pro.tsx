@@ -29,7 +29,7 @@ const StickerShuttlePro = () => {
 
   React.useEffect(() => {
     const currentMessage = messages[currentMessageIndex];
-    const typingSpeed = isDeleting ? 15 : 60;
+    const typingSpeed = isDeleting ? 8 : 30;
     const pauseTime = isDeleting ? 500 : 2000;
 
     const timer = setTimeout(() => {
@@ -141,8 +141,8 @@ const StickerShuttlePro = () => {
         {/* Hero Section */}
         <div className="relative overflow-hidden pt-20 pb-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
-              <div className="flex justify-center mb-6 pt-8">
+                          <div className="text-center">
+                <div className="flex justify-center mb-6 pt-8">
                 <img 
                   src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
                   alt="Sticker Shuttle Pro Logo" 
@@ -173,6 +173,28 @@ const StickerShuttlePro = () => {
                   </button>
               </div>
               
+              {/* Founding 500 Progress Bar */}
+              <div className="mb-8 max-w-xs mx-auto">
+                <div className="text-center mb-3">
+                  <span className="text-sm font-bold text-blue-300 tracking-wider">
+                    Founding 500 Members
+                  </span>
+                </div>
+                <div className="relative w-full h-3 bg-gray-700/30 rounded-full overflow-hidden"
+                     style={{
+                       border: '1px solid rgba(255, 255, 255, 0.1)',
+                       boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                       backdropFilter: 'blur(12px)'
+                     }}>
+                  <div className="h-full bg-gradient-to-r from-yellow-400 to-red-500 rounded-full transition-all duration-1000 ease-out"
+                       style={{ width: '48.4%' }}></div>
+                </div>
+                <div className="flex justify-between text-xs text-gray-400 mt-2">
+                  <span>242 members</span>
+                  <span>258 spots left</span>
+                </div>
+              </div>
+              
               {/* Value Proposition */}
               <i className="text-gray-300">Save <b>$1,294 per year</b> with Pro membership</i>
               
@@ -181,12 +203,12 @@ const StickerShuttlePro = () => {
                 <ul className="space-y-2 text-gray-300" style={{ fontFamily: 'Rubik, sans-serif' }}>
                   {/* Main Benefits Section Header */}
                   <li className="flex items-center justify-center mb-4">
-                    <span className="text-sm font-medium text-green-300 uppercase tracking-wide">What's Included?</span>
+                    <span className="text-m font-medium text-green-300 uppercase tracking-wide">What's Included?</span>
                   </li>
                   
                   <li className="flex items-center justify-center">
                     <span className="text-xl mr-3 flex-shrink-0">📦</span>
-                    <span><span style={{ fontWeight: 'bold' }}>100 custom stickers</span> monthly <span className="line-through text-red-400" style={{ fontFamily: 'Rubik, sans-serif', fontWeight: 'bold' }}>$87</span></span>
+                    <span><span style={{ fontWeight: 'bold' }}>100 custom stickers</span> delivered monthly <span className="line-through text-red-400" style={{ fontFamily: 'Rubik, sans-serif', fontWeight: 'bold' }}>$87</span></span>
                   </li>
                   
                   {/* Divider */}
@@ -225,7 +247,7 @@ const StickerShuttlePro = () => {
                   
                   {/* Additional Benefits Section Header */}
                   <li className="flex items-center justify-center mb-4">
-                    <span className="text-sm font-medium text-blue-300 uppercase tracking-wide">+ Additional Benefits</span>
+                    <span className="text-m font-medium text-blue-300 uppercase tracking-wide">+ Additional Benefits</span>
                   </li>
                   
                   <li className="flex items-center justify-center">
@@ -256,7 +278,7 @@ const StickerShuttlePro = () => {
                   
                   {/* Bonus Section */}
                   <li className="flex items-center justify-center mb-4">
-                    <span className="text-sm font-medium text-yellow-300 uppercase tracking-wide">++ Limited-Time Bonuses</span>
+                    <span className="text-m font-medium text-yellow-300 uppercase tracking-wide">+ Founding 500 Bonuses</span>
                   </li>
                   
                   <li className="flex items-center justify-center">
@@ -269,11 +291,19 @@ const StickerShuttlePro = () => {
                     <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
                   </div>
                   
+
+                  <li className="flex items-center justify-center">
+                    <span className="text-xl mr-3 flex-shrink-0">🎁</span>
+                    <span><span style={{ fontWeight: 'bold' }}>FREE Roadmap to Your First 100 Sales</span></span>
+                  </li>
+                                    {/* Divider */}
+                                    <div className="flex justify-center">
+                    <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
+                  </div>
                   <li className="flex items-center justify-center">
                     <span className="text-xl mr-3 flex-shrink-0">🎁</span>
                     <span><span style={{ fontWeight: 'bold' }}>150+ Exclusive Customizable Designs</span></span>
                   </li>
-
                 </ul>
               </div>
               
@@ -395,7 +425,7 @@ const StickerShuttlePro = () => {
                       <span className="text-2xl font-bold -mt-1">Annual</span>
                     </div>
                     <div className="flex items-center justify-center gap-3 mb-2">
-                      <div className="text-4xl font-bold" style={{ fontFamily: 'Rubik, sans-serif' }}>$397</div>
+                      <div className="text-4xl font-bold" style={{ fontFamily: 'Rubik, sans-serif' }}>$347</div>
                       <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold text-white"
                            style={{
                              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.8) 0%, rgba(220, 38, 38, 0.8) 100%)',
@@ -403,7 +433,7 @@ const StickerShuttlePro = () => {
                              border: '1px solid rgba(239, 68, 68, 0.4)',
                              boxShadow: 'rgba(239, 68, 68, 0.3) 0px 4px 16px'
                            }}>
-                        Save $71
+                        Save $121
                       </div>
                     </div>
                     <div className={selectedPlan === 'annual' ? 'text-blue-200' : 'text-gray-300'}>
@@ -428,6 +458,8 @@ const StickerShuttlePro = () => {
             </div>
           </div>
         </div>
+
+
 
         {/* FAQ Section */}
         <div className="py-0" style={{ backgroundColor: '#030140' }}>

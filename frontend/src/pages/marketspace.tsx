@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useRouter } from "next/router";
 import Layout from "@/components/Layout";
 import FloatingChatWidget from "@/components/FloatingChatWidget";
-import PageTransition from "@/components/PageTransition";
+
 import { getSupabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useQuery, useMutation } from "@apollo/client";
@@ -221,6 +221,14 @@ function ProductCard({ product, buildPackMode = false, selected, onToggleSelect,
                     ${product.original_price}
                   </span>
                 )}
+                {product.is_featured && !buildPackMode && (
+                  <div className="flex items-center gap-1">
+                    <svg className="w-4 h-4 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                    <span className="text-blue-300 text-xs">Trending</span>
+                  </div>
+                )}
               </div>
                               {!buildPackMode && (
                 <div className="flex items-center text-yellow-200 text-xs">
@@ -234,12 +242,6 @@ function ProductCard({ product, buildPackMode = false, selected, onToggleSelect,
                 </div>
               )}
             </div>
-            
-            {product.is_featured && (
-              <span className="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs">
-                Featured
-              </span>
-            )}
           </div>
         </div>
         </Link>
@@ -316,6 +318,14 @@ function ProductCard({ product, buildPackMode = false, selected, onToggleSelect,
                       ${product.original_price}
                     </span>
                   )}
+                  {product.is_featured && !buildPackMode && (
+                    <div className="flex items-center gap-1">
+                      <svg className="w-4 h-4 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h7m0 0v7m0-7l-7 7-4-4-6 6" />
+                      </svg>
+                      <span className="text-blue-300 text-xs">Trending</span>
+                    </div>
+                  )}
                 </div>
                 {!buildPackMode && (
                   <div className="flex items-center text-yellow-200 text-xs">
@@ -329,12 +339,6 @@ function ProductCard({ product, buildPackMode = false, selected, onToggleSelect,
                   </div>
                 )}
               </div>
-              
-              {product.is_featured && (
-                <span className="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs">
-                  Featured
-                </span>
-              )}
             </div>
           </div>
         </div>
@@ -389,6 +393,7 @@ export default function Marketplace() {
   const [collectionPreviews, setCollectionPreviews] = useState<{[key: string]: string}>({});
   const [allCreators, setAllCreators] = useState<any[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<MarketplaceProduct[]>([]);
+  const [mostRecentProducts, setMostRecentProducts] = useState<MarketplaceProduct[]>([]);
   const [categoryCounts, setCategoryCounts] = useState<{[key: string]: number}>({});
   const [buildPackMode, setBuildPackMode] = useState<boolean>(false);
   const [selectedPackIds, setSelectedPackIds] = useState<string[]>([]);
@@ -898,6 +903,11 @@ export default function Marketplace() {
     fetchProducts();
   }, [selectedCategories, showSaleItems, searchQuery, sortBy, selectedCreatorId, selectedCollectionId, buildPackMode, currentPage]);
 
+  // Fetch most recent products on component mount
+  useEffect(() => {
+    fetchMostRecentProducts();
+  }, []);
+
   // Fetch featured products when collection changes
   useEffect(() => {
     if (selectedCollectionId) {
@@ -1055,6 +1065,66 @@ export default function Marketplace() {
     } catch (err) {
       console.error('Error fetching featured products:', err);
       setFeaturedProducts([]);
+    }
+  };
+
+  const fetchMostRecentProducts = async () => {
+    try {
+      console.log('🕒 Fetching most recent products...');
+      
+      const { data, error } = await supabase
+        .from('marketplace_products')
+        .select(`
+          *,
+          creators (
+            id,
+            creator_name,
+            user_id,
+            profile_photo_url
+          )
+        `)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(6);
+
+      if (error) throw error;
+      
+      // Process creator profiles like in fetchProducts
+      const processedProducts = await Promise.all((data || []).map(async (product: any) => {
+        if (product.creators?.user_id) {
+          try {
+            const { data: profileData } = await supabase
+              .from('user_profiles')
+              .select('first_name, last_name, profile_photo_url')
+              .eq('user_id', product.creators.user_id)
+              .single();
+            
+            return {
+              ...product,
+              creator: {
+                ...product.creators,
+                user_profiles: profileData
+              }
+            };
+          } catch (profileError) {
+            return {
+              ...product,
+              creator: product.creators
+            };
+          }
+        } else {
+          return {
+            ...product,
+            creator: product.creators
+          };
+        }
+      }));
+      
+      console.log('✅ Most recent products loaded:', processedProducts.length);
+      setMostRecentProducts(processedProducts);
+    } catch (err) {
+      console.error('Error fetching most recent products:', err);
+      setMostRecentProducts([]);
     }
   };
 
@@ -1629,7 +1699,7 @@ export default function Marketplace() {
 
 
 
-      <PageTransition>
+
         {/* Main Content with Sidebar */}
         <section className="pt-[20px] pb-8">
         <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
@@ -1653,7 +1723,7 @@ export default function Marketplace() {
                   <div className="relative">
                                       {/* 50% OFF Pill - Positioned like a bow at top right */}
                   {!buildPackMode && (
-                    <div className="absolute -top-2 -right-5 z-[9999] transform rotate-12">
+                    <div className="absolute -top-2 -right-5 z-10 transform rotate-12">
                       <span className="inline-flex items-center justify-center text-xs bg-red-500 text-white px-2 py-1 rounded-full font-bold shadow-lg">
                         50% OFF
                       </span>
@@ -1742,50 +1812,6 @@ export default function Marketplace() {
                 </div>
 
                 
-                {/* Pack Size Selection - Only show in build pack mode */}
-                {buildPackMode && (
-                  <div className="mb-6">
-                    <label className="block text-sm font-semibold text-white mb-3">
-                      <div className="flex items-center gap-2">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4m-4 0l5.657 5.657M20 8V4m0 0h-4m4 0l-5.657 5.657" />
-                        </svg>
-                        Pack Size
-                      </div>
-                    </label>
-                    <div className="flex items-center gap-3">
-                      {[
-                        { size: '3"', price: 9.98 },
-                        { size: '4"', price: 12.48 },
-                        { size: '5"', price: 14.98 }
-                      ].map((sizeOption) => (
-                        <button
-                          key={sizeOption.size}
-                          onClick={() => setSelectedPackSize(sizeOption.size)}
-                          className={`px-4 py-2 rounded-lg border-2 transition-all duration-200 flex items-center justify-center font-medium ${
-                            selectedPackSize === sizeOption.size
-                              ? 'border-yellow-400/80 scale-105 shadow-md shadow-yellow-400/15'
-                              : 'border-white/30 opacity-75 hover:opacity-100 hover:border-white/50'
-                          }`}
-                          style={{
-                            background: selectedPackSize === sizeOption.size
-                              ? 'rgba(255, 215, 0, 0.15)'
-                              : 'rgba(255, 255, 255, 0.05)',
-                            backdropFilter: 'blur(12px)'
-                          }}
-                        >
-                          <span className={`text-sm ${
-                            selectedPackSize === sizeOption.size
-                              ? 'text-yellow-200'
-                              : 'text-white/80'
-                          }`}>
-                            {sizeOption.size} - ${sizeOption.price}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Category Filter */}
                 <div>
@@ -2101,14 +2127,7 @@ export default function Marketplace() {
                       Showing results for "{searchQuery}"
                     </div>
                   )}
-                  <div className="mt-3 pt-3 border-t border-white/10">
-                    <Link href="/creators-space-apply" className="text-xs text-blue-400 hover:text-blue-300 inline-flex items-center gap-1">
-                      Apply to be a creator
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </Link>
-                  </div>
+
                 </div>
               </div>
             </aside>
@@ -2121,7 +2140,7 @@ export default function Marketplace() {
                 <div className="relative">
                   {/* 50% OFF Pill - Positioned like a bow at top right */}
                   {!buildPackMode && (
-                    <div className="absolute -top-3 -right-3 z-[99999] transform rotate-12" style={{ position: 'fixed', top: '15px', right: '10px' }}>
+                    <div className="absolute -top-3 -right-3 z-10 transform rotate-12">
                       <span className="inline-flex items-center justify-center text-xs bg-red-500 text-white px-2 py-1 rounded-full font-bold shadow-lg">
                         50% OFF
                       </span>
@@ -2389,7 +2408,38 @@ export default function Marketplace() {
                     </div>
                   )}
 
-                                    {/* Mobile Filter Toggle Button */}
+                  {/* Store Credit Info Container */}
+                  <div 
+                    className="hidden sm:block rounded-2xl overflow-hidden mb-6"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.6) 0%, rgba(255, 215, 0, 0.4) 25%, rgba(250, 204, 21, 0.25) 50%, rgba(255, 193, 7, 0.15) 75%, rgba(250, 204, 21, 0.1) 100%)',
+                      backdropFilter: 'blur(25px) saturate(200%)',
+                      border: '1px solid rgba(255, 215, 0, 0.5)',
+                      boxShadow: 'rgba(250, 204, 21, 0.25) 0px 4px 20px, rgba(255, 255, 255, 0.3) 0px 1px 0px inset'
+                    }}
+                  >
+                    <div className="px-4 sm:px-6 py-4 sm:py-5">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <img 
+                            src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
+                            alt="Credits" 
+                            className="w-8 h-8 sm:w-6 sm:h-6 object-contain flex-shrink-0"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-base sm:text-lg font-bold text-white leading-tight">
+                              Earn 5% in store credit on every purchase!
+                            </h3>
+                            <p className="text-sm text-yellow-300 mt-1">
+                              Available on all orders
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mobile Filter Toggle Button */}
                   <div className="lg:hidden mb-4">
                     <div className="max-w-2xl mx-auto flex justify-start">
                       <button
@@ -2410,6 +2460,7 @@ export default function Marketplace() {
                       </button>
                     </div>
                   </div>
+
 
                   {/* Search Bar - Mobile only */}
                   <div className="mb-4 lg:hidden">
@@ -2448,24 +2499,20 @@ export default function Marketplace() {
                   </div>
 
                   {/* Recently Added Section - Without Title */}
-                  {products.length > 0 && (
+                  {mostRecentProducts.length > 0 && !searchQuery.trim() && (
                     <div data-section="recently-added" className="mb-8">
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4">
-                        {products
-                          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) // Sort by most recent
-                          .slice(0, 6) // Take first 6
-                          .map((product) => (
-                            <ProductCard 
-                              key={`recent-${product.id}`} 
-                              product={product} 
-                              buildPackMode={buildPackMode} 
-                              selected={selectedPackIds.includes(product.id)} 
-                              onToggleSelect={togglePackSelection} 
-                              onAddToCart={handleAddMarketplaceProductToCart} 
-                              getPriceOverride={getMarketplaceProductPrice} 
-                            />
-                          ))
-                        }
+                        {mostRecentProducts.map((product) => (
+                          <ProductCard 
+                            key={`recent-${product.id}`} 
+                            product={product} 
+                            buildPackMode={buildPackMode} 
+                            selected={selectedPackIds.includes(product.id)} 
+                            onToggleSelect={togglePackSelection} 
+                            onAddToCart={handleAddMarketplaceProductToCart} 
+                            getPriceOverride={getMarketplaceProductPrice} 
+                          />
+                        ))}
                       </div>
                     </div>
                   )}
@@ -2566,6 +2613,53 @@ export default function Marketplace() {
                   </div>
                 </>
               )}
+
+              {/* Custom Stickers Container */}
+              <div 
+                className="rounded-2xl overflow-hidden mb-6"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.6) 0%, rgba(96, 165, 250, 0.4) 25%, rgba(59, 130, 246, 0.25) 50%, rgba(37, 99, 235, 0.15) 75%, rgba(59, 130, 246, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(200%)',
+                  border: '1px solid rgba(59, 130, 246, 0.5)',
+                  boxShadow: 'rgba(59, 130, 246, 0.25) 0px 4px 20px, rgba(255, 255, 255, 0.3) 0px 1px 0px inset'
+                }}
+              >
+                <div className="px-4 sm:px-6 py-4 sm:py-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
+                        alt="Vinyl Stickers" 
+                        className="w-10 h-10 sm:w-8 sm:h-8 object-contain flex-shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-base sm:text-lg font-bold text-white leading-tight">
+                          Need custom stickers for your project?
+                        </h3>
+                        <p className="text-sm text-blue-300 mt-1">
+                          We can print your own custom designs
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => window.location.href = '/products'}
+                      className="px-4 py-3 sm:px-3 sm:py-2 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 w-full sm:w-auto"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.5) 0%, rgba(96, 165, 250, 0.35) 50%, rgba(37, 99, 235, 0.2) 100%)',
+                        backdropFilter: 'blur(25px) saturate(200%)',
+                        border: '1px solid rgba(59, 130, 246, 0.6)',
+                        boxShadow: 'rgba(59, 130, 246, 0.3) 0px 4px 16px, rgba(255, 255, 255, 0.4) 0px 1px 0px inset'
+                      }}
+                    >
+                      <svg className="w-4 h-4 sm:w-3 sm:h-3 inline mr-2 sm:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span className="text-sm sm:text-xs">Create Custom Stickers</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
 
               {/* Explore Stickers Section - Always show when filtering */}
               <div data-section="explore-stickers">
@@ -2931,7 +3025,7 @@ export default function Marketplace() {
             )}
             
             {/* Most Popular Section - Show when a collection is selected */}
-            {selectedCollectionId && !buildPackMode && featuredProducts.length > 0 && (
+            {selectedCollectionId && !buildPackMode && featuredProducts.length > 0 && !searchQuery.trim() && (
               <div className="mb-8">
                 <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
                   <svg className="w-6 h-6 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
@@ -3401,7 +3495,7 @@ export default function Marketplace() {
           </div>
         </div>
       )}
-      </PageTransition>
+
 
 
 
