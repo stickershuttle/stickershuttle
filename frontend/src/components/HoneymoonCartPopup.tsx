@@ -17,7 +17,7 @@ const HoneymoonCartPopup: React.FC<HoneymoonCartPopupProps> = ({
   // Default content for the honeymoon popup
   const defaultContent = {
     title: "🚨 Arrivederci! We're Off to Italy!",
-    excerpt: "We will be temporarily closed from September 4-17th for our honeymoon! All orders placed during this time will be processed upon our return. We appreciate your patience and understanding during this special time for us. As a small business, this is a tough decision. Thank you for understanding.❤️",
+    excerpt: "We’ll be closed September 3rd–18th for our honeymoon! Orders placed during this time will be processed once we return. Thank you for your patience and support. Taking this time off was a tough decision for us as a small business, and we truly appreciate your understanding.❤️",
     published_at: "2024-09-01T00:00:00Z"
   };
 
@@ -143,7 +143,7 @@ const HoneymoonCartPopup: React.FC<HoneymoonCartPopupProps> = ({
                   </div>
                 </div>
                 <span className="text-white text-sm leading-relaxed group-hover:text-gray-200 transition-colors duration-200">
-                  I agree to the current status of this order and understand that processing may be delayed during the honeymoon period (Sept. 4-17th).
+                  I agree to the current status of this order and understand that processing may be delayed if ordered during the closing period (Sept. 3rd-18th).
                 </span>
               </label>
             </div>
