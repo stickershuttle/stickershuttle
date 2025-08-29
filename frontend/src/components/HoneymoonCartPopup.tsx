@@ -1,6 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery } from '@apollo/client';
-import { GET_BLOG_POST_BY_SLUG } from '@/lib/blog-mutations';
+import React, { useState } from 'react';
 import Link from 'next/link';
 
 interface HoneymoonCartPopupProps {
@@ -15,24 +13,8 @@ const HoneymoonCartPopup: React.FC<HoneymoonCartPopupProps> = ({
   onAgree
 }) => {
   const [hasAgreed, setHasAgreed] = useState(false);
-  
-  // Fetch the honeymoon blog post
-  const { data, loading, error } = useQuery(GET_BLOG_POST_BY_SLUG, {
-    variables: { slug: 'ciao-bella-were-off-to-italy' },
-    skip: !isVisible
-  });
 
-  const blogPost = data?.blog_posts?.[0];
-
-  // Get first paragraph from content (assuming it's HTML or markdown)
-  const getFirstParagraph = (content: string) => {
-    if (!content) return '';
-    // Simple extraction of first paragraph - you may need to adjust based on your content format
-    const paragraphs = content.split('\n\n');
-    return paragraphs[0] || content.substring(0, 200);
-  };
-
-  // Default content when blog post is not available
+  // Default content for the honeymoon popup
   const defaultContent = {
     title: "🚨 Arrivederci! We're Off to Italy!",
     excerpt: "We will be temporarily closed from September 4-17th for our honeymoon! All orders placed during this time will be processed upon our return. We appreciate your patience and understanding during this special time for us. As a small business, this is a tough decision. Thank you for understanding.❤️",
@@ -85,8 +67,8 @@ const HoneymoonCartPopup: React.FC<HoneymoonCartPopupProps> = ({
           {/* Blog Post Image with Fade */}
           <div className="relative h-64 w-full overflow-hidden">
             <img
-              src={blogPost?.featured_image || "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755285232/blog/y4zgxmgbi4y1xb5vjwde.jpg"}
-              alt={blogPost?.title || defaultContent.title}
+              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755285232/blog/y4zgxmgbi4y1xb5vjwde.jpg"
+              alt={defaultContent.title}
               className="w-full h-full object-cover"
               onError={(e) => {
                 // Fallback to a default image if the featured image fails to load
@@ -102,46 +84,32 @@ const HoneymoonCartPopup: React.FC<HoneymoonCartPopupProps> = ({
 
           {/* Content - positioned to overlap the image fade */}
           <div className="relative -mt-16 px-6 pb-6 space-y-4">
-            {loading ? (
-              <div className="animate-pulse space-y-4">
-                <div className="h-6 bg-white bg-opacity-20 rounded w-3/4"></div>
-                <div className="space-y-2">
-                  <div className="h-4 bg-white bg-opacity-20 rounded"></div>
-                  <div className="h-4 bg-white bg-opacity-20 rounded w-5/6"></div>
-                </div>
+            {/* Title - positioned over the fade */}
+            <div className="relative z-10 mb-6">
+              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+                {defaultContent.title}
+              </h1>
+            </div>
+
+            {/* Blog Content */}
+            <div className="blog-content">
+              <div className="text-gray-300 leading-relaxed text-base">
+                <p className="mb-4">
+                  {defaultContent.excerpt}
+                </p>
               </div>
-            ) : (
-              <>
-                {/* Title - positioned over the fade */}
-                <div className="relative z-10 mb-6">
-                  <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-                    {blogPost?.title || defaultContent.title}
-                  </h1>
-                </div>
+            </div>
 
-                {/* Blog Content */}
-                <div className="blog-content">
-                  <div className="text-gray-300 leading-relaxed text-base">
-                    <p className="mb-4">
-                      {blogPost?.excerpt || 
-                       getFirstParagraph(blogPost?.content || '') || 
-                       defaultContent.excerpt}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Full Blog Link */}
-                <div className="text-center">
-                  <Link 
-                    href="/blog/ciao-bella-were-off-to-italy"
-                    className="text-blue-400 hover:text-blue-300 transition-colors duration-200 text-sm underline"
-                    onClick={onClose}
-                  >
-                    View full blog post →
-                  </Link>
-                </div>
-              </>
-            )}
+            {/* Full Blog Link */}
+            <div className="text-center">
+              <Link 
+                href="/blog/ciao-bella-were-off-to-italy"
+                className="text-blue-400 hover:text-blue-300 transition-colors duration-200 text-sm underline"
+                onClick={onClose}
+              >
+                View full blog post →
+              </Link>
+            </div>
 
             {/* Order Completion Notice */}
             <div className="text-center py-3 px-4 rounded-lg bg-green-500/10 border border-green-500/20">
