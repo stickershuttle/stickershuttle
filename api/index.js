@@ -230,6 +230,9 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
+    // Debug logging for CORS issues
+    console.log('🔍 CORS check - Origin:', origin);
+    
     const allowedOrigins = [
       // Local development
       'http://localhost:3000',
@@ -239,6 +242,9 @@ const corsOptions = {
       'https://stickershuttle.com',
       'https://www.stickershuttle.com',
       'https://stickershuttle.vercel.app',
+      
+      // Railway backend domain (for internal API calls)
+      'https://ss-beyond.up.railway.app',
       
       // Vercel preview deployments
       /^https:\/\/stickershuttle-[\w-]+\.vercel\.app$/,
@@ -256,9 +262,8 @@ const corsOptions = {
     if (isAllowed) {
       callback(null, true);
     } else {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('⚠️ CORS blocked:', origin);
-      }
+      // Temporarily enable logging in production to debug CORS issues
+      console.warn('⚠️ CORS blocked:', origin, 'Allowed origins:', allowedOrigins);
       callback(new Error('Not allowed by CORS'));
     }
   },
