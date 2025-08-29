@@ -727,100 +727,96 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
   return (
     <div className="transition-colors duration-200">
       <style jsx>{`
-  @keyframes bounce-in {
-    0% {
-      opacity: 0;
-      transform: translateX(-50%) translateY(20px) scale(0.5);
-    }
-    60% {
-      opacity: 1;
-      transform: translateX(-50%) translateY(-10px) scale(1.1);
-    }
-    100% {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0) scale(1);
-    }
-  }
+        @keyframes bounce-in {
+          0% {
+            opacity: 0;
+            transform: translateX(-50%) translateY(20px) scale(0.5);
+          }
+          60% {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-10px) scale(1.1);
+          }
+          100% {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0) scale(1);
+          }
+        }
   
-  @keyframes fade-out {
-    0% {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0) scale(1);
-    }
-    100% {
-      opacity: 0;
-      transform: translateX(-50%) translateY(-20px) scale(0.8);
-    }
-  }
+        @keyframes fade-out {
+          0% {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0) scale(1);
+          }
+          100% {
+            opacity: 0;
+            transform: translateX(-50%) translateY(-20px) scale(0.8);
+          }
+        }
   
-  @keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-3px); }
-  }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-3px); }
+        }
+        
+        .animate-bounce-in {
+          animation: bounce-in 0.4s ease-out;
+        }
   
+        .animate-fade-out {
+          animation: fade-out 0.3s ease-in forwards;
+        }
+  
+        .animate-glow-purple {
+          box-shadow: 0 0 15px rgba(168, 85, 247, 0.4), 0 0 25px rgba(168, 85, 247, 0.2);
+        }
+  
+        .animate-glow-green {
+          box-shadow: 0 0 15px rgba(34, 197, 94, 0.4), 0 0 25px rgba(34, 197, 94, 0.2);
+        }
+  
+        .animate-glow-yellow {
+          box-shadow: 0 0 15px rgba(234, 179, 8, 0.4), 0 0 25px rgba(234, 179, 8, 0.2);
+        }
+  
+        .animate-glow-red {
+          box-shadow: 0 0 15px rgba(239, 68, 68, 0.4), 0 0 25px rgba(239, 68, 68, 0.2);
+        }
 
+              .animate-glow-blue {
+          box-shadow: 0 0 15px rgba(59, 130, 246, 0.4), 0 0 25px rgba(59, 130, 246, 0.2);
+        }
   
-  .animate-bounce-in {
-    animation: bounce-in 0.4s ease-out;
-  }
-  
-  .animate-fade-out {
-    animation: fade-out 0.3s ease-in forwards;
-  }
-  
-  .animate-glow-purple {
-    box-shadow: 0 0 15px rgba(168, 85, 247, 0.4), 0 0 25px rgba(168, 85, 247, 0.2);
-  }
-  
-  .animate-glow-green {
-    box-shadow: 0 0 15px rgba(34, 197, 94, 0.4), 0 0 25px rgba(34, 197, 94, 0.2);
-  }
-  
-  .animate-glow-yellow {
-    box-shadow: 0 0 15px rgba(234, 179, 8, 0.4), 0 0 25px rgba(234, 179, 8, 0.2);
-  }
-  
-  .animate-glow-red {
-    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4), 0 0 25px rgba(239, 68, 68, 0.2);
-  }
+        .animate-glow-orange {
+          box-shadow: 0 0 15px rgba(249, 115, 22, 0.4), 0 0 25px rgba(249, 115, 22, 0.2);
+        }
 
-  .animate-glow-blue {
-    box-shadow: 0 0 15px rgba(59, 130, 246, 0.4), 0 0 25px rgba(59, 130, 246, 0.2);
-  }
+              .container-style {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(12px);
+          border-radius: 16px;
+        }
   
-  .animate-glow-orange {
-    box-shadow: 0 0 15px rgba(249, 115, 22, 0.4), 0 0 25px rgba(249, 115, 22, 0.2);
-  }
-
-  .container-style {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(12px);
-    border-radius: 16px;
-  }
+        .button-interactive {
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          position: relative;
+          overflow: hidden;
+        }
   
-  .button-interactive {
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    overflow: hidden;
-  }
+        .button-interactive:hover {
+          transform: translateY(-1px);
+        }
   
-  .button-interactive:hover {
-    transform: translateY(-1px);
-  }
+        .button-interactive:active {
+          transform: translateY(0) scale(0.98);
+        }
   
-  .button-interactive:active {
-    transform: translateY(0) scale(0.98);
-  }
-  
-  .button-selected {
-    position: relative;
-  }
-  
-
-`}</style>
-              
+        .button-selected {
+          position: relative;
+        }
+      `}</style>
+      
               <div className="">
                 {/* Honeymoon Alert Banner */}
                 <div className="mb-4">
@@ -2068,5 +2064,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
         </div>
       </div>
     </div>
-  )
+  );
 }
+
+export default StickerSheetsCalculator;

@@ -108,3 +108,7 @@ supabase-schema.sql
 test-webhook.json
 update-webhook-to-ngrok.js
 verify-schema.js 
+
+# Ignore specific calculator components
+frontend/src/components/sticker-sheets-calculator.tsx
+frontend/src/components/vinyl-banner-calculator.tsx
