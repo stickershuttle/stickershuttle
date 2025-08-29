@@ -23,6 +23,7 @@ import DiscountCodeInput from "@/components/DiscountCodeInput";
 import { UPDATE_USER_PROFILE_NAMES, CREATE_USER_PROFILE, GET_USER_PROFILE } from "@/lib/profile-mutations";
 import { TRACK_KLAVIYO_EVENT } from "@/lib/klaviyo-mutations";
 import { CREATE_SHARED_CART } from "@/lib/admin-mutations";
+import HoneymoonCartPopup from "@/components/HoneymoonCartPopup";
 
 // Available configuration options
 const SHAPE_OPTIONS = ["Custom Shape", "Circle", "Oval", "Rectangle", "Square"];
@@ -537,6 +538,10 @@ export default function CartPage() {
   const [sharedCartUrl, setSharedCartUrl] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   
+  // Honeymoon popup state
+  const [showHoneymoonPopup, setShowHoneymoonPopup] = useState(false);
+  const [hasAgreedToHoneymoon, setHasAgreedToHoneymoon] = useState(false);
+  
   // Additional payment state
   const [additionalPaymentAmount, setAdditionalPaymentAmount] = useState('');
   const [selectedPercentage, setSelectedPercentage] = useState<number | null>(null);
@@ -620,6 +625,17 @@ export default function CartPage() {
       setShowLoginBanner(true);
     }
   }, [userLoading, user, cart.length]);
+
+  // Show honeymoon popup when cart page loads with items
+  useEffect(() => {
+    if (cart.length > 0) {
+      // Small delay to let the page load
+      const timer = setTimeout(() => {
+        setShowHoneymoonPopup(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [cart.length]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -2836,6 +2852,12 @@ export default function CartPage() {
                           }
                         }
                         
+                        // Check if user has agreed to honeymoon terms
+                        if (!hasAgreedToHoneymoon) {
+                          setShowHoneymoonPopup(true);
+                          return;
+                        }
+                        
                         // Only trigger checkout if user is not in OTP verification process
                         if (!isOtpMode) {
                           const checkoutButton = document.querySelector('.cart-checkout-button-trigger');
@@ -2854,10 +2876,10 @@ export default function CartPage() {
                       disabled={isSendingOtp || isVerifyingOtp}
                     >
                       <div className="flex flex-col md:flex-row items-center justify-center gap-2 md:gap-3">
-                        <span className="text-3xl md:text-3xl">{!user && isOtpMode ? '🔐' : '💳'}</span>
+                        <span className="text-3xl md:text-3xl">{!hasAgreedToHoneymoon ? '⚠️' : (!user && isOtpMode ? '🔐' : '💳')}</span>
                         <div className="text-center md:text-left">
                           <div className="text-white font-bold text-lg flex items-center justify-center md:justify-start gap-2 mb-1">
-                            {isSendingOtp ? 'Sending Code...' : isVerifyingOtp ? 'Verifying...' : (!user && isOtpMode ? 'Verify & Checkout' : 'Go to Checkout')}
+                            {!hasAgreedToHoneymoon ? 'Review Notice' : (isSendingOtp ? 'Sending Code...' : isVerifyingOtp ? 'Verifying...' : (!user && isOtpMode ? 'Verify & Checkout' : 'Go to Checkout'))}
                           </div>
                           {user ? (
                             <div className="text-white/90 text-sm font-normal flex items-center justify-center md:justify-start gap-2">
@@ -3450,6 +3472,13 @@ export default function CartPage() {
           </div>
         </div>
       )}
+      
+      {/* Honeymoon Popup */}
+      <HoneymoonCartPopup
+        isVisible={showHoneymoonPopup}
+        onClose={() => setShowHoneymoonPopup(false)}
+        onAgree={() => setHasAgreedToHoneymoon(true)}
+      />
     </Layout>
   );
 } 

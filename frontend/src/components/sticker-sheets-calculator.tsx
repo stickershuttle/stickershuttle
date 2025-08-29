@@ -820,6 +820,24 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
   
 
 `}</style>
+              
+              {/* Honeymoon Alert Banner */}
+              <div className="mb-4">
+                <div 
+                  className="px-4 py-3 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-[1.002] flex items-center justify-center gap-2 text-center"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    boxShadow: '0 8px 32px rgba(239, 68, 68, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+                    backdropFilter: 'blur(12px)',
+                  }}
+                >
+                  <span className="text-red-300 text-sm md:text-base">
+                    🚨<b>ATTN: We will be temporarily closed from Sept. 4-17th</b>...<u> <a href="/blog/ciao-bella-were-off-to-italy" className="text-red-300 hover:text-red-200 transition-colors duration-200">Read more 🡒 </a></u>
+                  </span>
+                </div>
+              </div>
+              
               <div className="">
           {/* Main Container */}
         <div className="rounded-3xl">
@@ -1799,40 +1817,43 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                     )}
                   </div>
 
-                  {/* Rush Order Toggle */}
-                  <div>
-                    <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium relative"
+                  {/* Rush Order Toggle - Temporarily Disabled */}
+                  <div className="relative group">
+                    <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium relative opacity-40 cursor-not-allowed"
                          style={{
-                           background: isRushOrder 
-                             ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(239, 68, 68, 0.15) 50%, rgba(239, 68, 68, 0.05) 100%)'
-                             : 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.15) 50%, rgba(59, 130, 246, 0.05) 100%)',
-                           border: isRushOrder 
-                             ? '1px solid rgba(239, 68, 68, 0.4)'
-                             : '1px solid rgba(59, 130, 246, 0.4)',
+                           background: 'linear-gradient(135deg, rgba(107, 114, 128, 0.3) 0%, rgba(107, 114, 128, 0.15) 50%, rgba(107, 114, 128, 0.05) 100%)',
+                           border: '1px solid rgba(107, 114, 128, 0.4)',
                            backdropFilter: 'blur(12px)'
                          }}>
                       <button
-                        onClick={() => updateAllItemsRushOrder(!isRushOrder)}
-                        title={isRushOrder ? "Disable rush order for all cart items" : "Enable rush order for all cart items"}
-                        className={`w-12 h-6 rounded-full transition-colors ${
-                          isRushOrder ? 'bg-red-500' : 'bg-blue-500'
-                        }`}
+                        disabled={true}
+                        className="w-12 h-6 rounded-full transition-colors bg-gray-500 cursor-not-allowed"
                       >
-                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
-                          isRushOrder ? 'translate-x-7' : 'translate-x-1'
-                        }`} />
+                        <div className="w-4 h-4 bg-white rounded-full transition-transform translate-x-1" />
                       </button>
                       <div className="flex-1">
-                        <label className={`text-sm font-medium ${isRushOrder ? 'text-red-200' : 'text-blue-200'}`}>
-                          {isRushOrder ? '🚀 Rush Order (+40%)' : '🕒 Standard Production Time'}
+                        <label className="text-sm font-medium text-gray-400">
+                          🕒 Rush Order Temporarily Unavailable
                         </label>
-                        {isRushOrder && (
-                          <div className="text-xs text-orange-200 mt-1 font-medium">
-                            🛒 Applied to entire cart
-                          </div>
-                        )}
                       </div>
                     </div>
+                    
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <span>Uh oh! We're unable to rush orders right now.</span>
+                        <a 
+                          href="https://www.stickershuttle.com/blog/ciao-bella-were-off-to-italy" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-300 hover:text-blue-200 underline pointer-events-auto"
+                        >
+                          Read more →
+                        </a>
+                      </div>
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                    </div>
+                  </div>
                     
                     {/* Rush Order Disclaimer - right under rush order toggle */}
                     {isRushOrder && (
