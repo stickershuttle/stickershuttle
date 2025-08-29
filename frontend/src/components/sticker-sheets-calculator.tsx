@@ -817,12 +817,11 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
         }
       `}</style>
       
-              <div className="">
-                {/* Honeymoon Alert Banner */}
-                <div className="mb-4">
-                  <div 
-                    className="px-4 py-3 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-[1.002] flex items-center justify-center gap-2 text-center"
-                    style={{
+      {/* Honeymoon Alert Banner */}
+      <div className="mb-4">
+        <div 
+          className="px-4 py-3 rounded-lg font-medium text-white transition-all duration-200 transform hover:scale-[1.002] flex items-center justify-center gap-2 text-center"
+          style={{
                       background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
                       border: '1px solid rgba(239, 68, 68, 0.4)',
                       boxShadow: '0 8px 32px rgba(239, 68, 68, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
@@ -1370,7 +1369,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                         </div>
                       </>
                     ) : (
-                      /* Regular customer layout */
+                      // Regular customer layout
                       <>
                         <div className="flex items-center gap-2">
                           <span className="text-lg font-semibold text-white/80">Total:</span>
@@ -1823,6 +1822,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                          }}>
                       <button
                         disabled={true}
+                        title="Rush order temporarily unavailable"
                         className="w-12 h-6 rounded-full transition-colors bg-gray-500 cursor-not-allowed"
                       >
                         <div className="w-4 h-4 bg-white rounded-full transition-transform translate-x-1" />
@@ -1948,6 +1948,70 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                     )}
                   </div>
 
+                  {/* Pricing Breakdown */}
+                  <div className="container-style p-6 transition-colors duration-200">
+                    <h3 className="text-white font-semibold mb-3">Pricing Breakdown</h3>
+                    
+                    {totalPrice && !showSizeWarning ? (
+                      <div className="space-y-2 text-sm">
+                        {/* Wholesale pricing display */}
+                        {isWholesaleApproved() && totalPrice && (
+                          <div className="mb-3 p-3 rounded-lg text-sm"
+                               style={{
+                                 background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(34, 197, 94, 0.15) 50%, rgba(34, 197, 94, 0.05) 100%)',
+                                 border: '1px solid rgba(34, 197, 94, 0.4)',
+                                 backdropFilter: 'blur(12px)'
+                               }}>
+                            <div className="space-y-1">
+                              <div className="flex justify-between items-center text-white/80">
+                                <span>Competitive Price:</span>
+                                <span>{totalPrice}</span>
+                              </div>
+                              <div className="flex justify-between items-center text-orange-300 font-medium">
+                                <span>Aggressive Price:</span>
+                                <span>${(parseFloat(totalPrice.replace('$', '')) * 1.3).toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between items-center text-red-300 font-medium">
+                                <span>Homerun Price:</span>
+                                <span>${(parseFloat(totalPrice.replace('$', '')) * 1.5).toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between items-center text-green-300 font-medium">
+                                <span>Your Price:</span>
+                                <span>${calculateWholesaleDiscount(parseFloat(totalPrice.replace('$', ''))).finalPrice.toFixed(2)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Regular pricing breakdown */}
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center text-white/80">
+                            <span>Base Price:</span>
+                            <span>{costPerSticker}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-white/80">
+                            <span>Quantity:</span>
+                            <span>{selectedQuantity === "Custom" ? customQuantity : selectedQuantity}</span>
+                          </div>
+                          {isRushOrder && (
+                            <div className="flex justify-between items-center text-red-300 font-medium">
+                              <span>Rush Order Fee (+40%):</span>
+                              <span>+${(parseFloat(totalPrice.replace('$', '')) * 0.4).toFixed(2)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center text-green-300 font-medium border-t border-white/20 pt-2">
+                            <span>Total:</span>
+                            <span>{totalPrice}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-gray-400">Configure your sticker sheets to see pricing breakdown</p>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Additional Instructions Section - moved here */}
                   <div>
                     <div className="p-3 rounded-xl backdrop-blur-md"
@@ -1987,7 +2051,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
           <div className="space-y-3">
             {/* Conditional Button Display */}
             {!totalPrice || (!uploadedFile && !uploadLater) ? (
-              /* Single Upload Required Button */
+              // Single Upload Required Button
               <button 
                 disabled={true}
                 className="w-full py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
@@ -2005,7 +2069,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                 </span>
               </button>
             ) : (
-              /* Dual Buttons */
+              // Dual Buttons
               <div className="flex flex-col sm:flex-row gap-3">
                 {/* Add to Cart & Keep Shopping Button - Full width on mobile, 80% on desktop */}
                 <button 
@@ -2061,10 +2125,6 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
               </p>
             </div>
           </div>
-        </div>
-      </div>
     </div>
-  );
+  )
 }
-
-export default StickerSheetsCalculator;

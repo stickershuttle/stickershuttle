@@ -1266,7 +1266,6 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
           </div>
         </div>
       </div>
-      </div>
     </>
   );
 }; 
