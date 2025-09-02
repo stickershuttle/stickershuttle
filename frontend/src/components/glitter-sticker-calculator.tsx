@@ -878,7 +878,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
           }}
         >
           <span className="text-red-300 text-sm md:text-base">
-            🚨<b>ATTN: We will be temporarily closed from Sept. 3rd-18th</b>...<u> <a href="/blog/ciao-bella-were-off-to-italy" className="text-red-300 hover:text-red-200 transition-colors duration-200">Read more 🡒 </a></u>
+            🚨<b>ATTN: We are temporarily closed until Sept. 18th</b>...<u> <a href="/blog/ciao-bella-were-off-to-italy" className="text-red-300 hover:text-red-200 transition-colors duration-200">Read more → </a></u>
           </span>
         </div>
       </div>

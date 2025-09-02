@@ -361,7 +361,7 @@ export default function VinylStickersAlt() {
               <div className="flex-1">
                 <h3 className="text-white font-semibold text-sm mb-1">Important Notice</h3>
                 <p className="text-white text-sm leading-relaxed">
-                  All orders in August will be fulfilled. We will be closed from <strong>Sept. 4th-17th</strong>. Any orders during that time will be fulfilled when we return. For emergency orders, please text us (303) 219-0518.{' '}
+                  All orders in August will be fulfilled. We are temporarily closed until <strong>Sept. 18th</strong>. Any orders during that time will be fulfilled when we return. For emergency orders, please text us (303) 219-0518.{' '}
                   <Link href="/blog/ciao-bella-were-off-to-italy" className="underline hover:no-underline transition-all duration-200 font-medium">
                     Read more →
                   </Link>

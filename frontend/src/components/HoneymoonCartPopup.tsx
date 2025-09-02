@@ -17,7 +17,7 @@ const HoneymoonCartPopup: React.FC<HoneymoonCartPopupProps> = ({
   // Default content for the honeymoon popup
   const defaultContent = {
     title: "🚨 Arrivederci! We're Off to Italy!",
-    excerpt: "We’ll be closed September 3rd–18th for our honeymoon! Orders placed during this time will be processed once we return. Thank you for your patience and support. Taking this time off was a tough decision for us as a small business, and we truly appreciate your understanding.❤️",
+    excerpt: "We are temporarily closed until Sept. 18th as we'll be on our honeymoon! Orders placed during this time will be processed once we return. Thank you for your patience and support. Taking this time off was a tough decision for us as a small business, and we truly appreciate your understanding.❤️",
     published_at: "2024-09-01T00:00:00Z"
   };
 
@@ -111,13 +111,6 @@ const HoneymoonCartPopup: React.FC<HoneymoonCartPopupProps> = ({
               </Link>
             </div>
 
-            {/* Order Completion Notice */}
-            <div className="text-center py-3 px-4 rounded-lg bg-green-500/10 border border-green-500/20">
-              <p className="text-green-400 text-sm font-medium">
-                ✅ All orders placed through September 2nd will be completed before we leave!
-              </p>
-            </div>
-
             {/* Agreement Checkbox */}
             <div className="pt-6 mt-6 border-t border-white border-opacity-10">
               <label className="flex items-start gap-3 cursor-pointer group">
@@ -143,7 +136,7 @@ const HoneymoonCartPopup: React.FC<HoneymoonCartPopupProps> = ({
                   </div>
                 </div>
                 <span className="text-white text-sm leading-relaxed group-hover:text-gray-200 transition-colors duration-200">
-                  I agree to the current status of this order and understand that processing may be delayed if ordered during the closing period (Sept. 3rd-18th).
+                  I agree to the current status of this order and understand that production of this order will be delayed until we return (September 18th).
                 </span>
               </label>
             </div>

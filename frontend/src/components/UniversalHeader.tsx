@@ -334,11 +334,11 @@ export default function UniversalHeader() {
       }}>
         <div className="text-xs sm:text-sm leading-tight">
           <div className="sm:hidden">
-            <div>🚨 <span className="relative inline-block">ATTN<svg className="absolute -bottom-1 left-0 w-full h-2" viewBox="0 0 70 8" fill="none"><path d="M0 6c10-2 20-2 30 0s20 2 30 0c5-1 8-1 10 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.8"/></svg></span>: We'll be closed Sept. 4th-17th</div>
-            <div>for our Honeymoon! Read more →</div>
+            <div>🚨 <span className="relative inline-block">ATTN<svg className="absolute -bottom-1 left-0 w-full h-2" viewBox="0 0 70 8" fill="none"><path d="M0 6c10-2 20-2 30 0s20 2 30 0c5-1 8-1 10 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.8"/></svg></span>: We are temporarily closed until Sept. 18th</div>
+            <div>Read more →</div>
           </div>
           <div className="hidden sm:block">
-            🚨 <span className="relative inline-block">ATTN<svg className="absolute -bottom-1 left-0 w-full h-2" viewBox="0 0 70 8" fill="none"><path d="M0 6c10-2 20-2 30 0s20 2 30 0c5-1 8-1 10 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.8"/></svg></span>: We'll be closed Sept. 4th-17th for our Honeymoon! Read more →
+            🚨 <span className="relative inline-block">ATTN<svg className="absolute -bottom-1 left-0 w-full h-2" viewBox="0 0 70 8" fill="none"><path d="M0 6c10-2 20-2 30 0s20 2 30 0c5-1 8-1 10 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.8"/></svg></span>: We are temporarily closed until Sept. 18th. Read more →
           </div>
         </div>
       </Link>

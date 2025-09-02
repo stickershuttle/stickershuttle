@@ -51,6 +51,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
   const [postToInstagram, setPostToInstagram] = useState(false)
   const [instagramHandle, setInstagramHandle] = useState("")
   const [additionalNotes, setAdditionalNotes] = useState("")
+  const [vibrancyBoost, setVibrancyBoost] = useState(false)
   const [hoveredGoldTier, setHoveredGoldTier] = useState<number | null>(null)
   const [showCustomGoldMessage, setShowCustomGoldMessage] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
@@ -240,7 +241,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
       setTotalPrice("")
       setCostPerSticker("")
     }
-  }, [selectedSize, customWidth, customHeight, selectedQuantity, customQuantity, selectedKissOption, isRushOrder])
+  }, [selectedSize, customWidth, customHeight, selectedQuantity, customQuantity, selectedKissOption, isRushOrder, vibrancyBoost])
 
   useEffect(() => {
     console.log("Recalculating price due to size or quantity change")
@@ -410,9 +411,13 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
       let finalTotalPrice = realResult.totalPrice * kissOptionMultiplier;
       let finalPricePerSticker = realResult.finalPricePerSticker * kissOptionMultiplier;
       
+      // Apply vibrancy boost if enabled (+5%)
+      if (vibrancyBoost) {
+        finalTotalPrice *= 1.05;
+        finalPricePerSticker *= 1.05;
+      }
       
-      
-              console.log(`Real Pricing (Sheets) - Quantity: ${qty}, Area: ${area}, Kiss Option: ${selectedKissOption} (${kissOptionMultiplier}x), Total: $${finalTotalPrice.toFixed(2)}, Per sheet: $${finalPricePerSticker.toFixed(2)}`);
+      console.log(`Real Pricing (Sheets) - Quantity: ${qty}, Area: ${area}, Kiss Option: ${selectedKissOption} (${kissOptionMultiplier}x), Vibrancy: ${vibrancyBoost ? '+5%' : 'none'}, Total: $${finalTotalPrice.toFixed(2)}, Per sheet: $${finalPricePerSticker.toFixed(2)}`);
       
       return {
         total: finalTotalPrice,
@@ -463,11 +468,15 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
       pricePerSticker *= 1.4
     }
 
+    // Apply vibrancy boost if enabled (+5%)
+    if (vibrancyBoost) {
+      totalPrice *= 1.05;
+      pricePerSticker *= 1.05;
+    }
 
-
-          console.log(
-        `Legacy Pricing (Sheets) - Quantity: ${qty}, Area: ${area}, Kiss Option: ${selectedKissOption} (${kissOptionMultiplier}x), Total price: $${totalPrice.toFixed(2)}, Price per sheet: $${pricePerSticker.toFixed(2)}`,
-      )
+    console.log(
+      `Legacy Pricing (Sheets) - Quantity: ${qty}, Area: ${area}, Kiss Option: ${selectedKissOption} (${kissOptionMultiplier}x), Vibrancy: ${vibrancyBoost ? '+5%' : 'none'}, Total price: $${totalPrice.toFixed(2)}, Price per sheet: $${pricePerSticker.toFixed(2)}`,
+    )
 
     return {
       total: totalPrice,
@@ -685,6 +694,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
           
           proof: { type: "finish" as const, value: sendProof, displayValue: sendProof ? "Send Proof" : "No Proof", priceImpact: 0 },
           rush: { type: "finish" as const, value: isRushOrder, displayValue: isRushOrder ? "Rush Order" : "Standard", priceImpact: isRushOrder ? total * 0.4 : 0 },
+          vibrancy: { type: "finish" as const, value: vibrancyBoost, displayValue: vibrancyBoost ? "+25% Vibrancy" : "Standard Vibrancy", priceImpact: vibrancyBoost ? total * 0.05 : 0 },
           ...(postToInstagram && {
             instagram: { 
               type: "finish" as const, 
@@ -829,7 +839,7 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                     }}
                   >
                     <span className="text-red-300 text-sm md:text-base">
-                      🚨<b>ATTN: We will be temporarily closed from Sept. 3rd-18th</b>...<u> <a href="/blog/ciao-bella-were-off-to-italy" className="text-red-300 hover:text-red-200 transition-colors duration-200">Read more 🡒 </a></u>
+                      🚨<b>ATTN: We are temporarily closed until Sept. 18th</b>...<u> <a href="/blog/ciao-bella-were-off-to-italy" className="text-red-300 hover:text-red-200 transition-colors duration-200">Read more → </a></u>
                     </span>
                   </div>
                 </div>
@@ -1945,10 +1955,53 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                           </a>
                         </div>
                       </div>
-                    )}
-                  </div>
+                                         )}
 
-                  {/* Pricing Breakdown */}
+                     {/* +25% Vibrancy Option */}
+                     <div>
+                       <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+                            style={{
+                              background: vibrancyBoost 
+                                ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(168, 85, 247, 0.15) 50%, rgba(168, 85, 247, 0.05) 100%)'
+                                : 'linear-gradient(135deg, rgba(147, 51, 234, 0.3) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(147, 51, 234, 0.05) 100%)',
+                              border: vibrancyBoost 
+                                ? '1px solid rgba(168, 85, 247, 0.4)'
+                                : '1px solid rgba(147, 51, 234, 0.4)',
+                              backdropFilter: 'blur(12px)'
+                            }}>
+                         <button
+                           onClick={() => setVibrancyBoost(!vibrancyBoost)}
+                           title={vibrancyBoost ? "Disable vibrancy boost" : "Enable +25% vibrancy boost"}
+                           className={`w-12 h-6 rounded-full transition-colors ${
+                             vibrancyBoost ? 'bg-purple-500' : 'bg-white/20'
+                           }`}
+                         >
+                           <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                             vibrancyBoost ? 'translate-x-7' : 'translate-x-1'
+                           }`} />
+                         </button>
+                         <span className="text-xl">🎨</span>
+                         <label className={`text-sm font-medium ${vibrancyBoost ? 'text-purple-200' : 'text-purple-200'}`}>
+                           {vibrancyBoost ? '✅ +25% Vibrancy Active' : '+25% Vibrancy Boost'}
+                         </label>
+                       </div>
+                       
+                       {/* Vibrancy Boost Disclaimer */}
+                       {vibrancyBoost && (
+                         <div className="mt-3 space-y-2">
+                           <div className="text-xs text-purple-300 font-medium flex items-center gap-2">
+                             <span>🎨</span>
+                             <span>+25% Vibrancy enhancement is active (+5% to total price)</span>
+                           </div>
+                           <div className="text-xs text-white/70 leading-relaxed">
+                             *Vibrancy enhancement uses advanced color saturation techniques to make colors more vivid and vibrant. Returns due to color accuracy differences are not eligible when this option is selected.
+                           </div>
+                         </div>
+                       )}
+                     </div>
+                   </div>
+
+                   {/* Pricing Breakdown */}
                   <div className="container-style p-6 transition-colors duration-200">
                     <h3 className="text-white font-semibold mb-3">Pricing Breakdown</h3>
                     
@@ -1993,12 +2046,18 @@ export default function StickerSheetsCalculator({ initialBasePricing, realPricin
                             <span>Quantity:</span>
                             <span>{selectedQuantity === "Custom" ? customQuantity : selectedQuantity}</span>
                           </div>
-                          {isRushOrder && (
-                            <div className="flex justify-between items-center text-red-300 font-medium">
-                              <span>Rush Order Fee (+40%):</span>
-                              <span>+${(parseFloat(totalPrice.replace('$', '')) * 0.4).toFixed(2)}</span>
-                            </div>
-                          )}
+                                                     {isRushOrder && (
+                             <div className="flex justify-between items-center text-red-300 font-medium">
+                               <span>Rush Order Fee (+40%):</span>
+                               <span>+${(parseFloat(totalPrice.replace('$', '')) * 0.4).toFixed(2)}</span>
+                             </div>
+                           )}
+                           {vibrancyBoost && (
+                             <div className="flex justify-between items-center text-purple-300 font-medium">
+                               <span>Vibrancy Boost (+5%):</span>
+                               <span>+${(parseFloat(totalPrice.replace('$', '')) * 0.05).toFixed(2)}</span>
+                             </div>
+                           )}
                           <div className="flex justify-between items-center text-green-300 font-medium border-t border-white/20 pt-2">
                             <span>Total:</span>
                             <span>{totalPrice}</span>
