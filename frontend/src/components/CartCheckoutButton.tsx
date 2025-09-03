@@ -26,6 +26,8 @@ interface CartCheckoutButtonProps {
     lastName: string;
     email: string;
   };
+  allowBypassPayment?: boolean;
+  agreedToSettlement?: boolean;
 }
 
 const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
@@ -40,7 +42,9 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
   creditsToApply = 0,
   onCreditsChange,
   isBlindShipment = false,
-  guestCheckoutData
+  guestCheckoutData,
+  allowBypassPayment = false,
+  agreedToSettlement = false
 }) => {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
@@ -282,6 +286,40 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
       // Start monitoring for order completion before checkout
       if (user) {
         startMonitoring();
+      }
+
+      // Handle bypass payment if enabled
+      if (allowBypassPayment) {
+        if (!agreedToSettlement) {
+          throw new Error('You must agree to settle the balance within 7 days to bypass payment');
+        }
+        
+        // Create order without payment processing
+        console.log('💰 Bypassing payment - creating order with pending payment status');
+        
+        // Call onCheckoutStart to show loading state
+        onCheckoutStart?.();
+        
+        // Create a special order with pending payment status
+        const bypassOrderData = {
+          cartItems,
+          customerInfo,
+          shippingAddress,
+          orderNote: 'Payment bypassed - balance to be settled within 7 days',
+          discountCode,
+          discountAmount: discountAmount || 0,
+          creditsToApply: creditsToApply || 0,
+          isBlindShipment,
+          bypassPayment: true,
+          agreedToSettlement
+        };
+        
+        // Store bypass order data for backend processing
+        sessionStorage.setItem('bypass_payment_order', JSON.stringify(bypassOrderData));
+        
+        // Redirect to a special bypass confirmation page
+        router.push('/checkout/bypass-confirmation');
+        return;
       }
 
       const result = await processCheckout(

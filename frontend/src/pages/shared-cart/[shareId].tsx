@@ -492,6 +492,11 @@ export default function SharedCartPage() {
   const [creditToApply, setCreditToApply] = useState(0);
   const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; amount: number } | null>(null);
   
+  // Admin options from shared cart
+  const [allowBypassPayment, setAllowBypassPayment] = useState(false);
+  const [allowCreditsEarning, setAllowCreditsEarning] = useState(true);
+  const [agreedToSettlement, setAgreedToSettlement] = useState(false);
+  
   // Blind shipment toggle state
   const [isBlindShipment, setIsBlindShipment] = useState(false);
   
@@ -531,6 +536,11 @@ export default function SharedCartPage() {
             ? JSON.parse(data.getSharedCart.sharedCart.cartData)
             : data.getSharedCart.sharedCart.cartData;
           setCart(cartData);
+          
+          // Set admin options from shared cart
+          setAllowBypassPayment(data.getSharedCart.sharedCart.allowBypassPayment || false);
+          setAllowCreditsEarning(data.getSharedCart.sharedCart.allowCreditsEarning !== false); // Default to true
+          
           setIsLoading(false);
         } catch (parseError) {
           console.error('Error parsing cart data:', parseError);
@@ -2361,11 +2371,12 @@ export default function SharedCartPage() {
                       // rather than the final total (which includes credits and fees)
                       const baseForCredits = afterDiscounts;
                       
-                      const creditEarnings = calculateCreditEarningsWithLimit(
+                      // Only calculate credit earnings if admin allows it
+                      const creditEarnings = allowCreditsEarning ? calculateCreditEarningsWithLimit(
                         baseForCredits,
                         userCredits,
                         creditRateDecimal
-                      );
+                      ) : { creditAmount: 0, isLimitReached: false, isLimitExceeded: false, potentialAmount: 0 };
                       
                       if (creditEarnings.isLimitReached) {
                         return (
@@ -2414,6 +2425,17 @@ export default function SharedCartPage() {
                         </div>
                       );
                     })()}
+                    
+                    {/* Show message when credits are disabled */}
+                    {!allowCreditsEarning && (
+                      <div className="flex justify-between text-gray-400 text-sm font-medium mt-3 pt-3 border-t border-white/10">
+                        <span className="flex items-center gap-2">
+                          <span>🚫</span>
+                          Store Credit Earnings Disabled
+                        </span>
+                        <span>$0.00</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Store Credit Section */}
@@ -2644,9 +2666,48 @@ export default function SharedCartPage() {
 
                   {/* Checkout Actions */}
                   <div className="space-y-4">
+                    {/* Settlement Agreement for Bypass Payment */}
+                    {allowBypassPayment && (
+                      <div className="p-4 rounded-xl space-y-3" style={{
+                        background: 'rgba(255, 193, 7, 0.1)',
+                        border: '1px solid rgba(255, 193, 7, 0.2)',
+                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                        backdropFilter: 'blur(12px)'
+                      }}>
+                        <div className="flex items-start gap-3">
+                          <span className="text-lg text-yellow-400">💰</span>
+                          <div className="flex-1">
+                            <h4 className="text-yellow-300 font-medium mb-2">Payment Bypass Agreement</h4>
+                            <p className="text-yellow-200 text-sm mb-3">
+                              This order allows payment to be settled outside of the website (cash, check, etc.). 
+                              You must agree to settle the balance within 7 days.
+                            </p>
+                            <div className="flex items-start gap-2">
+                              <input
+                                type="checkbox"
+                                id="customer-settlement-agreement"
+                                checked={agreedToSettlement}
+                                onChange={(e) => setAgreedToSettlement(e.target.checked)}
+                                className="mt-1 h-4 w-4 text-yellow-500 rounded border-yellow-300 focus:ring-yellow-500"
+                              />
+                              <label htmlFor="customer-settlement-agreement" className="text-yellow-200 text-sm cursor-pointer">
+                                I agree to settle the balance of <strong>${finalTotal.toFixed(2)}</strong> with Sticker Shuttle within 7 days
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
                     {/* Enhanced Checkout Button */}
                     <button
                       onClick={async () => {
+                        // Validate settlement agreement if bypass payment is enabled
+                        if (allowBypassPayment && !agreedToSettlement) {
+                          alert('You must agree to settle the balance within 7 days to proceed with this order.');
+                          return;
+                        }
+                        
                         // Validate guest checkout form if user is not logged in
                         if (!user) {
                           if (!isOtpMode) {
@@ -2831,6 +2892,8 @@ export default function SharedCartPage() {
                         discountAmount={appliedDiscount?.amount}
                         isBlindShipment={isBlindShipment}
                         guestCheckoutData={!user ? { firstName: guestCheckoutData.firstName, lastName: guestCheckoutData.lastName, email: guestCheckoutData.email } : undefined}
+                        allowBypassPayment={allowBypassPayment}
+                        agreedToSettlement={agreedToSettlement}
                         onCheckoutStart={() => {
                           console.log('🚀 Starting enhanced cart checkout with user context:', updatedCart.length, 'items');
                           console.log('👤 User state at checkout:', user ? `Logged in as ${user.email} (ID: ${user.id})` : 'Guest user');

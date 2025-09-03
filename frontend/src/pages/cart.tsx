@@ -538,6 +538,11 @@ export default function CartPage() {
   const [sharedCartUrl, setSharedCartUrl] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   
+  // Admin-specific shared cart options
+  const [showAdminOptions, setShowAdminOptions] = useState(false);
+  const [allowBypassPayment, setAllowBypassPayment] = useState(false);
+  const [allowCreditsEarning, setAllowCreditsEarning] = useState(true);
+  
   // Honeymoon popup state
   const [showHoneymoonPopup, setShowHoneymoonPopup] = useState(false);
   const [hasAgreedToHoneymoon, setHasAgreedToHoneymoon] = useState(false);
@@ -562,6 +567,9 @@ export default function CartPage() {
   const isWholesale = userProfile?.isWholesaleCustomer || false;
   const creditRate = isWholesale ? 2.5 : 5;
   const creditRateDecimal = isWholesale ? 0.025 : 0.05;
+  
+  // Check if user is admin
+  const isAdmin = user?.email === 'justin@stickershuttle.com';
 
   // Mutations for user profile
   const [updateUserProfileNames] = useMutation(UPDATE_USER_PROFILE_NAMES);
@@ -570,17 +578,23 @@ export default function CartPage() {
   // Mutation for creating shared cart
   const [createSharedCart] = useMutation(CREATE_SHARED_CART, {
     onCompleted: (data) => {
+      console.log('🎉 Shared cart mutation completed:', data);
       if (data.createSharedCart.success) {
+        console.log('🔗 Setting shared cart URL:', data.createSharedCart.shareUrl);
         setSharedCartUrl(data.createSharedCart.shareUrl);
+        console.log('🔗 Setting show share modal to true');
         setShowShareModal(true);
+        console.log('✅ Shared cart created successfully, modal should show');
         // Shared cart created successfully
       } else {
         console.error('❌ Error creating shared cart:', data.createSharedCart.error);
+        alert('Failed to create shared cart: ' + data.createSharedCart.error);
       }
       setIsCreatingSharedCart(false);
     },
     onError: (error) => {
       console.error('❌ GraphQL error creating shared cart:', error);
+      alert('GraphQL error creating shared cart: ' + error.message);
       setIsCreatingSharedCart(false);
     }
   });
@@ -1165,22 +1179,33 @@ export default function CartPage() {
 
   // Handle creating a shared cart
   const handleCreateSharedCart = async () => {
+    console.log('🔗 Share button clicked - starting shared cart creation...');
+    
     // Use cart context directly to ensure we get the most up-to-date data including additional payments
     const cartToShare = cart.length > 0 ? cart : updatedCart;
     
     if (cartToShare.length === 0) {
       console.error('❌ Cannot share empty cart');
+      alert('Cannot share empty cart');
       return;
     }
 
+    console.log('📦 Cart items to share:', cartToShare.length);
+
     // Ensure we include any pricing updates for the shared cart
     const cartWithUpdatedPricing = cartToShare.map(item => {
-      const pricing = calculateItemPricing(item, item.quantity, pricingData);
-      return {
-        ...item,
-        unitPrice: pricing.perSticker,
-        totalPrice: pricing.total
-      };
+      try {
+        const pricing = calculateItemPricing(item, item.quantity, pricingData);
+        return {
+          ...item,
+          unitPrice: pricing.perSticker,
+          totalPrice: pricing.total
+        };
+      } catch (error) {
+        console.error('❌ Error calculating pricing for item:', item, error);
+        // Fallback to original pricing
+        return item;
+      }
     });
 
     console.log('🔗 Creating shared cart with items:', cartWithUpdatedPricing.map(item => ({ 
@@ -1192,15 +1217,23 @@ export default function CartPage() {
     setIsCreatingSharedCart(true);
     
     try {
-      await createSharedCart({
+      const result = await createSharedCart({
         variables: {
           input: {
-            cartData: JSON.stringify(cartWithUpdatedPricing)
+            cartData: JSON.stringify(cartWithUpdatedPricing),
+            // Include admin-specific options if user is admin
+            ...(isAdmin && {
+              allowBypassPayment,
+              allowCreditsEarning
+            })
           }
         }
       });
+      
+      console.log('✅ Shared cart creation result:', result);
     } catch (error) {
       console.error('❌ Error creating shared cart:', error);
+      alert('Failed to create shared cart. Please try again.');
       setIsCreatingSharedCart(false);
     }
   };
@@ -2291,22 +2324,98 @@ export default function CartPage() {
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-xl font-semibold text-white">Order Summary</h3>
                     {updatedCart.length > 0 && (
-                      <button
-                        onClick={handleCreateSharedCart}
-                        disabled={isCreatingSharedCart}
-                        className="text-white/70 hover:text-white transition-colors"
-                        title="Share this cart with others"
-                      >
-                        {isCreatingSharedCart ? (
-                          <div className="w-5 h-5 animate-spin rounded-full border-2 border-white/70 border-t-transparent"></div>
-                        ) : (
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                          </svg>
+                      <div className="flex items-center gap-2">
+                        {/* Admin Options Toggle */}
+                        {isAdmin && (
+                          <button
+                            onClick={() => setShowAdminOptions(!showAdminOptions)}
+                            className="text-white/70 hover:text-white transition-colors"
+                            title="Admin Options"
+                          >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                          </button>
                         )}
-                      </button>
+                        <button
+                          onClick={handleCreateSharedCart}
+                          disabled={isCreatingSharedCart}
+                          className="text-white/70 hover:text-white transition-colors"
+                          title="Share this cart with others"
+                        >
+                          {isCreatingSharedCart ? (
+                            <div className="w-5 h-5 animate-spin rounded-full border-2 border-white/70 border-t-transparent"></div>
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                     )}
                   </div>
+                  
+                  {/* Admin Options Panel */}
+                  {isAdmin && showAdminOptions && (
+                    <div className="mb-6 p-4 rounded-lg border border-white/10 bg-white/5">
+                      <h4 className="text-sm font-semibold text-white mb-3">🔧 Admin Shared Cart Options</h4>
+                      <div className="space-y-3">
+                        {/* Bypass Payment Toggle */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm text-gray-300 cursor-pointer">
+                              Allow user to bypass payment
+                            </label>
+                            <span className="text-xs text-gray-400">(cash, check, etc.)</span>
+                          </div>
+                          <button
+                            onClick={() => setAllowBypassPayment(!allowBypassPayment)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                              allowBypassPayment ? 'bg-blue-500' : 'bg-gray-600'
+                            }`}
+                            title={allowBypassPayment ? 'Disable bypass payment' : 'Enable bypass payment'}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                allowBypassPayment ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                        
+                        {/* Credits Earning Toggle */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm text-gray-300 cursor-pointer">
+                              Allow user to earn credits on this order
+                            </label>
+                          </div>
+                          <button
+                            onClick={() => setAllowCreditsEarning(!allowCreditsEarning)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                              allowCreditsEarning ? 'bg-blue-500' : 'bg-gray-600'
+                            }`}
+                            title={allowCreditsEarning ? 'Disable credits earning' : 'Enable credits earning'}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                allowCreditsEarning ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                        
+                        {/* Warning for disabled credits */}
+                        {!allowCreditsEarning && (
+                          <div className="text-xs text-red-300 bg-red-500/10 p-2 rounded border border-red-500/20">
+                            ⚠️ Store credit earnings will be removed from this order
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="space-y-3 mb-6">
                     <div className="flex justify-between text-gray-300">
                       <span>Subtotal ({totalQuantity} {(() => {
@@ -3384,9 +3493,10 @@ export default function CartPage() {
         </div>
       )}
 
-      {/* Share Cart Modal */}
+            {/* Share Cart Modal */}
       {showShareModal && sharedCartUrl && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          {console.log('🎭 Rendering share modal - showShareModal:', showShareModal, 'sharedCartUrl:', sharedCartUrl)}
           <div 
             className="max-w-md w-full rounded-2xl p-6"
             style={{

@@ -13,6 +13,8 @@ interface SharedCart {
   expiresAt: string;
   accessCount: number;
   lastAccessAt: string;
+  allowBypassPayment?: boolean;
+  allowCreditsEarning?: boolean;
 }
 
 export default function SharedCartsAdmin() {
@@ -201,13 +203,14 @@ export default function SharedCartsAdmin() {
                   <th className="p-4 text-gray-300 font-semibold">Expires</th>
                   <th className="p-4 text-gray-300 font-semibold">Views</th>
                   <th className="p-4 text-gray-300 font-semibold">Status</th>
+                  <th className="p-4 text-gray-300 font-semibold">Admin Options</th>
                   <th className="p-4 text-gray-300 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredCarts.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-gray-400">
+                    <td colSpan={9} className="p-8 text-center text-gray-400">
                       {searchTerm ? 'No shared carts match your search.' : 'No shared carts found.'}
                     </td>
                   </tr>
@@ -257,6 +260,25 @@ export default function SharedCartsAdmin() {
                         }`}>
                           {isExpired(cart.expiresAt) ? 'Expired' : 'Active'}
                         </span>
+                      </td>
+                      <td className="p-4">
+                        <div className="space-y-1">
+                          {cart.allowBypassPayment && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-yellow-400">💰</span>
+                              <span className="text-xs text-yellow-300">Bypass Payment</span>
+                            </div>
+                          )}
+                          {!cart.allowCreditsEarning && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-red-400">🚫</span>
+                              <span className="text-xs text-red-300">No Credits</span>
+                            </div>
+                          )}
+                          {!cart.allowBypassPayment && cart.allowCreditsEarning && (
+                            <span className="text-xs text-gray-400">Standard</span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">

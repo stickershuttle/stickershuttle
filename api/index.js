@@ -2459,6 +2459,8 @@ const typeDefs = gql`
     expiresAt: String
     accessCount: Int!
     lastAccessAt: String
+    allowBypassPayment: Boolean
+    allowCreditsEarning: Boolean
   }
   
   type SharedCartResult {
@@ -2478,6 +2480,8 @@ const typeDefs = gql`
   input CreateSharedCartInput {
     cartData: JSON!
     expiresAt: String
+    allowBypassPayment: Boolean
+    allowCreditsEarning: Boolean
   }
   
   # Promotional Container Types
@@ -5856,7 +5860,9 @@ const resolvers = {
             createdAt: sharedCart.created_at,
             expiresAt: sharedCart.expires_at,
             accessCount: sharedCart.access_count + 1,
-            lastAccessAt: new Date().toISOString()
+            lastAccessAt: new Date().toISOString(),
+            allowBypassPayment: sharedCart.allow_bypass_payment || false,
+            allowCreditsEarning: sharedCart.allow_credits_earning !== false // Default to true
           }
         };
       } catch (error) {
@@ -9392,18 +9398,29 @@ const resolvers = {
         // Set expiration (default 30 days from now)
         const expiresAt = input.expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
         
+        // Prepare shared cart data
+        const sharedCartData = {
+          share_id: shareId,
+          cart_data: input.cartData,
+          created_by: createdBy,
+          expires_at: expiresAt,
+          access_count: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        // Add admin-specific fields if provided
+        if (input.allowBypassPayment !== undefined) {
+          sharedCartData.allow_bypass_payment = input.allowBypassPayment;
+        }
+        if (input.allowCreditsEarning !== undefined) {
+          sharedCartData.allow_credits_earning = input.allowCreditsEarning;
+        }
+        
         // Create shared cart record
         const { data: sharedCart, error } = await client
           .from('shared_carts')
-          .insert({
-            share_id: shareId,
-            cart_data: input.cartData,
-            created_by: createdBy,
-            expires_at: expiresAt,
-            access_count: 0,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
+          .insert(sharedCartData)
           .select('*')
           .single();
 
@@ -9426,7 +9443,9 @@ const resolvers = {
             createdAt: sharedCart.created_at,
             expiresAt: sharedCart.expires_at,
             accessCount: sharedCart.access_count,
-            lastAccessAt: sharedCart.last_access_at
+            lastAccessAt: sharedCart.last_access_at,
+            allowBypassPayment: sharedCart.allow_bypass_payment || false,
+            allowCreditsEarning: sharedCart.allow_credits_earning !== false // Default to true
           },
           shareUrl
         };

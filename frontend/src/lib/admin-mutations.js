@@ -54,6 +54,8 @@ export const CREATE_SHARED_CART = gql`
         expiresAt
         accessCount
         lastAccessAt
+        allowBypassPayment
+        allowCreditsEarning
       }
       shareUrl
       error
@@ -74,6 +76,8 @@ export const GET_SHARED_CART = gql`
         expiresAt
         accessCount
         lastAccessAt
+        allowBypassPayment
+        allowCreditsEarning
       }
       error
     }
