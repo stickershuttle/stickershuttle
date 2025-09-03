@@ -113,7 +113,7 @@ const nextConfig = {
               "form-action 'self' https://checkout.stripe.com",
               "frame-ancestors 'none'",
               "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://www.googletagmanager.com",
-              ...(isDev ? ["worker-src 'self' blob:"] : [])
+              "worker-src 'self' blob:"
             ].join('; ')
           },
           // Prevent clickjacking
