@@ -13,14 +13,19 @@ export default function BypassConfirmationPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
 
-  const [createCustomerOrder] = useMutation(CREATE_CUSTOMER_ORDER);
+  // Only use Apollo Client on the client side
+  const [createCustomerOrder] = useMutation(CREATE_CUSTOMER_ORDER, {
+    skip: !isClient
+  });
 
   // Get user context
   useEffect(() => {
     const getUser = async () => {
       try {
         if (typeof window !== 'undefined') {
+          setIsClient(true);
           const supabase = getSupabase();
           const { data: { session } } = await supabase.auth.getSession();
           setUser(session?.user || null);
@@ -53,6 +58,11 @@ export default function BypassConfirmationPage() {
   const handleCreateOrder = async () => {
     if (!bypassOrderData) {
       setError('No order data available');
+      return;
+    }
+
+    if (!isClient) {
+      setError('Please wait for page to load completely');
       return;
     }
 

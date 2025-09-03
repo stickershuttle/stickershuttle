@@ -355,4 +355,81 @@ export const MARK_ORDER_PICKED_UP = gql`
       updatedAt
     }
   }
+`;
+
+// Mutation to create customer order
+export const CREATE_CUSTOMER_ORDER = gql`
+  mutation CreateCustomerOrder($input: CustomerOrderInput!) {
+    createCustomerOrder(input: $input) {
+      id
+      userId
+      guestEmail
+      stripePaymentIntentId
+      stripeCheckoutSessionId
+      orderNumber
+      orderStatus
+      fulfillmentStatus
+      financialStatus
+      trackingNumber
+      trackingCompany
+      trackingUrl
+      subtotalPrice
+      totalTax
+      totalPrice
+      discountAmount
+      creditsApplied
+      currency
+      customerFirstName
+      customerLastName
+      customerEmail
+      customerPhone
+      shippingAddress
+      billingAddress
+      shipping_method
+      is_express_shipping
+      is_rush_order
+      is_blind_shipment
+      orderTags
+      orderNote
+      orderCreatedAt
+      orderUpdatedAt
+      createdAt
+      updatedAt
+      proof_status
+      proof_sent_at
+      proof_link
+      items {
+        id
+        customerOrderId
+        stripeLineItemId
+        productId
+        productName
+        productCategory
+        sku
+        quantity
+        unitPrice
+        totalPrice
+        calculatorSelections
+        customFiles
+        customerNotes
+        instagramHandle
+        instagramOptIn
+        fulfillmentStatus
+        createdAt
+        updatedAt
+      }
+      proofs {
+        id
+        proofUrl
+        proofPublicId
+        proofTitle
+        uploadedAt
+        uploadedBy
+        status
+        customerNotes
+        adminNotes
+        cutLines
+      }
+    }
+  }
 `; 
