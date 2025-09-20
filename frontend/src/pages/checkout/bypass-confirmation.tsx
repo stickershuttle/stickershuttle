@@ -74,27 +74,31 @@ export default function BypassConfirmationPage() {
       const subtotal = bypassOrderData.cartItems.reduce((sum: number, item: any) => sum + (item.totalPrice || 0), 0);
       const finalTotal = subtotal - (bypassOrderData.discountAmount || 0) - (bypassOrderData.creditsToApply || 0);
 
+      // Prepare order input
+      const orderInput = {
+        userId: user?.id,
+        guestEmail: !user ? bypassOrderData.customerInfo.email : undefined,
+        orderStatus: 'pending_payment',
+        fulfillmentStatus: 'pending',
+        financialStatus: 'pending',
+        subtotalPrice: subtotal,
+        totalPrice: finalTotal,
+        currency: 'USD',
+        customerFirstName: bypassOrderData.customerInfo.firstName,
+        customerLastName: bypassOrderData.customerInfo.lastName,
+        customerEmail: bypassOrderData.customerInfo.email,
+        customerPhone: bypassOrderData.customerInfo.phone,
+        shippingAddress: bypassOrderData.shippingAddress,
+        billingAddress: bypassOrderData.shippingAddress, // Use shipping as billing
+        orderNote: bypassOrderData.orderNote || 'Bypass payment order - payment to be settled within 7 days'
+      };
+
+      console.log('Creating bypass order with input:', orderInput);
+
       // Create order with pending payment status
       const result = await createCustomerOrder({
         variables: {
-          input: {
-            userId: user?.id,
-            guestEmail: !user ? bypassOrderData.customerInfo.email : undefined,
-            orderStatus: 'pending_payment',
-            fulfillmentStatus: 'pending',
-            financialStatus: 'pending',
-            subtotalPrice: subtotal,
-            totalPrice: finalTotal,
-            currency: 'USD',
-            customerFirstName: bypassOrderData.customerInfo.firstName,
-            customerLastName: bypassOrderData.customerInfo.lastName,
-            customerEmail: bypassOrderData.customerInfo.email,
-            customerPhone: bypassOrderData.customerInfo.phone,
-            shippingAddress: bypassOrderData.shippingAddress,
-            billingAddress: bypassOrderData.shippingAddress, // Use shipping as billing
-            orderNote: bypassOrderData.orderNote,
-            orderTags: ['bypass_payment', 'admin_shared_cart']
-          }
+          input: orderInput
         }
       });
 
@@ -114,6 +118,13 @@ export default function BypassConfirmationPage() {
       }
     } catch (err) {
       console.error('Error creating bypass order:', err);
+      console.error('Error details:', {
+        message: err.message,
+        stack: err.stack,
+        graphQLErrors: err.graphQLErrors,
+        networkError: err.networkError,
+        extraInfo: err.extraInfo
+      });
       setError(err instanceof Error ? err.message : 'Failed to create order');
     } finally {
       setIsProcessing(false);

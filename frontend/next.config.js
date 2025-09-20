@@ -102,7 +102,7 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com https://app.posthog.com https://fonts.googleapis.com${isDev ? ' https://us-assets.i.posthog.com' : ''}`,
+                             `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://www.google-analytics.com https://app.posthog.com https://fonts.googleapis.com https://us-assets.i.posthog.com https://static.hotjar.com https://googleads.g.doubleclick.net`,
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
               "img-src 'self' data: blob: https: http:",
               "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com https://*.stripe.com",

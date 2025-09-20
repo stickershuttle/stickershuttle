@@ -325,24 +325,6 @@ export default function UniversalHeader() {
     <>
     {false && !isAdminPage && !isMarketspacePage && <HeaderAlerts />}
     
-    {/* Honeymoon Notice Banner - Hidden */}
-    {false && !isAdminPage && !isMarketspacePage && (
-      <Link href="/blog/ciao-bella-were-off-to-italy" className="w-full fixed z-50 text-center pt-3 pb-4 sm:pb-3 px-3 text-white font-medium block hover:brightness-110 transition-all duration-200 cursor-pointer" style={{ 
-        background: 'linear-gradient(135deg, rgb(147, 51, 234), rgb(168, 85, 247), rgb(196, 181, 253))',
-        top: 'var(--header-alerts-height, 0px)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
-      }}>
-        <div className="text-xs sm:text-sm leading-tight">
-          <div className="sm:hidden">
-            <div>🚨 <span className="relative inline-block">ATTN<svg className="absolute -bottom-1 left-0 w-full h-2" viewBox="0 0 70 8" fill="none"><path d="M0 6c10-2 20-2 30 0s20 2 30 0c5-1 8-1 10 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.8"/></svg></span>: We are temporarily closed until Sept. 18th</div>
-            <div>Read more →</div>
-          </div>
-          <div className="hidden sm:block">
-            🚨 <span className="relative inline-block">ATTN<svg className="absolute -bottom-1 left-0 w-full h-2" viewBox="0 0 70 8" fill="none"><path d="M0 6c10-2 20-2 30 0s20 2 30 0c5-1 8-1 10 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.8"/></svg></span>: We are temporarily closed until Sept. 18th. Read more →
-          </div>
-        </div>
-      </Link>
-    )}
     
     <header className={`w-full fixed z-50 ${!isAdminPage ? 'pb-[5px]' : ''} top-0`} style={{ backgroundColor: '#030140' }}>
               <div className={isAdminPage ? "w-full py-4 px-8" : "w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto py-4 px-4"}>
