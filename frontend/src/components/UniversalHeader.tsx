@@ -781,23 +781,21 @@ export default function UniversalHeader() {
                     </Link>
 
                     {/* Creators Space - Available to all users */}
-                    {(
-                      <Link 
-                        href="/marketspace" 
-                        className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleLinkClick('/marketspace');
-                        }}
-                        style={{ textDecoration: 'none' }}
-                      >
-                        <img 
-                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755179299/MarketspaceLogoFinal_q2fcer.svg" 
-                          alt="Creators Space" 
-                          className="h-8 w-auto object-contain"
-                        />
-                      </Link>
-                    )}
+                    <Link 
+                      href="/marketspace" 
+                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleLinkClick('/marketspace');
+                      }}
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755179299/MarketspaceLogoFinal_q2fcer.svg" 
+                        alt="Creators Space" 
+                        className="h-8 w-auto object-contain"
+                      />
+                    </Link>
                   </div>
                 </div>
               </div>
