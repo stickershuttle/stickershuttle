@@ -153,4 +153,39 @@ export const GET_ALL_CUSTOMERS_WITH_PROFILES = gql`
       updatedAt
     }
   }
-`; 
+`;
+
+// Admin order creation from shared cart
+export const CREATE_ADMIN_ORDER_FROM_SHARED_CART = gql`
+  mutation CreateAdminOrderFromSharedCart($input: AdminSharedCartOrderInput!) {
+    createAdminOrderFromSharedCart(input: $input) {
+      success
+      message
+      order {
+        id
+        orderNumber
+        orderStatus
+        fulfillmentStatus
+        financialStatus
+        subtotalPrice
+        totalTax
+        totalPrice
+        currency
+        customerFirstName
+        customerLastName
+        customerEmail
+        customerPhone
+        shippingAddress
+        billingAddress
+        orderNote
+        isBlindShipment
+        creditsApplied
+        orderCreatedAt
+        orderUpdatedAt
+        createdAt
+        updatedAt
+      }
+      error
+    }
+  }
+`;

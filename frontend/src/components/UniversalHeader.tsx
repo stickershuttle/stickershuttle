@@ -46,13 +46,13 @@ export default function UniversalHeader() {
   const isCreator = creatorData?.getCreatorByUserId?.isActive || false;
   const isUserAdmin = user && ADMIN_EMAILS.includes(user.email || '');
   
-  // Only show marketspace elements if we have completed the creator check OR user is admin
-  const hasMarketspaceAccess = user && (isUserAdmin || (!creatorLoading && isCreator));
+  // Marketspace is now available to everyone
+  const hasMarketspaceAccess = true;
   
   // Removed debug logging - issue resolved
   
-  // Show marketspace elements if on marketspace URL AND user has access
-  const isMarketspacePage = isOnMarketspaceURL && hasMarketspaceAccess;
+  // Show marketspace elements if on marketspace URL (now available to everyone)
+  const isMarketspacePage = isOnMarketspaceURL;
 
   // Sync marketspace search with URL query
   useEffect(() => {
@@ -433,37 +433,6 @@ export default function UniversalHeader() {
               </Link>
             </div>
             
-            {/* Apply for a Space button - only show on marketplace */}
-            {isMarketspacePage && (
-              <button
-                className="text-center px-4 py-2 ml-6 rounded-lg font-semibold transition-all duration-200 transform hover:scale-[1.015] relative overflow-hidden holographic-button"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.01)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  boxShadow: '2px 2px 0px rgba(0, 0, 0, 0.75), rgba(255, 255, 255, 0.33) 0px 1px 0px inset',
-                  backdropFilter: 'blur(12px)'
-                }}
-                onClick={() => {
-                  router.push('/creators-space-apply');
-                }}
-              >
-                {/* Holographic moving gradient overlay */}
-                <div 
-                  className="absolute inset-0 opacity-30"
-                  style={{
-                    background: 'linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57, #ff9ff3, #54a0ff)',
-                    backgroundSize: '400% 400%',
-                    animation: 'holographicMove 3s ease-in-out infinite'
-                  }}
-                ></div>
-                <span className="inline-flex items-center justify-center relative z-10 text-white">
-                  Apply for a Space
-                  <svg className="w-4 h-4 ml-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
-              </button>
-            )}
           </div>
 
           {/* Mobile Logo - Centered */}
@@ -811,8 +780,8 @@ export default function UniversalHeader() {
                       </div>
                     </Link>
 
-                    {/* Creators Space - Only show for authorized users */}
-                    {user && (isUserAdmin || (!creatorLoading && isCreator)) && (
+                    {/* Creators Space - Available to all users */}
+                    {(
                       <Link 
                         href="/marketspace" 
                         className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
@@ -870,8 +839,8 @@ export default function UniversalHeader() {
 
 
 
-                {/* Marketspace - Only show for authorized users when NOT on marketspace */}
-                {user && (isUserAdmin || (!creatorLoading && isCreator)) && !isMarketspacePage && (
+                {/* Marketspace - Available to all users when NOT on marketspace */}
+                {!isMarketspacePage && (
                   <Link 
                     href="/marketspace"
                     className={`rounded-lg transition-all duration-200 transform hover:scale-105 flex items-center${(router.pathname === '/marketspace' || router.pathname.startsWith('/marketspace/') || router.asPath === '/marketspace') ? ' active' : ''}`}

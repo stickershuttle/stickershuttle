@@ -1087,6 +1087,9 @@ const typeDefs = gql`
     
     # Promotional container mutations
     updatePromotionalContainer(id: ID!, input: PromotionalContainerInput!): PromotionalContainer!
+    
+    # Admin shared cart bypass mutations
+    createAdminOrderFromSharedCart(input: AdminSharedCartOrderInput!): AdminOrderResult!
   }
 
   type Customer {
@@ -2519,6 +2522,25 @@ const typeDefs = gql`
     badgeText: String
     badgeColor: String
     isActive: Boolean
+  }
+  
+  input AdminSharedCartOrderInput {
+    shareId: String!
+    customerFirstName: String!
+    customerLastName: String!
+    customerEmail: String!
+    customerPhone: String
+    shippingAddress: AddressInput!
+    orderNote: String
+    creditsToApply: Float
+    isBlindShipment: Boolean
+  }
+  
+  type AdminOrderResult {
+    success: Boolean!
+    message: String
+    order: CustomerOrder
+    error: String
   }
 `;
 
@@ -12239,6 +12261,189 @@ const resolvers = {
       } catch (error) {
         console.error('❌ Error in updatePromotionalContainer:', error);
         throw new Error(error.message);
+      }
+    },
+
+    // Admin shared cart bypass mutation
+    createAdminOrderFromSharedCart: async (_, { input }, context) => {
+      const { user } = context;
+      if (!user) {
+        throw new AuthenticationError('Authentication required');
+      }
+
+      try {
+        // Admin authentication required
+        requireAdminAuth(user);
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get shared cart data
+        const { data: sharedCart, error: sharedCartError } = await client
+          .from('shared_carts')
+          .select('*')
+          .eq('share_id', input.shareId)
+          .single();
+
+        if (sharedCartError) {
+          console.error('❌ Error retrieving shared cart:', sharedCartError);
+          throw new Error('Shared cart not found');
+        }
+
+        // Parse cart data
+        const cartItems = typeof sharedCart.cart_data === 'string' 
+          ? JSON.parse(sharedCart.cart_data)
+          : sharedCart.cart_data;
+
+        if (!cartItems || cartItems.length === 0) {
+          throw new Error('Shared cart is empty');
+        }
+
+        // Generate order number
+        const orderNumber = `ADM-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+
+        // Calculate totals
+        const subtotalPrice = cartItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+        const totalTax = 0; // Admin orders typically don't include tax
+        const creditsToApply = input.creditsToApply || 0;
+        const totalPrice = Math.max(0, subtotalPrice - creditsToApply);
+
+        // Create order record
+        const orderData = {
+          order_number: orderNumber,
+          order_status: 'pending',
+          fulfillment_status: 'pending',
+          financial_status: 'pending_payment',
+          subtotal_price: subtotalPrice,
+          total_tax: totalTax,
+          total_price: totalPrice,
+          currency: 'USD',
+          customer_first_name: input.customerFirstName,
+          customer_last_name: input.customerLastName,
+          customer_email: input.customerEmail,
+          customer_phone: input.customerPhone || null,
+          shipping_address: input.shippingAddress,
+          billing_address: input.shippingAddress, // Use shipping as billing for admin orders
+          order_note: input.orderNote || 'Admin created order from shared cart',
+          is_blind_shipment: input.isBlindShipment || false,
+          credits_applied: creditsToApply,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        const { data: newOrder, error: orderError } = await client
+          .from('customer_orders')
+          .insert(orderData)
+          .select('*')
+          .single();
+
+        if (orderError) {
+          console.error('❌ Error creating order:', orderError);
+          throw new Error(`Failed to create order: ${orderError.message}`);
+        }
+
+        // Create order items
+        const orderItems = cartItems.map((item, index) => ({
+          customer_order_id: newOrder.id,
+          product_id: item.productId || item.product.id,
+          product_name: item.productName || item.product.name,
+          product_category: item.productCategory || item.product.category,
+          sku: item.sku || null,
+          quantity: item.quantity,
+          unit_price: item.unitPrice || item.totalPrice / item.quantity,
+          total_price: item.totalPrice,
+          calculator_selections: item.calculatorSelections || {},
+          custom_files: item.customFiles || [],
+          customer_notes: item.customerNotes || '',
+          instagram_handle: item.instagramHandle || null,
+          instagram_opt_in: item.instagramOptIn || false,
+          fulfillment_status: 'pending',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }));
+
+        const { error: itemsError } = await client
+          .from('order_items')
+          .insert(orderItems);
+
+        if (itemsError) {
+          console.error('❌ Error creating order items:', itemsError);
+          // Clean up the order if items failed
+          await client.from('customer_orders').delete().eq('id', newOrder.id);
+          throw new Error(`Failed to create order items: ${itemsError.message}`);
+        }
+
+        // Apply credits if specified
+        if (creditsToApply > 0) {
+          // Find user by email
+          const { data: userData, error: userError } = await client
+            .from('users')
+            .select('id')
+            .eq('email', input.customerEmail)
+            .single();
+
+          if (userData) {
+            // Deduct credits (negative amount)
+            const { error: creditError } = await client
+              .from('credits')
+              .insert({
+                user_id: userData.id,
+                amount: -creditsToApply,
+                reason: `Applied to admin order ${orderNumber}`,
+                transaction_type: 'order_payment',
+                order_id: newOrder.id,
+                created_at: new Date().toISOString(),
+                created_by: user.id
+              });
+
+            if (creditError) {
+              console.error('❌ Error applying credits:', creditError);
+              // Don't fail the order for credit errors, just log
+            }
+          }
+        }
+
+        console.log('✅ Successfully created admin order from shared cart:', orderNumber);
+        
+        return {
+          success: true,
+          message: `Order ${orderNumber} created successfully`,
+          order: {
+            id: String(newOrder.id),
+            orderNumber: newOrder.order_number,
+            orderStatus: newOrder.order_status,
+            fulfillmentStatus: newOrder.fulfillment_status,
+            financialStatus: newOrder.financial_status,
+            subtotalPrice: newOrder.subtotal_price,
+            totalTax: newOrder.total_tax,
+            totalPrice: newOrder.total_price,
+            currency: newOrder.currency,
+            customerFirstName: newOrder.customer_first_name,
+            customerLastName: newOrder.customer_last_name,
+            customerEmail: newOrder.customer_email,
+            customerPhone: newOrder.customer_phone,
+            shippingAddress: newOrder.shipping_address,
+            billingAddress: newOrder.billing_address,
+            orderNote: newOrder.order_note,
+            isBlindShipment: newOrder.is_blind_shipment,
+            creditsApplied: newOrder.credits_applied,
+            orderCreatedAt: newOrder.created_at,
+            orderUpdatedAt: newOrder.updated_at,
+            createdAt: newOrder.created_at,
+            updatedAt: newOrder.updated_at
+          }
+        };
+      } catch (error) {
+        console.error('❌ Error in createAdminOrderFromSharedCart:', error);
+        return {
+          success: false,
+          message: null,
+          order: null,
+          error: error.message
+        };
       }
     }
   }

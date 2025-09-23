@@ -22,7 +22,7 @@ import { useQuery, useMutation } from "@apollo/client";
 import DiscountCodeInput from "@/components/DiscountCodeInput";
 import { UPDATE_USER_PROFILE_NAMES, CREATE_USER_PROFILE } from "@/lib/profile-mutations";
 import { TRACK_KLAVIYO_EVENT } from "@/lib/klaviyo-mutations";
-import { GET_SHARED_CART } from "@/lib/admin-mutations";
+import { GET_SHARED_CART, CREATE_ADMIN_ORDER_FROM_SHARED_CART } from "@/lib/admin-mutations";
 import { GET_USER_PROFILE } from "@/lib/profile-mutations";
 
 // Available configuration options
@@ -524,6 +524,32 @@ export default function SharedCartPage() {
   // Loading and error states for shared cart
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Admin state
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showAdminOrderModal, setShowAdminOrderModal] = useState(false);
+  const [adminOrderData, setAdminOrderData] = useState({
+    customerFirstName: '',
+    customerLastName: '',
+    customerEmail: '',
+    customerPhone: '',
+    shippingAddress: {
+      first_name: '',
+      last_name: '',
+      company: '',
+      address1: '',
+      address2: '',
+      city: '',
+      state: '',
+      zip: '',
+      country: 'United States',
+      phone: ''
+    },
+    orderNote: '',
+    creditsToApply: 0,
+    isBlindShipment: false
+  });
+  const [isCreatingAdminOrder, setIsCreatingAdminOrder] = useState(false);
 
   // Query shared cart data
   const { data: sharedCartData, loading: sharedCartLoading, error: sharedCartError } = useQuery(GET_SHARED_CART, {
@@ -568,6 +594,9 @@ export default function SharedCartPage() {
   // Mutations for user profile
   const [updateUserProfileNames] = useMutation(UPDATE_USER_PROFILE_NAMES);
   const [createUserProfile] = useMutation(CREATE_USER_PROFILE);
+  
+  // Admin order creation mutation
+  const [createAdminOrder] = useMutation(CREATE_ADMIN_ORDER_FROM_SHARED_CART);
 
   const userCredits = creditData?.getUserCreditBalance?.balance || 0;
 
@@ -590,6 +619,11 @@ export default function SharedCartPage() {
           const supabase = await getSupabase();
           const { data: { session } } = await supabase.auth.getSession();
           setUser(session?.user || null);
+          
+          // Check if user is admin
+          if (session?.user?.email === 'justin@stickershuttle.com') {
+            setIsAdmin(true);
+          }
         }
       } catch (error) {
         console.error('Error checking user:', error);
@@ -1143,6 +1177,83 @@ export default function SharedCartPage() {
       alert('Login failed. Please try again.');
     } finally {
       setIsLoggingIn(false);
+    }
+  };
+
+  // Admin order creation handler
+  const handleCreateAdminOrder = async () => {
+    if (!adminOrderData.customerFirstName.trim() || !adminOrderData.customerLastName.trim() || !adminOrderData.customerEmail.trim()) {
+      alert('Please fill in customer first name, last name, and email');
+      return;
+    }
+
+    if (!adminOrderData.shippingAddress.address1.trim() || !adminOrderData.shippingAddress.city.trim() || !adminOrderData.shippingAddress.state.trim() || !adminOrderData.shippingAddress.zip.trim()) {
+      alert('Please fill in complete shipping address');
+      return;
+    }
+
+    setIsCreatingAdminOrder(true);
+    try {
+      const result = await createAdminOrder({
+        variables: {
+          input: {
+            shareId: shareId as string,
+            customerFirstName: adminOrderData.customerFirstName.trim(),
+            customerLastName: adminOrderData.customerLastName.trim(),
+            customerEmail: adminOrderData.customerEmail.trim(),
+            customerPhone: adminOrderData.customerPhone.trim() || null,
+            shippingAddress: {
+              first_name: adminOrderData.customerFirstName.trim(),
+              last_name: adminOrderData.customerLastName.trim(),
+              company: adminOrderData.shippingAddress.company.trim() || null,
+              address1: adminOrderData.shippingAddress.address1.trim(),
+              address2: adminOrderData.shippingAddress.address2.trim() || null,
+              city: adminOrderData.shippingAddress.city.trim(),
+              state: adminOrderData.shippingAddress.state.trim(),
+              zip: adminOrderData.shippingAddress.zip.trim(),
+              country: adminOrderData.shippingAddress.country,
+              phone: adminOrderData.customerPhone.trim() || null
+            },
+            orderNote: adminOrderData.orderNote.trim() || null,
+            creditsToApply: adminOrderData.creditsToApply || 0,
+            isBlindShipment: adminOrderData.isBlindShipment
+          }
+        }
+      });
+
+      if (result.data?.createAdminOrderFromSharedCart?.success) {
+        alert(`Order ${result.data.createAdminOrderFromSharedCart.order.orderNumber} created successfully!`);
+        setShowAdminOrderModal(false);
+        // Reset form
+        setAdminOrderData({
+          customerFirstName: '',
+          customerLastName: '',
+          customerEmail: '',
+          customerPhone: '',
+          shippingAddress: {
+            first_name: '',
+            last_name: '',
+            company: '',
+            address1: '',
+            address2: '',
+            city: '',
+            state: '',
+            zip: '',
+            country: 'United States',
+            phone: ''
+          },
+          orderNote: '',
+          creditsToApply: 0,
+          isBlindShipment: false
+        });
+      } else {
+        alert(`Failed to create order: ${result.data?.createAdminOrderFromSharedCart?.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Admin order creation error:', error);
+      alert(`Failed to create order: ${error.message}`);
+    } finally {
+      setIsCreatingAdminOrder(false);
     }
   };
 
@@ -2699,6 +2810,28 @@ export default function SharedCartPage() {
                       </div>
                     )}
                     
+                    {/* Admin Create Order Button */}
+                    {isAdmin && (
+                      <button
+                        onClick={() => setShowAdminOrderModal(true)}
+                        className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                          backdropFilter: 'blur(25px) saturate(180%)',
+                          border: '1px solid rgba(34, 197, 94, 0.4)',
+                          boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                        }}
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-lg">⚡</span>
+                          <span>Create Order (Admin)</span>
+                        </div>
+                        <div className="text-white/90 text-sm font-normal">
+                          Bypass payment and create order directly
+                        </div>
+                      </button>
+                    )}
+                    
                     {/* Enhanced Checkout Button */}
                     <button
                       onClick={async () => {
@@ -3318,6 +3451,255 @@ export default function SharedCartPage() {
                   Create one during checkout
                 </button>
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Order Creation Modal */}
+      {showAdminOrderModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div 
+            className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+              backdropFilter: 'blur(12px)'
+            }}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white">Create Admin Order</h2>
+                <button
+                  onClick={() => setShowAdminOrderModal(false)}
+                  className="text-gray-400 hover:text-white text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Customer Information */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-4">Customer Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">First Name *</label>
+                      <input
+                        type="text"
+                        value={adminOrderData.customerFirstName}
+                        onChange={(e) => setAdminOrderData(prev => ({ ...prev, customerFirstName: e.target.value }))}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter first name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Last Name *</label>
+                      <input
+                        type="text"
+                        value={adminOrderData.customerLastName}
+                        onChange={(e) => setAdminOrderData(prev => ({ ...prev, customerLastName: e.target.value }))}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter last name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Email *</label>
+                      <input
+                        type="email"
+                        value={adminOrderData.customerEmail}
+                        onChange={(e) => setAdminOrderData(prev => ({ ...prev, customerEmail: e.target.value }))}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter email address"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Phone</label>
+                      <input
+                        type="tel"
+                        value={adminOrderData.customerPhone}
+                        onChange={(e) => setAdminOrderData(prev => ({ ...prev, customerPhone: e.target.value }))}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter phone number"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Shipping Address */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-4">Shipping Address</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Company</label>
+                      <input
+                        type="text"
+                        value={adminOrderData.shippingAddress.company}
+                        onChange={(e) => setAdminOrderData(prev => ({ 
+                          ...prev, 
+                          shippingAddress: { ...prev.shippingAddress, company: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Company name (optional)"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Address Line 1 *</label>
+                      <input
+                        type="text"
+                        value={adminOrderData.shippingAddress.address1}
+                        onChange={(e) => setAdminOrderData(prev => ({ 
+                          ...prev, 
+                          shippingAddress: { ...prev.shippingAddress, address1: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Street address"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Address Line 2</label>
+                      <input
+                        type="text"
+                        value={adminOrderData.shippingAddress.address2}
+                        onChange={(e) => setAdminOrderData(prev => ({ 
+                          ...prev, 
+                          shippingAddress: { ...prev.shippingAddress, address2: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Apartment, suite, etc. (optional)"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">City *</label>
+                        <input
+                          type="text"
+                          value={adminOrderData.shippingAddress.city}
+                          onChange={(e) => setAdminOrderData(prev => ({ 
+                            ...prev, 
+                            shippingAddress: { ...prev.shippingAddress, city: e.target.value }
+                          }))}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="City"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">State *</label>
+                        <input
+                          type="text"
+                          value={adminOrderData.shippingAddress.state}
+                          onChange={(e) => setAdminOrderData(prev => ({ 
+                            ...prev, 
+                            shippingAddress: { ...prev.shippingAddress, state: e.target.value }
+                          }))}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="State"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">ZIP Code *</label>
+                        <input
+                          type="text"
+                          value={adminOrderData.shippingAddress.zip}
+                          onChange={(e) => setAdminOrderData(prev => ({ 
+                            ...prev, 
+                            shippingAddress: { ...prev.shippingAddress, zip: e.target.value }
+                          }))}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="ZIP code"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Country</label>
+                      <select
+                        value={adminOrderData.shippingAddress.country}
+                        onChange={(e) => setAdminOrderData(prev => ({ 
+                          ...prev, 
+                          shippingAddress: { ...prev.shippingAddress, country: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        title="Select country"
+                      >
+                        <option value="United States">United States</option>
+                        <option value="Canada">Canada</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Order Options */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-4">Order Options</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Order Note</label>
+                      <textarea
+                        value={adminOrderData.orderNote}
+                        onChange={(e) => setAdminOrderData(prev => ({ ...prev, orderNote: e.target.value }))}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Special instructions or notes"
+                        rows={3}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Credits to Apply</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={adminOrderData.creditsToApply}
+                        onChange={(e) => setAdminOrderData(prev => ({ ...prev, creditsToApply: parseFloat(e.target.value) || 0 }))}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="blind-shipment"
+                        checked={adminOrderData.isBlindShipment}
+                        onChange={(e) => setAdminOrderData(prev => ({ ...prev, isBlindShipment: e.target.checked }))}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="blind-shipment" className="ml-2 block text-sm text-gray-300">
+                        Blind shipment (no branding)
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-4 pt-6">
+                  <button
+                    onClick={() => setShowAdminOrderModal(false)}
+                    className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateAdminOrder}
+                    disabled={isCreatingAdminOrder}
+                    className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-500 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                      backdropFilter: 'blur(25px) saturate(180%)',
+                      border: '1px solid rgba(34, 197, 94, 0.4)',
+                      boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                    }}
+                  >
+                    {isCreatingAdminOrder ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Creating Order...
+                      </>
+                    ) : (
+                      'Create Order'
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

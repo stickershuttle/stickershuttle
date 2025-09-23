@@ -1593,77 +1593,16 @@ export default function Marketplace() {
     scrollToTop();
   };
 
-  if (userLoading || (user && !creatorData)) {
+  // Show loading state while data is being fetched
+  if (userLoading) {
     return (
       <Layout title="Market Space - Sticker Shuttle">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p className="text-white text-lg">Loading Creators Space...</p>
+            <p className="text-white text-lg">Loading Market Space...</p>
           </div>
         </div>
-      </Layout>
-    );
-  }
-
-  // Allow access for admin or active creators
-  const hasAccess = user && (ADMIN_EMAILS.includes(user.email || '') || creatorData?.getCreatorByUserId?.isActive);
-  
-  if (!hasAccess) {
-    return (
-      <Layout title="Market Space - Coming Soon | Sticker Shuttle">
-        <section className="pt-[20px] pb-8">
-          <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
-            <div 
-              className="bg-white bg-opacity-5 backdrop-blur-sm rounded-2xl py-12 px-8 md:px-12 relative overflow-hidden text-center"
-              style={{
-                background: 'linear-gradient(135deg, #0a0a2e 0%, #1a1a4a 25%, #2d1b6b 50%, #4c1d95 75%, #7c3aed 100%)',
-                backgroundImage: `
-                  radial-gradient(ellipse at 25% 30%, rgba(139, 92, 246, 0.5) 0%, transparent 60%),
-                  radial-gradient(ellipse at 75% 70%, rgba(124, 58, 237, 0.4) 0%, transparent 50%),
-                  radial-gradient(ellipse at 50% 20%, rgba(147, 51, 234, 0.3) 0%, transparent 40%)
-                `
-              }}
-            >
-              <div className="relative z-10">
-                <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-white/10 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                  </svg>
-                </div>
-                <h1 className="text-3xl md:text-4xl font-bold text-white mb-4" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif' }}>
-                  Marketplace Coming Soon
-                </h1>
-                <p className="text-gray-300 text-lg mb-8 max-w-2xl mx-auto">
-                  We're building an amazing marketplace for pre-made sticker designs. Stay tuned for the launch!
-                </p>
-                
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Link href="/products/vinyl-stickers">
-                    <button className="px-8 py-3 font-semibold text-lg transition-all duration-300 transform hover:scale-101 rounded-lg"
-                      style={{
-                        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                        backdropFilter: 'blur(25px) saturate(180%)',
-                        border: '1px solid rgba(59, 130, 246, 0.4)',
-                        boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
-                        color: 'white'
-                      }}
-                    >
-                      Custom Vinyl Stickers
-                    </button>
-                  </Link>
-                  
-                  <Link href="/products">
-                    <button className="px-8 py-3 font-semibold text-lg text-white hover:text-gray-200 transition-all duration-300 hover:scale-105 rounded-lg border border-gray-400 hover:border-gray-300">
-                      View All Products
-                    </button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-        <FloatingChatWidget />
       </Layout>
     );
   }
