@@ -2,5 +2,27 @@
   "github": {
     "silent": true
   },
-  "ignoreCommand": "git log -1 --pretty=%B | grep -q '^Bump\\|^build(deps)\\|^chore(deps)\\|dependabot' && exit 0 || exit 1"
+  "ignoreCommand": "git log -1 --pretty=%B | grep -q '^Bump\\|^build(deps)\\|^chore(deps)\\|dependabot' && exit 0 || exit 1",
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/bannership",
+      "has": [
+        {
+          "type": "host",
+          "value": "bannership.stickershuttle.com"
+        }
+      ]
+    },
+    {
+      "source": "/:path((?!bannership).*)",
+      "destination": "/bannership/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "bannership.stickershuttle.com"
+        }
+      ]
+    }
+  ]
 } 
