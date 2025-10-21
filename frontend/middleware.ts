@@ -5,9 +5,14 @@ export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
   const { pathname } = request.nextUrl
   
+  // Debug logging
+  console.log('🔍 Middleware invoked:', { hostname, pathname })
+  
   // Detect if we're on the bannership subdomain
   const isBannershipSubdomain = hostname.startsWith('bannership.') || 
                                  hostname === 'bannership.stickershuttle.com'
+  
+  console.log('🔍 Is Bannership subdomain?', isBannershipSubdomain)
   
   // Skip middleware for static files, API routes, and Next.js internals
   if (
@@ -16,6 +21,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/favicon.ico') ||
     pathname.includes('.')
   ) {
+    console.log('⏭️ Skipping middleware for:', pathname)
     return NextResponse.next()
   }
   
@@ -34,7 +40,11 @@ export function middleware(request: NextRequest) {
       
       console.log(`🔄 Rewriting ${pathname} to ${url.pathname}`)
       return NextResponse.rewrite(url)
+    } else {
+      console.log('✅ Already on /bannership path, no rewrite needed')
     }
+  } else {
+    console.log('📍 Not bannership subdomain, serving normally')
   }
   
   return NextResponse.next()
