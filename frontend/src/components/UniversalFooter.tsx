@@ -1,16 +1,25 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { getSupabase } from '../lib/supabase';
 import { useQuery } from '@apollo/client';
 import { GET_USER_PROFILE } from '@/lib/profile-mutations';
 
-export default function UniversalFooter() {
+interface UniversalFooterProps {
+  forceBannershipMode?: boolean;
+}
+
+export default function UniversalFooter({ forceBannershipMode }: UniversalFooterProps) {
   const [user, setUser] = useState<any>(null);
+  const router = useRouter();
   const { data: profileData } = useQuery(GET_USER_PROFILE, {
     variables: { userId: user?.id || '' },
     skip: !user?.id,
   });
   const isWholesale = !!profileData?.getUserProfile?.isWholesaleCustomer;
+  
+  // Check if we're on a bannership page
+  const isBannershipPage = router.pathname === '/bannership' || router.pathname.startsWith('/bannership/') || forceBannershipMode;
 
   useEffect(() => {
     const checkUser = async () => {
@@ -39,7 +48,7 @@ export default function UniversalFooter() {
 
   return (
     <>
-      <footer className="py-12 mt-8" style={{ backgroundColor: '#030140', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+      <footer className="py-12 mt-8" style={{ backgroundColor: isBannershipPage ? '#000000' : '#030140', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
         <div className="w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
             
@@ -81,7 +90,7 @@ export default function UniversalFooter() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/products/vinyl-banners" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
+                  <Link href="/bannership" className="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
                     Vinyl Banners
                   </Link>
                 </li>
@@ -192,11 +201,13 @@ export default function UniversalFooter() {
             {/* Our Mission */}
             <div>
               <h3 className="text-white font-semibold text-lg mb-4 flex items-center">
-                <span className="mr-2">🚀</span>
+                <span className="mr-2">{isBannershipPage ? '🏴‍☠️' : '🚀'}</span>
                 Our Mission
               </h3>
               <p className="text-gray-300 text-sm leading-relaxed mb-6">
-                We're called Sticker Shuttle, what do you think our mission is? To get your stickers to you as fast as humanly possible. At no extra cost.
+                {isBannershipPage 
+                  ? "At Bannership, our mission is to make bringing your banner to life fast, easy, and effortless. No treasure maps, no upsells... just smooth sailing from idea to delivery at full speed."
+                  : "We're called Sticker Shuttle, what do you think our mission is? To get your stickers to you as fast as humanly possible. At no extra cost."}
               </p>
               
               {/* Social Media Links */}
@@ -229,15 +240,20 @@ export default function UniversalFooter() {
           <div className="mt-12 pt-8" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
             <div className="flex flex-col md:flex-row items-center justify-between">
               {/* Logo with v3.5 */}
-              <div className="mb-4 md:mb-0 flex items-center gap-3">
-                <img 
-                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
-                  alt="Sticker Shuttle Logo" 
-                  className="h-10 w-auto object-contain footer-logo-hover cursor-pointer"
-                />
-                <span className="holographic-v3-container text-sm px-3 py-1 rounded-full">
-                  <span className="holographic-v3-text">v3.5</span>
-                </span>
+              <div className="mb-4 md:mb-0 flex flex-col items-center gap-2">
+                {isBannershipPage && (
+                  <span className="text-gray-400 text-xs tracking-[0.3em] uppercase">POWERED BY</span>
+                )}
+                <div className="flex items-center gap-3">
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
+                    alt="Sticker Shuttle Logo" 
+                    className="h-10 w-auto object-contain footer-logo-hover cursor-pointer"
+                  />
+                  <span className="holographic-v3-container text-sm px-3 py-1 rounded-full">
+                    <span className="holographic-v3-text">v3.5</span>
+                  </span>
+                </div>
               </div>
               
               {/* Legal Links */}

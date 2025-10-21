@@ -789,6 +789,118 @@ app.post('/api/add-to-resend-audience', express.json(), async (req, res) => {
   }
 });
 
+// Add contact form endpoint
+app.post('/api/contact', express.json(), async (req, res) => {
+  try {
+    const { name, email, subject, message, relatedOrder } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !subject || !message) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Please fill in all required fields' 
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid email address'
+      });
+    }
+
+    console.log('📧 Processing contact form submission:', {
+      name,
+      email,
+      subject,
+      relatedOrder,
+      messageLength: message.length
+    });
+
+    // Import the email notifications module
+    const emailNotifications = require('./email-notifications');
+
+    // Subject mapping
+    const subjectMap = {
+      'general': 'General Inquiry',
+      'order': 'Order Question',
+      'custom': 'Custom Design Request',
+      'shipping': 'Shipping & Delivery',
+      'technical': 'Technical Support',
+      'wholesale': 'Wholesale Inquiry',
+      'other': 'Other',
+      'concern': 'Customer Concern',
+      'order-issue': 'Order Issue',
+      'proof-concerns': 'Proof Concerns',
+      'shipping-delay': 'Shipping Delay',
+      'quality-issue': 'Quality Issue',
+      'refund-request': 'Refund Request',
+      'design-help': 'Design Help Request',
+      'billing-question': 'Billing Question',
+      'technical-issue': 'Technical Support',
+      'product-inquiry': 'Product Inquiry'
+    };
+
+    const emailSubject = `[Contact Form] ${subjectMap[subject] || subject} - ${name}`;
+    
+    const emailContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #030140; margin-bottom: 20px;">New Contact Form Submission</h2>
+        
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+          <h3 style="margin-top: 0; color: #030140;">Contact Information</h3>
+          <p><strong>Name:</strong> ${name}</p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Subject:</strong> ${subjectMap[subject] || subject}</p>
+          ${relatedOrder ? `<p><strong>Related Order:</strong> ${relatedOrder}</p>` : ''}
+        </div>
+        
+        <div style="background: #ffffff; padding: 20px; border: 1px solid #e9ecef; border-radius: 8px;">
+          <h3 style="margin-top: 0; color: #030140;">Message</h3>
+          <p style="white-space: pre-wrap; line-height: 1.6;">${message}</p>
+        </div>
+        
+        <div style="margin-top: 20px; padding: 15px; background: #e3f2fd; border-radius: 8px; font-size: 14px; color: #1565c0;">
+          <p style="margin: 0;"><strong>Reply to:</strong> ${email}</p>
+          <p style="margin: 5px 0 0 0;"><strong>Submitted:</strong> ${new Date().toLocaleString()}</p>
+        </div>
+      </div>
+    `;
+
+    // Send email using the email notifications module
+    const result = await emailNotifications.sendEmail(
+      'orbit@stickershuttle.com',
+      emailSubject,
+      emailContent
+    );
+
+    if (result.success) {
+      console.log('✅ Contact form email sent successfully:', result.id);
+      return res.status(200).json({ 
+        success: true, 
+        message: 'Message sent successfully!' 
+      });
+    } else {
+      console.error('❌ Failed to send contact form email:', result.error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send message. Please try again later or contact us directly.',
+        error: result.error
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error in contact form endpoint:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Failed to send message. Please try again later or contact us directly.',
+      error: error.message
+    });
+  }
+});
+
 // Add bulk sync all users to Resend audience endpoint (admin only)
 app.post('/api/bulk-sync-users-to-resend', express.json(), async (req, res) => {
   try {
@@ -1090,6 +1202,9 @@ const typeDefs = gql`
     
     # Admin shared cart bypass mutations
     createAdminOrderFromSharedCart(input: AdminSharedCartOrderInput!): AdminOrderResult!
+    
+    # Admin user management mutations
+    adminChangeUserPassword(userId: ID!, newPassword: String!): AdminPasswordChangeResult!
   }
 
   type Customer {
@@ -2540,6 +2655,12 @@ const typeDefs = gql`
     success: Boolean!
     message: String
     order: CustomerOrder
+    error: String
+  }
+  
+  type AdminPasswordChangeResult {
+    success: Boolean!
+    message: String
     error: String
   }
 `;
@@ -7553,7 +7674,7 @@ const resolvers = {
               shipping_address: input.shippingAddress,
               billing_address: input.billingAddress || input.shippingAddress,
               order_tags: generateOrderTags(input.cartItems).split(','),
-              order_note: generateOrderNote(input.cartItems),
+              order_note: input.orderNote || generateOrderNote(input.cartItems),
               is_blind_shipment: safeIsBlindShipment,
               order_created_at: new Date().toISOString(),
               order_updated_at: new Date().toISOString()
@@ -12442,6 +12563,75 @@ const resolvers = {
           success: false,
           message: null,
           order: null,
+          error: error.message
+        };
+      }
+    },
+
+    // Admin password change mutation
+    adminChangeUserPassword: async (_, { userId, newPassword }, context) => {
+      try {
+        // Check admin authentication
+        const user = context.user;
+        requireAdminAuth(user);
+
+        console.log(`🔐 Admin ${user.email} attempting to change password for user ${userId}`);
+
+        // Validate password strength
+        if (!newPassword || newPassword.length < 8) {
+          return {
+            success: false,
+            message: 'Password must be at least 8 characters long',
+            error: 'Invalid password'
+          };
+        }
+
+        // Check if Supabase client is ready
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+
+        // Get user info first for logging
+        const { data: targetUser, error: getUserError } = await client.auth.admin.getUserById(userId);
+        
+        if (getUserError) {
+          console.error(`❌ Error getting user ${userId}:`, getUserError);
+          return {
+            success: false,
+            message: 'User not found',
+            error: getUserError.message
+          };
+        }
+
+        // Change the user's password using Supabase Admin API
+        const { error: updateError } = await client.auth.admin.updateUserById(userId, {
+          password: newPassword
+        });
+
+        if (updateError) {
+          console.error(`❌ Error changing password for user ${userId}:`, updateError);
+          return {
+            success: false,
+            message: 'Failed to change password',
+            error: updateError.message
+          };
+        }
+
+        console.log(`✅ Password successfully changed for user: ${targetUser.user.email} (${userId}) by admin: ${user.email}`);
+
+        return {
+          success: true,
+          message: `Password successfully changed for ${targetUser.user.email}`,
+          error: null
+        };
+
+      } catch (error) {
+        console.error('❌ Error in adminChangeUserPassword:', error);
+        return {
+          success: false,
+          message: 'Failed to change password',
           error: error.message
         };
       }

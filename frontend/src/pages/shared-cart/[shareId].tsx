@@ -161,8 +161,10 @@ const calculateItemPricing = (
     };
   }
   
-  // For vinyl banners, use the original pricing from the calculator - don't recalculate
-  if (item.product.category === 'vinyl-banners') {
+  // For all banner types, use the original pricing from the calculator - don't recalculate
+  if (item.product.category === 'vinyl-banners' || 
+      item.product.category === 'pop-up-banners' || 
+      item.product.category === 'x-banners') {
     return {
       total: item.totalPrice,
       perSticker: item.unitPrice,

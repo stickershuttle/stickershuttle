@@ -10,7 +10,13 @@ import HeaderAlerts from './HeaderAlerts';
 import CartIndicator from './CartIndicator';
 
 
-export default function UniversalHeader() {
+interface UniversalHeaderProps {
+  customLogo?: string;
+  customLogoAlt?: string;
+  forceBannershipMode?: boolean;
+}
+
+export default function UniversalHeader({ customLogo, customLogoAlt, forceBannershipMode }: UniversalHeaderProps = {}) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState<boolean>(false);
   const [user, setUser] = useState<any>(null);
@@ -36,6 +42,9 @@ export default function UniversalHeader() {
   const isOnMarketspaceURL = router.pathname === '/marketspace' || 
                             router.pathname.startsWith('/marketspace/') || 
                             router.pathname === '/creators-space-apply';
+
+  // Check if we're on a bannership page
+  const isBannershipPage = forceBannershipMode || router.pathname === '/bannership' || router.pathname.startsWith('/bannership/');
 
   // Check if user is a creator
   const { data: creatorData, loading: creatorLoading } = useQuery(GET_CREATOR_BY_USER_ID, {
@@ -326,7 +335,7 @@ export default function UniversalHeader() {
     {false && !isAdminPage && !isMarketspacePage && <HeaderAlerts />}
     
     
-    <header className={`w-full fixed z-50 ${!isAdminPage ? 'pb-[5px]' : ''} top-0`} style={{ backgroundColor: '#030140' }}>
+    <header className={`w-full fixed z-50 ${!isAdminPage ? 'pb-[5px]' : ''} top-0`} style={{ backgroundColor: isBannershipPage ? '#000000' : '#030140' }}>
               <div className={isAdminPage ? "w-full py-4 px-8" : "w-[95%] md:w-[90%] xl:w-[90%] 2xl:w-[75%] mx-auto py-4 px-4"}>
         <div className="flex items-center justify-between relative" style={{ paddingTop: '2px' }}>
           {/* Mobile/Tablet Left Side - Avatar or Login Icons */}
@@ -390,10 +399,20 @@ export default function UniversalHeader() {
           {/* Desktop Left Side - Logo */}
           <div className="hidden lg:flex items-center">
             <div className={isAdminPage ? "" : "lg:mr-6"}>
-              <Link href="/" className="flex items-center gap-2">
+              <Link href={customLogo && isBannershipPage ? "/bannership" : "/"} className="flex items-center gap-2">
                 <div className="relative h-12 w-auto logo-container">
+                  {/* Custom Logo - Show if provided (takes priority) */}
+                  {customLogo && (
+                    <img 
+                      src={customLogo} 
+                      alt={customLogoAlt || "Logo"} 
+                      className="h-12 w-auto object-contain cursor-pointer transition-all duration-500 logo-hover"
+                      style={{ maxWidth: 'none' }}
+                    />
+                  )}
+                  
                   {/* Admin SSPro Logo - Show only for admin users */}
-                  {isAdmin && (
+                  {!customLogo && isAdmin && (
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755791936/SSPro_wxtsdq.png" 
                       alt="SSPro Logo" 
@@ -403,7 +422,7 @@ export default function UniversalHeader() {
                   )}
                   
                   {/* Main Sticker Shuttle Logo - Show for non-admin users or when not admin */}
-                  {!isAdmin && (
+                  {!customLogo && !isAdmin && (
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
                       alt="Sticker Shuttle Logo" 
@@ -412,8 +431,8 @@ export default function UniversalHeader() {
                     />
                   )}
                   
-                  {/* Marketspace Logo with back arrow - Only show for non-admin users */}
-                  {!isAdmin && (
+                  {/* Marketspace Logo with back arrow - Only show for non-admin users and no custom logo */}
+                  {!customLogo && !isAdmin && (
                     <div className={`absolute top-0 left-0 flex items-center gap-2 transition-all duration-500 ${isMarketspacePage ? 'logo-in' : 'logo-out'}`}>
                       {/* Back arrow for marketspace */}
                       {isMarketspacePage && (
@@ -437,10 +456,20 @@ export default function UniversalHeader() {
 
           {/* Mobile Logo - Centered */}
           <div className="lg:hidden absolute left-1/2 transform -translate-x-1/2 z-40">
-            <Link href="/">
+            <Link href={customLogo && isBannershipPage ? "/bannership" : "/"}>
               <div className="relative h-12 w-auto logo-container">
+                {/* Custom Logo - Show if provided (takes priority) */}
+                {customLogo && (
+                  <img 
+                    src={customLogo} 
+                    alt={customLogoAlt || "Logo"} 
+                    className="h-12 w-auto object-contain cursor-pointer transition-all duration-500 logo-hover"
+                    style={{ maxWidth: 'none' }}
+                  />
+                )}
+                
                 {/* Admin SSPro Logo - Show only for admin users */}
-                {isAdmin && (
+                {!customLogo && isAdmin && (
                   <img 
                     src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755791936/SSPro_wxtsdq.png" 
                     alt="SSPro Logo" 
@@ -450,7 +479,7 @@ export default function UniversalHeader() {
                 )}
                 
                 {/* Main Sticker Shuttle Logo - Show for non-admin users */}
-                {!isAdmin && (
+                {!customLogo && !isAdmin && (
                   <img 
                     src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
                     alt="Sticker Shuttle Logo" 
@@ -459,8 +488,8 @@ export default function UniversalHeader() {
                   />
                 )}
                 
-                {/* Marketplace Logo - Only show for non-admin users */}
-                {!isAdmin && (
+                {/* Marketplace Logo - Only show for non-admin users and no custom logo */}
+                {!customLogo && !isAdmin && (
                   <img 
                     src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755176111/MarketspaceLogo_y4s7os.svg" 
                     alt="Marketspace Logo" 
@@ -543,7 +572,7 @@ export default function UniversalHeader() {
                 onClick={() => setIsSearchDropdownOpen(!isSearchDropdownOpen)}
                 onBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 300)}
               >
-                Select sticker type...
+                {isBannershipPage ? 'Select banner type...' : 'Select sticker type...'}
               </button>
               <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                 <svg 
@@ -574,228 +603,334 @@ export default function UniversalHeader() {
                   onMouseLeave={() => setIsSearchDropdownOpen(false)}
                 >
                 <div className="p-2">
-                  <h3 className="text-sm font-semibold text-white mb-2 px-2">Sticker Types:</h3>
+                  <h3 className="text-sm font-semibold text-white mb-2 px-2">{isBannershipPage ? 'Banner Types:' : 'Sticker Types:'}</h3>
                   <div className="space-y-1">
-                    {/* Vinyl Stickers */}
-                    <Link 
-                      href="/products/vinyl-stickers" 
-                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline" 
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleLinkClick('/products/vinyl-stickers');
-                      }}
-                      style={{ textDecoration: 'none' }}
-                    >
-                      <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
-                        <img 
-                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
-                          alt="Vinyl" 
-                          className="max-w-full max-h-full object-contain"
-                          style={{
-                            filter: 'drop-shadow(0 0 6px rgba(168, 242, 106, 0.4))'
+                    {isBannershipPage ? (
+                      <>
+                        {/* Pop Up Banners */}
+                        <Link 
+                          href="/bannership/products/pop-up-banners" 
+                          className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleLinkClick('/bannership/products/pop-up-banners');
                           }}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Vinyl Stickers</p>
-                        <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(168, 242, 106)' }}>Waterproof & UV Resistant</p>
-                      </div>
-                    </Link>
-                    
-                    {/* Holographic Stickers */}
-                    <Link 
-                      href="/products/holographic-stickers" 
-                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleLinkClick('/products/holographic-stickers');
-                      }}
-                      style={{ textDecoration: 'none' }}
-                    >
-                      <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
-                        <img 
-                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
-                          alt="Holographic" 
-                          className="max-w-full max-h-full object-contain"
-                          style={{
-                            filter: 'drop-shadow(0 0 6px rgba(168, 85, 247, 0.4))'
-                          }}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Holographic Stickers</p>
-                        <p 
-                          className="text-xs transition-colors duration-200 group-hover:text-gray-700" 
-                          style={{ 
-                            background: 'linear-gradient(45deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3, #ff0000, #ff7f00)',
-                            backgroundSize: '200% 200%',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text',
-                            animation: 'holographicShimmer 3s ease-in-out infinite'
-                          }}
+                          style={{ textDecoration: 'none' }}
                         >
-                          Rainbow Holographic Effect
-                        </p>
-                      </div>
-                    </Link>
-                    
-                    {/* Chrome Stickers */}
-                    <Link 
-                      href="/products/chrome-stickers" 
-                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleLinkClick('/products/chrome-stickers');
-                      }}
-                      style={{ textDecoration: 'none' }}
-                    >
-                      <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
-                        <img 
-                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
-                          alt="Chrome" 
-                          className="max-w-full max-h-full object-contain"
-                          style={{
-                            filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.4))'
+                          <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
+                            <img 
+                              src="/popup-banner-icon.png" 
+                              alt="Pop Up Banners" 
+                              className="max-w-full max-h-full object-contain"
+                              style={{
+                                filter: 'drop-shadow(0 0 6px rgba(59, 130, 246, 0.4))'
+                              }}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Pop Up Banners</p>
+                            <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(59, 130, 246)' }}>Portable Display Banners</p>
+                          </div>
+                        </Link>
+                        
+                        {/* Vinyl Banners */}
+                        <Link 
+                          href="/bannership/products/vinyl-banners" 
+                          className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleLinkClick('/bannership/products/vinyl-banners');
                           }}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Chrome Stickers</p>
-                        <p 
-                          className="text-xs transition-colors duration-200 group-hover:text-gray-700" 
-                          style={{ 
-                            background: 'linear-gradient(45deg, #dcdcdc, #ffffff, #c0c0c0, #f0f0f0, #e8e8e8)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text'
-                          }}
+                          style={{ textDecoration: 'none' }}
                         >
-                          Mirror Chrome Finish
-                        </p>
-                      </div>
-                    </Link>
-                    
-                    {/* Glitter Stickers */}
-                    <Link 
-                      href="/products/glitter-stickers" 
-                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleLinkClick('/products/glitter-stickers');
-                      }}
-                      style={{ textDecoration: 'none' }}
-                    >
-                      <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
-                        <img 
-                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
-                          alt="Glitter" 
-                          className="max-w-full max-h-full object-contain"
-                          style={{
-                            filter: 'drop-shadow(0 0 6px rgba(59, 130, 246, 0.4))'
+                          <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
+                            <img 
+                              src="/vinyl-banner-icon.png" 
+                              alt="Vinyl Banners" 
+                              className="max-w-full max-h-full object-contain"
+                              style={{
+                                filter: 'drop-shadow(0 0 6px rgba(196, 181, 253, 0.4))'
+                              }}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Vinyl Banners</p>
+                            <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(196, 181, 253)' }}>Heavy Duty 13oz Vinyl</p>
+                          </div>
+                        </Link>
+                        
+                        {/* X Banners */}
+                        <Link 
+                          href="/bannership/products/x-banners" 
+                          className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleLinkClick('/bannership/products/x-banners');
                           }}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Glitter Stickers</p>
-                        <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(59, 130, 246)' }}>Sparkly Glitter Finish</p>
-                      </div>
-                    </Link>
-                    
-                    {/* Clear Stickers */}
-                    <Link 
-                      href="/products/clear-stickers" 
-                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleLinkClick('/products/clear-stickers');
-                      }}
-                      style={{ textDecoration: 'none' }}
-                    >
-                      <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
-                        <img 
-                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749849590/StickerShuttle_ClearIcon_zxjnqc.svg" 
-                          alt="Clear" 
-                          className="max-w-full max-h-full object-contain"
-                          style={{
-                            filter: 'drop-shadow(0 0 6px rgba(34, 197, 94, 0.4))'
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
+                            <img 
+                              src="/x-banner-icon.png" 
+                              alt="X Banners" 
+                              className="max-w-full max-h-full object-contain"
+                              style={{
+                                filter: 'drop-shadow(0 0 6px rgba(168, 242, 106, 0.4))'
+                              }}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">X Banners</p>
+                            <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(168, 242, 106)' }}>Freestanding Display Banners</p>
+                          </div>
+                        </Link>
+                        
+                        {/* Horizontal Divider */}
+                        <div className="my-2 border-t border-white/20"></div>
+                        
+                        {/* Sticker Shuttle Logo Link */}
+                        <Link 
+                          href="/" 
+                          className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleLinkClick('/');
                           }}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Clear Stickers</p>
-                        <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(34, 197, 94)' }}>Transparent Finish</p>
-                      </div>
-                    </Link>
-                    
-                    {/* Sticker Sheets */}
-                    <Link 
-                      href="/products/sticker-sheets" 
-                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleLinkClick('/products/sticker-sheets');
-                      }}
-                      style={{ textDecoration: 'none' }}
-                    >
-                      <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
-                        <img 
-                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749847809/StickerShuttle_StickerSheetsIcon_2_g61dty.svg" 
-                          alt="Sticker Sheets" 
-                          className="max-w-full max-h-full object-contain"
-                          style={{
-                            filter: 'drop-shadow(0 0 6px rgba(248, 113, 113, 0.4))'
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <img 
+                            src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
+                            alt="Sticker Shuttle" 
+                            className="h-8 w-auto object-contain"
+                          />
+                          {/* Vertical Divider */}
+                          <div className="mx-3 h-8 border-l border-white/30"></div>
+                          {/* Text */}
+                          <span className="text-white text-sm">Get your stickers here!</span>
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        {/* Vinyl Stickers */}
+                        <Link 
+                          href="/products/vinyl-stickers" 
+                          className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleLinkClick('/products/vinyl-stickers');
                           }}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Sticker Sheets</p>
-                        <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(248, 113, 113)' }}>Multiple Stickers Per Sheet</p>
-                      </div>
-                    </Link>
-                    
-                    {/* Vinyl Banners */}
-                    <Link 
-                      href="/products/vinyl-banners" 
-                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleLinkClick('/products/vinyl-banners');
-                      }}
-                      style={{ textDecoration: 'none' }}
-                    >
-                      <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
-                        <img 
-                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593724/Vinyl-Banner_c84nis.png" 
-                          alt="Vinyl Banners" 
-                          className="max-w-full max-h-full object-contain"
-                          style={{
-                            filter: 'drop-shadow(0 0 6px rgba(196, 181, 253, 0.4))'
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
+                            <img 
+                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
+                              alt="Vinyl" 
+                              className="max-w-full max-h-full object-contain"
+                              style={{
+                                filter: 'drop-shadow(0 0 6px rgba(168, 242, 106, 0.4))'
+                              }}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Vinyl Stickers</p>
+                            <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(168, 242, 106)' }}>Waterproof & UV Resistant</p>
+                          </div>
+                        </Link>
+                        
+                        {/* Holographic Stickers */}
+                        <Link 
+                          href="/products/holographic-stickers" 
+                          className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleLinkClick('/products/holographic-stickers');
                           }}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Vinyl Banners</p>
-                        <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(196, 181, 253)' }}>Heavy Duty 13oz Vinyl</p>
-                      </div>
-                    </Link>
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
+                            <img 
+                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
+                              alt="Holographic" 
+                              className="max-w-full max-h-full object-contain"
+                              style={{
+                                filter: 'drop-shadow(0 0 6px rgba(168, 85, 247, 0.4))'
+                              }}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Holographic Stickers</p>
+                            <p 
+                              className="text-xs transition-colors duration-200 group-hover:text-gray-700" 
+                              style={{ 
+                                background: 'linear-gradient(45deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3, #ff0000, #ff7f00)',
+                                backgroundSize: '200% 200%',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                backgroundClip: 'text',
+                                animation: 'holographicShimmer 3s ease-in-out infinite'
+                              }}
+                            >
+                              Rainbow Holographic Effect
+                            </p>
+                          </div>
+                        </Link>
+                        
+                        {/* Chrome Stickers */}
+                        <Link 
+                          href="/products/chrome-stickers" 
+                          className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleLinkClick('/products/chrome-stickers');
+                          }}
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
+                            <img 
+                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
+                              alt="Chrome" 
+                              className="max-w-full max-h-full object-contain"
+                              style={{
+                                filter: 'drop-shadow(0 0 6px rgba(220, 220, 220, 0.4))'
+                              }}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Chrome Stickers</p>
+                            <p 
+                              className="text-xs transition-colors duration-200 group-hover:text-gray-700" 
+                              style={{ 
+                                background: 'linear-gradient(45deg, #dcdcdc, #ffffff, #c0c0c0, #f0f0f0, #e8e8e8)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                backgroundClip: 'text'
+                              }}
+                            >
+                              Mirror Chrome Finish
+                            </p>
+                          </div>
+                        </Link>
+                        
+                        {/* Glitter Stickers */}
+                        <Link 
+                          href="/products/glitter-stickers" 
+                          className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleLinkClick('/products/glitter-stickers');
+                          }}
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
+                            <img 
+                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
+                              alt="Glitter" 
+                              className="max-w-full max-h-full object-contain"
+                              style={{
+                                filter: 'drop-shadow(0 0 6px rgba(59, 130, 246, 0.4))'
+                              }}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Glitter Stickers</p>
+                            <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(59, 130, 246)' }}>Sparkly Glitter Finish</p>
+                          </div>
+                        </Link>
+                        
+                        {/* Clear Stickers */}
+                        <Link 
+                          href="/products/clear-stickers" 
+                          className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleLinkClick('/products/clear-stickers');
+                          }}
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
+                            <img 
+                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749849590/StickerShuttle_ClearIcon_zxjnqc.svg" 
+                              alt="Clear" 
+                              className="max-w-full max-h-full object-contain"
+                              style={{
+                                filter: 'drop-shadow(0 0 6px rgba(34, 197, 94, 0.4))'
+                              }}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Clear Stickers</p>
+                            <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(34, 197, 94)' }}>Transparent Finish</p>
+                          </div>
+                        </Link>
+                        
+                        {/* Sticker Sheets */}
+                        <Link 
+                          href="/products/sticker-sheets" 
+                          className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleLinkClick('/products/sticker-sheets');
+                          }}
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <div className="w-8 h-8 mr-3 flex items-center justify-center flex-shrink-0">
+                            <img 
+                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749847809/StickerShuttle_StickerSheetsIcon_2_g61dty.svg" 
+                              alt="Sticker Sheets" 
+                              className="max-w-full max-h-full object-contain"
+                              style={{
+                                filter: 'drop-shadow(0 0 6px rgba(248, 113, 113, 0.4))'
+                              }}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-white group-hover:text-gray-800 text-sm font-medium transition-colors duration-200">Sticker Sheets</p>
+                            <p className="text-xs transition-colors duration-200 group-hover:text-gray-700" style={{ color: 'rgb(248, 113, 113)' }}>Multiple Stickers Per Sheet</p>
+                          </div>
+                        </Link>
+                        
+                        {/* Horizontal Divider */}
+                        <div className="my-2 border-t border-white/20"></div>
+                        
+                        {/* Bannership Logo Link */}
+                        <Link 
+                          href="/bannership" 
+                          className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleLinkClick('/bannership');
+                          }}
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <img 
+                            src="/bannership-logo.svg" 
+                            alt="Bannership" 
+                            className="h-8 w-auto object-contain"
+                          />
+                          {/* Vertical Divider */}
+                          <div className="mx-3 h-8 border-l border-white/30"></div>
+                          {/* Text */}
+                          <span className="text-white text-sm">Get your vinyl banners here!</span>
+                        </Link>
 
-                    {/* Creators Space - Available to all users */}
-                    <Link 
-                      href="/marketspace" 
-                      className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleLinkClick('/marketspace');
-                      }}
-                      style={{ textDecoration: 'none' }}
-                    >
-                      <img 
-                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755179299/MarketspaceLogoFinal_q2fcer.svg" 
-                        alt="Creators Space" 
-                        className="h-8 w-auto object-contain"
-                      />
-                    </Link>
+                        {/* Creators Space - Hidden */}
+                        {/* <Link 
+                          href="/marketspace" 
+                          className="flex items-center px-3 py-2 rounded-lg hover:bg-white hover:bg-opacity-[0.01] cursor-pointer transition-all duration-200 group block no-underline"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleLinkClick('/marketspace');
+                          }}
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <img 
+                            src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755179299/MarketspaceLogoFinal_q2fcer.svg" 
+                            alt="Creators Space" 
+                            className="h-8 w-auto object-contain"
+                          />
+                        </Link> */}
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -837,8 +972,8 @@ export default function UniversalHeader() {
 
 
 
-                {/* Marketspace - Available to all users when NOT on marketspace */}
-                {!isMarketspacePage && (
+                {/* Marketspace - Hidden */}
+                {/* {!isMarketspacePage && !isBannershipPage && (
                   <Link 
                     href="/marketspace"
                     className={`rounded-lg transition-all duration-200 transform hover:scale-105 flex items-center${(router.pathname === '/marketspace' || router.pathname.startsWith('/marketspace/') || router.asPath === '/marketspace') ? ' active' : ''}`}
@@ -847,6 +982,21 @@ export default function UniversalHeader() {
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755176111/MarketspaceLogo_y4s7os.svg"
                       alt="Creators Space" 
+                      className="h-8 w-auto object-contain"
+                    />
+                  </Link>
+                )} */}
+
+                {/* Sticker Shuttle Logo - Show on bannership page */}
+                {isBannershipPage && (
+                  <Link 
+                    href="/"
+                    className="rounded-lg transition-all duration-200 transform hover:scale-105 flex items-center"
+                    aria-label="Sticker Shuttle Home"
+                  >
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png"
+                      alt="Sticker Shuttle Logo" 
                       className="h-8 w-auto object-contain"
                     />
                   </Link>
@@ -1382,124 +1532,197 @@ export default function UniversalHeader() {
             </button>
           </div>
 
-          {/* Sticker Types Quick Access - 2 Column Grid */}
+          {/* Product Types Quick Access - 2 Column Grid */}
           <div className="mb-8">
             <h3 className="text-sm font-semibold text-white mb-4">Quick Access:</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <Link 
-                href="/products/vinyl-stickers" 
-                className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <div className="w-12 h-12 mb-2 flex items-center justify-center">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
-                    alt="Vinyl" 
-                    className="max-w-full max-h-full object-contain"
-                    style={{
-                      filter: 'drop-shadow(0 0 8px rgba(168, 242, 106, 0.5))'
-                    }}
-                  />
+            {isBannershipPage ? (
+              <>
+                {/* Bannership Products */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Link 
+                    href="/bannership/products/pop-up-banners" 
+                    className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <div className="w-12 h-12 mb-2 flex items-center justify-center">
+                      <img 
+                        src="/popup-banner-icon.png" 
+                        alt="Pop Up Banners" 
+                        className="max-w-full max-h-full object-contain"
+                        style={{
+                          filter: 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.5))'
+                        }}
+                      />
+                    </div>
+                    <p className="text-white text-xs font-medium text-center">Pop Up</p>
+                    <p className="text-white text-xs text-center mt-0.5">Banners</p>
+                  </Link>
+                  
+                  <Link 
+                    href="/bannership/products/vinyl-banners" 
+                    className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <div className="w-12 h-12 mb-2 flex items-center justify-center">
+                      <img 
+                        src="/vinyl-banner-icon.png" 
+                        alt="Vinyl Banners" 
+                        className="max-w-full max-h-full object-contain"
+                        style={{
+                          filter: 'drop-shadow(0 0 8px rgba(196, 181, 253, 0.5))'
+                        }}
+                      />
+                    </div>
+                    <p className="text-white text-xs font-medium text-center">Vinyl</p>
+                    <p className="text-white text-xs text-center mt-0.5">Banners</p>
+                  </Link>
+                  
+                  <Link 
+                    href="/bannership/products/x-banners" 
+                    className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <div className="w-12 h-12 mb-2 flex items-center justify-center">
+                      <img 
+                        src="/x-banner-icon.png" 
+                        alt="X Banners" 
+                        className="max-w-full max-h-full object-contain"
+                        style={{
+                          filter: 'drop-shadow(0 0 8px rgba(168, 242, 106, 0.5))'
+                        }}
+                      />
+                    </div>
+                    <p className="text-white text-xs font-medium text-center">X-</p>
+                    <p className="text-white text-xs text-center mt-0.5">Banners</p>
+                  </Link>
                 </div>
-                <p className="text-white text-xs font-medium text-center">Vinyl</p>
-                <p className="text-white text-xs text-center mt-0.5">Stickers</p>
-              </Link>
-              
-              <Link 
-                href="/products/holographic-stickers" 
-                className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <div className="w-12 h-12 mb-2 flex items-center justify-center">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
-                    alt="Holographic" 
-                    className="max-w-full max-h-full object-contain"
-                    style={{
-                      filter: 'drop-shadow(0 0 8px rgba(168, 85, 247, 0.5))'
-                    }}
-                  />
+                
+                {/* Horizontal Divider */}
+                <div className="my-3 border-t border-white/20"></div>
+                
+                {/* Sticker Shuttle Section */}
+                <div className="px-2">
+                  <Link 
+                    href="/" 
+                    className="flex items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
+                      alt="Sticker Shuttle" 
+                      className="h-8 w-auto object-contain"
+                    />
+                    {/* Vertical Divider */}
+                    <div className="mx-3 h-8 border-l border-white/30"></div>
+                    {/* Text */}
+                    <span className="text-white text-xs">Get your stickers here!</span>
+                  </Link>
                 </div>
-                <p className="text-white text-xs font-medium text-center">Holographic</p>
-                <p className="text-white text-xs text-center mt-0.5">Stickers</p>
-              </Link>
-              
-              <Link 
-                href="/products/chrome-stickers" 
-                className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <div className="w-12 h-12 mb-2 flex items-center justify-center">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
-                    alt="Chrome" 
-                    className="max-w-full max-h-full object-contain"
-                    style={{
-                      filter: 'drop-shadow(0 0 8px rgba(220, 220, 220, 0.5))'
-                    }}
-                  />
+              </>
+            ) : (
+              <>
+                {/* Sticker Shuttle Products */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Link 
+                    href="/products/vinyl-stickers" 
+                    className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <div className="w-12 h-12 mb-2 flex items-center justify-center">
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
+                        alt="Vinyl" 
+                        className="max-w-full max-h-full object-contain"
+                        style={{
+                          filter: 'drop-shadow(0 0 8px rgba(168, 242, 106, 0.5))'
+                        }}
+                      />
+                    </div>
+                    <p className="text-white text-xs font-medium text-center">Vinyl</p>
+                    <p className="text-white text-xs text-center mt-0.5">Stickers</p>
+                  </Link>
+                  
+                  <Link 
+                    href="/products/holographic-stickers" 
+                    className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <div className="w-12 h-12 mb-2 flex items-center justify-center">
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
+                        alt="Holographic" 
+                        className="max-w-full max-h-full object-contain"
+                        style={{
+                          filter: 'drop-shadow(0 0 8px rgba(168, 85, 247, 0.5))'
+                        }}
+                      />
+                    </div>
+                    <p className="text-white text-xs font-medium text-center">Holographic</p>
+                    <p className="text-white text-xs text-center mt-0.5">Stickers</p>
+                  </Link>
+                  
+                  <Link 
+                    href="/products/chrome-stickers" 
+                    className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <div className="w-12 h-12 mb-2 flex items-center justify-center">
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
+                        alt="Chrome" 
+                        className="max-w-full max-h-full object-contain"
+                        style={{
+                          filter: 'drop-shadow(0 0 8px rgba(220, 220, 220, 0.5))'
+                        }}
+                      />
+                    </div>
+                    <p className="text-white text-xs font-medium text-center">Chrome</p>
+                    <p className="text-white text-xs text-center mt-0.5">Stickers</p>
+                  </Link>
+                  
+                  <Link 
+                    href="/products/glitter-stickers" 
+                    className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <div className="w-12 h-12 mb-2 flex items-center justify-center">
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
+                        alt="Glitter" 
+                        className="max-w-full max-h-full object-contain"
+                        style={{
+                          filter: 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.5))'
+                        }}
+                      />
+                    </div>
+                    <p className="text-white text-xs font-medium text-center">Glitter</p>
+                    <p className="text-white text-xs text-center mt-0.5">Stickers</p>
+                  </Link>
                 </div>
-                <p className="text-white text-xs font-medium text-center">Chrome</p>
-                <p className="text-white text-xs text-center mt-0.5">Stickers</p>
-              </Link>
-              
-              <Link 
-                href="/products/glitter-stickers" 
-                className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <div className="w-12 h-12 mb-2 flex items-center justify-center">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
-                    alt="Glitter" 
-                    className="max-w-full max-h-full object-contain"
-                    style={{
-                      filter: 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.5))'
-                    }}
-                  />
+                
+                {/* Horizontal Divider */}
+                <div className="my-3 border-t border-white/20"></div>
+                
+                {/* Bannership Section */}
+                <div className="px-2">
+                  <Link 
+                    href="/bannership" 
+                    className="flex items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <img 
+                      src="/bannership-logo.svg" 
+                      alt="Bannership" 
+                      className="h-8 w-auto object-contain"
+                    />
+                    {/* Vertical Divider */}
+                    <div className="mx-3 h-8 border-l border-white/30"></div>
+                    {/* Text */}
+                    <span className="text-white text-xs">Get your vinyl banners here!</span>
+                  </Link>
                 </div>
-                <p className="text-white text-xs font-medium text-center">Glitter</p>
-                <p className="text-white text-xs text-center mt-0.5">Stickers</p>
-              </Link>
-              
-              <Link 
-                href="/products/vinyl-banners" 
-                className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <div className="w-12 h-12 mb-2 flex items-center justify-center">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593724/Vinyl-Banner_c84nis.png" 
-                    alt="Vinyl Banners" 
-                    className="max-w-full max-h-full object-contain"
-                    style={{
-                      filter: 'drop-shadow(0 0 8px rgba(196, 181, 253, 0.5))'
-                    }}
-                  />
-                </div>
-                <p className="text-white text-xs font-medium text-center">Vinyl</p>
-                <p className="text-white text-xs text-center mt-0.5">Banners</p>
-              </Link>
-              
-              <Link 
-                href="/products/sticker-sheets" 
-                className="flex flex-col items-center p-4 rounded-lg hover:bg-white/10 cursor-pointer transition-all duration-200 group" 
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <div className="w-12 h-12 mb-2 flex items-center justify-center">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749847809/StickerShuttle_StickerSheetsIcon_2_g61dty.svg" 
-                    alt="Sticker Sheets" 
-                    className="max-w-full max-h-full object-contain"
-                    style={{
-                      filter: 'drop-shadow(0 0 8px rgba(196, 181, 253, 0.5))'
-                    }}
-                  />
-                </div>
-                <p className="text-white text-xs font-medium text-center">Sticker</p>
-                <p className="text-white text-xs text-center mt-0.5">Sheets</p>
-              </Link>
-            </div>
+              </>
+            )}
           </div>
 
           {/* Navigation Items */}

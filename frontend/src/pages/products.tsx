@@ -476,78 +476,60 @@ export default function Products() {
           </div>
           </div>
 
-          {/* Signage Section */}
+          {/* Banners Section */}
           <div className="mt-16">
-            {/* Signage Title */}
+            {/* Banners Title */}
             <div className="text-center mb-8">
-              <h2 className="text-2xl sm:text-3xl md:text-4xl text-white mb-4" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>Signage</h2>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl text-white mb-4" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>Banners</h2>
               <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-                Professional signage solutions for your business or event needs.
+                High-quality banners made easy by <span className="text-purple-400 font-semibold">Bannership</span>, our child company.
               </p>
             </div>
 
-            {/* Signage Desktop Grid */}
-            <div className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
-              {/* Vinyl Banners */}
-              <Link href="/products/vinyl-banners">
+            {/* Banners Desktop Grid - Full Width Bannership */}
+            <div className="hidden md:block mb-16">
+              <Link href="/bannership">
                 <div 
-                  className="text-center group/card cursor-pointer rounded-2xl p-6 transition-all duration-500 ease-out hover:scale-105 hover:shadow-lg transform overflow-hidden"
+                  className="group/card cursor-pointer rounded-2xl p-8 transition-all duration-500 ease-out hover:scale-[1.02] hover:shadow-2xl transform overflow-hidden flex items-center justify-center gap-6"
                   style={{ 
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    background: '#000000',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
                     backdropFilter: 'blur(12px)'
                   }}
                 >
-                  <div className="w-40 h-40 mx-auto mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-1 transition-transform duration-500 ease-out">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593724/Vinyl-Banner_c84nis.png" 
-                      alt="Vinyl Banners" 
-                      className="w-full h-full object-contain"
-                      style={{
-                        filter: 'none'
-                      }}
-                    />
-                  </div>
-                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2">Vinyl Banners →</h3>
+                  <img 
+                    src="/bannership-logo.svg" 
+                    alt="Bannership" 
+                    className="h-12 w-auto object-contain group-hover/card:scale-105 transition-transform duration-500 ease-out"
+                  />
+                  <div className="h-12 border-l border-white/30"></div>
+                  <span className="text-white text-xl font-semibold group-hover/card:text-purple-300 transition-colors duration-300">Get your vinyl banners here →</span>
                 </div>
               </Link>
             </div>
 
-            {/* Signage Mobile Grid */}
+            {/* Banners Mobile - Full Width Bannership */}
             <div className="w-full mx-auto px-2 md:hidden mb-16">
-              <div 
-                style={{ 
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(1, 1fr)',
-                  gap: '16px'
-                }}
-              >
-                <Link href="/products/vinyl-banners">
-                  <div 
-                    className="text-center rounded-2xl p-6 flex flex-col"
-                    style={{ 
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                      backdropFilter: 'blur(12px)',
-                      height: '220px'
-                    }}
-                  >
-                    <div className="w-28 h-28 mx-auto flex items-center justify-center mb-6">
-                      <img 
-                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593724/Vinyl-Banner_c84nis.png" 
-                        alt="Vinyl Banners"
-                        className="w-full h-full object-contain"
-                        style={{
-                          filter: 'none'
-                        }}
-                      />
-                    </div>
-                    <h3 className="font-semibold text-white text-sm mb-6">Vinyl<br/>Banners →</h3>
-                  </div>
-                </Link>
-              </div>
+              <Link href="/bannership">
+                <div 
+                  className="rounded-2xl p-6 flex flex-col items-center justify-center gap-4"
+                  style={{ 
+                    background: '#000000',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)'
+                  }}
+                >
+                  <img 
+                    src="/bannership-logo.svg" 
+                    alt="Bannership" 
+                    className="h-10 w-auto object-contain"
+                  />
+                  <div className="w-full border-t border-white/30"></div>
+                  <span className="text-white text-sm font-semibold text-center">Get your vinyl banners here →</span>
+                </div>
+              </Link>
             </div>
           </div>
 

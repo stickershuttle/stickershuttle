@@ -230,9 +230,10 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
     }
   }
 
-  const calculatePricing = () => {
+  const calculatePricing = (qty?: string) => {
     const sqFt = calculateSquareFootage();
-    const quantity = selectedQuantity === 'Custom' ? parseInt(customQuantity) || 1 : parseInt(selectedQuantity);
+    const qtyParam = qty !== undefined ? qty : selectedQuantity;
+    const quantity = qtyParam === 'Custom' ? parseInt(customQuantity) || 1 : parseInt(qtyParam);
     
     if (sqFt === 0 || (selectedSize === 'custom' && customSizeError) || quantity <= 0) {
       return {
@@ -411,8 +412,8 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
         shortDescription: "Professional outdoor signage, durable and weather-resistant",
         basePrice: finalUnitPrice,
         pricingModel: "per-unit" as const,
-        images: [],
-        defaultImage: "",
+        images: ['/vinyl-banner-icon.png'],
+        defaultImage: '/vinyl-banner-icon.png',
         features: [],
         attributes: [],
         customizable: true,
@@ -474,6 +475,12 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
   const handleCheckout = () => {
     if (pricing.total === 0) return;
     
+    // Validate file upload requirement
+    if (!uploadedFile && !uploadLater) {
+      alert('Please upload your artwork or select "Upload artwork later"');
+      return;
+    }
+    
     const cartItem = createCartItem();
     addToCart(cartItem);
     // Redirect to cart page for checkout
@@ -482,6 +489,12 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
 
   const handleAddToCartAndKeepShopping = () => {
     if (pricing.total === 0) return;
+    
+    // Validate file upload requirement
+    if (!uploadedFile && !uploadLater) {
+      alert('Please upload your artwork or select "Upload artwork later"');
+      return;
+    }
     
     const cartItem = createCartItem();
     addToCart(cartItem);
@@ -670,36 +683,50 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
               Select Quantity
             </h2>
             <div className="space-y-3">
-              {['1', '5', '10', '25', 'Custom'].map((amount) => (
-                <button
-                  key={amount}
-                  onClick={() => handleQuantityChange(amount)}
-                  aria-label={`Select ${amount} banners`}
-                  className={`button-interactive relative w-full text-left px-4 py-3 rounded-xl flex items-center justify-between transition-all border backdrop-blur-md
-                    ${
-                      selectedQuantity === amount
-                        ? "bg-green-500/20 text-green-200 font-medium border-green-400/50 button-selected animate-glow-green"
-                        : "hover:bg-white/10 border-white/20 text-white/80"
-                    }`}
-                >
-                  <span>{amount === 'Custom' ? 'Custom Quantity' : `${amount} Banner${amount === '1' ? '' : 's'}`}</span>
-                  {amount === '5' && (
-                    <span className="absolute top-1 right-2 text-[10px] text-green-300 font-medium">
-                      5% Off
-                    </span>
-                  )}
-                  {amount === '10' && (
-                    <span className="absolute top-1 right-2 text-[10px] text-green-300 font-medium">
-                      10% Off
-                    </span>
-                  )}
-                  {amount === '25' && (
-                    <span className="absolute top-1 right-2 text-[10px] text-green-300 font-medium">
-                      25% Off
-                    </span>
-                  )}
-                </button>
-              ))}
+              {['1', '5', '10', '25', 'Custom'].map((amount) => {
+                const qtyPricing = amount !== 'Custom' ? calculatePricing(amount) : null;
+                const discountText = amount === '5' ? '5% OFF' : amount === '10' ? '10% OFF' : amount === '25' ? '25% OFF' : null;
+                
+                return (
+                  <button
+                    key={amount}
+                    onClick={() => handleQuantityChange(amount)}
+                    aria-label={`Select ${amount} banners`}
+                    className={`button-interactive relative w-full text-left px-4 py-3 rounded-xl transition-all border backdrop-blur-md
+                      ${
+                        selectedQuantity === amount
+                          ? "bg-green-500/20 text-green-200 font-medium border-green-400/50 button-selected animate-glow-green"
+                          : "hover:bg-white/10 border-white/20 text-white/80"
+                      }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{amount === 'Custom' ? 'Custom Quantity' : `${amount} Banner${amount === '1' ? '' : 's'}`}</span>
+                      {qtyPricing && qtyPricing.total > 0 && (
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`px-2 py-1 text-xs font-medium rounded-lg border ${
+                              selectedQuantity === amount ? 'text-white' : 'text-green-200'
+                            }`}
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(34, 197, 94, 0.15) 50%, rgba(34, 197, 94, 0.05) 100%)',
+                              border: '1px solid rgba(34, 197, 94, 0.4)',
+                              backdropFilter: 'blur(12px)'
+                            }}
+                          >
+                            ${qtyPricing.total.toFixed(2)}
+                          </span>
+                          {discountText && (
+                            <span className="text-xs bg-red-500/20 text-red-300 px-2 py-1 rounded">{discountText}</span>
+                          )}
+                        </div>
+                      )}
+                      {amount === 'Custom' && (
+                        <span className="text-xs text-gray-400">Enter amount</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
             <div className="flex-1 flex flex-col justify-end">
               {selectedQuantity === 'Custom' && (
@@ -915,41 +942,29 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
 
           {/* Additional Options */}
           <div className="space-y-4">
-            {/* Rush Order Toggle - Temporarily Disabled */}
-            <div className="relative group">
-              <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium relative opacity-40 cursor-not-allowed"
-                   style={{
-                     background: 'linear-gradient(135deg, rgba(107, 114, 128, 0.3) 0%, rgba(107, 114, 128, 0.15) 50%, rgba(107, 114, 128, 0.05) 100%)',
-                     border: '1px solid rgba(107, 114, 128, 0.4)',
-                     backdropFilter: 'blur(12px)'
-                   }}>
-                  <button
-                    disabled={true}
-                    className="w-12 h-6 rounded-full transition-colors bg-gray-500 cursor-not-allowed"
-                  >
-                    <div className="w-4 h-4 bg-white rounded-full transition-transform translate-x-1" />
-                  </button>
-                  <div className="flex-1">
-                    <label className="text-sm font-medium text-gray-400">
-                      🕒 Rush Order Temporarily Unavailable
-                    </label>
-                  </div>
-                </div>
-                
-                {/* Tooltip */}
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
-                  <div className="flex items-center gap-2">
-                    <span>Uh oh! We're unable to rush orders right now.</span>
-                    <a 
-                      href="https://www.stickershuttle.com/blog/ciao-bella-were-off-to-italy" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-blue-300 hover:text-blue-200 underline pointer-events-auto"
-                    >
-                      Read more →
-                    </a>
-                  </div>
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+            {/* Rush Order Toggle */}
+            <div className="flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
+                 style={{
+                   background: 'rgba(255, 255, 255, 0.05)',
+                   border: '1px solid rgba(255, 255, 255, 0.1)',
+                   boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                   backdropFilter: 'blur(12px)'
+                 }}>
+                <button
+                  onClick={() => setRushOrder(!rushOrder)}
+                  title={rushOrder ? "Disable rush order" : "Enable rush order"}
+                  className={`w-12 h-6 rounded-full transition-colors ${
+                    rushOrder ? 'bg-orange-500' : 'bg-white/20'
+                  }`}
+                >
+                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                    rushOrder ? 'translate-x-7' : 'translate-x-1'
+                  }`} />
+                </button>
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-white">
+                    ⚡ Rush Order (+35%)
+                  </label>
                 </div>
               </div>
                 
@@ -1048,12 +1063,10 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
                   </div>
                 </div>
               )}
-            </div>
-          </div>
 
-          {/* Pricing Breakdown */}
-          <div className="container-style p-6 transition-colors duration-200">
-            <h3 className="text-white font-semibold mb-3">Pricing Breakdown</h3>
+              {/* Pricing Breakdown */}
+              <div className="container-style p-6 transition-colors duration-200 mt-6">
+                <h3 className="text-white font-semibold mb-3">Pricing Breakdown</h3>
             
             {pricing.total > 0 ? (
               <div className="space-y-2 text-sm">
@@ -1168,84 +1181,86 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
                 )}
               </div>
             )}
-          </div>
 
-          {/* Action Buttons */}
-          <div className="space-y-3">
-            {/* Conditional Button Display */}
-            {!pricing.total || pricing.total === 0 ? (
-              /* Single Configuration Required Button */
-              <button 
-                disabled={true}
-                className="w-full py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  background: '#666',
-                  color: 'white',
-                  fontWeight: 'bold'
-                }}
-              >
-                <span className="relative z-10 flex items-center justify-center gap-2">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Please Configure Your Banner Above
-                </span>
-              </button>
-            ) : (
-              /* Dual Buttons */
-              <div className="flex flex-col sm:flex-row gap-3">
-                {/* Add to Cart & Keep Shopping Button - Full width on mobile, 50% on desktop */}
+            {/* Action Buttons */}
+            <div className="space-y-3 mt-6">
+              {/* Conditional Button Display */}
+              {!pricing.total || pricing.total === 0 ? (
+                /* Single Configuration Required Button */
                 <button 
-                  onClick={handleAddToCartAndKeepShopping}
-                  className="w-full sm:w-1/2 py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group hover:scale-[1.0025] cursor-pointer"
+                  disabled={true}
+                  className="w-full py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
-                    background: 'linear-gradient(135deg, #ffd713, #ffed4e)',
-                    color: '#030140',
-                    fontWeight: 'bold',
-                    border: '0.03125rem solid #e6c211',
-                    boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)'
-                  }}
-                >
-                  <span className="relative z-10 flex items-center justify-center gap-2">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    <span className="hidden sm:inline">Add & Keep Shopping</span>
-                    <span className="sm:hidden">Add & Keep Shopping</span>
-                  </span>
-                </button>
-
-                {/* Checkout Button - Full width on mobile, 50% on desktop */}
-                <button 
-                  onClick={handleCheckout}
-                  className="w-full sm:w-1/2 py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group hover:scale-[1.025] cursor-pointer"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                    backdropFilter: 'blur(25px) saturate(180%)',
-                    border: '1px solid rgba(59, 130, 246, 0.4)',
-                    boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                    background: '#666',
                     color: 'white',
                     fontWeight: 'bold'
                   }}
                 >
                   <span className="relative z-10 flex items-center justify-center gap-2">
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span>Checkout</span>
+                    Please Configure Your Banner Above
                   </span>
                 </button>
-              </div>
-            )}
+              ) : (
+                /* Dual Buttons */
+                <div className="flex flex-col sm:flex-row gap-3">
+                  {/* Add to Cart & Keep Shopping Button - Full width on mobile, 50% on desktop */}
+                  <button 
+                    onClick={handleAddToCartAndKeepShopping}
+                    className="w-full sm:w-1/2 py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group hover:scale-[1.0025] cursor-pointer"
+                    style={{
+                      background: 'linear-gradient(135deg, #ffd713, #ffed4e)',
+                      color: '#030140',
+                      fontWeight: 'bold',
+                      border: '0.03125rem solid #e6c211',
+                      boxShadow: '2px 2px #cfaf13, 0 0 20px rgba(255, 215, 19, 0.3)'
+                    }}
+                  >
+                    <span className="relative z-10 flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span className="hidden sm:inline">Add & Keep Shopping</span>
+                      <span className="sm:hidden">Add & Keep Shopping</span>
+                    </span>
+                  </button>
 
-            {/* Helpful text */}
-            <div className="text-center py-2">
-              <p className="text-white/60 text-sm">
-                {!pricing.total || pricing.total === 0
-                  ? "Complete your banner configuration to proceed"
-                  : "Items will be added to your cart for review before checkout"
-                }
-              </p>
+                  {/* Checkout Button - Full width on mobile, 50% on desktop */}
+                  <button 
+                    onClick={handleCheckout}
+                    className="w-full sm:w-1/2 py-4 px-6 rounded-xl text-lg font-semibold transition-all duration-300 relative overflow-hidden group hover:scale-[1.025] cursor-pointer"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                      backdropFilter: 'blur(25px) saturate(180%)',
+                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                      boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                      color: 'white',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    <span className="relative z-10 flex items-center justify-center gap-2">
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      <span>Checkout</span>
+                    </span>
+                  </button>
+                </div>
+              )}
+
+              {/* Helpful text */}
+              <div className="text-center py-2">
+                <p className="text-white/60 text-sm">
+                  {!pricing.total || pricing.total === 0
+                    ? "Complete your banner configuration to proceed"
+                    : "Items will be added to your cart for review before checkout"
+                  }
+                </p>
+              </div>
+            </div>
+              </div>
             </div>
           </div>
         </div>

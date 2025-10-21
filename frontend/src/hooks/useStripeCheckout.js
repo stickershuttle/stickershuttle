@@ -30,7 +30,21 @@ export const useStripeCheckout = () => {
         console.warn('Could not get user context, proceeding as guest:', userError);
       }
 
-      // Step 2: Process order through API
+      // Step 2: Detect order source (which subdomain)
+      let orderSource = 'stickershuttle';
+      if (typeof window !== 'undefined') {
+        const hostname = window.location.hostname;
+        if (hostname.startsWith('bannership.')) {
+          orderSource = 'bannership';
+        }
+      }
+
+      // Add order source to order note
+      const enhancedOrderNote = orderSource === 'bannership' 
+        ? `[Bannership] ${orderNote}`.trim()
+        : orderNote;
+
+      // Step 3: Process order through API
           // Processing order with Stripe
 
       // Helper function to safely parse float and handle NaN
@@ -83,7 +97,7 @@ export const useStripeCheckout = () => {
             },
             shippingAddress,
             billingAddress: billingAddress || shippingAddress,
-            orderNote,
+            orderNote: enhancedOrderNote,
             discountCode,
             discountAmount: safeParseFloat(discountAmount, 0),
             creditsToApply: safeParseFloat(creditsToApply, 0),

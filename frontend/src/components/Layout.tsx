@@ -13,6 +13,10 @@ interface LayoutProps {
   canonical?: string;
   structuredData?: object;
   preconnect?: string[];
+  customLogo?: string;
+  customLogoAlt?: string;
+  customBackground?: string;
+  forceBannershipMode?: boolean;
 }
 
 export default function Layout({ 
@@ -23,7 +27,11 @@ export default function Layout({
   keywords,
   canonical,
   structuredData,
-  preconnect
+  preconnect,
+  customLogo,
+  customLogoAlt,
+  customBackground,
+  forceBannershipMode
 }: LayoutProps) {
   const router = useRouter();
   
@@ -31,6 +39,10 @@ export default function Layout({
   const isMarketspacePage = router.pathname === '/marketspace' || 
                            router.pathname.startsWith('/marketspace/') || 
                            router.pathname === '/creators-space-apply';
+  
+  // Check if we're on a bannership page
+  const isBannershipPage = router.pathname === '/bannership' || 
+                          router.pathname.startsWith('/bannership/');
   
   return (
     <>
@@ -44,12 +56,12 @@ export default function Layout({
         preconnect={preconnect}
       />
       
-      <div className="min-h-screen text-white relative" style={{ backgroundColor: '#030140', fontFamily: 'Inter, sans-serif' }}>
-        <UniversalHeader />
+      <div className="min-h-screen text-white relative" style={{ backgroundColor: customBackground || (isBannershipPage ? '#000000' : '#030140'), fontFamily: 'Inter, sans-serif' }}>
+        <UniversalHeader customLogo={customLogo} customLogoAlt={customLogoAlt} forceBannershipMode={forceBannershipMode} />
         <main className={isMarketspacePage ? "pt-16" : "pt-16"}>
           {children}
         </main>
-        <UniversalFooter />
+        <UniversalFooter forceBannershipMode={forceBannershipMode} />
       </div>
     </>
   );

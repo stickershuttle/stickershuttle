@@ -1,6 +1,40 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { CartItem } from "@/types/product";
 import { getSupabase } from "@/lib/supabase";
+import { getBaseDomain } from "@/utils/domain-aware-links";
+
+// Cookie helper functions for cross-subdomain session management
+function getCookie(name: string): string | null {
+  if (typeof window === 'undefined') return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+  return null;
+}
+
+function setCookie(name: string, value: string, options: {
+  domain?: string;
+  path?: string;
+  maxAge?: number;
+  sameSite?: string;
+  secure?: boolean;
+} = {}) {
+  if (typeof window === 'undefined') return;
+  
+  let cookieString = `${name}=${value}`;
+  
+  if (options.domain) cookieString += `; domain=${options.domain}`;
+  if (options.path) cookieString += `; path=${options.path}`;
+  if (options.maxAge) cookieString += `; max-age=${options.maxAge}`;
+  if (options.sameSite) cookieString += `; samesite=${options.sameSite}`;
+  if (options.secure) cookieString += '; secure';
+  
+  document.cookie = cookieString;
+}
+
+function generateSessionId(): string {
+  return `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
 
 interface CartContextType {
   cart: CartItem[];
@@ -27,6 +61,34 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<any>(null);
   const [userLoading, setUserLoading] = useState(true);
   const [isRushOrder, setIsRushOrder] = useState(false);
+
+  // Setup cross-subdomain session ID for cart continuity
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      let sessionId = getCookie('cart_session_id');
+      
+      if (!sessionId) {
+        sessionId = generateSessionId();
+        const baseDomain = getBaseDomain();
+        
+        // Set cookie with base domain for cross-subdomain access
+        setCookie('cart_session_id', sessionId, {
+          domain: baseDomain,
+          path: '/',
+          maxAge: 30 * 24 * 60 * 60, // 30 days
+          sameSite: 'lax',
+          secure: window.location.protocol === 'https:'
+        });
+        
+        console.log('🍪 Created new session ID:', sessionId, 'for domain:', baseDomain);
+      } else {
+        console.log('🍪 Using existing session ID:', sessionId);
+      }
+      
+      // Store in localStorage as backup
+      localStorage.setItem('cart_session_id', sessionId);
+    }
+  }, []);
 
   // Check user authentication state
   useEffect(() => {

@@ -277,7 +277,7 @@ export default function AdminOrders() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [orderTab, setOrderTab] = useState<'all' | 'marketspace'>('all');
+  const [orderTab, setOrderTab] = useState<'all' | 'marketspace' | 'bannership'>('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'status' | 'total'>('date');
@@ -547,6 +547,30 @@ export default function AdminOrders() {
     });
   };
 
+  // Helper function to check if order contains Bannership items
+  // Shows orders with any Bannership products (pop-up banners, X-banners, vinyl banners)
+  const isBannershipOrder = (order: Order) => {
+    if (!order.items || !Array.isArray(order.items)) return false;
+    return order.items.some(item => {
+      const category = item.productCategory || '';
+      return category === 'pop-up-banners' || 
+             category === 'x-banners' || 
+             category === 'vinyl-banners';
+    });
+  };
+
+  // Helper function to check if order is ONLY banners (no stickers)
+  const isBannerOnlyOrder = (order: Order) => {
+    if (!order.items || !Array.isArray(order.items)) return false;
+    // Check if ALL items are banner products
+    return order.items.every(item => {
+      const category = item.productCategory || '';
+      return category === 'pop-up-banners' || 
+             category === 'x-banners' || 
+             category === 'vinyl-banners';
+    });
+  };
+
   // Filter and sort orders
   const allFilteredOrders = React.useMemo(() => {
     if (!data?.getAllOrders) return [];
@@ -556,11 +580,15 @@ export default function AdminOrders() {
     // Filter to only show paid orders
     orders = orders.filter(order => order.financialStatus === 'paid');
 
-    // Apply Market Space tab filter
+    // Apply tab filters
     if (orderTab === 'marketspace') {
       orders = orders.filter(order => isMarketSpaceOrder(order));
+    } else if (orderTab === 'bannership') {
+      orders = orders.filter(order => isBannershipOrder(order));
     } else if (orderTab === 'all') {
-      orders = orders.filter(order => !isMarketSpaceOrder(order));
+      // Show orders that are not Market Space and not banner-only
+      // Mixed orders (banners + stickers) will show here AND in Bannership tab
+      orders = orders.filter(order => !isMarketSpaceOrder(order) && !isBannerOnlyOrder(order));
     }
 
     // Apply status filter
@@ -2239,7 +2267,18 @@ export default function AdminOrders() {
   const timeFilteredAnalytics = useMemo(() => {
     if (!data?.getAllOrders) return null;
     
-    const allOrders = data.getAllOrders.filter((order: Order) => order.financialStatus === 'paid');
+    let allOrders = data.getAllOrders.filter((order: Order) => order.financialStatus === 'paid');
+    
+    // Apply tab filter to analytics
+    if (orderTab === 'marketspace') {
+      allOrders = allOrders.filter(order => isMarketSpaceOrder(order));
+    } else if (orderTab === 'bannership') {
+      allOrders = allOrders.filter(order => isBannershipOrder(order));
+    } else if (orderTab === 'all') {
+      // Show all orders except Market Space and banner-only orders
+      allOrders = allOrders.filter(order => !isMarketSpaceOrder(order) && !isBannerOnlyOrder(order));
+    }
+    
     const filteredOrders = getFilteredOrdersByTime(allOrders, timeFilter);
     
     const totalSales = filteredOrders.reduce((sum: number, order: Order) => sum + order.totalPrice, 0);
@@ -2258,7 +2297,7 @@ export default function AdminOrders() {
       totalStickers,
       chartData
     };
-  }, [data, timeFilter]);
+  }, [data, timeFilter, orderTab]);
 
 
 
@@ -2641,12 +2680,16 @@ export default function AdminOrders() {
                       }}
                     >
                       <div className="flex items-center justify-between mb-1 lg:mb-2">
-                        <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Stickers</span>
+                        <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">
+                          {orderTab === 'bannership' ? 'Banners' : 'Stickers'}
+                        </span>
                       </div>
                       <div className="text-sm lg:text-xl font-bold text-white mb-1">
                         {(timeFilteredAnalytics?.totalStickers || 0).toLocaleString()}
                       </div>
-                      <div className="text-xs text-gray-500 hidden lg:block">Stickers produced</div>
+                      <div className="text-xs text-gray-500 hidden lg:block">
+                        {orderTab === 'bannership' ? 'Banners produced' : 'Stickers produced'}
+                      </div>
                     </div>
                   </div>
 
@@ -2693,6 +2736,16 @@ export default function AdminOrders() {
                             }`}
                           >
                             Market Space
+                          </button>
+                          <button
+                            onClick={() => setOrderTab('bannership')}
+                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                              orderTab === 'bannership'
+                                ? 'bg-green-500/20 text-green-300 border border-green-500/40'
+                                : 'text-gray-400 hover:text-white'
+                            }`}
+                          >
+                            Bannership
                           </button>
                         </div>
                       </div>
@@ -2847,6 +2900,16 @@ export default function AdminOrders() {
                       >
                         Market Space
                       </button>
+                      <button
+                        onClick={() => setOrderTab('bannership')}
+                        className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                          orderTab === 'bannership'
+                            ? 'bg-green-500/20 text-green-300 border border-green-500/40'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        Bannership
+                      </button>
                     </div>
                   </div>
 
@@ -2943,6 +3006,23 @@ export default function AdminOrders() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                       </svg>
                     </div>
+
+                    {/* Print Production Log Button */}
+                    <button
+                      onClick={() => window.print()}
+                      className="px-4 py-2 rounded-lg text-white text-sm font-semibold transition-all duration-200 hover:scale-105 flex items-center gap-2"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: '1px solid rgba(59, 130, 246, 0.4)',
+                        boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                      }}
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                      </svg>
+                      Print Log
+                    </button>
                   </div>
                 </div>
 
@@ -3154,11 +3234,13 @@ export default function AdminOrders() {
                           <th className="pl-4 pr-2 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
                             Items
                           </th>
-                          <th className="px-2 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
-                            Shape
-                          </th>
+                          {orderTab !== 'bannership' && (
+                            <th className="px-2 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                              Shape
+                            </th>
+                          )}
                           <th className="px-2 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider max-w-32">
-                            Material
+                            {orderTab === 'bannership' ? 'Specs' : 'Material'}
                           </th>
                           <th className="px-2 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
                             Size
@@ -3363,26 +3445,51 @@ export default function AdminOrders() {
                                   ))}
                                 </div>
                               </td>
-                              {/* Shape */}
-                              <td className="px-2 py-4">
-                                {firstItemSelections.cut?.displayValue ? (
-                                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-blue-300"
-                                    style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
-                                    {firstItemSelections.cut.displayValue}
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-500">-</span>
-                                )}
-                              </td>
-                              {/* Material */}
+                              {/* Shape (Not shown for Bannership) */}
+                              {orderTab !== 'bannership' && (
+                                <td className="px-2 py-4">
+                                  {firstItemSelections.cut?.displayValue ? (
+                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-blue-300"
+                                      style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                                      {firstItemSelections.cut.displayValue}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-500">-</span>
+                                  )}
+                                </td>
+                              )}
+                              {/* Specs / Material */}
                               <td className="px-2 py-4 max-w-32">
-                                {firstItemSelections.material?.displayValue ? (
-                                  <span className="inline-block px-3 py-1 rounded-full text-xs font-medium text-green-300 break-words"
-                                    style={{ backgroundColor: 'rgba(145, 200, 72, 0.2)', border: '1px solid rgba(145, 200, 72, 0.3)' }}>
-                                    {firstItemSelections.material.displayValue}
-                                  </span>
+                                {orderTab === 'bannership' ? (
+                                  // For Bannership: Show frameType, finishing, material, or vinylType as "Specs"
+                                  firstItemSelections.frameType?.displayValue || firstItemSelections.frameType ? (
+                                    <span className="inline-block px-3 py-1 rounded-full text-xs font-medium text-green-300 break-words"
+                                      style={{ backgroundColor: 'rgba(145, 200, 72, 0.2)', border: '1px solid rgba(145, 200, 72, 0.3)' }}>
+                                      {firstItemSelections.frameType?.displayValue || firstItemSelections.frameType}
+                                    </span>
+                                  ) : firstItemSelections.finishing?.displayValue || firstItemSelections.finishing ? (
+                                    <span className="inline-block px-3 py-1 rounded-full text-xs font-medium text-green-300 break-words"
+                                      style={{ backgroundColor: 'rgba(145, 200, 72, 0.2)', border: '1px solid rgba(145, 200, 72, 0.3)' }}>
+                                      {firstItemSelections.finishing?.displayValue || firstItemSelections.finishing}
+                                    </span>
+                                  ) : firstItemSelections.material?.displayValue || firstItemSelections.vinylType?.displayValue ? (
+                                    <span className="inline-block px-3 py-1 rounded-full text-xs font-medium text-green-300 break-words"
+                                      style={{ backgroundColor: 'rgba(145, 200, 72, 0.2)', border: '1px solid rgba(145, 200, 72, 0.3)' }}>
+                                      {firstItemSelections.material?.displayValue || firstItemSelections.vinylType?.displayValue}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-500">-</span>
+                                  )
                                 ) : (
-                                  <span className="text-gray-500">-</span>
+                                  // For other orders: Show material normally
+                                  firstItemSelections.material?.displayValue ? (
+                                    <span className="inline-block px-3 py-1 rounded-full text-xs font-medium text-green-300 break-words"
+                                      style={{ backgroundColor: 'rgba(145, 200, 72, 0.2)', border: '1px solid rgba(145, 200, 72, 0.3)' }}>
+                                      {firstItemSelections.material.displayValue}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-500">-</span>
+                                  )
                                 )}
                               </td>
                               {/* Size */}
@@ -3735,6 +3842,18 @@ export default function AdminOrders() {
                                         </span>
                                       </div>
                                     ) : null}
+                                    {selections.frameType?.displayValue && (
+                                      <div className="flex">
+                                        <span className="text-gray-500 w-20">Frame:</span>
+                                        <span className="text-gray-300">{selections.frameType.displayValue}</span>
+                                      </div>
+                                    )}
+                                    {selections.finishing?.displayValue && (
+                                      <div className="flex">
+                                        <span className="text-gray-500 w-20">Finishing:</span>
+                                        <span className="text-gray-300">{selections.finishing.displayValue}</span>
+                                      </div>
+                                    )}
                                     {selections.whiteOption?.displayValue && (
                                       <div className="flex">
                                         <span className="text-gray-500 w-20">White Ink:</span>
@@ -4484,10 +4603,28 @@ export default function AdminOrders() {
                                         </span>
                                       </div>
                                     ) : null}
+                                    {selections.frameType?.displayValue && (
+                                      <div className="flex flex-col">
+                                        <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Frame Type</span>
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-purple-300 whitespace-nowrap"
+                                          style={{ backgroundColor: 'rgba(168, 85, 247, 0.2)', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
+                                          {selections.frameType.displayValue}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {selections.finishing?.displayValue && (
+                                      <div className="flex flex-col">
+                                        <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Finishing</span>
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-teal-300 whitespace-nowrap"
+                                          style={{ backgroundColor: 'rgba(20, 184, 166, 0.2)', border: '1px solid rgba(20, 184, 166, 0.3)' }}>
+                                          {selections.finishing.displayValue}
+                                        </span>
+                                      </div>
+                                    )}
                                     {selections.material?.displayValue && (
                                       <div className="flex flex-col">
                                         <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">
-                                          {item.productCategory === 'vinyl-banners' ? 'Finish Options' : 'Material'}
+                                          {item.productCategory === 'vinyl-banners' || item.productCategory === 'pop-up-banners' || item.productCategory === 'x-banners' ? 'Material' : 'Material'}
                                         </span>
                                         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-green-300 whitespace-nowrap"
                                           style={{ backgroundColor: 'rgba(145, 200, 72, 0.2)', border: '1px solid rgba(145, 200, 72, 0.3)' }}>
@@ -6256,6 +6393,234 @@ export default function AdminOrders() {
             }}
           />
         )}
+
+        {/* Print Section - Always rendered but hidden on screen */}
+        <div id="print-section" style={{ 
+          position: 'absolute',
+          left: '-9999px',
+          top: '-9999px',
+          width: '8.5in',
+          background: 'white',
+          color: 'black',
+          padding: '20px',
+          fontSize: '12px',
+          lineHeight: '1.4'
+        }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: 'black', marginBottom: '10px' }}>
+            Sticker Shuttle - Production Log
+          </h1>
+          <p style={{ fontSize: '16px', color: '#374151', marginBottom: '20px' }}>
+            {new Date().toLocaleDateString('en-US', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            })}
+          </p>
+          <hr style={{ border: '1px solid #D1D5DB', marginBottom: '20px' }} />
+
+          {(() => {
+            const printingOrders = (data?.getAllOrders || []).filter((order: Order) => {
+              const proofStatus = getProofStatus(order);
+              return proofStatus === 'Printing';
+            });
+
+            if (printingOrders.length === 0) {
+              return <p style={{ color: '#6B7280' }}>No orders in printing status</p>;
+            }
+
+            return printingOrders.map((order: Order, orderIndex: number) => (
+              <div 
+                key={order.id}
+                style={{
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  marginBottom: '24px',
+                  pageBreakInside: 'avoid',
+                  background: 'white'
+                }}
+              >
+                {/* Order Header */}
+                <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '12px', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                    <div>
+                      <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: 'black', marginBottom: '8px' }}>
+                        Order #{order.orderNumber || order.id.substring(0, 8).toUpperCase()}
+                      </h2>
+                      <p style={{ fontSize: '14px', color: '#374151', marginBottom: '4px' }}>
+                        <strong>Customer:</strong> {order.customerFirstName} {order.customerLastName}
+                      </p>
+                      <p style={{ fontSize: '14px', color: '#374151', marginBottom: '4px' }}>
+                        <strong>Email:</strong> {order.customerEmail}
+                      </p>
+                      <p style={{ fontSize: '14px', color: '#374151' }}>
+                        <strong>Location:</strong> {(() => {
+                          const addr = typeof order.shippingAddress === 'string' 
+                            ? JSON.parse(order.shippingAddress) 
+                            : order.shippingAddress;
+                          return addr ? `${addr.city || ''}, ${addr.state || addr.province || ''}`.trim() : 'N/A';
+                        })()}
+                      </p>
+                    </div>
+                    {order.is_blind_shipment && (
+                      <div style={{
+                        padding: '8px 16px',
+                        background: '#FFF7ED',
+                        border: '2px solid #EA580C',
+                        borderRadius: '8px',
+                        fontWeight: 'bold',
+                        color: '#C2410C'
+                      }}>
+                        ⚠️ BLIND SHIPPING
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Order Items */}
+                {order.items.map((item: any, itemIndex: number) => {
+                  const itemImage = getProductImage(item);
+                  const selections = typeof item.calculatorSelections === 'string' 
+                    ? JSON.parse(item.calculatorSelections) 
+                    : item.calculatorSelections;
+                  
+                  const size = selections?.size?.displayValue || selections?.size || 'N/A';
+                  const material = selections?.material?.displayValue || selections?.material || 'Premium Vinyl';
+
+                  return (
+                    <div 
+                      key={item.id}
+                      style={{
+                        display: 'flex',
+                        gap: '16px',
+                        borderBottom: itemIndex < order.items.length - 1 ? '1px solid #F3F4F6' : 'none',
+                        paddingBottom: '16px',
+                        marginBottom: itemIndex < order.items.length - 1 ? '16px' : '0'
+                      }}
+                    >
+                      {/* Design Image */}
+                      <div style={{ flexShrink: 0 }}>
+                        {itemImage ? (
+                          <img
+                            src={itemImage}
+                            alt={item.productName}
+                            style={{
+                              width: '150px',
+                              height: '150px',
+                              objectFit: 'contain',
+                              border: '2px solid #E5E7EB',
+                              borderRadius: '8px',
+                              background: 'white',
+                              padding: '8px'
+                            }}
+                          />
+                        ) : (
+                          <div style={{
+                            width: '150px',
+                            height: '150px',
+                            border: '2px solid #E5E7EB',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: '#F9FAFB',
+                            color: '#9CA3AF',
+                            fontSize: '48px'
+                          }}>
+                            📄
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Item Details */}
+                      <div style={{ flex: 1 }}>
+                        <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: 'black', marginBottom: '8px' }}>
+                          Item #{itemIndex + 1}: {item.productName}
+                        </h3>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          <div>
+                            <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '4px' }}>
+                              <strong style={{ color: '#374151' }}>Quantity:</strong> {item.quantity}
+                            </p>
+                            <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '4px' }}>
+                              <strong style={{ color: '#374151' }}>Size:</strong> {size}
+                            </p>
+                          </div>
+                          <div>
+                            <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '4px' }}>
+                              <strong style={{ color: '#374151' }}>Material:</strong> {material}
+                            </p>
+                            {item.productCategory && (
+                              <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '4px' }}>
+                                <strong style={{ color: '#374151' }}>Category:</strong> {item.productCategory}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {item.customerNotes && (
+                          <div style={{ marginTop: '8px', padding: '8px', background: '#FEF3C7', borderRadius: '4px' }}>
+                            <p style={{ fontSize: '12px', color: '#92400E' }}>
+                              <strong>Notes:</strong> {item.customerNotes}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Order Footer */}
+                <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #E5E7EB' }}>
+                  <p style={{ fontSize: '14px', color: '#374151' }}>
+                    <strong>Total Items:</strong> {order.items.reduce((sum: number, item: any) => sum + item.quantity, 0)} • 
+                    <strong style={{ marginLeft: '12px' }}>Order {orderIndex + 1}</strong> of {printingOrders.length}
+                  </p>
+                </div>
+              </div>
+            ));
+          })()}
+        </div>
+
+        {/* Print Styles */}
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            @media print {
+              body {
+                background: white !important;
+                margin: 0 !important;
+                padding: 0 !important;
+              }
+              
+              @page {
+                margin: 0.5in;
+                size: letter;
+              }
+              
+              /* Hide everything except print section */
+              body > *:not(#print-section) {
+                display: none !important;
+              }
+              
+              #print-section {
+                position: static !important;
+                left: auto !important;
+                top: auto !important;
+                width: 100% !important;
+                background: white !important;
+                color: black !important;
+                display: block !important;
+              }
+              
+              /* Ensure page breaks work */
+              .page-break {
+                page-break-before: always;
+              }
+            }
+          `
+        }} />
       </div>
     </AdminLayout>
   );

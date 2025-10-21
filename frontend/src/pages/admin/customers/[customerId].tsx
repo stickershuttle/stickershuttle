@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import AdminLayout from '@/components/AdminLayout';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { getSupabase } from '../../../lib/supabase';
-import { GET_USER_PROFILE, UPDATE_TAX_EXEMPTION, UPDATE_WHOLESALE_STATUS, UPDATE_CREATOR_STATUS, GET_CREATOR_BY_USER_ID } from '../../../lib/profile-mutations';
+import { GET_USER_PROFILE, UPDATE_TAX_EXEMPTION, UPDATE_WHOLESALE_STATUS, UPDATE_CREATOR_STATUS, GET_CREATOR_BY_USER_ID, ADMIN_CHANGE_USER_PASSWORD } from '../../../lib/profile-mutations';
 import { ADD_USER_CREDITS, GET_USER_CREDIT_BALANCE, GET_USER_CREDIT_HISTORY } from '../../../lib/credit-mutations';
 
 // Import GET_ALL_CUSTOMERS query
@@ -153,6 +153,13 @@ export default function CustomerDetail() {
   const [creditAmount, setCreditAmount] = useState('');
   const [creditReason, setCreditReason] = useState('');
   const [creditLoading, setCreditLoading] = useState(false);
+  
+  // Password change states
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
   // Get all orders first
   const { data: allOrdersData, loading: ordersLoading, error } = useQuery(GET_ORDERS_BY_EMAIL);
@@ -200,6 +207,7 @@ export default function CustomerDetail() {
 
   // Update creator status mutation
   const [updateCreatorStatus] = useMutation(UPDATE_CREATOR_STATUS);
+  const [adminChangeUserPassword] = useMutation(ADMIN_CHANGE_USER_PASSWORD);
 
   // Check if user is admin
   useEffect(() => {
@@ -550,6 +558,60 @@ export default function CustomerDetail() {
     }
   };
 
+  // Handle password change
+  const handlePasswordChange = async () => {
+    if (!customerUserId) return;
+
+    // Validate passwords
+    if (!newPassword || newPassword.length < 8) {
+      setPasswordError('Password must be at least 8 characters long');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match');
+      return;
+    }
+
+    setPasswordLoading(true);
+    setPasswordError('');
+
+    try {
+      const { data } = await adminChangeUserPassword({
+        variables: {
+          userId: customerUserId,
+          newPassword: newPassword
+        }
+      });
+
+      if (data?.adminChangeUserPassword?.success) {
+        console.log('✅ Password changed successfully');
+        // Close modal and reset form
+        setShowPasswordModal(false);
+        setNewPassword('');
+        setConfirmPassword('');
+        setPasswordError('');
+        // Show success message
+        alert(`Password successfully changed for ${customerEmail}`);
+      } else {
+        setPasswordError(data?.adminChangeUserPassword?.message || 'Failed to change password');
+      }
+    } catch (error) {
+      console.error('❌ Error changing password:', error);
+      setPasswordError('Failed to change password. Please try again.');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  // Handle closing password modal
+  const handleClosePasswordModal = () => {
+    setShowPasswordModal(false);
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError('');
+  };
+
   if (loading || !isAdmin) {
     return (
       <AdminLayout>
@@ -882,6 +944,49 @@ export default function CustomerDetail() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Password Management Section */}
+            {customerUserId && (
+              <div className="glass-container p-4 xl:p-6 mb-6 xl:mb-8">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-red-500/20">
+                      <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-base font-medium text-white">Password Management</h3>
+                      <p className="text-sm text-gray-400">Change customer password if they can't access their account</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowPasswordModal(true)}
+                      className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-all duration-200 hover:scale-105"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                      }}
+                    >
+                      Change Password
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <span className="text-sm text-red-300">
+                      Use this feature only when customers are locked out of their accounts. The new password will be set immediately.
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1236,6 +1341,109 @@ export default function CustomerDetail() {
                   disabled={creditLoading}
                 >
                   {creditLoading ? 'Adding...' : 'Add Credits'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Password Change Modal */}
+        {showPasswordModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="rounded-lg p-6 w-full max-w-md"
+                 style={{
+                   background: 'rgba(255, 255, 255, 0.05)',
+                   border: '1px solid rgba(255, 255, 255, 0.1)',
+                   boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                   backdropFilter: 'blur(12px)'
+                 }}>
+              <h3 className="text-xl font-bold text-white mb-4">Change Customer Password</h3>
+              <p className="text-sm text-gray-400 mb-4">
+                Changing password for: <span className="text-white font-medium">{customerEmail}</span>
+              </p>
+              
+              {passwordError && (
+                <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-sm text-red-300">{passwordError}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="mb-4">
+                <label htmlFor="newPassword" className="block text-sm font-medium text-gray-300 mb-1">New Password</label>
+                <input
+                  type="password"
+                  id="newPassword"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password (min 8 characters)"
+                  className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                    backdropFilter: 'blur(12px)'
+                  }}
+                />
+              </div>
+              <div className="mb-4">
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-1">Confirm Password</label>
+                <input
+                  type="password"
+                  id="confirmPassword"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                  className="text-white rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                    backdropFilter: 'blur(12px)'
+                  }}
+                />
+              </div>
+              
+              <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <span className="text-sm text-yellow-300">
+                    This will immediately change the customer's password. They will need to use the new password to log in.
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={handleClosePasswordModal}
+                  className="px-4 py-2 text-white rounded hover:bg-gray-700 transition-colors"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                    backdropFilter: 'blur(12px)'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePasswordChange}
+                  className="px-4 py-2 text-white rounded transition-colors"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                  }}
+                  disabled={passwordLoading}
+                >
+                  {passwordLoading ? 'Changing...' : 'Change Password'}
                 </button>
               </div>
             </div>

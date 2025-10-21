@@ -278,4 +278,15 @@ export const GET_CREATOR_SALES_STATS = gql`
       customFivePackCount
     }
   }
+`;
+
+// Admin password change mutation
+export const ADMIN_CHANGE_USER_PASSWORD = gql`
+  mutation AdminChangeUserPassword($userId: ID!, $newPassword: String!) {
+    adminChangeUserPassword(userId: $userId, newPassword: $newPassword) {
+      success
+      message
+      error
+    }
+  }
 `; 

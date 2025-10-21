@@ -7,6 +7,8 @@ export type ProductCategory =
   | 'clear-stickers'    // Added
   | 'sticker-sheets'    // Added
   | 'vinyl-banners'
+  | 'pop-up-banners'    // Added for Bannership pop-up banners
+  | 'x-banners'         // Added for Bannership X-banners
   | 'deals'             // Added for preset deals
   | 'marketplace'       // Added for marketplace products
   | 'marketplace-stickers' // Added for marketplace sticker products

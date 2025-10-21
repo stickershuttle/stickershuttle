@@ -1605,36 +1605,22 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
                       </div>
                     </button>
 
-                    {/* Rush Order - Temporarily Disabled */}
-                    <div className="relative group">
-                      <button
-                        disabled={true}
-                        className="relative text-center p-3 rounded-xl transition-all duration-200 overflow-hidden cursor-not-allowed opacity-40 border-[1.5px] border-solid border-gray-400/20 text-gray-400 w-full"
-                      >
-                        <div className="flex flex-col items-center gap-2">
-                          <span className="text-xl">🚀</span>
-                          <span className="text-xs font-medium">
-                            Rush order
-                          </span>
-                        </div>
-                      </button>
-                      
-                      {/* Tooltip */}
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span>Uh oh! We're unable to rush orders right now.</span>
-                          <a 
-                            href="https://www.stickershuttle.com/blog/ciao-bella-were-off-to-italy" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-300 hover:text-blue-200 underline pointer-events-auto"
-                          >
-                            Read more →
-                          </a>
-                        </div>
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                    {/* Rush Order */}
+                    <button
+                      onClick={() => updateAllItemsRushOrder(!isRushOrder)}
+                      className={`relative text-center p-3 rounded-xl transition-all duration-200 overflow-hidden border-[1.5px] border-solid w-full ${
+                        isRushOrder 
+                          ? 'bg-orange-500/20 border-orange-400/50 text-orange-300' 
+                          : 'bg-white/5 border-white/20 text-white hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <span className="text-xl">🚀</span>
+                        <span className="text-xs font-medium">
+                          Rush order (+40%)
+                        </span>
                       </div>
-                    </div>
+                    </button>
 
                     {/* +25% Vibrancy */}
                     <button

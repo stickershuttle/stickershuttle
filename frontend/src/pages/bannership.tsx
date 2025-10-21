@@ -7,7 +7,7 @@ import SEOHead from "../components/SEOHead";
 import { useRouter } from "next/router";
 import { getSupabase } from "../lib/supabase";
 
-export default function Home() {
+export default function Bannership() {
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [user, setUser] = useState<any>(null);
@@ -45,24 +45,24 @@ export default function Home() {
 
   
 
-  // Enhanced structured data for homepage
+  // Enhanced structured data for bannership page
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "name": "Sticker Shuttle",
-    "url": "https://stickershuttle.com",
-    "logo": "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png",
-    "description": "Professional custom sticker printing with fast shipping and high quality materials. Trusted by brands like Amazon, Nike, and thousands of businesses worldwide.",
+    "name": "Bannership",
+    "url": "https://stickershuttle.com/bannership",
+    "logo": "/bannership-logo.svg",
+    "description": "Professional custom banner printing with fast shipping and high quality materials. Trusted by brands like Amazon, Nike, and thousands of businesses worldwide.",
     "foundingDate": "2024",
     "contactPoint": {
       "@type": "ContactPoint",
-      "telephone": "+1-555-STICKER",
+      "telephone": "+1-555-BANNER",
       "contactType": "customer service",
       "email": "orbit@stickershuttle.com"
     },
     "sameAs": [
-      "https://twitter.com/stickershuttle",
-      "https://instagram.com/stickershuttle"
+      "https://twitter.com/bannership",
+      "https://instagram.com/bannership"
     ],
     "address": {
       "@type": "PostalAddress",
@@ -70,30 +70,30 @@ export default function Home() {
     },
     "hasOfferCatalog": {
       "@type": "OfferCatalog",
-      "name": "Custom Sticker Products",
+      "name": "Custom Banner Products",
       "itemListElement": [
         {
           "@type": "Offer",
           "itemOffered": {
             "@type": "Product",
-            "name": "Custom Vinyl Stickers",
-            "description": "High-quality custom vinyl stickers with fast 24-hour printing"
+            "name": "Custom Vinyl Banners",
+            "description": "High-quality custom vinyl banners with fast 24-hour printing"
           }
         },
         {
           "@type": "Offer", 
           "itemOffered": {
             "@type": "Product",
-            "name": "Holographic Stickers",
-            "description": "Eye-catching holographic custom stickers"
+            "name": "Mesh Banners",
+            "description": "Durable mesh banners for outdoor use"
           }
         },
         {
           "@type": "Offer",
           "itemOffered": {
             "@type": "Product", 
-            "name": "Clear Stickers",
-            "description": "Professional transparent custom stickers"
+            "name": "Fabric Banners",
+            "description": "Professional fabric banners for indoor displays"
           }
         }
       ]
@@ -103,31 +103,33 @@ export default function Home() {
   return (
     <>
       <Layout 
-        title="Sticker Shuttle - Premium Custom Stickers & Vinyl Banners"
-        description="Professional custom stickers, vinyl banners, and decals with fast printing. Trusted by Amazon, Nike, Harry Potter and thousands of businesses. Free shipping, high quality materials."
+        title="Bannership - Premium Custom Banners & Vinyl Displays"
+        description="Professional custom banners, vinyl displays, and signage with fast printing. Trusted by Amazon, Nike, Harry Potter and thousands of businesses. Free shipping, high quality materials."
         ogImage="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png"
-        keywords="custom stickers, vinyl stickers, holographic stickers, clear stickers, chrome stickers, glitter stickers, custom decals, vinyl banners, business stickers, promotional stickers, logo stickers"
-        canonical="https://stickershuttle.com"
+        keywords="custom banners, vinyl banners, mesh banners, fabric banners, outdoor banners, indoor banners, business signage, promotional banners, display banners"
+        canonical="https://stickershuttle.com/bannership"
         structuredData={structuredData}
         preconnect={[
           "https://res.cloudinary.com",
           "https://fonts.googleapis.com",
           "https://api.stripe.com"
         ]}
+        customLogo="/bannership-logo.svg"
+        customLogoAlt="Bannership Logo"
       >
         
         {/* Hero Section with Banner Background */}
         <section className="relative pt-[20px]">
-                      <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4 pb-4">
+          <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4 pb-4">
             <div 
               className="rounded-2xl pt-12 px-12 pb-8 relative overflow-hidden min-h-[400px] hero-banner"
               style={{
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
                 backdropFilter: 'blur(12px)'
               }}
             >
               <div className="text-center relative z-10">
+
                 {/* Earn 5% back above H1 - pill container on desktop, text/icon on mobile */}
                 <div className="mb-4">
                   {/* Desktop pill container */}
@@ -160,27 +162,21 @@ export default function Home() {
                 </div>
 
                 <h1 className="text-4xl sm:text-5xl md:text-6xl mb-4 leading-none" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
-                  <span className="block md:inline">Tired of waiting</span>
-                  <span className="block md:inline"> weeks to get</span>
-                  <span className="block md:block"> your stickers?</span>
+                  <span className="block md:inline">We make vinyl banners</span>
+                  <span className="block md:block"> for businesses</span>
+                  <span className="block md:block"> like yours.</span>
                 </h1>
                 <p className="text-lg sm:text-xl mb-6 text-purple-100">
-                  <span className="block sm:inline md:block">See why brands like Amazon, Nike Football, and thousands</span>
-                  <span className="block sm:inline md:inline">of others trust us with their business.</span>
+                  <span className="block sm:inline md:block">Because every ship needs colors worth flying.</span>
                 </p>
                 <div className="flex flex-col items-center gap-4 mb-4">
                   <a 
-                    href="/products"
+                    href="/bannership/products"
                     className="primaryButton px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-[1.004] inline-block rounded-lg"
                   >
                     Start Here →
                   </a>
-                  <a 
-                    href="/products/sample-packs" 
-                    className="text-white hover:text-purple-200 transition pb-0 md:pb-0"
-                  >
-                    Order Sample Pack →
-                  </a>
+
                   {/* Hide deals link for wholesale users (handled in header globally). Keeping home CTA generic. */}
 
         </div>
@@ -190,82 +186,17 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Brands Section - Infinite Scroll */}
-        <section className="py-4">
-          <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
-            <div className="flex justify-center mb-4">
-              <div 
-                className="px-4 py-1.5 rounded-full text-center text-sm text-gray-300"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(12px)'
-                }}
-              >
-                Brands we print for:
-              </div>
-            </div>
-            <div className="relative overflow-hidden">
-              <div 
-                className="flex gap-4 animate-scroll"
-                style={{
-                  animation: 'scroll 35s linear infinite',
-                  width: 'max-content'
-                }}
-              >
-                {/* First set of brands */}
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593661/StickerShuttle_Brands_AndHealth_bawirz.png" alt="AndHealth" width={120} height={80} className="h-20 w-auto brand-float-1" priority />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593675/Wahl-Icon-Web_tq0jqm.webp" alt="Wahl" width={120} height={80} className="h-20 w-auto brand-float-2" priority />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593600/Amazon-Go_by2gkb.png" alt="Amazon" width={120} height={80} className="h-20 w-auto brand-float-3" priority />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593604/ChickFilA-Icon-Web_anobg1.png" alt="Chick-fil-A" width={120} height={80} className="h-20 w-auto brand-float-4" priority />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_Nike_gmedyb.png" alt="Nike" width={120} height={80} className="h-20 w-auto brand-float-5" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751505017/StickerShuttle_HarryPotter_zlrki5.png" alt="Harry Potter" width={120} height={80} className="h-20 w-auto brand-float-6" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751396878/CanAmIcon_o3tydg.png" alt="Can-Am" width={96} height={64} className="h-16 w-auto brand-float-1" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1760744819/BAGPLOGO_o2vhx1.png" alt="BAGP" width={120} height={80} className="h-20 w-auto brand-float-2" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593671/StickerShuttle_Brands_XFinity_nz2obt.png" alt="Xfinity" width={120} height={80} className="h-20 w-auto brand-float-3" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" width={120} height={80} className="h-20 w-auto brand-float-4" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_SSPR_ewqax7.png" alt="SSPR" width={120} height={80} className="h-20 w-auto brand-float-5" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593662/StickerShuttle_Brands_CGR_ryewlb.png" alt="CGR" width={120} height={80} className="h-20 w-auto brand-float-6" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_WF_vrafue.png" alt="WF" width={120} height={80} className="h-20 w-auto brand-float-1" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593666/StickerShuttle_Brands_UnoMas_ntorew.png" alt="UnoMas" width={120} height={80} className="h-20 w-auto brand-float-2" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593610/LT-Icon_llqxai.png" alt="LT" width={120} height={80} className="h-20 w-auto brand-float-3" />
-                
-                {/* Duplicate set for seamless loop */}
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593661/StickerShuttle_Brands_AndHealth_bawirz.png" alt="AndHealth" width={120} height={80} className="h-20 w-auto brand-float-1" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593675/Wahl-Icon-Web_tq0jqm.webp" alt="Wahl" width={120} height={80} className="h-20 w-auto brand-float-2" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593600/Amazon-Go_by2gkb.png" alt="Amazon" width={120} height={80} className="h-20 w-auto brand-float-3" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593604/ChickFilA-Icon-Web_anobg1.png" alt="Chick-fil-A" width={120} height={80} className="h-20 w-auto brand-float-4" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_Nike_gmedyb.png" alt="Nike" width={120} height={80} className="h-20 w-auto brand-float-5" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751505017/StickerShuttle_HarryPotter_zlrki5.png" alt="Harry Potter" width={120} height={80} className="h-20 w-auto brand-float-6" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751396878/CanAmIcon_o3tydg.png" alt="Can-Am" width={96} height={64} className="h-16 w-auto brand-float-1" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1760744819/BAGPLOGO_o2vhx1.png" alt="BAGP" width={120} height={80} className="h-20 w-auto brand-float-2" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593671/StickerShuttle_Brands_XFinity_nz2obt.png" alt="Xfinity" width={120} height={80} className="h-20 w-auto brand-float-3" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_Valhallan_cxjhgn.png" alt="Valhallan" width={120} height={80} className="h-20 w-auto brand-float-4" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593665/StickerShuttle_Brands_SSPR_ewqax7.png" alt="SSPR" width={120} height={80} className="h-20 w-auto brand-float-5" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593662/StickerShuttle_Brands_CGR_ryewlb.png" alt="CGR" width={120} height={80} className="h-20 w-auto brand-float-6" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593669/StickerShuttle_Brands_WF_vrafue.png" alt="WF" width={120} height={80} className="h-20 w-auto brand-float-1" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593666/StickerShuttle_Brands_UnoMas_ntorew.png" alt="UnoMas" width={120} height={80} className="h-20 w-auto brand-float-2" />
-                <Image src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593610/LT-Icon_llqxai.png" alt="LT" width={120} height={80} className="h-20 w-auto brand-float-3" />
-              </div>
-              
-              {/* Fade effects */}
-              <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-[#030140] to-transparent pointer-events-none"></div>
-              <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-[#030140] to-transparent pointer-events-none"></div>
-            </div>
-          </div>
-        </section>
 
         {/* Product Types Section - With Click to Show Features */}
         <section className="py-4">
           <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4 relative">
             
             {/* Desktop/Tablet Grid */}
-            <div className="hidden sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 group/container">
-              {/* Vinyl Stickers */}
-              <Link href="/products/vinyl-stickers">
+            <div className="hidden sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 group/container">
+              {/* Pop Up Banners */}
+              <Link href="/bannership/products/pop-up-banners">
                 <div 
-                  className="vinyl-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-300 ease-out hover:scale-105 transform overflow-hidden"
+                  className="banner-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-300 ease-out hover:scale-105 transform overflow-hidden"
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -275,24 +206,24 @@ export default function Home() {
                 >
                   <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-40 lg:h-40 mx-auto mb-4 lg:mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-3 transition-transform duration-500 ease-out">
                     <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
-                      alt="Vinyl Stickers" 
+                      src="/popup-banner-icon.png" 
+                      alt="Pop Up Banners" 
                       className="w-full h-full object-contain"
                       style={{
                         filter: 'none'
                       }}
                     />
                   </div>
-                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Vinyl Stickers →</h3>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Pop Up Banners →</h3>
                   
                   {/* Features hidden - just show on click */}
                 </div>
               </Link>
 
-              {/* Holographic Stickers */}
-              <Link href="/products/holographic-stickers">
+              {/* Vinyl Banners */}
+              <Link href="/bannership/products/vinyl-banners">
                 <div 
-                  className="holographic-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-300 ease-out hover:scale-105 transform overflow-hidden"
+                  className="banner-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-300 ease-out hover:scale-105 transform overflow-hidden"
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -302,24 +233,24 @@ export default function Home() {
                 >
                   <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-40 lg:h-40 mx-auto mb-4 lg:mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-3 transition-transform duration-500 ease-out">
                     <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
-                      alt="Holographic Stickers" 
+                      src="/vinyl-banner-icon.png" 
+                      alt="Vinyl Banners" 
                       className="w-full h-full object-contain"
                       style={{
                         filter: 'none'
                       }}
                     />
                   </div>
-                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Holographic Stickers →</h3>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Vinyl Banners →</h3>
                   
                   {/* Features hidden - just show on click */}
                 </div>
               </Link>
 
-              {/* Glitter Stickers */}
-              <Link href="/products/glitter-stickers">
+              {/* X-Banner */}
+              <Link href="/bannership/products/x-banners">
                 <div 
-                  className="glitter-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-300 ease-out hover:scale-105 transform overflow-hidden"
+                  className="banner-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-300 ease-out hover:scale-105 transform overflow-hidden"
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -327,24 +258,24 @@ export default function Home() {
                     backdropFilter: 'blur(12px)'
                   }}
                 >
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-40 lg:h-40 mx-auto mb-4 lg:mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-2 transition-transform duration-500 ease-out">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
-                      alt="Glitter Stickers" 
-                      className="w-full h-full object-contain"
-                      style={{
-                        filter: 'none'
-                      }}
-                    />
-                  </div>
-                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Glitter Stickers →</h3>
+                   <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-40 lg:h-40 mx-auto mb-4 lg:mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:-rotate-2 transition-transform duration-500 ease-out">
+                     <img 
+                       src="/x-banner-icon.png?v=2" 
+                       alt="X-Banner" 
+                       className="w-full h-full object-contain"
+                       style={{
+                         filter: 'none'
+                       }}
+                     />
+                   </div>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">X-Banner →</h3>
                   
                   {/* Features hidden - just show on click */}
                 </div>
               </Link>
 
-              {/* Chrome Stickers */}
-              <Link href="/products/chrome-stickers">
+              {/* Stickers */}
+              <Link href="/">
                 <div 
                   className="chrome-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-300 ease-out hover:scale-105 transform overflow-hidden"
                   style={{
@@ -356,15 +287,15 @@ export default function Home() {
                 >
                   <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-40 lg:h-40 mx-auto mb-4 lg:mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-2 transition-transform duration-500 ease-out">
                     <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
-                      alt="Chrome Stickers" 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
+                      alt="Stickers" 
                       className="w-full h-full object-contain"
                       style={{
                         filter: 'none'
                       }}
                     />
                   </div>
-                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Chrome Stickers →</h3>
+                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Stickers →</h3>
                   
                   {/* Features hidden - just show on click */}
                 </div>
@@ -397,186 +328,116 @@ export default function Home() {
                 </div>
               </Link>
 
-              {/* Sticker Sheets */}
-              <Link href="/products/sticker-sheets">
-                <div 
-                  className="banner-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-300 ease-out hover:scale-105 transform overflow-hidden"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(12px)'
-                  }}
-                >
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-40 lg:h-40 mx-auto mb-4 lg:mb-6 flex items-center justify-center group-hover/card:scale-110 group-hover/card:rotate-1 transition-transform duration-500 ease-out">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749847809/StickerShuttle_StickerSheetsIcon_2_g61dty.svg" 
-                      alt="Sticker Sheets" 
-                      className="w-full h-full object-contain"
-                                              style={{
-                          filter: 'none'
-                        }}
-                    />
-                  </div>
-                  <h3 className="font-semibold text-white group-hover/card:text-purple-400 transition-colors duration-300 ease-out mb-2 text-sm lg:text-base">Sticker Sheets →</h3>
-                  
-                  {/* Features hidden - just show on click */}
-                </div>
-              </Link>
+               {/* Sticker Sheets - Hidden */}
             </div>
 
             {/* Mobile Scrollable Cards */}
             <div className="sm:hidden overflow-x-auto pb-4">
               <div className="flex space-x-4 w-max">
-                {/* Vinyl Stickers Mobile */}
-                <Link href="/products/vinyl-stickers">
+                {/* Pop Up Banners Mobile */}
+                <Link href="/bannership/products/pop-up-banners">
                   <div 
                     className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
                     style={{
                       background: 'rgba(255, 255, 255, 0.05)',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
                       boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                      backdropFilter: 'blur(12px)'
+                      backdropFilter: 'blur(12px)',
+                      height: '240px'
+                    }}
+                  >
+                    <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
+                      <img 
+                        src="/popup-banner-icon.png" 
+                        alt="Pop Up Banners" 
+                        className="w-full h-full object-contain"
+                        style={{
+                          filter: 'none'
+                        }}
+                      />
+                    </div>
+                    <h3 className="font-semibold text-white">Pop Up<br/>Banners →</h3>
+                  </div>
+                </Link>
+
+                {/* Vinyl Banners Mobile */}
+                <Link href="/bannership/products/vinyl-banners">
+                  <div 
+                    className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                      backdropFilter: 'blur(12px)',
+                      height: '240px'
+                    }}
+                  >
+                    <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
+                      <img 
+                        src="/vinyl-banner-icon.png" 
+                        alt="Vinyl Banners" 
+                        className="w-full h-full object-contain"
+                        style={{
+                          filter: 'none'
+                        }}
+                      />
+                    </div>
+                    <h3 className="font-semibold text-white">Vinyl<br/>Banners →</h3>
+                  </div>
+                </Link>
+
+                {/* X-Banner Mobile */}
+                <Link href="/bannership/products/x-banners">
+                  <div 
+                    className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                      backdropFilter: 'blur(12px)',
+                      height: '240px'
+                    }}
+                  >
+                     <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
+                       <img 
+                         src="/x-banner-icon.png?v=2" 
+                         alt="X-Banner" 
+                         className="w-full h-full object-contain"
+                         style={{
+                           filter: 'none'
+                         }}
+                       />
+                     </div>
+                    <h3 className="font-semibold text-white">X-<br/>Banners →</h3>
+                  </div>
+                </Link>
+
+                {/* Stickers Mobile */}
+                <Link href="/">
+                  <div 
+                    className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                      backdropFilter: 'blur(12px)',
+                      height: '240px'
                     }}
                   >
                     <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
                       <img 
                         src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
-                        alt="Vinyl Stickers" 
+                        alt="Stickers" 
                         className="w-full h-full object-contain"
                         style={{
                           filter: 'none'
                         }}
                       />
                     </div>
-                    <h3 className="font-semibold text-white">Vinyl<br/>Stickers →</h3>
+                    <h3 className="font-semibold text-white">Stickers →</h3>
                   </div>
                 </Link>
 
-                {/* Holographic Stickers Mobile */}
-                <Link href="/products/holographic-stickers">
-                  <div 
-                    className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                      backdropFilter: 'blur(12px)'
-                    }}
-                  >
-                    <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
-                      <img 
-                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593621/PurpleAlien_StickerShuttle_HolographicIcon_ukdotq.png" 
-                        alt="Holographic Stickers" 
-                        className="w-full h-full object-contain"
-                        style={{
-                          filter: 'none'
-                        }}
-                      />
-                    </div>
-                    <h3 className="font-semibold text-white">Holographic<br/>Stickers →</h3>
-                  </div>
-                </Link>
-
-                {/* Glitter Stickers Mobile */}
-                <Link href="/products/glitter-stickers">
-                  <div 
-                    className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                      backdropFilter: 'blur(12px)'
-                    }}
-                  >
-                    <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
-                      <img 
-                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
-                        alt="Glitter Stickers" 
-                        className="w-full h-full object-contain"
-                        style={{
-                          filter: 'none'
-                        }}
-                      />
-                    </div>
-                    <h3 className="font-semibold text-white">Glitter<br/>Stickers →</h3>
-                  </div>
-                </Link>
-
-                {/* Chrome Stickers Mobile */}
-                <Link href="/products/chrome-stickers">
-                  <div 
-                    className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                      backdropFilter: 'blur(12px)'
-                    }}
-                  >
-                    <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
-                      <img 
-                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593680/yELLOWAlien_StickerShuttle_ChromeIcon_nut4el.png" 
-                        alt="Chrome Stickers" 
-                        className="w-full h-full object-contain"
-                        style={{
-                          filter: 'none'
-                        }}
-                      />
-                    </div>
-                    <h3 className="font-semibold text-white">Chrome<br/>Stickers →</h3>
-                  </div>
-                </Link>
-
-                {/* Clear Stickers Mobile */}
-                <Link href="/products/clear-stickers">
-                  <div 
-                    className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                      backdropFilter: 'blur(12px)'
-                    }}
-                  >
-                    <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
-                      <img 
-                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749849590/StickerShuttle_ClearIcon_zxjnqc.svg" 
-                        alt="Clear Stickers" 
-                        className="w-full h-full object-contain"
-                        style={{
-                          filter: 'none'
-                        }}
-                      />
-                    </div>
-                    <h3 className="font-semibold text-white">Clear<br/>Stickers →</h3>
-                  </div>
-                </Link>
-
-                {/* Sticker Sheets Mobile */}
-                <Link href="/products/sticker-sheets">
-                  <div 
-                    className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                      backdropFilter: 'blur(12px)'
-                    }}
-                  >
-                    <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
-                      <img 
-                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749847809/StickerShuttle_StickerSheetsIcon_2_g61dty.svg" 
-                        alt="Sticker Sheets" 
-                        className="w-full h-full object-contain"
-                        style={{
-                          filter: 'none'
-                        }}
-                      />
-                    </div>
-                    <h3 className="font-semibold text-white">Sticker<br/>Sheets →</h3>
-                  </div>
-                </Link>
               </div>
             </div>
           </div>
@@ -669,17 +530,17 @@ export default function Home() {
             <div className="text-center mb-6 mt-4">
               <div className="flex justify-center mb-4">
                 <h2 className="text-3xl font-bold text-white">
-                  <span style={{filter: 'drop-shadow(0 0 10px rgba(34, 197, 94, 0.6)) drop-shadow(0 0 20px rgba(34, 197, 94, 0.4))', display: 'inline-block'}}>👽</span> <span className="relative inline-block">Not<span className="absolute -bottom-1 left-0 right-0 h-1 bg-yellow-400 transform rotate-1 rounded-full"></span></span> a conspiracy theory...
+                  <span style={{filter: 'drop-shadow(0 0 10px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 20px rgba(255, 255, 255, 0.4))', display: 'inline-block'}}>☠️</span> There&apos;s <span className="relative inline-block">nothing<span className="absolute -bottom-1 left-0 right-0 h-1 bg-white transform rotate-1 rounded-full"></span></span> to fear...
                 </h2>
               </div>
               <p className="text-gray-300 text-lg">
-                                    And we&apos;re not aliens, that&apos;s why thousands of other businesses DO believe in us...
+                                    We may be pirates, but we are trusted across the far seas...
               </p>
             </div>
 
             {/* Desktop Reviews Grid */}
             <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Review 1 - Rach Plants */}
+              {/* Review 1 - Certified Garbage Rat */}
               <div 
                 className="rounded-2xl p-6 flex flex-col"
                 style={{ 
@@ -690,9 +551,11 @@ export default function Home() {
                 }}
               >
                 <div className="flex items-center mb-4">
-                  <div className="w-12 h-12 rounded-full mr-3 flex items-center justify-center font-bold text-white" style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.6) 0%, rgba(59, 130, 246, 0.4) 100%)' }}>
-                    RP
-                  </div>
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601651/unnamed_1_100x100_crop_center_ozo8lq.webp" 
+                    alt="Certified Garbage Rat"
+                    className="w-12 h-12 rounded-full mr-3"
+                  />
                   <img 
                     src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
                     alt="Google"
@@ -700,8 +563,8 @@ export default function Home() {
                   />
                 </div>
                 
-                <h3 className="text-white font-semibold mb-1">Rach Plants</h3>
-                <p className="text-gray-400 text-sm mb-3">Matte Stickers& Vinyl Banners</p>
+                <h3 className="text-white font-semibold mb-1">Certified Garbage Rat</h3>
+                <p className="text-gray-400 text-sm mb-3">Matte Stickers & Vinyl Banners</p>
                 
                 <div className="flex gap-1 mb-4">
                   {[1, 2, 3, 4, 5].map((star) => (
@@ -712,11 +575,11 @@ export default function Home() {
                 </div>
                 
                 <p className="text-gray-300 text-sm leading-relaxed flex-grow">
-                  Incredible! They were able to not only make my business logo into great quality stickers, they also made my own photos into stickers!! I recommend them to everyone looking for custom stickers! Beautiful work, quality, attention to detail, communication! 10/10!
+                  We got one of our designs custom made into stickers and they definitely did not disappoint! We had previously been using another website but the speed and quality of sticker shuttle is far better than our stickers before. I would highly recommend!
                 </p>
               </div>
 
-              {/* Review 2 - Anita J */}
+              {/* Review 2 - Panda Reaper */}
               <div 
                 className="rounded-2xl p-6 flex flex-col"
                 style={{ 
@@ -729,45 +592,6 @@ export default function Home() {
                 <div className="flex items-center mb-4">
                   <img 
                     src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601649/download_1_100x100_crop_center_z69tdh.avif" 
-                    alt="Anita J"
-                    className="w-12 h-12 rounded-full mr-3"
-                  />
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
-                    alt="Google"
-                    className="w-8 h-8 ml-auto"
-                  />
-                </div>
-                
-                <h3 className="text-white font-semibold mb-1">Anita J</h3>
-                <p className="text-gray-400 text-sm mb-3">Matte Vinyl Stickers</p>
-                
-                <div className="flex gap-1 mb-4">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <svg key={star} className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
-                </div>
-                
-                <p className="text-gray-300 text-sm leading-relaxed flex-grow">
-                  Absolutely loved the quality and thickness of the stickers but what really made me excited was the ability to speak to the owner directly who provides amazing customer service and truly delivers on the timelines posted. Would recommend to anyone looking!
-                </p>
-              </div>
-
-              {/* Review 3 - Panda Reaper */}
-              <div 
-                className="rounded-2xl p-6 flex flex-col"
-                style={{ 
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(12px)'
-                }}
-              >
-                <div className="flex items-center mb-4">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601646/unnamed_14467655-4d00-451c-bca6-b5be86af2814_100x100_crop_center_cmftk1.webp" 
                     alt="Panda Reaper"
                     className="w-12 h-12 rounded-full mr-3"
                   />
@@ -794,7 +618,46 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* Review 4 - Certified Garbage Rat */}
+              {/* Review 3 - Anita J */}
+              <div 
+                className="rounded-2xl p-6 flex flex-col"
+                style={{ 
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)'
+                }}
+              >
+                <div className="flex items-center mb-4">
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601646/unnamed_14467655-4d00-451c-bca6-b5be86af2814_100x100_crop_center_cmftk1.webp" 
+                    alt="Anita J"
+                    className="w-12 h-12 rounded-full mr-3"
+                  />
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
+                    alt="Google"
+                    className="w-8 h-8 ml-auto"
+                  />
+                </div>
+                
+                <h3 className="text-white font-semibold mb-1">Anita J</h3>
+                <p className="text-gray-400 text-sm mb-3">Matte Vinyl Stickers</p>
+                
+                <div className="flex gap-1 mb-4">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <svg key={star} className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  ))}
+                </div>
+                
+                <p className="text-gray-300 text-sm leading-relaxed flex-grow">
+                  Absolutely loved the quality and thickness of the stickers but what really made me excited was the ability to speak to the owner directly who provides amazing customer service and truly delivers on the timelines posted. Would recommend to anyone looking!
+                </p>
+              </div>
+
+              {/* Review 4 - Rach Plants */}
               <div 
                 className="rounded-2xl p-6 flex flex-col"
                 style={{ 
@@ -807,7 +670,7 @@ export default function Home() {
                 <div className="flex items-center mb-4">
                   <img 
                     src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601644/111_100x100_crop_center_ubs7st.avif" 
-                    alt="Certified Garbage Rat"
+                    alt="Rach Plants"
                     className="w-12 h-12 rounded-full mr-3"
                   />
                   <img 
@@ -817,8 +680,8 @@ export default function Home() {
                   />
                 </div>
                 
-                <h3 className="text-white font-semibold mb-1">Certified Garbage Rat</h3>
-                <p className="text-gray-400 text-sm mb-3">Matte Stickers & Vinyl Banners</p>
+                <h3 className="text-white font-semibold mb-1">Rach Plants</h3>
+                <p className="text-gray-400 text-sm mb-3">Matte Stickers& Vinyl Banners</p>
                 
                 <div className="flex gap-1 mb-4">
                   {[1, 2, 3, 4, 5].map((star) => (
@@ -829,7 +692,7 @@ export default function Home() {
                 </div>
                 
                 <p className="text-gray-300 text-sm leading-relaxed flex-grow">
-                  We got one of our designs custom made into stickers and they definitely did not disappoint! We had previously been using another website but the speed and quality of sticker shuttle is far better than our stickers before. I would highly recommend!
+                  Incredible! They were able to not only make my business logo into great quality stickers, they also made my own photos into stickers!! I recommend them to everyone looking for custom stickers! Beautiful work, quality, attention to detail, communication! 10/10!
                 </p>
               </div>
             </div>
@@ -837,10 +700,10 @@ export default function Home() {
             {/* Mobile Swipeable Reviews */}
             <div className="md:hidden overflow-x-auto pb-4 relative">
               {/* Left fade only */}
-              <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#030140] to-transparent pointer-events-none z-10"></div>
+              <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-black to-transparent pointer-events-none z-10"></div>
               
               <div className="flex space-x-4 w-max" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                {/* Review 1 - Rach Plants Mobile */}
+                {/* Review 1 - Certified Garbage Rat Mobile */}
                 <div 
                   className="flex-shrink-0 w-72 rounded-2xl p-6 flex flex-col"
                   style={{ 
@@ -851,9 +714,11 @@ export default function Home() {
                   }}
                 >
                   <div className="flex items-center mb-4">
-                    <div className="w-12 h-12 rounded-full mr-3 flex items-center justify-center font-bold text-white" style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.6) 0%, rgba(59, 130, 246, 0.4) 100%)' }}>
-                      RP
-                    </div>
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601651/unnamed_1_100x100_crop_center_ozo8lq.webp" 
+                      alt="Certified Garbage Rat"
+                      className="w-12 h-12 rounded-full mr-3"
+                    />
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
                       alt="Google"
@@ -861,8 +726,8 @@ export default function Home() {
                     />
                   </div>
                   
-                  <h3 className="text-white font-semibold mb-1">Rach Plants</h3>
-                  <p className="text-gray-400 text-sm mb-3">Matte Stickers& Vinyl Banners</p>
+                  <h3 className="text-white font-semibold mb-1">Certified Garbage Rat</h3>
+                  <p className="text-gray-400 text-sm mb-3">Matte Stickers & Vinyl Banners</p>
                   
                   <div className="flex gap-1 mb-4">
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -873,11 +738,11 @@ export default function Home() {
                   </div>
                   
                   <p className="text-gray-300 text-sm leading-relaxed flex-grow">
-                    Incredible! They were able to not only make my business logo into great quality stickers, they also made my own photos into stickers!! I recommend them to everyone looking for custom stickers! Beautiful work, quality, attention to detail, communication! 10/10!
+                    We got one of our designs custom made into stickers and they definitely did not disappoint! We had previously been using another website but the speed and quality of sticker shuttle is far better than our stickers before. I would highly recommend!
                   </p>
                 </div>
 
-                {/* Review 2 - Anita J Mobile */}
+                {/* Review 2 - Panda Reaper Mobile */}
                 <div 
                   className="flex-shrink-0 w-72 rounded-2xl p-6 flex flex-col"
                   style={{ 
@@ -890,45 +755,6 @@ export default function Home() {
                   <div className="flex items-center mb-4">
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601649/download_1_100x100_crop_center_z69tdh.avif" 
-                      alt="Anita J"
-                      className="w-12 h-12 rounded-full mr-3"
-                    />
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
-                      alt="Google"
-                      className="w-8 h-8 ml-auto"
-                    />
-                  </div>
-                  
-                  <h3 className="text-white font-semibold mb-1">Anita J</h3>
-                  <p className="text-gray-400 text-sm mb-3">Matte Vinyl Stickers</p>
-                  
-                  <div className="flex gap-1 mb-4">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <svg key={star} className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                    ))}
-                  </div>
-                  
-                  <p className="text-gray-300 text-sm leading-relaxed flex-grow">
-                    Absolutely loved the quality and thickness of the stickers but what really made me excited was the ability to speak to the owner directly who provides amazing customer service and truly delivers on the timelines posted. Would recommend to anyone looking!
-                  </p>
-                </div>
-
-                {/* Review 3 - Panda Reaper Mobile */}
-                <div 
-                  className="flex-shrink-0 w-72 rounded-2xl p-6 flex flex-col"
-                  style={{ 
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(12px)'
-                  }}
-                >
-                  <div className="flex items-center mb-4">
-                    <img 
-                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601646/unnamed_14467655-4d00-451c-bca6-b5be86af2814_100x100_crop_center_cmftk1.webp" 
                       alt="Panda Reaper"
                       className="w-12 h-12 rounded-full mr-3"
                     />
@@ -955,7 +781,46 @@ export default function Home() {
                   </p>
                 </div>
 
-                {/* Review 4 - Certified Garbage Rat Mobile */}
+                {/* Review 3 - Anita J Mobile */}
+                <div 
+                  className="flex-shrink-0 w-72 rounded-2xl p-6 flex flex-col"
+                  style={{ 
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(12px)'
+                  }}
+                >
+                  <div className="flex items-center mb-4">
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601646/unnamed_14467655-4d00-451c-bca6-b5be86af2814_100x100_crop_center_cmftk1.webp" 
+                      alt="Anita J"
+                      className="w-12 h-12 rounded-full mr-3"
+                    />
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601653/Google__G__logo_svg_100x100_crop_center_hg9knc.avif" 
+                      alt="Google"
+                      className="w-8 h-8 ml-auto"
+                    />
+                  </div>
+                  
+                  <h3 className="text-white font-semibold mb-1">Anita J</h3>
+                  <p className="text-gray-400 text-sm mb-3">Matte Vinyl Stickers</p>
+                  
+                  <div className="flex gap-1 mb-4">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <svg key={star} className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
+                  </div>
+                  
+                  <p className="text-gray-300 text-sm leading-relaxed flex-grow">
+                    Absolutely loved the quality and thickness of the stickers but what really made me excited was the ability to speak to the owner directly who provides amazing customer service and truly delivers on the timelines posted. Would recommend to anyone looking!
+                  </p>
+                </div>
+
+                {/* Review 4 - Rach Plants Mobile */}
                 <div 
                   className="flex-shrink-0 w-72 rounded-2xl p-6 flex flex-col"
                   style={{ 
@@ -968,7 +833,7 @@ export default function Home() {
                   <div className="flex items-center mb-4">
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749601644/111_100x100_crop_center_ubs7st.avif" 
-                      alt="Certified Garbage Rat"
+                      alt="Rach Plants"
                       className="w-12 h-12 rounded-full mr-3"
                     />
                     <img 
@@ -978,8 +843,8 @@ export default function Home() {
                     />
                   </div>
                   
-                  <h3 className="text-white font-semibold mb-1">Certified Garbage Rat</h3>
-                  <p className="text-gray-400 text-sm mb-3">Matte Stickers & Vinyl Banners</p>
+                  <h3 className="text-white font-semibold mb-1">Rach Plants</h3>
+                  <p className="text-gray-400 text-sm mb-3">Matte Stickers& Vinyl Banners</p>
                   
                   <div className="flex gap-1 mb-4">
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -990,7 +855,7 @@ export default function Home() {
                   </div>
                   
                   <p className="text-gray-300 text-sm leading-relaxed flex-grow">
-                    We got one of our designs custom made into stickers and they definitely did not disappoint! We had previously been using another website but the speed and quality of sticker shuttle is far better than our stickers before. I would highly recommend!
+                    Incredible! They were able to not only make my business logo into great quality stickers, they also made my own photos into stickers!! I recommend them to everyone looking for custom stickers! Beautiful work, quality, attention to detail, communication! 10/10!
                   </p>
                 </div>
               </div>
@@ -1076,7 +941,16 @@ export default function Home() {
         )}
 
         {/* Custom CSS for infinite scroll animation */}
-        <style jsx>{`
+        <style jsx global>{`
+          body {
+            background-color: #000000 !important;
+          }
+          
+          /* Override Layout background */
+          .min-h-screen {
+            background-color: #000000 !important;
+          }
+          
           @keyframes scroll {
             0% {
               transform: translateX(0);
@@ -1241,12 +1115,9 @@ export default function Home() {
           }
           
           /* Sticker type hover effects - simple lightening */
-          .vinyl-hover:hover,
-          .holographic-hover:hover,
+          .banner-hover:hover,
           .chrome-hover:hover,
-          .glitter-hover:hover,
-          .clear-hover:hover,
-          .banner-hover:hover {
+          .clear-hover:hover {
             background: rgba(255, 255, 255, 0.08) !important;
             border-color: rgba(255, 255, 255, 0.15) !important;
           }
@@ -1309,18 +1180,14 @@ export default function Home() {
             transform: scale(1.05);
           }
 
-          /* Responsive Banner Styles */
+          /* Responsive Banner Styles - With background image */
           .hero-banner {
-            background-image: url('https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751994147/StickerShuttle_Banner_MainMobile_a93h3q.png');
+            background: 
+              linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.7)),
+              url('https://res.cloudinary.com/dxcnvqk6b/image/upload/v1759850159/BannerShip_VinylBanner_VinylBanner_adi95s.png');
             background-size: cover;
-            background-position: center bottom;
+            background-position: center;
             background-repeat: no-repeat;
-          }
-          
-          @media (min-width: 768px) {
-            .hero-banner {
-              background-image: url('https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751382016/StickerShuttle_Banner_Main_nlzoro.png');
-            }
           }
 
         `}</style>

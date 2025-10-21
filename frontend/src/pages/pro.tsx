@@ -436,6 +436,17 @@ const StickerShuttlePro = () => {
                         Save $121
                       </div>
                     </div>
+                    <div className="flex justify-center mb-2">
+                      <div className="text-sm font-bold tracking-widest"
+                           style={{
+                             background: 'linear-gradient(135deg, #FFD700 0%, #FFC107 50%, #FF8F00 100%)',
+                             WebkitBackgroundClip: 'text',
+                             WebkitTextFillColor: 'transparent',
+                             backgroundClip: 'text'
+                           }}>
+                        FOUNDING MEMBER SPECIAL
+                      </div>
+                    </div>
                     <div className={selectedPlan === 'annual' ? 'text-blue-200' : 'text-gray-300'}>
                       <span className="line-through text-gray-500 mr-2">(originally $468)</span>
                     </div>

@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useCart } from './CartContext';
+import { getCartUrl } from '@/utils/domain-aware-links';
 
 interface CartIndicatorProps {
   className?: string;
@@ -12,7 +13,7 @@ export default function CartIndicator({ className = "" }: CartIndicatorProps) {
 
   return (
     <Link
-      href="/cart"
+      href={getCartUrl()}
       className={`text-white transition-all duration-200 transform hover:scale-110 p-2 relative ${className}`}
       aria-label="Shopping cart"
     >

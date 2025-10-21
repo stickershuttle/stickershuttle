@@ -60,6 +60,8 @@ const capitalize = (str: string): string => {
 const getItemTypeName = (productCategory: string, quantity: number): string => {
   switch (productCategory) {
     case 'vinyl-banners':
+    case 'pop-up-banners':
+    case 'x-banners':
       return quantity === 1 ? 'banner' : 'banners';
     case 'vinyl-stickers':
     case 'holographic-stickers':
@@ -170,13 +172,36 @@ const calculateItemPricing = (
     };
   }
   
-  // For vinyl banners, use the original pricing from the calculator - don't recalculate
-  if (item.product.category === 'vinyl-banners') {
+  // For all banner types, use original pricing from calculator
+  if (item.product.category === 'vinyl-banners' || 
+      item.product.category === 'pop-up-banners' || 
+      item.product.category === 'x-banners') {
+    const baseUnitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : 0;
+    
+    // Get quantity discount rate based on product type
+    let discountRate = 0;
+    if (item.product.name === 'Vinyl Banners') {
+      // Vinyl banners: 5% at 5+, 10% at 10+, 15% at 15+, 25% at 25+
+      if (quantity >= 25) discountRate = 0.25;
+      else if (quantity >= 15) discountRate = 0.15;
+      else if (quantity >= 10) discountRate = 0.10;
+      else if (quantity >= 5) discountRate = 0.05;
+    } else if (item.product.name === 'Pop Up Banners' || item.product.name === 'X Banners') {
+      // Pop-up and X banners: 15% at 5+, 25% at 10+, 35% at 25+
+      if (quantity >= 25) discountRate = 0.35;
+      else if (quantity >= 10) discountRate = 0.25;
+      else if (quantity >= 5) discountRate = 0.15;
+    }
+    
+    const subtotal = baseUnitPrice * quantity;
+    const discountAmount = subtotal * discountRate;
+    const total = subtotal - discountAmount;
+    
     return {
-      total: item.totalPrice,
-      perSticker: item.unitPrice,
-      discountPercentage: 0,
-      area: (item.customization.additionalInfo as any)?.sqFt || 15 // Use stored square footage or default
+      total: total,
+      perSticker: baseUnitPrice, // Keep original unit price, discount is on total
+      discountPercentage: Math.round(discountRate * 100),
+      area: (item.customization.additionalInfo as any)?.sqFt || 15
     };
   }
   
@@ -469,13 +494,16 @@ const formatOptionName = (type: string, key?: string, productCategory?: string) 
   if (key === 'kissOption') return "Kiss Cut Options";
   if (key === 'whiteOption') return "White Ink";
   if (key === 'vibrancy') return "Add-on";
+  if (key === 'frameType') return "Frame Type";
   
   switch (type) {
     case "shape":
       return "Shape";
     case "finish":
-      // For vinyl banners, show "Finishing" instead of "Material"
-      return productCategory === "vinyl-banners" ? "Finishing" : "Material";
+      // For all banner types, show "Finishing" instead of "Material"
+      return (productCategory === "vinyl-banners" || 
+              productCategory === "pop-up-banners" || 
+              productCategory === "x-banners") ? "Finishing" : "Material";
     case "size-preset":
       return "Size";
     case "white-base":
@@ -707,6 +735,15 @@ export default function CartPage() {
   const getQuantityIncrement = (currentQuantity: number, item?: CartItem): number => {
     // Sample packs should increment by 1
     if (item && item.product.name === 'Sample Pack by Sticker Shuttle') {
+      return 1;
+    }
+    // Banners should increment by 1
+    if (item && (item.product.id === 'x-banners' || 
+                 item.product.id === 'pop-up-banners' || 
+                 item.product.id === 'vinyl-banners' ||
+                 item.product.category === 'vinyl-banners' ||
+                 item.product.category === 'pop-up-banners' ||
+                 item.product.category === 'x-banners')) {
       return 1;
     }
     // Regular products increment by 50 or 250
@@ -1368,17 +1405,29 @@ export default function CartPage() {
     return sum;
   }, 0);
 
+  // Check if cart contains only bannership products
+  const isBannershipOnly = updatedCart.length > 0 && updatedCart.every(item => 
+    item.product.id === 'x-banners' || 
+    item.product.id === 'pop-up-banners' || 
+    item.product.id === 'vinyl-banners'
+  );
+
   return (
-    <Layout title="Your Cart - Sticker Shuttle">
+    <Layout 
+      title="Your Cart - Sticker Shuttle"
+      customLogo={isBannershipOnly ? "/bannership-logo.svg" : undefined}
+      customLogoAlt={isBannershipOnly ? "Bannership Logo" : undefined}
+      customBackground={isBannershipOnly ? "#000000" : undefined}
+      forceBannershipMode={isBannershipOnly}
+    >
       <section className="pt-7 pb-8">
         <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
 
-
-
-
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <h1 className="text-3xl font-bold text-white">Your Cart</h1>
-          </div>
+          {!isBannershipOnly && (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <h1 className="text-3xl font-bold text-white">Your Cart</h1>
+            </div>
+          )}
 
 
           
@@ -1796,7 +1845,7 @@ export default function CartPage() {
                           <div className="flex justify-between items-start mb-4">
                             <div className="flex items-center gap-3">
                               {/* Product Icon */}
-                              {item.product.name.toLowerCase().includes('vinyl') && (
+                              {item.product.name.toLowerCase().includes('vinyl') && !item.product.name.includes('Banners') && (
                                 <img 
                                   src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593599/Alien_Rocket_mkwlag.png" 
                                   alt="Vinyl Stickers Icon" 
@@ -1821,6 +1870,27 @@ export default function CartPage() {
                                 <img 
                                   src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749593602/BlueAlien_StickerShuttle_GlitterIcon_rocwpi.png" 
                                   alt="Glitter Icon" 
+                                  className="w-8 h-8 object-contain"
+                                />
+                              )}
+                              {item.product.name === 'Pop Up Banners' && (
+                                <img 
+                                  src="/popup-banner-icon.png" 
+                                  alt="Pop Up Banners Icon" 
+                                  className="w-8 h-8 object-contain"
+                                />
+                              )}
+                              {item.product.name === 'X Banners' && (
+                                <img 
+                                  src="/x-banner-icon.png?v=2" 
+                                  alt="X Banners Icon" 
+                                  className="w-8 h-8 object-contain"
+                                />
+                              )}
+                              {item.product.name === 'Vinyl Banners' && (
+                                <img 
+                                  src="/vinyl-banner-icon.png" 
+                                  alt="Vinyl Banners Icon" 
                                   className="w-8 h-8 object-contain"
                                 />
                               )}
@@ -1889,7 +1959,19 @@ export default function CartPage() {
                                   if (key === 'size' && item.customization.selections?.['size-preset']) return false;
                                   // For deal items, only allow shape options (no material/finish)
                                   if (item.customization.isDeal && (key === 'material' || key === 'finish')) return false;
+                                  // For X banners, only show size (skip includeStand)
+                                  if (item.product.name === 'X Banners' && key === 'includeStand') return false;
                                   return true;
+                                })
+                                .sort(([keyA], [keyB]) => {
+                                  // Custom ordering for pop-up banners: size first, then frame type
+                                  if (item.product.name === 'Pop Up Banners') {
+                                    if (keyA === 'size') return -1;
+                                    if (keyB === 'size') return 1;
+                                    if (keyA === 'frameType') return -1;
+                                    if (keyB === 'frameType') return 1;
+                                  }
+                                  return 0;
                                 })
                                 .map(([key, sel]) => {
                                 
@@ -1906,7 +1988,12 @@ export default function CartPage() {
                                 
                                 const optionType = getOptionType(key);
                                 // For deal items, only allow shape swapping
-                                const canSwap = optionType !== null && (!item.customization.isDeal || optionType === 'shape');
+                                // For vinyl banners, pop-up banners, and X banners, make all options non-editable
+                                const canSwap = optionType !== null && 
+                                  (!item.customization.isDeal || optionType === 'shape') &&
+                                  item.product.name !== 'Vinyl Banners' &&
+                                  item.product.name !== 'Pop Up Banners' &&
+                                  item.product.name !== 'X Banners';
                                 const isDropdownOpen = activeDropdown?.itemId === item.id && activeDropdown?.type === optionType;
                                 
                                 return (
@@ -1948,13 +2035,15 @@ export default function CartPage() {
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <span className="text-red-300 font-medium">+40%</span>
-                                    <button
-                                      onClick={() => handleRushOrderToggle(item.id, false)}
-                                      className="text-red-300/60 hover:text-red-300 transition-colors text-sm"
-                                      title="Remove rush order"
-                                    >
-                                      ✕
-                                    </button>
+                                    {item.product.name !== 'Vinyl Banners' && item.product.name !== 'Pop Up Banners' && item.product.name !== 'X Banners' && (
+                                      <button
+                                        onClick={() => handleRushOrderToggle(item.id, false)}
+                                        className="text-red-300/60 hover:text-red-300 transition-colors text-sm"
+                                        title="Remove rush order"
+                                      >
+                                        ✕
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               )}
@@ -2424,7 +2513,11 @@ export default function CartPage() {
                       <span>${(subtotal / totalQuantity).toFixed(2)} per {(() => {
                         // Determine the most common product type in cart
                         const productTypes = updatedCart.map(item => item.product.category);
-                        const bannerCount = productTypes.filter(type => type === 'vinyl-banners').length;
+                        const bannerCount = productTypes.filter(type => 
+                          type === 'vinyl-banners' || 
+                          type === 'pop-up-banners' || 
+                          type === 'x-banners'
+                        ).length;
                         const stickerCount = productTypes.length - bannerCount;
                         
                         // If all items are banners, use banner terminology
@@ -3285,6 +3378,16 @@ export default function CartPage() {
         
         .store-credit-input[type=number] {
           -moz-appearance: textfield;
+        }
+
+        /* Bannership Hero Banner Background */
+        .hero-banner {
+          background: 
+            linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.7)),
+            url('https://res.cloudinary.com/dxcnvqk6b/image/upload/v1759850159/BannerShip_VinylBanner_VinylBanner_adi95s.png');
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
         }
       `}</style>
 
