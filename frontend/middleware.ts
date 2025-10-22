@@ -2,65 +2,38 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
-  // Get hostname from multiple possible sources
-  const hostname = request.headers.get('host') || 
-                   request.headers.get('x-forwarded-host') ||
-                   request.nextUrl.hostname || ''
+  // Get the hostname (e.g. bannership.stickershuttle.com, stickershuttle.com)
+  const hostname = request.headers.get('host') || ''
+  const url = request.nextUrl
   
-  const { pathname } = request.nextUrl
+  console.log('Middleware - hostname:', hostname, 'pathname:', url.pathname)
   
-  // Debug logging
-  console.log('🔍 Middleware invoked:', { 
-    hostname, 
-    pathname,
-    allHeaders: Object.fromEntries(request.headers.entries())
-  })
-  
-  // Detect if we're on the bannership subdomain
-  const isBannershipSubdomain = hostname.includes('bannership') || 
-                                 hostname.startsWith('bannership.') || 
-                                 hostname === 'bannership.stickershuttle.com'
-  
-  console.log('🔍 Is Bannership subdomain?', isBannershipSubdomain, '(hostname:', hostname, ')')
-  
-  // Skip middleware for static files, API routes, and Next.js internals
-  if (
-    pathname.startsWith('/api') ||
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/favicon.ico') ||
-    pathname.match(/\.(png|jpg|jpeg|svg|ico|css|js)$/)
-  ) {
-    console.log('⏭️ Skipping middleware for:', pathname)
-    return NextResponse.next()
-  }
-  
-  // Handle bannership subdomain
-  if (isBannershipSubdomain) {
-    console.log('🏴‍☠️ Bannership subdomain detected!')
+  // Check if this is the bannership subdomain
+  if (hostname === 'bannership.stickershuttle.com' || 
+      hostname.startsWith('bannership-stickershuttle-com') || // Vercel preview URLs
+      hostname.includes('bannership.')) {
     
-    const url = request.nextUrl.clone()
+    console.log('Bannership subdomain detected!')
     
-    // If not already on /bannership path
-    if (!pathname.startsWith('/bannership')) {
-      // Rewrite to add /bannership prefix
-      if (pathname === '/') {
-        url.pathname = '/bannership'
+    // If we're on the bannership subdomain but NOT already on a /bannership path
+    if (!url.pathname.startsWith('/bannership')) {
+      // Clone the URL
+      const newUrl = url.clone()
+      
+      // Rewrite the path to add /bannership prefix
+      if (url.pathname === '/') {
+        newUrl.pathname = '/bannership'
+      } else if (url.pathname === '/products') {
+        newUrl.pathname = '/bannership/products'
+      } else if (url.pathname.startsWith('/products/')) {
+        newUrl.pathname = `/bannership${url.pathname}`
       } else {
-        url.pathname = `/bannership${pathname}`
+        newUrl.pathname = `/bannership${url.pathname}`
       }
       
-      console.log(`🔄 REWRITING: ${pathname} → ${url.pathname}`)
-      
-      const response = NextResponse.rewrite(url)
-      // Add a custom header to verify middleware ran
-      response.headers.set('x-middleware-rewrite', url.pathname)
-      response.headers.set('x-original-host', hostname)
-      return response
-    } else {
-      console.log('✅ Already on /bannership path, no rewrite needed')
+      console.log(`Rewriting ${url.pathname} to ${newUrl.pathname}`)
+      return NextResponse.rewrite(newUrl)
     }
-  } else {
-    console.log('📍 Regular domain (not bannership):', hostname)
   }
   
   return NextResponse.next()
@@ -68,8 +41,14 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/',
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public files with extensions
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\..*|_vercel).*)',
   ],
 }
-

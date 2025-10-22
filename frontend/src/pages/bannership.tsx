@@ -171,7 +171,7 @@ export default function Bannership() {
                 </p>
                 <div className="flex flex-col items-center gap-4 mb-4">
                   <a 
-                    href="/bannership/products"
+                    href="/products"
                     className="primaryButton px-12 py-4 font-bold text-lg transition-all duration-300 transform hover:scale-[1.004] inline-block rounded-lg"
                   >
                     Start Here →
@@ -194,7 +194,7 @@ export default function Bannership() {
             {/* Desktop/Tablet Grid */}
             <div className="hidden sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 group/container">
               {/* Pop Up Banners */}
-              <Link href="/bannership/products/pop-up-banners">
+              <Link href="/products/pop-up-banners">
                 <div 
                   className="banner-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-300 ease-out hover:scale-105 transform overflow-hidden"
                   style={{
@@ -221,7 +221,7 @@ export default function Bannership() {
               </Link>
 
               {/* Vinyl Banners */}
-              <Link href="/bannership/products/vinyl-banners">
+              <Link href="/products/vinyl-banners">
                 <div 
                   className="banner-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-300 ease-out hover:scale-105 transform overflow-hidden"
                   style={{
@@ -248,7 +248,7 @@ export default function Bannership() {
               </Link>
 
               {/* X-Banner */}
-              <Link href="/bannership/products/x-banners">
+              <Link href="/products/x-banners">
                 <div 
                   className="banner-hover text-center group/card cursor-pointer rounded-2xl p-4 lg:p-6 transition-all duration-300 ease-out hover:scale-105 transform overflow-hidden"
                   style={{
@@ -335,7 +335,7 @@ export default function Bannership() {
             <div className="sm:hidden overflow-x-auto pb-4">
               <div className="flex space-x-4 w-max">
                 {/* Pop Up Banners Mobile */}
-                <Link href="/bannership/products/pop-up-banners">
+                <Link href="/products/pop-up-banners">
                   <div 
                     className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
                     style={{
@@ -361,7 +361,7 @@ export default function Bannership() {
                 </Link>
 
                 {/* Vinyl Banners Mobile */}
-                <Link href="/bannership/products/vinyl-banners">
+                <Link href="/products/vinyl-banners">
                   <div 
                     className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
                     style={{
@@ -387,7 +387,7 @@ export default function Bannership() {
                 </Link>
 
                 {/* X-Banner Mobile */}
-                <Link href="/bannership/products/x-banners">
+                <Link href="/products/x-banners">
                   <div 
                     className="flex-shrink-0 w-48 text-center rounded-2xl p-6"
                     style={{

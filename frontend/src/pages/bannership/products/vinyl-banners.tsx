@@ -88,7 +88,7 @@ export default function BannershipVinylBanners() {
           >
             {/* Back Arrow - Top Left */}
             <Link 
-              href="/bannership/products"
+              href="/products"
               className="absolute top-4 left-4 z-20 flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 hover:scale-110"
               style={{
                 background: 'rgba(255, 255, 255, 0.05)',

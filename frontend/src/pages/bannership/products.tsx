@@ -22,7 +22,7 @@ export default function BannershipProducts() {
     if (router.query.added === 'true') {
       setShowSuccess(true);
       // Clean URL after showing message
-      router.replace('/bannership/products', undefined, { shallow: true });
+      router.replace('/products', undefined, { shallow: true });
       // Auto-hide after 5 seconds
       setTimeout(() => setShowSuccess(false), 5000);
     }
