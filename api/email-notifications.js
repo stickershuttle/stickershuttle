@@ -2337,6 +2337,511 @@ const getPickupCompletedEmailTemplate = (orderData) => {
   };
 };
 
+// ============================================
+// PRO MEMBER EMAIL NOTIFICATIONS
+// ============================================
+
+// Send Pro member welcome email (first order)
+const sendProMemberWelcomeEmail = async (orderData, userProfile) => {
+  if (!RESEND_API_KEY) {
+    console.error('❌ RESEND_API_KEY not configured');
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  const normalizedOrderData = normalizeOrderData(orderData);
+  
+  const template = {
+    subject: `🎉 Welcome to Sticker Shuttle Pro! Your First 100 Stickers Are On The Way - Order #${normalizedOrderData.orderNumber}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #030140 0%, #1e40af 100%); color: white; padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 30px; }
+          .pro-logo { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+          .benefit-box { background: #f0f8ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 5px; }
+          .button { background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="pro-logo">🚀 Welcome to Sticker Shuttle Pro!</div>
+          <p style="margin: 0; font-size: 16px;">Your Premium Membership is Now Active</p>
+        </div>
+
+        <div>
+          <h2>🎉 Congratulations, ${userProfile.first_name || 'Pro Member'}!</h2>
+          <p>Welcome to the Sticker Shuttle Pro family! We're thrilled to have you on board.</p>
+
+          <div class="benefit-box">
+            <h3 style="margin-top: 0;">📦 Your First Order is Being Prepared</h3>
+            <p><strong>Order Number:</strong> ${normalizedOrderData.orderNumber}</p>
+            <p><strong>Product:</strong> 100 Custom Matte Vinyl Stickers (3")</p>
+            <p><strong>Status:</strong> Building Proof</p>
+          </div>
+
+          <h3>✨ What Happens Next?</h3>
+          <ol>
+            <li><strong>Proof Review</strong> - Our team will create a proof of your design for approval</li>
+            <li><strong>Design Approval</strong> - Once approved, your design is ready for all future monthly orders</li>
+            <li><strong>Printing & Shipping</strong> - We'll print and ship your stickers with FREE 2-Day Air shipping</li>
+            <li><strong>Monthly Benefits</strong> - Every 30 days, you'll automatically receive your next 100 stickers!</li>
+          </ol>
+
+          <h3>🎁 Your Pro Member Benefits</h3>
+          <ul>
+            <li>✅ <strong>100 Custom Matte Vinyl Stickers</strong> every month (3" size)</li>
+            <li>✅ <strong>FREE 2-Day Air Shipping</strong> on all orders</li>
+            <li>✅ <strong>Priority Printing</strong> - Your orders jump the queue</li>
+            <li>✅ <strong>5% Discount</strong> on all additional custom orders</li>
+            <li>✅ <strong>One-Time Design Approval</strong> - No re-approval needed each month</li>
+            <li>✅ <strong>Design Swap Flexibility</strong> - Change your design up to 5 days before printing</li>
+          </ul>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://stickershuttle.com/account/dashboard" class="button">View Your Order</a>
+          </div>
+
+          <div class="benefit-box">
+            <h4 style="margin-top: 0;">📍 Important: Shipping Address</h4>
+            <p>Your stickers will ship to the address you provided during signup. You can update your default shipping address anytime in your Pro Membership settings.</p>
+          </div>
+
+          <p>Questions? We're here to help! Reply to this email or contact us at <a href="mailto:orbit@stickershuttle.com">orbit@stickershuttle.com</a></p>
+
+          <div class="footer">
+            <p>You're receiving this email because you're a Sticker Shuttle Pro member.</p>
+            <p>Manage your subscription at <a href="https://stickershuttle.com/account/dashboard">your dashboard</a></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  const result = await sendEmail(normalizedOrderData.customerEmail, template.subject, template.html);
+  return result;
+};
+
+// Send monthly order created email
+const sendProMonthlyOrderCreatedEmail = async (orderData, userProfile) => {
+  if (!RESEND_API_KEY) {
+    console.error('❌ RESEND_API_KEY not configured');
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  const normalizedOrderData = normalizeOrderData(orderData);
+  const hasDesign = userProfile.pro_current_design_file;
+  const designApproved = userProfile.pro_design_approved;
+  
+  const template = {
+    subject: `📦 Your Monthly Pro Stickers Are Ready! - Order #${normalizedOrderData.orderNumber}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #030140 0%, #1e40af 100%); color: white; padding: 25px; border-radius: 10px; text-align: center; margin-bottom: 25px; }
+          .alert { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 5px; }
+          .info-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 5px; }
+          .button { background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1 style="margin: 0;">🚀 Monthly Pro Stickers Ready!</h1>
+          <p style="margin: 10px 0 0 0;">Order #${normalizedOrderData.orderNumber}</p>
+        </div>
+
+        <div>
+          <p>Hi ${userProfile.first_name || 'Pro Member'},</p>
+          <p>Great news! Your monthly Pro member benefit order has been created and is ready for production.</p>
+
+          <div class="info-box">
+            <h3 style="margin-top: 0;">📦 Order Details</h3>
+            <p><strong>Order Number:</strong> ${normalizedOrderData.orderNumber}</p>
+            <p><strong>Product:</strong> 100 Custom Matte Vinyl Stickers (3")</p>
+            <p><strong>Design:</strong> ${hasDesign ? (designApproved ? 'Approved ✅' : 'Pending Approval ⏳') : 'Please upload ⚠️'}</p>
+            <p><strong>Status:</strong> ${hasDesign && designApproved ? 'Ready for Production' : 'Awaiting Design Approval'}</p>
+          </div>
+
+          ${!hasDesign ? `
+          <div class="alert">
+            <h4 style="margin-top: 0;">⚠️ Action Required: Upload Your Design</h4>
+            <p>You haven't uploaded a design yet! Please upload your design file in your Pro Membership dashboard so we can start production.</p>
+            <a href="https://stickershuttle.com/account/dashboard" class="button">Upload Design Now</a>
+          </div>
+          ` : !designApproved ? `
+          <div class="alert">
+            <h4 style="margin-top: 0;">⏳ Design Pending Approval</h4>
+            <p>Your design is currently under review by our team. We'll notify you once it's approved for production!</p>
+          </div>
+          ` : `
+          <div class="info-box">
+            <h3 style="margin-top: 0;">🎨 Your Approved Design</h3>
+            <p>We're using your pre-approved design for this month's stickers. No proof approval needed - we'll start printing right away!</p>
+          </div>
+          `}
+
+          <h3>🚚 Shipping Information</h3>
+          <p>Your stickers will ship with <strong>FREE 2-Day Air Shipping</strong> to your default address on file.</p>
+          <p>Need to update your shipping address? You can do that anytime in your Pro Membership settings.</p>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://stickershuttle.com/account/dashboard" class="button">View Order Status</a>
+          </div>
+
+          <p>Questions? We're here to help at <a href="mailto:orbit@stickershuttle.com">orbit@stickershuttle.com</a></p>
+
+          <div class="footer">
+            <p>This is your monthly Pro member benefit. No payment required!</p>
+            <p>Manage your Pro membership at <a href="https://stickershuttle.com/account/dashboard">your dashboard</a></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  const result = await sendEmail(normalizedOrderData.customerEmail, template.subject, template.html);
+  return result;
+};
+
+// Send design approved email
+const sendProDesignApprovedEmail = async (userProfile) => {
+  if (!RESEND_API_KEY) {
+    console.error('❌ RESEND_API_KEY not configured');
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  const template = {
+    subject: `✅ Your Pro Design Has Been Approved!`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 25px; border-radius: 10px; text-align: center; margin-bottom: 25px; }
+          .success-box { background: #d1fae5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0; border-radius: 5px; }
+          .button { background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1 style="margin: 0;">✅ Design Approved!</h1>
+          <p style="margin: 10px 0 0 0;">Ready for Production</p>
+        </div>
+
+        <div>
+          <p>Hi ${userProfile.first_name || 'Pro Member'},</p>
+          <p>Excellent news! Your Pro membership design has been reviewed and <strong>approved</strong> by our team.</p>
+
+          <div class="success-box">
+            <h3 style="margin-top: 0;">🎨 What This Means</h3>
+            <ul style="margin-bottom: 0;">
+              <li>Your design is now <strong>ready for production</strong></li>
+              <li>We'll use this design for <strong>all your monthly orders</strong></li>
+              <li><strong>No re-approval needed</strong> each month</li>
+              <li>Your next stickers will print and ship automatically</li>
+            </ul>
+          </div>
+
+          <h3>📅 Design Changes</h3>
+          <p>You can swap your design anytime, up until <strong>5 days before</strong> your next monthly order. After that, the design locks for production.</p>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://stickershuttle.com/account/dashboard" class="button">View Pro Dashboard</a>
+          </div>
+
+          <p>Questions about your design or Pro benefits? We're here to help at <a href="mailto:orbit@stickershuttle.com">orbit@stickershuttle.com</a></p>
+
+          <div class="footer">
+            <p>You're receiving this email as a Sticker Shuttle Pro member.</p>
+            <p>Design approved at: ${new Date().toLocaleString()}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  const result = await sendEmail(userProfile.email, template.subject, template.html);
+  return result;
+};
+
+// Send design lock warning email (3 days before lock)
+const sendProDesignLockWarningEmail = async (userProfile, daysRemaining) => {
+  if (!RESEND_API_KEY) {
+    console.error('❌ RESEND_API_KEY not configured');
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  const template = {
+    subject: `⚠️ Design Lock in ${daysRemaining} Days - Change Now or Keep Current Design`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 25px; border-radius: 10px; text-align: center; margin-bottom: 25px; }
+          .warning-box { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 5px; }
+          .button { background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1 style="margin: 0;">⚠️ Design Lock Reminder</h1>
+          <p style="margin: 10px 0 0 0;">Action Required in ${daysRemaining} Days</p>
+        </div>
+
+        <div>
+          <p>Hi ${userProfile.first_name || 'Pro Member'},</p>
+          <p>This is a friendly reminder that your Pro membership design will be <strong>locked for production in ${daysRemaining} days</strong>.</p>
+
+          <div class="warning-box">
+            <h3 style="margin-top: 0;">⏰ Time-Sensitive Action</h3>
+            <p>You have <strong>${daysRemaining} days</strong> to make any design changes for your next monthly sticker order. After that, your design will lock to ensure timely printing and delivery.</p>
+          </div>
+
+          <h3>🎯 Your Options</h3>
+          <ul>
+            <li><strong>Keep Current Design:</strong> No action needed! We'll use your approved design.</li>
+            <li><strong>Change Design:</strong> Upload a new design in your Pro dashboard (needs approval).</li>
+          </ul>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://stickershuttle.com/account/dashboard" class="button">Go to Pro Dashboard</a>
+          </div>
+
+          <p><strong>Note:</strong> Once locked, your design cannot be changed for this month's order to ensure we meet our production and shipping timelines.</p>
+
+          <p>Questions? Contact us at <a href="mailto:orbit@stickershuttle.com">orbit@stickershuttle.com</a></p>
+
+          <div class="footer">
+            <p>Sticker Shuttle Pro - Premium Monthly Sticker Subscription</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  const result = await sendEmail(userProfile.email, template.subject, template.html);
+  return result;
+};
+
+// Send design locked email
+const sendProDesignLockedEmail = async (userProfile) => {
+  if (!RESEND_API_KEY) {
+    console.error('❌ RESEND_API_KEY not configured');
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  const template = {
+    subject: `🔒 Your Design is Locked for Production`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; padding: 25px; border-radius: 10px; text-align: center; margin-bottom: 25px; }
+          .info-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 5px; }
+          .button { background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1 style="margin: 0;">🔒 Design Locked</h1>
+          <p style="margin: 10px 0 0 0;">Now in Production</p>
+        </div>
+
+        <div>
+          <p>Hi ${userProfile.first_name || 'Pro Member'},</p>
+          <p>Your Pro membership design has been <strong>locked for production</strong>. We're now within the 5-day production window for your next monthly sticker order!</p>
+
+          <div class="info-box">
+            <h3 style="margin-top: 0;">📋 What's Happening Now</h3>
+            <ul style="margin-bottom: 0;">
+              <li>Your design is <strong>queued for printing</strong></li>
+              <li>Production begins in the next <strong>1-2 business days</strong></li>
+              <li>You'll receive <strong>FREE 2-Day Air shipping</strong> once printed</li>
+              <li>Your order will arrive within <strong>5-7 days</strong></li>
+            </ul>
+          </div>
+
+          <h3>🎨 About Design Changes</h3>
+          <p>Your design is now locked for this month's order to ensure timely delivery. Don't worry - you can swap your design for <strong>next month's order</strong> anytime after this one ships!</p>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://stickershuttle.com/account/dashboard" class="button">Track Your Order</a>
+          </div>
+
+          <p>Questions about your order? We're here to help at <a href="mailto:orbit@stickershuttle.com">orbit@stickershuttle.com</a></p>
+
+          <div class="footer">
+            <p>Sticker Shuttle Pro - Premium Monthly Sticker Subscription</p>
+            <p>Design locked at: ${new Date().toLocaleString()}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  const result = await sendEmail(userProfile.email, template.subject, template.html);
+  return result;
+};
+
+// Send payment failure email
+const sendProPaymentFailedEmail = async (userProfile, invoice) => {
+  if (!RESEND_API_KEY) {
+    console.error('❌ RESEND_API_KEY not configured');
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  const template = {
+    subject: `❌ Pro Membership Payment Failed - Update Payment Method`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 25px; border-radius: 10px; text-align: center; margin-bottom: 25px; }
+          .alert { background: #fee2e2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; border-radius: 5px; }
+          .button { background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1 style="margin: 0;">❌ Payment Failed</h1>
+          <p style="margin: 10px 0 0 0;">Update Payment Method Required</p>
+        </div>
+
+        <div>
+          <p>Hi ${userProfile.first_name || 'Pro Member'},</p>
+          <p>We attempted to process your Pro membership renewal payment, but it failed.</p>
+
+          <div class="alert">
+            <h3 style="margin-top: 0;">⚠️ Action Required</h3>
+            <p><strong>Amount Due:</strong> $${invoice ? (invoice.amount_due / 100).toFixed(2) : '39.00'}</p>
+            <p><strong>Next Attempt:</strong> We'll retry automatically in the next few days</p>
+            <p>Please update your payment method to keep your Pro benefits active.</p>
+          </div>
+
+          <h3>💡 What Happens If Payment Isn't Resolved?</h3>
+          <ul>
+            <li>Your Pro benefits will be <strong>paused</strong> after multiple failed attempts</li>
+            <li>Monthly sticker orders will <strong>stop being generated</strong></li>
+            <li>You'll lose access to Pro member discounts and priority shipping</li>
+          </ul>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://stickershuttle.com/account/dashboard" class="button">Update Payment Method</a>
+          </div>
+
+          <p>Need help? Contact us at <a href="mailto:orbit@stickershuttle.com">orbit@stickershuttle.com</a> - we're here to assist!</p>
+
+          <div class="footer">
+            <p>Sticker Shuttle Pro - Premium Monthly Sticker Subscription</p>
+            <p>Payment attempted: ${new Date().toLocaleString()}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  const result = await sendEmail(userProfile.email, template.subject, template.html);
+  return result;
+};
+
+// Send subscription cancellation email
+const sendProCancellationEmail = async (userProfile) => {
+  if (!RESEND_API_KEY) {
+    console.error('❌ RESEND_API_KEY not configured');
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  const template = {
+    subject: `😢 Sorry to See You Go - Pro Membership Canceled`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #64748b 0%, #475569 100%); color: white; padding: 25px; border-radius: 10px; text-align: center; margin-bottom: 25px; }
+          .info-box { background: #f1f5f9; border-left: 4px solid #64748b; padding: 15px; margin: 20px 0; border-radius: 5px; }
+          .button { background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1 style="margin: 0;">😢 Subscription Canceled</h1>
+          <p style="margin: 10px 0 0 0;">We're sad to see you go</p>
+        </div>
+
+        <div>
+          <p>Hi ${userProfile.first_name || 'valued customer'},</p>
+          <p>Your Sticker Shuttle Pro membership has been canceled. We're sorry to see you go!</p>
+
+          <div class="info-box">
+            <h3 style="margin-top: 0;">📋 What Happens Now</h3>
+            <ul style="margin-bottom: 0;">
+              <li>Your Pro benefits remain <strong>active until the end of your current billing period</strong></li>
+              <li>Any pending monthly sticker orders will <strong>still be fulfilled</strong></li>
+              <li>After the period ends, no new monthly orders will be generated</li>
+              <li>You can still place custom orders as a regular customer</li>
+            </ul>
+          </div>
+
+          <h3>💬 We'd Love Your Feedback</h3>
+          <p>Would you mind sharing why you canceled? Your feedback helps us improve Pro for everyone.</p>
+          <p>Simply reply to this email with your thoughts - we read every response!</p>
+
+          <h3>💙 Come Back Anytime</h3>
+          <p>If you change your mind, you're always welcome to rejoin Sticker Shuttle Pro. Your account and order history will remain intact.</p>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://stickershuttle.com/pro" class="button">Rejoin Pro</a>
+          </div>
+
+          <p>Thank you for being part of our Pro community. We hope to see you again soon!</p>
+
+          <div class="footer">
+            <p>Sticker Shuttle - Custom Stickers & Vinyl Printing</p>
+            <p>Canceled at: ${new Date().toLocaleString()}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  const result = await sendEmail(userProfile.email, template.subject, template.html);
+  return result;
+};
+
 // Export all functions for use in other modules
 module.exports = {
   sendEmail,
@@ -2358,5 +2863,13 @@ module.exports = {
   sendPickupReadyNotification,
   sendPickupCompletedNotification,
   getMarketplaceOrderEmailTemplate,
-  isMarketSpaceOrder
+  isMarketSpaceOrder,
+  // Pro Member Email Notifications
+  sendProMemberWelcomeEmail,
+  sendProMonthlyOrderCreatedEmail,
+  sendProDesignApprovedEmail,
+  sendProDesignLockWarningEmail,
+  sendProDesignLockedEmail,
+  sendProPaymentFailedEmail,
+  sendProCancellationEmail
 }; 

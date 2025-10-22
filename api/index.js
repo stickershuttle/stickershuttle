@@ -134,12 +134,17 @@ const { discountManager } = require('./discount-manager');
 const KlaviyoClient = require('./klaviyo-client');
 const klaviyoClient = new KlaviyoClient();
 const creditHandlers = require('./credit-handlers');
+const emailNotifications = require('./email-notifications');
+const ProOrderScheduler = require('./pro-order-scheduler');
 
 // Initialize enhanced tracking
 const trackingEnhancer = new EasyPostTrackingEnhancer(easyPostClient);
 
 // Initialize credit handlers with Supabase
 creditHandlers.initializeWithSupabase(supabaseClient);
+
+// Initialize Pro order scheduler
+const proOrderScheduler = new ProOrderScheduler(supabaseClient, emailNotifications);
 
 // Check service status  
 const services = {
@@ -948,6 +953,43 @@ app.post('/api/contact', express.json(), async (req, res) => {
   }
 });
 
+// Create Stripe Customer Portal session for Pro members
+app.post('/api/create-portal-session', express.json(), async (req, res) => {
+  try {
+    const { customerId, returnUrl } = req.body;
+
+    console.log('📋 Creating Stripe portal session for customer:', customerId);
+
+    if (!customerId) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Customer ID is required' 
+      });
+    }
+
+    const stripeClient = require('./stripe-client');
+    
+    // Create a portal session
+    const session = await stripeClient.stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: returnUrl || `${process.env.FRONTEND_URL || 'http://localhost:3000'}/account/dashboard?view=pro-membership`,
+    });
+
+    console.log('✅ Stripe portal session created:', session.id);
+
+    res.json({ 
+      success: true,
+      url: session.url 
+    });
+  } catch (error) {
+    console.error('❌ Error creating Stripe portal session:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to create portal session' 
+    });
+  }
+});
+
 // Add bulk sync all users to Resend audience endpoint (admin only)
 app.post('/api/bulk-sync-users-to-resend', express.json(), async (req, res) => {
   try {
@@ -988,6 +1030,74 @@ app.post('/api/bulk-sync-users-to-resend', express.json(), async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error in bulk-sync-users-to-resend endpoint:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Add Pro order scheduler manual trigger endpoint (admin only)
+app.post('/api/admin/run-pro-scheduler', express.json(), async (req, res) => {
+  try {
+    const { adminKey } = req.body;
+    
+    // Simple admin key check
+    if (adminKey !== process.env.ADMIN_SECRET_KEY) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    console.log('🔄 Manually triggering Pro order scheduler...');
+
+    // Run the scheduler
+    const result = await proOrderScheduler.runScheduledTasks();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Pro scheduler executed successfully',
+      data: result
+    });
+
+  } catch (error) {
+    console.error('❌ Error in run-pro-scheduler endpoint:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// Add Pro order scheduler manual trigger endpoint (admin only)
+app.post('/api/admin/run-pro-scheduler', express.json(), async (req, res) => {
+  try {
+    const { adminKey } = req.body;
+    
+    // Simple admin key check
+    if (adminKey !== process.env.ADMIN_SECRET_KEY) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    console.log('🔄 Manually triggering Pro order scheduler...');
+
+    // Run the scheduler
+    const result = await proOrderScheduler.runScheduledTasks();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Pro scheduler executed successfully',
+      data: result
+    });
+
+  } catch (error) {
+    console.error('❌ Error in run-pro-scheduler endpoint:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -1098,6 +1208,9 @@ const typeDefs = gql`
     getUnreadCreditNotifications(userId: ID!): [CreditNotification!]!
     validateCreditApplication(userId: ID!, orderSubtotal: Float!, requestedCredits: Float!): CreditValidation!
     getAllCreditTransactions(limit: Int, offset: Int): AllCreditTransactionsResult!
+    
+    # Pro Member Analytics
+    getProMemberAnalytics: ProAnalytics!
   }
 
   type Mutation {
@@ -1262,6 +1375,9 @@ const typeDefs = gql`
     updateProMemberDesign(userId: ID!, designFile: String!): ProDesignUpdateResult!
     approveProMemberDesign(userId: ID!): ProDesignUpdateResult!
     lockProMemberDesign(userId: ID!): ProDesignUpdateResult!
+    
+    # Pro member shipping management mutations
+    updateProMemberShippingAddress(userId: ID!, shippingAddress: AddressInput!): UserProfileResult!
   }
 
   type Customer {
@@ -1366,7 +1482,9 @@ const typeDefs = gql`
     isProMember: Boolean
     proStatus: String
     proPlan: String
-    proSubscriptionId: String
+    proStripeSubscriptionId: String
+    proStripeCustomerId: String
+    proSubscriptionStartDate: String
     proCurrentPeriodStart: String
     proCurrentPeriodEnd: String
     proDesignApproved: Boolean
@@ -1374,6 +1492,10 @@ const typeDefs = gql`
     proDesignApprovedAt: String
     proDesignLocked: Boolean
     proDesignLockedAt: String
+    proDefaultShippingAddress: JSON
+    proShippingAddressUpdatedAt: String
+    proPaymentFailed: Boolean
+    proLastPaymentFailure: String
     createdAt: String!
     updatedAt: String!
   }
@@ -2745,6 +2867,26 @@ const typeDefs = gql`
     message: String
     userProfile: UserProfile
     error: String
+  }
+  
+  type ProAnalytics {
+    totalProMembers: Int!
+    activeProMembers: Int!
+    monthlySignups: Int!
+    annualSignups: Int!
+    monthlyPlanMembers: Int!
+    annualPlanMembers: Int!
+    monthlyRevenue: Float!
+    annualRevenue: Float!
+    annualYRR: Float!
+    monthlyMRR: Float!
+    annualMRR: Float!
+    churnRate: Float!
+    ordersGenerated: Int!
+    pendingDesignApprovals: Int!
+    lockedDesigns: Int!
+    paymentFailures: Int!
+    averageOrdersPerMember: Float!
   }
 `;
 
@@ -4572,7 +4714,9 @@ const resolvers = {
           isProMember: profile.is_pro_member || false,
           proStatus: profile.pro_status,
           proPlan: profile.pro_plan,
-          proSubscriptionId: profile.pro_subscription_id,
+          proStripeSubscriptionId: profile.pro_stripe_subscription_id,
+          proStripeCustomerId: profile.pro_stripe_customer_id,
+          proSubscriptionStartDate: profile.pro_subscription_start_date,
           proCurrentPeriodStart: profile.pro_current_period_start,
           proCurrentPeriodEnd: profile.pro_current_period_end,
           proDesignApproved: profile.pro_design_approved || false,
@@ -4589,9 +4733,13 @@ const resolvers = {
       }
     },
 
-    getAllProMembers: async () => {
+    getAllProMembers: async (_, args, context) => {
       try {
         console.log('💎 Fetching all Pro members');
+        
+        // Check admin authentication
+        const user = context.user;
+        requireAdminAuth(user);
         
         if (!supabaseClient.isReady()) {
           throw new Error('Profile service is currently unavailable');
@@ -4642,14 +4790,134 @@ const resolvers = {
           isProMember: profile.is_pro_member || false,
           proStatus: profile.pro_status,
           proPlan: profile.pro_plan,
-          proSubscriptionId: profile.pro_subscription_id,
+          proStripeSubscriptionId: profile.pro_stripe_subscription_id,
+          proStripeCustomerId: profile.pro_stripe_customer_id,
+          proSubscriptionStartDate: profile.pro_subscription_start_date,
           proCurrentPeriodStart: profile.pro_current_period_start,
           proCurrentPeriodEnd: profile.pro_current_period_end,
+          proDesignApproved: profile.pro_design_approved || false,
+          proCurrentDesignFile: profile.pro_current_design_file || null,
+          proDesignApprovedAt: profile.pro_design_approved_at || null,
+          proDesignLocked: profile.pro_design_locked || false,
+          proDesignLockedAt: profile.pro_design_locked_at || null,
+          proDefaultShippingAddress: profile.pro_default_shipping_address || null,
+          proShippingAddressUpdatedAt: profile.pro_shipping_address_updated_at || null,
+          proPaymentFailed: profile.pro_payment_failed || false,
+          proLastPaymentFailure: profile.pro_last_payment_failure || null,
           createdAt: profile.created_at,
           updatedAt: profile.updated_at
         }));
       } catch (error) {
         console.error('❌ Error in getAllProMembers:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    // Get Pro Member Analytics
+    getProMemberAnalytics: async (_, args, context) => {
+      try {
+        console.log('📊 Fetching Pro member analytics');
+        
+        // Check admin authentication
+        const user = context.user;
+        requireAdminAuth(user);
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('Analytics service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get all Pro members
+        const { data: allProMembers, error: membersError } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('is_pro_member', true);
+
+        if (membersError) {
+          throw new Error(`Failed to fetch Pro members: ${membersError.message}`);
+        }
+
+        const totalProMembers = allProMembers?.length || 0;
+        const activeProMembers = allProMembers?.filter(m => m.pro_status === 'active').length || 0;
+        
+        // Count signups this month (based on subscription start date)
+        const currentMonth = new Date();
+        currentMonth.setDate(1);
+        currentMonth.setHours(0, 0, 0, 0);
+        
+        console.log('📊 Pro Analytics Debug:');
+        console.log('Current month start:', currentMonth.toISOString());
+        console.log('Total Pro members:', allProMembers?.length || 0);
+        
+        const monthlySignups = allProMembers?.filter(m => {
+          if (!m.pro_subscription_start_date) {
+            console.log(`⚠️ Member ${m.email} has no pro_subscription_start_date`);
+            return false;
+          }
+          const signupDate = new Date(m.pro_subscription_start_date);
+          const isThisMonth = signupDate >= currentMonth;
+          console.log(`📅 Member ${m.email}: signup=${signupDate.toISOString()}, thisMonth=${isThisMonth}`);
+          return isThisMonth;
+        }).length || 0;
+        
+        console.log('Monthly signups calculated:', monthlySignups);
+        
+        // Count total monthly vs annual plan members (all time)
+        const monthlyPlanMembers = allProMembers?.filter(m => m.pro_plan === 'monthly').length || 0;
+        const annualPlanMembers = allProMembers?.filter(m => m.pro_plan === 'annual').length || 0;
+        
+        // Count active members by plan
+        const monthlyMembers = allProMembers?.filter(m => m.pro_plan === 'monthly' && m.pro_status === 'active').length || 0;
+        const annualMembers = allProMembers?.filter(m => m.pro_plan === 'annual' && m.pro_status === 'active').length || 0;
+        
+        const pendingDesignApprovals = allProMembers?.filter(m => m.pro_current_design_file && !m.pro_design_approved).length || 0;
+        const lockedDesigns = allProMembers?.filter(m => m.pro_design_locked).length || 0;
+        const paymentFailures = allProMembers?.filter(m => m.pro_payment_failed).length || 0;
+
+        // Calculate revenue
+        const monthlyMRR = monthlyMembers * 39; // $39/month
+        const annualMRR = (annualMembers * 347) / 12; // $347/year = ~$28.92/month
+        const totalMRR = monthlyMRR + annualMRR;
+        const monthlyRevenue = monthlyMembers * 39;
+        const annualRevenue = annualMembers * 347;
+        const annualYRR = annualMembers * 347; // Annual Yearly Recurring Revenue
+
+        // Get orders generated (Pro monthly stickers)
+        const { data: proOrders, error: ordersError } = await client
+          .from('orders_main')
+          .select('id')
+          .contains('order_tags', ['pro-monthly-stickers']);
+
+        const ordersGenerated = proOrders?.length || 0;
+        const averageOrdersPerMember = totalProMembers > 0 ? ordersGenerated / totalProMembers : 0;
+
+        // Calculate churn rate (canceled members / total members)
+        const canceledMembers = allProMembers?.filter(m => m.pro_status === 'canceled' || m.pro_status === 'past_due').length || 0;
+        const churnRate = totalProMembers > 0 ? (canceledMembers / totalProMembers) * 100 : 0;
+
+        return {
+          totalProMembers,
+          activeProMembers,
+          monthlySignups,
+          annualSignups: annualPlanMembers,
+          monthlyPlanMembers,
+          annualPlanMembers,
+          monthlyRevenue,
+          annualRevenue,
+          annualYRR,
+          monthlyMRR,
+          annualMRR,
+          churnRate,
+          ordersGenerated,
+          pendingDesignApprovals,
+          lockedDesigns,
+          paymentFailures,
+          averageOrdersPerMember
+        };
+
+      } catch (error) {
+        console.error('❌ Error in getProMemberAnalytics:', error);
         throw new Error(error.message);
       }
     },
@@ -12867,8 +13135,12 @@ const resolvers = {
                 continue;
               }
 
-              // Generate order number
-              const orderNumber = `PRO-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+              // Generate SS-XXXX format order number
+              const orderNumber = await generateOrderNumber(client);
+
+              // Get user's current design file and shipping address
+              const designFiles = member.pro_current_design_file ? [member.pro_current_design_file] : [];
+              const shippingAddress = member.pro_default_shipping_address || {};
 
               // Create the Pro member monthly order
               const orderData = {
@@ -12885,10 +13157,10 @@ const resolvers = {
                 customer_last_name: member.last_name || '',
                 customer_email: member.email || '',
                 customer_phone: member.phone_number || '',
-                shipping_address: {}, // Will be updated when user provides address
+                shipping_address: shippingAddress,
                 billing_address: {},
                 order_tags: ['pro-monthly-stickers', 'pro-member', 'monthly-benefit'],
-                order_note: `Monthly Pro member sticker benefit - 100 matte vinyl stickers. Scheduled for ${nextPeriodStart.toLocaleDateString()}.`,
+                order_note: `Monthly Pro member sticker benefit - 100 custom matte vinyl stickers (3"). Scheduled for ${nextPeriodStart.toLocaleDateString()}.${designFiles.length === 0 ? ' Design pending upload.' : ''}${!shippingAddress.address1 ? ' Shipping address pending.' : ''}`,
                 order_created_at: new Date().toISOString(),
                 order_updated_at: new Date().toISOString()
               };
@@ -12896,7 +13168,7 @@ const resolvers = {
               const order = await supabaseClient.createCustomerOrder(orderData);
               
               if (order) {
-                // Create the order item for 100 matte vinyl stickers
+                // Create the order item for 100 custom matte vinyl stickers
                 const orderItem = {
                   customer_order_id: order.id,
                   product_id: 'pro-monthly-stickers',
@@ -12907,15 +13179,16 @@ const resolvers = {
                   unit_price: 0.00,
                   total_price: 0.00,
                   calculator_selections: {
-                    selectedSize: '3" x 3"',
+                    selectedShape: 'Custom',
+                    selectedSize: '3"',
                     selectedQuantity: '100',
                     selectedMaterial: 'Matte',
                     selectedWhiteOption: 'White ink',
                     isProMember: true,
                     proMonthlyBenefit: true
                   },
-                  custom_files: [], // User will upload design later
-                  customer_notes: 'Pro member monthly benefit - 100 matte vinyl stickers',
+                  custom_files: designFiles,
+                  customer_notes: `Pro member monthly benefit - 100 custom matte vinyl stickers (3")${designFiles.length > 0 ? ' (Design attached)' : ' (Design pending upload)'}`,
                   fulfillment_status: 'unfulfilled',
                   created_at: new Date().toISOString(),
                   updated_at: new Date().toISOString()
@@ -13193,6 +13466,15 @@ const resolvers = {
 
         console.log(`✅ Successfully approved Pro design for user ${userId}`);
         
+        // Send design approved email
+        try {
+          if (emailNotifications.sendProDesignApprovedEmail) {
+            await emailNotifications.sendProDesignApprovedEmail(updatedProfile);
+          }
+        } catch (emailError) {
+          console.error('❌ Error sending design approved email:', emailError);
+        }
+        
         return {
           success: true,
           message: 'Design approved successfully',
@@ -13288,6 +13570,94 @@ const resolvers = {
           message: 'Failed to lock design',
           userProfile: null,
           error: error.message
+        };
+      }
+    },
+
+    // Update Pro member shipping address
+    updateProMemberShippingAddress: async (_, { userId, shippingAddress }, context) => {
+      try {
+        console.log(`📍 Updating Pro member shipping address for user: ${userId}`);
+        
+        // Check authentication (user can update their own address, or admin can update any)
+        const user = context.user;
+        if (!user || (user.id !== userId && !isAdminUser(user))) {
+          throw new Error('Unauthorized to update shipping address');
+        }
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Update the default shipping address
+        const { data: updatedProfile, error: updateError } = await client
+          .from('user_profiles')
+          .update({
+            pro_default_shipping_address: shippingAddress,
+            pro_shipping_address_updated_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', userId)
+          .eq('is_pro_member', true)
+          .select('*')
+          .single();
+
+        if (updateError) {
+          console.error(`❌ Error updating shipping address:`, updateError);
+          throw new Error(`Failed to update shipping address: ${updateError.message}`);
+        }
+
+        console.log(`✅ Successfully updated shipping address for user ${userId}`);
+        
+        // Update any unfulfilled Pro orders with the new address
+        const { data: unfulfilledOrders, error: ordersError } = await client
+          .from('orders_main')
+          .select('id, order_number')
+          .eq('user_id', userId)
+          .contains('order_tags', ['pro-monthly-stickers'])
+          .eq('fulfillment_status', 'unfulfilled');
+
+        if (!ordersError && unfulfilledOrders && unfulfilledOrders.length > 0) {
+          console.log(`📦 Updating ${unfulfilledOrders.length} unfulfilled Pro orders with new address`);
+          
+          for (const order of unfulfilledOrders) {
+            await client
+              .from('orders_main')
+              .update({
+                shipping_address: shippingAddress,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', order.id);
+          }
+          
+          console.log(`✅ Updated ${unfulfilledOrders.length} Pro orders with new shipping address`);
+        }
+        
+        return {
+          success: true,
+          message: `Shipping address updated successfully${unfulfilledOrders?.length > 0 ? ` and applied to ${unfulfilledOrders.length} pending orders` : ''}`,
+          userProfile: {
+            id: updatedProfile.id,
+            userId: updatedProfile.user_id,
+            firstName: updatedProfile.first_name,
+            lastName: updatedProfile.last_name,
+            email: updatedProfile.email,
+            isProMember: updatedProfile.is_pro_member,
+            proDefaultShippingAddress: updatedProfile.pro_default_shipping_address,
+            proShippingAddressUpdatedAt: updatedProfile.pro_shipping_address_updated_at,
+            createdAt: updatedProfile.created_at,
+            updatedAt: updatedProfile.updated_at
+          }
+        };
+
+      } catch (error) {
+        console.error('❌ Error in updateProMemberShippingAddress:', error);
+        return {
+          success: false,
+          message: 'Failed to update shipping address',
+          userProfile: null
         };
       }
     }
@@ -13454,6 +13824,14 @@ async function startServer() {
             } catch (error) {
               console.error('Auth verification error:', error);
             }
+          }
+          
+          // Passive Pro order scheduler check (runs max once per hour)
+          if (proOrderScheduler.shouldRun()) {
+            // Run scheduler in background (don't block the request)
+            proOrderScheduler.runScheduledTasks().catch(err => {
+              console.error('❌ Pro scheduler error:', err);
+            });
           }
           
           return {

@@ -92,6 +92,11 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
   };
 
   // Helper function to check if an order contains deal items
+  const isProMemberOrder = (order: any) => {
+    return order.orderTags?.includes('pro-monthly-stickers') || 
+           order.orderTags?.includes('pro-member');
+  };
+
   const isOrderFromDeal = (order: any) => {
     // First check: Search the entire order JSON for deal indicators
     const orderStr = JSON.stringify(order).toLowerCase();
@@ -259,28 +264,30 @@ const OrderDetailsView: React.FC<OrderDetailsViewProps> = ({
           >
             {markingReadyForPickup ? '🔄 Processing...' : '🏪 Ready for Pickup'}
           </button>
-          <button
-            onClick={() => handleReorder(selectedOrderForInvoice.id)}
-            disabled={isOrderFromDeal(selectedOrderForInvoice)}
-            className="px-4 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              background: isOrderFromDeal(selectedOrderForInvoice) 
-                ? 'rgba(107, 114, 128, 0.5)'
-                : 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-              backdropFilter: 'blur(25px) saturate(180%)',
-              border: isOrderFromDeal(selectedOrderForInvoice) 
-                ? '1px solid rgba(107, 114, 128, 0.3)'
-                : '1px solid rgba(59, 130, 246, 0.4)',
-              boxShadow: isOrderFromDeal(selectedOrderForInvoice) 
-                ? 'none'
-                : 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
-              color: isOrderFromDeal(selectedOrderForInvoice) 
-                ? 'rgba(156, 163, 175, 0.8)'
-                : 'white'
-            }}
-          >
-            🔄 {isOrderFromDeal(selectedOrderForInvoice) ? 'Reorder (Disabled on Deals)' : 'Re-order'}
-          </button>
+          {!isProMemberOrder(selectedOrderForInvoice) && (
+            <button
+              onClick={() => handleReorder(selectedOrderForInvoice.id)}
+              disabled={isOrderFromDeal(selectedOrderForInvoice)}
+              className="px-4 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: isOrderFromDeal(selectedOrderForInvoice) 
+                  ? 'rgba(107, 114, 128, 0.5)'
+                  : 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                backdropFilter: 'blur(25px) saturate(180%)',
+                border: isOrderFromDeal(selectedOrderForInvoice) 
+                  ? '1px solid rgba(107, 114, 128, 0.3)'
+                  : '1px solid rgba(59, 130, 246, 0.4)',
+                boxShadow: isOrderFromDeal(selectedOrderForInvoice) 
+                  ? 'none'
+                  : 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                color: isOrderFromDeal(selectedOrderForInvoice) 
+                  ? 'rgba(156, 163, 175, 0.8)'
+                  : 'white'
+              }}
+            >
+              🔄 {isOrderFromDeal(selectedOrderForInvoice) ? 'Reorder (Disabled on Deals)' : 'Re-order'}
+            </button>
+          )}
           <button
             onClick={() => generatePrintPDF()}
             className="px-4 py-2 rounded-lg font-medium transition-all duration-200"

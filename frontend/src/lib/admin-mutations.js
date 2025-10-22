@@ -189,3 +189,60 @@ export const CREATE_ADMIN_ORDER_FROM_SHARED_CART = gql`
     }
   }
 `;
+
+// Get Pro member analytics (admin only)
+export const GET_PRO_MEMBER_ANALYTICS = gql`
+  query GetProMemberAnalytics {
+    getProMemberAnalytics {
+      totalProMembers
+      activeProMembers
+      monthlySignups
+      annualSignups
+      monthlyPlanMembers
+      annualPlanMembers
+      monthlyRevenue
+      annualRevenue
+      annualYRR
+      monthlyMRR
+      annualMRR
+      churnRate
+      ordersGenerated
+      pendingDesignApprovals
+      lockedDesigns
+      paymentFailures
+      averageOrdersPerMember
+    }
+  }
+`;
+
+// Get all Pro members (admin only)
+export const GET_ALL_PRO_MEMBERS = gql`
+  query GetAllProMembers {
+    getAllProMembers {
+      id
+      userId
+      firstName
+      lastName
+      email
+      isProMember
+      proStatus
+      proPlan
+      proStripeSubscriptionId
+      proStripeCustomerId
+      proSubscriptionStartDate
+      proCurrentPeriodStart
+      proCurrentPeriodEnd
+      proDesignApproved
+      proCurrentDesignFile
+      proDesignApprovedAt
+      proDesignLocked
+      proDesignLockedAt
+      proDefaultShippingAddress
+      proShippingAddressUpdatedAt
+      proPaymentFailed
+      proLastPaymentFailure
+      createdAt
+      updatedAt
+    }
+  }
+`;

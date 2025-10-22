@@ -63,11 +63,22 @@ export const GET_USER_PROFILE = gql`
       taxExemptUpdatedAt
       taxExemptUpdatedBy
       isProMember
+      proStatus
+      proPlan
+      proStripeSubscriptionId
+      proStripeCustomerId
+      proSubscriptionStartDate
+      proCurrentPeriodStart
+      proCurrentPeriodEnd
       proDesignApproved
       proCurrentDesignFile
       proDesignApprovedAt
       proDesignLocked
       proDesignLockedAt
+      proDefaultShippingAddress
+      proShippingAddressUpdatedAt
+      proPaymentFailed
+      proLastPaymentFailure
       createdAt
       updatedAt
     }
@@ -293,6 +304,27 @@ export const ADMIN_CHANGE_USER_PASSWORD = gql`
       success
       message
       error
+    }
+  }
+`;
+
+// Update Pro member shipping address
+export const UPDATE_PRO_SHIPPING_ADDRESS = gql`
+  mutation UpdateProMemberShippingAddress($userId: ID!, $shippingAddress: AddressInput!) {
+    updateProMemberShippingAddress(userId: $userId, shippingAddress: $shippingAddress) {
+      success
+      message
+      userProfile {
+        id
+        userId
+        firstName
+        lastName
+        email
+        isProMember
+        proDefaultShippingAddress
+        proShippingAddressUpdatedAt
+        updatedAt
+      }
     }
   }
 `; 

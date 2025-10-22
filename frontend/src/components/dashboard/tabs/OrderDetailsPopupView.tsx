@@ -60,6 +60,11 @@ const OrderDetailsPopupView: React.FC<OrderDetailsPopupViewProps> = ({
   const order = selectedOrderForDetails;
 
   // Helper function to check if an order contains deal items
+  const isProMemberOrder = (order: any) => {
+    return order.orderTags?.includes('pro-monthly-stickers') || 
+           order.orderTags?.includes('pro-member');
+  };
+
   const isOrderFromDeal = (order: any) => {
     // First check: Search the entire order JSON for deal indicators
     const orderStr = JSON.stringify(order).toLowerCase();
@@ -237,30 +242,32 @@ const OrderDetailsPopupView: React.FC<OrderDetailsPopupViewProps> = ({
 
           {/* Actions */}
           <div className="flex flex-wrap gap-3 pt-4 border-t border-white/10">
-            <div className="flex flex-col">
-              <button
-                onClick={() => handleReorder(order.id)}
-                disabled={isOrderFromDeal(order)}
-                className="px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  background: isOrderFromDeal(order) 
-                    ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(107, 114, 128, 0.25) 50%, rgba(107, 114, 128, 0.1) 100%)'
-                    : 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
-                  backdropFilter: 'blur(25px) saturate(180%)',
-                  border: isOrderFromDeal(order) 
-                    ? '1px solid rgba(107, 114, 128, 0.4)'
-                    : '1px solid rgba(245, 158, 11, 0.4)',
-                  boxShadow: isOrderFromDeal(order) 
-                    ? 'rgba(107, 114, 128, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                    : 'rgba(245, 158, 11, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                }}
-              >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-                </svg>
-                {isOrderFromDeal(order) ? 'Reorder (Disabled on Deals)' : 'Reorder'}
-              </button>
-            </div>
+            {!isProMemberOrder(order) && (
+              <div className="flex flex-col">
+                <button
+                  onClick={() => handleReorder(order.id)}
+                  disabled={isOrderFromDeal(order)}
+                  className="px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    background: isOrderFromDeal(order) 
+                      ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(107, 114, 128, 0.25) 50%, rgba(107, 114, 128, 0.1) 100%)'
+                      : 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: isOrderFromDeal(order) 
+                      ? '1px solid rgba(107, 114, 128, 0.4)'
+                      : '1px solid rgba(245, 158, 11, 0.4)',
+                    boxShadow: isOrderFromDeal(order) 
+                      ? 'rgba(107, 114, 128, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                      : 'rgba(245, 158, 11, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                  }}
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                  </svg>
+                  {isOrderFromDeal(order) ? 'Reorder (Disabled on Deals)' : 'Reorder'}
+                </button>
+              </div>
+            )}
 
             {isOrderShippedWithTracking(order) && (
               <button

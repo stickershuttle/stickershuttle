@@ -2198,6 +2198,32 @@ async function handleSubscriptionCreated(subscription) {
     const userId = customer.metadata?.userId;
     const plan = subscription.metadata?.plan || (subscription.items.data[0].price.recurring.interval === 'month' ? 'monthly' : 'annual');
     
+    // Get the checkout session to extract shipping address
+    let shippingAddress = null;
+    try {
+      const checkoutSessionId = subscription.metadata?.checkout_session_id || customer.metadata?.checkoutSessionId;
+      if (checkoutSessionId) {
+        const session = await stripeClient.stripe.checkout.sessions.retrieve(checkoutSessionId);
+        if (session.shipping_details?.address) {
+          const addr = session.shipping_details.address;
+          shippingAddress = {
+            first_name: session.shipping_details.name?.split(' ')[0] || customer.name?.split(' ')[0] || '',
+            last_name: session.shipping_details.name?.split(' ').slice(1).join(' ') || customer.name?.split(' ').slice(1).join(' ') || '',
+            address1: addr.line1 || '',
+            address2: addr.line2 || '',
+            city: addr.city || '',
+            state: addr.state || '',
+            zip: addr.postal_code || '',
+            country: addr.country || 'US',
+            phone: session.customer_details?.phone || customer.phone || ''
+          };
+          console.log('📍 Captured shipping address from Stripe checkout:', shippingAddress);
+        }
+      }
+    } catch (addressError) {
+      console.error('❌ Error extracting shipping address from checkout:', addressError);
+    }
+    
     console.log('📋 Subscription details:', {
       subscriptionId: subscription.id,
       customerId,
@@ -2205,7 +2231,8 @@ async function handleSubscriptionCreated(subscription) {
       plan,
       status: subscription.status,
       currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000)
+      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      hasShippingAddress: !!shippingAddress
     });
 
     // Create or update user profile with Pro status
@@ -2213,20 +2240,29 @@ async function handleSubscriptionCreated(subscription) {
       // Get uploaded design file from customer metadata
       const uploadedDesignFile = customer.metadata?.uploadedFileUrl;
       
+      const profileUpdate = {
+        user_id: userId,
+        is_pro_member: true,
+        pro_subscription_id: subscription.id,
+        pro_plan: plan,
+        pro_status: subscription.status,
+        pro_subscription_start_date: new Date(subscription.current_period_start * 1000).toISOString(),
+        pro_current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+        pro_current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+        pro_current_design_file: uploadedDesignFile || null,
+        pro_design_approved: uploadedDesignFile ? false : null, // If file uploaded, needs approval
+        updated_at: new Date().toISOString()
+      };
+      
+      // Add shipping address if captured
+      if (shippingAddress) {
+        profileUpdate.pro_default_shipping_address = shippingAddress;
+        profileUpdate.pro_shipping_address_updated_at = new Date().toISOString();
+      }
+      
       const { error: profileError } = await client
         .from('user_profiles')
-        .upsert({
-          user_id: userId,
-          is_pro_member: true,
-          pro_subscription_id: subscription.id,
-          pro_plan: plan,
-          pro_status: subscription.status,
-          pro_current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-          pro_current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-          pro_current_design_file: uploadedDesignFile || null,
-          pro_design_approved: uploadedDesignFile ? false : null, // If file uploaded, needs approval
-          updated_at: new Date().toISOString()
-        }, {
+        .upsert(profileUpdate, {
           onConflict: 'user_id'
         });
 
@@ -2256,6 +2292,9 @@ async function handleSubscriptionCreated(subscription) {
           // Generate SS-XXXX format order number
           const orderNumber = await generateOrderNumber(client);
           
+          // Use captured shipping address or fall back to profile default
+          const orderShippingAddress = shippingAddress || userProfile.pro_default_shipping_address || {};
+          
           // Create the Pro member signup order
           const orderData = {
             user_id: userId,
@@ -2271,10 +2310,10 @@ async function handleSubscriptionCreated(subscription) {
             customer_last_name: userProfile.last_name || '',
             customer_email: customer.email || userProfile.email || '',
             customer_phone: userProfile.phone_number || '',
-            shipping_address: {}, // Will be updated when user provides address
+            shipping_address: orderShippingAddress,
             billing_address: {},
             order_tags: ['pro-monthly-stickers', 'pro-member', 'monthly-benefit', 'signup-order'],
-            order_note: `Initial Pro member signup order - 100 matte vinyl stickers. Plan: ${plan}`,
+            order_note: `Initial Pro member signup order - 100 custom matte vinyl stickers (3"). Plan: ${plan}${!orderShippingAddress.address1 ? ' Shipping address pending.' : ''}`,
             order_created_at: new Date().toISOString(),
             order_updated_at: new Date().toISOString()
           };
@@ -2317,6 +2356,23 @@ async function handleSubscriptionCreated(subscription) {
               console.error(`❌ Error creating signup order item:`, itemError);
             } else {
               console.log(`✅ Successfully created Pro signup order ${orderNumber}`);
+              
+              // Initialize Pro order generation tracking
+              try {
+                const ProOrderScheduler = require('./pro-order-scheduler');
+                const emailNotifications = require('./email-notifications');
+                const scheduler = new ProOrderScheduler(supabase, emailNotifications);
+                
+                const subscriptionStartDate = new Date(subscription.current_period_start * 1000);
+                await scheduler.initializeTracking(userId, subscriptionStartDate);
+                
+                // Send welcome email to Pro member
+                if (emailNotifications.sendProMemberWelcomeEmail) {
+                  await emailNotifications.sendProMemberWelcomeEmail(order, userProfile);
+                }
+              } catch (trackingError) {
+                console.error('❌ Error initializing Pro tracking:', trackingError);
+              }
             }
           }
         }
@@ -2371,6 +2427,38 @@ async function handleSubscriptionUpdated(subscription) {
         console.error('❌ Error updating subscription status:', profileError);
       } else {
         console.log('✅ Subscription status updated');
+        
+        // Handle paused or past_due subscriptions
+        if (subscription.status === 'past_due' || subscription.status === 'paused') {
+          console.log(`⏸️ Subscription ${subscription.status} - pausing order generation`);
+          
+          try {
+            await client
+              .from('pro_order_generation_log')
+              .update({
+                status: 'paused',
+                updated_at: new Date().toISOString()
+              })
+              .eq('user_id', userId);
+            console.log('✅ Paused Pro order generation due to subscription status');
+          } catch (trackingError) {
+            console.error('❌ Error pausing Pro tracking:', trackingError);
+          }
+        } else if (subscription.status === 'active') {
+          // Resume order generation if subscription becomes active again
+          try {
+            await client
+              .from('pro_order_generation_log')
+              .update({
+                status: 'active',
+                updated_at: new Date().toISOString()
+              })
+              .eq('user_id', userId);
+            console.log('✅ Resumed Pro order generation - subscription active');
+          } catch (trackingError) {
+            console.error('❌ Error resuming Pro tracking:', trackingError);
+          }
+        }
       }
     }
 
@@ -2394,7 +2482,7 @@ async function handleSubscriptionDeleted(subscription) {
     const userId = customer.metadata?.userId;
 
     if (userId && userId !== 'guest') {
-      const { error: profileError } = await client
+      const { data: userProfile, error: profileError } = await client
         .from('user_profiles')
         .update({
           is_pro_member: false,
@@ -2402,16 +2490,42 @@ async function handleSubscriptionDeleted(subscription) {
           pro_canceled_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
-        .eq('pro_subscription_id', subscription.id);
+        .eq('pro_subscription_id', subscription.id)
+        .select('*')
+        .single();
 
       if (profileError) {
         console.error('❌ Error updating canceled subscription:', profileError);
       } else {
         console.log('✅ Pro membership canceled');
+        
+        // Send cancellation email to customer
+        try {
+          const emailNotifications = require('./email-notifications');
+          if (emailNotifications.sendProCancellationEmail && userProfile) {
+            await emailNotifications.sendProCancellationEmail(userProfile);
+          }
+        } catch (emailError) {
+          console.error('❌ Error sending cancellation email:', emailError);
+        }
+        
+        // Pause order generation tracking
+        try {
+          await client
+            .from('pro_order_generation_log')
+            .update({
+              status: 'canceled',
+              updated_at: new Date().toISOString()
+            })
+            .eq('user_id', userId);
+          console.log('✅ Paused Pro order generation tracking');
+        } catch (trackingError) {
+          console.error('❌ Error pausing Pro tracking:', trackingError);
+        }
       }
     }
 
-    // Send cancellation notification
+    // Send cancellation notification to Discord
     await notificationHelpers.sendDiscordNotification({
       title: '😢 Pro Member Canceled',
       description: `Pro subscription canceled: ${subscription.id}`,
@@ -2533,10 +2647,29 @@ async function handleInvoicePaymentFailed(invoice) {
           console.error('❌ Error updating payment failure status:', profileError);
         } else {
           console.log('✅ Payment failure status updated');
+          
+          // Get user profile for email
+          const { data: userProfile } = await client
+            .from('user_profiles')
+            .select('*')
+            .eq('user_id', userId)
+            .single();
+          
+          // Send payment failure email to customer
+          if (userProfile) {
+            try {
+              const emailNotifications = require('./email-notifications');
+              if (emailNotifications.sendProPaymentFailedEmail) {
+                await emailNotifications.sendProPaymentFailedEmail(userProfile, invoice);
+              }
+            } catch (emailError) {
+              console.error('❌ Error sending payment failure email:', emailError);
+            }
+          }
         }
       }
 
-      // Send payment failure notification
+      // Send payment failure notification to Discord
       await notificationHelpers.sendDiscordNotification({
         title: '⚠️ Pro Payment Failed',
         description: `Pro subscription payment failed`,

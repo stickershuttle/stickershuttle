@@ -447,9 +447,32 @@ class StripeClient {
       // Subscriptions can collect addresses but can't have shipping_options
       if (!isSubscription) {
         sessionCreateData.shipping_options = shippingOptions;
+      } else {
+        // For subscriptions, add metadata to subscription so we can retrieve it later
+        sessionCreateData.subscription_data = {
+          metadata: {
+            plan: orderData.metadata?.plan || subscriptionInterval,
+            checkout_session_id: '{CHECKOUT_SESSION_ID}' // Stripe will replace this
+          }
+        };
       }
 
       const session = await this.stripe.checkout.sessions.create(sessionCreateData);
+      
+      // Update subscription metadata with actual session ID for Pro subscriptions
+      if (isSubscription && session.subscription) {
+        try {
+          await this.stripe.subscriptions.update(session.subscription, {
+            metadata: {
+              ...sessionCreateData.subscription_data?.metadata,
+              checkout_session_id: session.id
+            }
+          });
+          console.log('✅ Updated subscription with checkout session ID');
+        } catch (metadataError) {
+          console.error('❌ Error updating subscription metadata:', metadataError);
+        }
+      }
 
       return {
         success: true,

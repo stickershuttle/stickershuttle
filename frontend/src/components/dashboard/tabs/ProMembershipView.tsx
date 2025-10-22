@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { uploadToCloudinary, validateFile, CloudinaryUploadResult, UploadProgress } from '@/utils/cloudinary';
-import { useMutation } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import { gql } from '@apollo/client';
 import AIFileImage from '../../AIFileImage';
+import { GET_USER_ORDERS } from '@/lib/order-mutations';
 
 // GraphQL mutations for Pro design management
 const UPDATE_PRO_MEMBER_DESIGN = gql`
@@ -28,6 +29,12 @@ interface ProMembershipViewProps {
 }
 
 export default function ProMembershipView({ profile, user }: ProMembershipViewProps) {
+  // Fetch user's orders to display Pro order history
+  const { data: ordersData } = useQuery(GET_USER_ORDERS, {
+    variables: { userId: user?.id },
+    skip: !user?.id,
+  });
+
   // Upload state
   const [uploadedFile, setUploadedFile] = useState<CloudinaryUploadResult | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -37,8 +44,56 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
   const [swapSuccess, setSwapSuccess] = useState<string | null>(null);
   const [swapError, setSwapError] = useState<string | null>(null);
 
+  // Countdown state for next order
+  const [daysUntilNextOrder, setDaysUntilNextOrder] = useState<number | null>(null);
+  const [daysUntilLock, setDaysUntilLock] = useState<number | null>(null);
+
+  // Subscription management state
+  const [isLoadingPortal, setIsLoadingPortal] = useState(false);
+
   // GraphQL mutations
   const [updateProMemberDesign] = useMutation(UPDATE_PRO_MEMBER_DESIGN);
+
+  // Calculate countdown timers
+  useEffect(() => {
+    if (!profile?.pro_current_period_end) return;
+
+    const calculateCountdown = () => {
+      const now = new Date();
+      const periodEnd = new Date(profile.pro_current_period_end);
+      
+      // Next order is 5 days before period end (25 days into 30-day cycle)
+      const nextOrderDate = new Date(periodEnd);
+      nextOrderDate.setDate(periodEnd.getDate() - 5);
+      
+      const daysUntilOrder = Math.ceil((nextOrderDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      setDaysUntilNextOrder(daysUntilOrder > 0 ? daysUntilOrder : 0);
+
+      // Design locks 5 days before next order (10 days before period end)
+      const lockDate = new Date(nextOrderDate);
+      lockDate.setDate(nextOrderDate.getDate() - 5);
+      
+      const daysUntilLockDate = Math.ceil((lockDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      setDaysUntilLock(daysUntilLockDate > 0 ? daysUntilLockDate : 0);
+    };
+
+    calculateCountdown();
+    const interval = setInterval(calculateCountdown, 1000 * 60 * 60); // Update every hour
+
+    return () => clearInterval(interval);
+  }, [profile?.pro_current_period_end]);
+
+  // Get Pro orders from user's order history
+  const proOrders = React.useMemo(() => {
+    if (!ordersData?.getUserOrders) return [];
+    return ordersData.getUserOrders
+      .filter((order: any) => 
+        order.orderTags?.includes('pro-monthly-stickers') || 
+        order.orderTags?.includes('pro-member')
+      )
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 3); // Last 3 Pro orders
+  }, [ordersData]);
 
   // Check if design is locked (within 5-day production window)
   const isDesignLocked = () => {
@@ -85,6 +140,54 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
       setSwapError('Failed to update design. Please try again.');
     } finally {
       setIsSwappingDesign(false);
+    }
+  };
+
+
+  // Open Stripe Customer Portal for subscription management
+  const handleManageSubscription = async () => {
+    console.log('🔍 Debug - Profile data:', profile);
+    console.log('🔍 Debug - Stripe Customer ID:', profile?.pro_stripe_customer_id);
+    
+    if (!profile?.pro_stripe_customer_id) {
+      console.error('❌ No Stripe customer ID found');
+      alert('Unable to manage subscription: No Stripe customer ID found. Please contact support.');
+      return;
+    }
+
+    try {
+      setIsLoadingPortal(true);
+
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+      console.log('🔍 Debug - Backend URL:', backendUrl);
+      
+      const response = await fetch(`${backendUrl}/api/create-portal-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customerId: profile.pro_stripe_customer_id,
+          returnUrl: `${window.location.origin}/account/dashboard?view=pro-membership`
+        }),
+      });
+
+      console.log('🔍 Debug - Response status:', response.status);
+      const data = await response.json();
+      console.log('🔍 Debug - Response data:', data);
+
+      if (data.success && data.url) {
+        // Open Stripe portal in new tab
+        window.open(data.url, '_blank');
+      } else {
+        console.error('Failed to create portal session:', data.error);
+        alert(`Unable to open subscription management: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error opening Stripe portal:', error);
+      alert('Unable to open subscription management. Please try again later.');
+    } finally {
+      setIsLoadingPortal(false);
     }
   };
 
@@ -215,6 +318,57 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
         </div>
       </div>
 
+      {/* Alert Banners */}
+      {!profile?.pro_current_design_file && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-3">
+          <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div>
+            <h3 className="text-sm font-semibold text-red-300 mb-1">No Design Uploaded</h3>
+            <p className="text-sm text-red-200/80">Please upload your monthly sticker design below to get started with your Pro membership benefits.</p>
+          </div>
+        </div>
+      )}
+
+      {profile?.pro_current_design_file && !profile?.pro_design_approved && (
+        <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-start gap-3">
+          <svg className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div>
+            <h3 className="text-sm font-semibold text-yellow-300 mb-1">Design Pending Approval</h3>
+            <p className="text-sm text-yellow-200/80">Your design is awaiting approval from our team. We'll send you an email once it's approved!</p>
+          </div>
+        </div>
+      )}
+
+      {(!profile?.pro_default_shipping_address || !profile?.pro_default_shipping_address?.address1) && (
+        <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-start gap-3">
+          <svg className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <div>
+            <h3 className="text-sm font-semibold text-orange-300 mb-1">Shipping Address Needed</h3>
+            <p className="text-sm text-orange-200/80">Please add a shipping address below to ensure your monthly stickers are delivered on time.</p>
+          </div>
+        </div>
+      )}
+
+      {daysUntilLock !== null && daysUntilLock <= 3 && daysUntilLock > 0 && !profile?.pro_design_locked && (
+        <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-start gap-3">
+          <svg className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div>
+            <h3 className="text-sm font-semibold text-cyan-300 mb-1">Design Lock Warning</h3>
+            <p className="text-sm text-cyan-200/80">
+              Your design will be locked in {daysUntilLock} day{daysUntilLock !== 1 ? 's' : ''} for production.  Make any changes now!
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Membership Status Card */}
       <div 
         className="p-6 rounded-2xl relative overflow-hidden"
@@ -264,11 +418,39 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
           {profile?.pro_current_period_start && profile?.pro_current_period_end && (
             <div className="mt-4 pt-4 border-t border-white/10">
               <p className="text-xs text-gray-400 mb-2">Current Billing Period</p>
-              <p className="text-sm text-white">
+              <p className="text-sm text-white mb-3">
                 {new Date(profile.pro_current_period_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 {' → '}
                 {new Date(profile.pro_current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </p>
+              <button
+                onClick={handleManageSubscription}
+                disabled={isLoadingPortal}
+                className="w-full px-4 py-2 rounded-lg font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(61, 209, 249, 0.2), rgba(43, 184, 217, 0.2))',
+                  border: '1px solid rgba(61, 209, 249, 0.3)',
+                  color: '#3dd1f9'
+                }}
+              >
+                {isLoadingPortal ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Opening...
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Manage Subscription
+                  </span>
+                )}
+              </button>
             </div>
           )}
         </div>
@@ -670,6 +852,326 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
                 </p>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Shipping Address Management */}
+      <div 
+        className="rounded-xl p-6"
+        style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(12px)'
+        }}
+      >
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-cyan-500/20">
+              <svg className="w-6 h-6 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white">Shipping Address</h3>
+              <p className="text-sm text-gray-400">Default address for monthly sticker shipments</p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              console.log('🏠 Edit address via Stripe clicked');
+              handleManageSubscription();
+            }}
+            disabled={isLoadingPortal}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-50"
+            style={{
+              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+              backdropFilter: 'blur(25px) saturate(180%)',
+              border: '1px solid rgba(59, 130, 246, 0.4)',
+              boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+            }}
+          >
+            {isLoadingPortal ? 'Opening...' : 'Edit Address'}
+          </button>
+        </div>
+
+
+         {/* Display current address */}
+         <div className="space-y-2">
+           {(() => {
+             console.log('🔍 Checking shipping address condition:');
+             console.log('profile?.pro_default_shipping_address:', profile?.pro_default_shipping_address);
+             console.log('profile?.pro_default_shipping_address?.address1:', profile?.pro_default_shipping_address?.address1);
+             console.log('Full profile:', profile);
+             
+             return profile?.pro_default_shipping_address?.address1;
+           })() ? (
+             <>
+               <p className="text-white">
+                 {profile.pro_default_shipping_address.first_name} {profile.pro_default_shipping_address.last_name}
+               </p>
+               <p className="text-gray-300">{profile.pro_default_shipping_address.address1}</p>
+               {profile.pro_default_shipping_address.address2 && (
+                 <p className="text-gray-300">{profile.pro_default_shipping_address.address2}</p>
+               )}
+               <p className="text-gray-300">
+                 {profile.pro_default_shipping_address.city}, {profile.pro_default_shipping_address.province} {profile.pro_default_shipping_address.zip}
+               </p>
+               <p className="text-gray-300">{profile.pro_default_shipping_address.country}</p>
+               {profile.pro_default_shipping_address.phone && (
+                 <p className="text-gray-300">Phone: {profile.pro_default_shipping_address.phone}</p>
+               )}
+             </>
+           ) : (
+             <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+               <p className="text-yellow-300">⚠️ No shipping address on file. Please add one to ensure smooth delivery.</p>
+             </div>
+           )}
+         </div>
+
+         {/* Stripe Portal Info */}
+         <div className="mt-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+           <div className="flex items-start gap-2">
+             <svg className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+             </svg>
+             <p className="text-sm text-blue-300">
+               <strong>Note:</strong> Click "Edit Address" to open your Stripe Customer Portal where you can securely update your shipping address and billing information.
+             </p>
+           </div>
+         </div>
+      </div>
+
+      {/* Next Order Countdown */}
+      {daysUntilNextOrder !== null && (
+        <div 
+          className="p-6 rounded-2xl"
+          style={{
+            background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(139, 92, 246, 0.1))',
+            border: '1px solid rgba(168, 85, 247, 0.3)',
+            boxShadow: 'rgba(168, 85, 247, 0.2) 0px 8px 32px',
+            backdropFilter: 'blur(12px)'
+          }}
+        >
+          <div className="flex items-center gap-4 mb-4">
+            <div className="p-3 rounded-xl bg-purple-500/20">
+              <svg className="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-white mb-1">Next Order Generation</h3>
+              <p className="text-sm text-gray-400">Automated monthly sticker batch</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <p className="text-xs text-gray-400 mb-1">Order Creation</p>
+              <p className="text-2xl font-bold text-purple-400">
+                {daysUntilNextOrder === 0 ? 'Today!' : `${daysUntilNextOrder} day${daysUntilNextOrder !== 1 ? 's' : ''}`}
+              </p>
+            </div>
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <p className="text-xs text-gray-400 mb-1">Design Lock</p>
+              <p className="text-2xl font-bold text-cyan-400">
+                {daysUntilLock === 0 ? 'Locked' : daysUntilLock === null || daysUntilLock < 0 ? 'Locked' : `${daysUntilLock} day${daysUntilLock !== 1 ? 's' : ''}`}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Order History */}
+      {proOrders.length > 0 && (
+        <div 
+          className="p-6 rounded-2xl"
+          style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px',
+            backdropFilter: 'blur(12px)'
+          }}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded-lg bg-cyan-500/20">
+              <svg className="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-white">Recent Pro Orders</h3>
+          </div>
+          <div className="space-y-3">
+            {proOrders.map((order: any) => (
+              <div 
+                key={order.id}
+                className="p-4 rounded-xl flex items-center justify-between"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                    alt="Pro" 
+                    className="w-6 h-6"
+                  />
+                  <div>
+                    <p className="text-sm font-semibold text-white">
+                      {order.orderNumber || order.id.substring(0, 8).toUpperCase()}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                    order.fulfillmentStatus === 'fulfilled' 
+                      ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                      : order.fulfillmentStatus === 'unfulfilled'
+                      ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                      : 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
+                  }`}>
+                    {order.fulfillmentStatus === 'fulfilled' && '✓ Shipped'}
+                    {order.fulfillmentStatus === 'unfulfilled' && '⏳ Processing'}
+                    {order.fulfillmentStatus === 'partial' && '📦 Partial'}
+                    {!order.fulfillmentStatus && 'Pending'}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Subscription Management */}
+      <div 
+        className="p-6 rounded-2xl"
+        style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+          backdropFilter: 'blur(12px)'
+        }}
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-3 rounded-xl bg-orange-500/20">
+            <svg className="w-6 h-6 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white">Subscription Management</h3>
+            <p className="text-sm text-gray-400">Manage payment method and subscription</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {/* Payment Method Management */}
+          <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-blue-300 mb-1">Update Payment Method</h4>
+                <p className="text-sm text-blue-200/80 mb-3">
+                  Change your credit card, update billing details, or view your payment history.
+                </p>
+                
+                <button
+                  onClick={() => {
+                    console.log('💳 Update payment method clicked');
+                    handleManageSubscription();
+                  }}
+                  disabled={isLoadingPortal}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-50"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                  }}
+                >
+                  {isLoadingPortal ? 'Opening...' : 'Manage Payment Methods'}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-red-300 mb-1">Cancel Your Membership</h4>
+                <p className="text-sm text-red-200/80 mb-3">
+                  Cancel your Pro membership permanently. You'll continue to receive benefits until the end of your current billing period, then your membership will end.
+                </p>
+                
+                {/* Benefits End Date */}
+                {(() => {
+                  console.log('🔍 Profile data for benefits end date:', {
+                    pro_current_period_end: profile?.pro_current_period_end,
+                    proCurrentPeriodEnd: profile?.proCurrentPeriodEnd,
+                    fullProfile: profile
+                  });
+                  
+                  const endDate = profile?.pro_current_period_end || profile?.proCurrentPeriodEnd;
+                  
+                  return endDate ? (
+                    <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/40">
+                      <div className="flex items-center gap-2 mb-2">
+                        <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span className="text-sm font-semibold text-red-300">Benefits End Date</span>
+                      </div>
+                      <p className="text-sm text-red-200">
+                        <strong>{new Date(endDate).toLocaleDateString('en-US', { 
+                          weekday: 'long',
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}</strong>
+                      </p>
+
+                    </div>
+                  ) : null;
+                })()}
+                
+                <button
+                  onClick={() => {
+                    console.log('🔴 Cancel button clicked');
+                    handleManageSubscription();
+                  }}
+                  disabled={isLoadingPortal}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-50"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                  }}
+                >
+                  {isLoadingPortal ? 'Opening...' : 'Cancel Membership'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+            <div className="flex items-start gap-2">
+              <svg className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm text-blue-300">
+                <strong>Note:</strong> This will open your Stripe Customer Portal where you can manage all subscription settings, including payment methods and billing history.
+              </p>
+            </div>
           </div>
         </div>
       </div>

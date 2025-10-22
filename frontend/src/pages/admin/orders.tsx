@@ -591,6 +591,28 @@ export default function AdminOrders() {
            order.orderStatus === 'Pro Monthly Order';
   };
 
+  // Helper function to detect Pro order issues
+  const getProOrderIssues = (order: Order) => {
+    if (!isProOrder(order)) return null;
+    
+    const issues: { type: string; label: string; color: string }[] = [];
+    const orderNote = order.orderNote || '';
+    
+    // Check for design issues
+    if (orderNote.includes('Design pending upload') || orderNote.includes('Awaiting Design Upload')) {
+      issues.push({ type: 'no-design', label: 'No Design', color: 'text-red-300 bg-red-500/20 border-red-500/30' });
+    } else if (orderNote.includes('Pending Design Approval')) {
+      issues.push({ type: 'unapproved', label: 'Needs Approval', color: 'text-yellow-300 bg-yellow-500/20 border-yellow-500/30' });
+    }
+    
+    // Check for shipping address issues
+    if (orderNote.includes('Shipping address pending') || orderNote.includes('Awaiting Shipping Address')) {
+      issues.push({ type: 'no-address', label: 'No Address', color: 'text-orange-300 bg-orange-500/20 border-orange-500/30' });
+    }
+    
+    return issues.length > 0 ? issues : null;
+  };
+
   // Filter and sort orders
   const allFilteredOrders = React.useMemo(() => {
     if (!data?.getAllOrders) return [];
@@ -3483,18 +3505,37 @@ export default function AdminOrders() {
                               <td className="px-3 py-4">
                                 {/* Check if this is a Pro monthly order */}
                                 {order.orderTags?.includes('pro-monthly-stickers') ? (
-                                  <div className="flex items-center gap-2">
-                                    <img 
-                                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
-                                      alt="Pro" 
-                                      className="w-4 h-4 object-contain"
-                                    />
-                                    <span className="text-base font-semibold text-cyan-300">
-                                      $0.00
-                                    </span>
-                                    <span className="text-xs text-cyan-400 opacity-75">
-                                      (Pro Benefit)
-                                    </span>
+                                  <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                      <img 
+                                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                                        alt="Pro" 
+                                        className="w-4 h-4 object-contain"
+                                      />
+                                      <span className="text-base font-semibold text-cyan-300">
+                                        $0.00
+                                      </span>
+                                      <span className="text-xs text-cyan-400 opacity-75">
+                                        (Pro Benefit)
+                                      </span>
+                                    </div>
+                                    {/* Pro Order Issue Indicators */}
+                                    {getProOrderIssues(order) && (
+                                      <div className="flex flex-wrap gap-1">
+                                        {getProOrderIssues(order)!.map((issue, idx) => (
+                                          <span 
+                                            key={idx} 
+                                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${issue.color}`}
+                                            title={`${issue.label} - Check order notes for details`}
+                                          >
+                                            {issue.type === 'no-design' && '⚠️'}
+                                            {issue.type === 'unapproved' && '⏳'}
+                                            {issue.type === 'no-address' && '📍'}
+                                            <span className="ml-1">{issue.label}</span>
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 ) : (
                                   <div className="text-base font-semibold" style={{ color: '#86efac' }}>
