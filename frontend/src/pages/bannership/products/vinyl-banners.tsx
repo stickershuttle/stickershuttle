@@ -46,7 +46,6 @@ export default function BannershipVinylBanners() {
     <Layout 
       title="Vinyl Banners - Professional Signage | Bannership"
       description="Heavy-duty vinyl banners perfect for outdoor advertising, events, and business signage. Weather-resistant and professionally finished."
-      canonical="https://bannership.stickershuttle.com/products/vinyl-banners"
       ogImage="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749652827/StickerShuttle_VinylBanner_VinylBanner_chvbfs.png"
       customLogo="/bannership-logo.svg"
       customLogoAlt="Bannership Logo"
@@ -88,7 +87,7 @@ export default function BannershipVinylBanners() {
           >
             {/* Back Arrow - Top Left */}
             <Link 
-              href="/products"
+              href="/bannership/products"
               className="absolute top-4 left-4 z-20 flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 hover:scale-110"
               style={{
                 background: 'rgba(255, 255, 255, 0.05)',

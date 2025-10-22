@@ -254,52 +254,8 @@ const nextConfig = {
       },
     ] : [];
 
-    // Subdomain rewrites (always apply on Vercel)
-    const subdomainRewrites = [
-      {
-        source: '/',
-        has: [
-          {
-            type: 'host',
-            value: 'bannership.stickershuttle.com',
-          },
-        ],
-        destination: '/bannership',
-      },
-      {
-        source: '/products',
-        has: [
-          {
-            type: 'host',
-            value: 'bannership.stickershuttle.com',
-          },
-        ],
-        destination: '/bannership/products',
-      },
-      {
-        source: '/products/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'bannership.stickershuttle.com',
-          },
-        ],
-        destination: '/bannership/products/:path*',
-      },
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'bannership.stickershuttle.com',
-          },
-        ],
-        destination: '/bannership/:path*',
-      },
-    ];
-
     return {
-      beforeFiles: [...devRewrites, ...subdomainRewrites],
+      beforeFiles: devRewrites,
       afterFiles: [],
       fallback: []
     };

@@ -26,5 +26,28 @@
         }
       ]
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/bannership",
+      "has": [
+        {
+          "type": "host",
+          "value": "bannership.stickershuttle.com"
+        }
+      ]
+    },
+    {
+      "source": "/:path((?!bannership).*)",
+      "destination": "/bannership/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "bannership.stickershuttle.com"
+        }
+      ]
+    }
   ]
 }
+

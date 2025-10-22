@@ -383,7 +383,6 @@ export default function BannershipPopUpBanners() {
     <Layout 
       title="Pop Up Banners - Professional Signage | Bannership"
       description="Portable pop-up banners perfect for trade shows, events, and business displays. Easy setup and professional appearance."
-      canonical="https://bannership.stickershuttle.com/products/pop-up-banners"
       ogImage="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749652827/StickerShuttle_VinylBanner_VinylBanner_chvbfs.png"
       customLogo="/bannership-logo.svg"
       customLogoAlt="Bannership Logo"
