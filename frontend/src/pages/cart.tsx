@@ -593,7 +593,8 @@ export default function CartPage() {
   const creditRateDecimal = isWholesale ? 0.025 : 0.05;
   
   // Check if user is admin
-  const isAdmin = user?.email === 'justin@stickershuttle.com';
+  const ADMIN_EMAILS = ['justin@stickershuttle.com'];
+  const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email);
 
   // Mutations for user profile
   const [updateUserProfileNames] = useMutation(UPDATE_USER_PROFILE_NAMES);

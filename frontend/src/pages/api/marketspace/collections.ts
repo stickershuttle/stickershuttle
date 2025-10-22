@@ -17,7 +17,8 @@ async function isAuthorized(req: NextApiRequest, supabase: any): Promise<boolean
     }
 
     // Check if user is admin
-    if (user.email === 'justin@stickershuttle.com') {
+    const ADMIN_EMAILS = ['justin@stickershuttle.com'];
+    if (ADMIN_EMAILS.includes(user.email || '')) {
       return true;
     }
 

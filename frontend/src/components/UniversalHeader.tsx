@@ -463,7 +463,7 @@ export default function UniversalHeader({ customLogo, customLogoAlt, forceBanner
                   <img 
                     src={customLogo} 
                     alt={customLogoAlt || "Logo"} 
-                    className="h-12 w-auto object-contain cursor-pointer transition-all duration-500 logo-hover"
+                    className="h-10 w-auto object-contain cursor-pointer transition-all duration-500 logo-hover"
                     style={{ maxWidth: 'none' }}
                   />
                 )}

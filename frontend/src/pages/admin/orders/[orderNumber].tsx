@@ -4,7 +4,7 @@ import AdminLayout from '@/components/AdminLayout';
 import { getSupabase } from '../../../lib/supabase';
 
 // Admin check - add your admin email(s) here
-const ADMIN_EMAILS = ['justin@stickershuttle.com']; // Add all admin emails here
+const ADMIN_EMAILS = ['justin@stickershuttle.com', 'tommy@bannership.com']; // Add all admin emails here
 
 // This component will redirect to the main orders page but with the order selected
 export default function OrderDetail() {

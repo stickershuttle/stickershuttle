@@ -49,7 +49,7 @@ function requireAdminAuth(user) {
   if (!user) {
     throw new AuthenticationError('Authentication required');
   }
-  const ADMIN_EMAILS = ['justin@stickershuttle.com', 'admin@stickershuttle.com', 'orbit@stickershuttle.com'];
+  const ADMIN_EMAILS = ['justin@stickershuttle.com', 'admin@stickershuttle.com', 'orbit@stickershuttle.com', 'tommy@bannership.com'];
   const email = String(user.email || '').toLowerCase();
   if (!ADMIN_EMAILS.includes(email)) {
     throw new AuthenticationError('Admin access required');

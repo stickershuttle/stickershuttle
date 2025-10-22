@@ -194,7 +194,8 @@ function AdminCredits() {
         return;
       }
 
-      const isAdmin = session.user.email === 'justin@stickershuttle.com';
+      const ADMIN_EMAILS = ['justin@stickershuttle.com'];
+      const isAdmin = ADMIN_EMAILS.includes(session.user.email || '');
       
       if (!isAdmin) {
         router.push('/account/dashboard');

@@ -40,11 +40,27 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
   const [breadcrumbKey, setBreadcrumbKey] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   
   // Fetch orders data for outstanding count
   const { data: ordersData } = useQuery(GET_ALL_ORDERS, {
     errorPolicy: 'ignore' // Don't break the layout if orders query fails
   });
+
+  // Check current user
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const { getSupabase } = await import('../lib/supabase');
+        const supabase = getSupabase();
+        const { data: { session } } = await supabase.auth.getSession();
+        setCurrentUser(session?.user || null);
+      } catch (error) {
+        console.error('Error checking user:', error);
+      }
+    };
+    checkUser();
+  }, []);
   
   // Ensure we only render breadcrumbs on client side to avoid hydration mismatch
   useEffect(() => {
@@ -85,6 +101,20 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
   const hasCustomItemsNeedingProofs = (order: any) => {
     return order.items?.some((item: any) => !isSamplePackItem(item));
   };
+
+  // Helper function to check if order contains Bannership items
+  const isBannershipOrder = (order: any) => {
+    if (!order.items || !Array.isArray(order.items)) return false;
+    return order.items.some((item: any) => {
+      const category = item.productCategory || '';
+      return category === 'pop-up-banners' || 
+             category === 'x-banners' || 
+             category === 'vinyl-banners';
+    });
+  };
+
+  // Check if user is Bannership-only admin
+  const isBannershipOnlyAdmin = currentUser?.email === 'tommy@bannership.com';
 
   // Get proof status (updated logic for mixed orders)
   const getProofStatus = (order: any) => {
@@ -139,9 +169,14 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
   const outstandingOrdersCount = React.useMemo(() => {
     if (!ordersData?.getAllOrders) return 0;
     
-    const paidOrders = ordersData.getAllOrders.filter((order: any) => 
+    let paidOrders = ordersData.getAllOrders.filter((order: any) => 
       order.financialStatus === 'paid'
     );
+
+    // Filter to only Bannership orders for tommy@bannership.com
+    if (isBannershipOnlyAdmin) {
+      paidOrders = paidOrders.filter((order: any) => isBannershipOrder(order));
+    }
     
     const outstandingOrders = paidOrders.filter((order: any) => {
       const status = getProofStatus(order);
@@ -150,7 +185,7 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
     });
     
     return outstandingOrders.length;
-  }, [ordersData]);
+  }, [ordersData, isBannershipOnlyAdmin]);
   
   // Get breadcrumb data based on current route
   const getBreadcrumbs = () => {
@@ -541,20 +576,23 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
 
                 {/* Customers */}
                 <a
-                  href="/admin/customers"
+                  href={isBannershipOnlyAdmin ? "#" : "/admin/customers"}
+                  onClick={(e) => isBannershipOnlyAdmin && e.preventDefault()}
                   className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
-                    router.asPath.startsWith('/admin/customers')
-                      ? 'text-white bg-blue-500/15 border-l-3 border-blue-500'
-                      : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                    isBannershipOnlyAdmin 
+                      ? 'text-gray-600 cursor-not-allowed opacity-40' 
+                      : router.asPath.startsWith('/admin/customers')
+                        ? 'text-white bg-blue-500/15 border-l-3 border-blue-500'
+                        : 'text-gray-400 hover:text-white border-l-3 border-transparent'
                   }`}
                   onMouseEnter={(e) => {
-                    if (!router.asPath.startsWith('/admin/customers')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/customers')) {
                       e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
                       e.currentTarget.style.color = '#93BBFC';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!router.asPath.startsWith('/admin/customers')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/customers')) {
                       e.currentTarget.style.backgroundColor = 'transparent';
                       e.currentTarget.style.color = '';
                     }
@@ -568,20 +606,23 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
 
                 {/* Discounts */}
                 <a
-                  href="/admin/discounts"
+                  href={isBannershipOnlyAdmin ? "#" : "/admin/discounts"}
+                  onClick={(e) => isBannershipOnlyAdmin && e.preventDefault()}
                   className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
-                    router.asPath.startsWith('/admin/discounts')
-                      ? 'text-white bg-yellow-500/15 border-l-3 border-yellow-500'
-                      : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                    isBannershipOnlyAdmin 
+                      ? 'text-gray-600 cursor-not-allowed opacity-40' 
+                      : router.asPath.startsWith('/admin/discounts')
+                        ? 'text-white bg-yellow-500/15 border-l-3 border-yellow-500'
+                        : 'text-gray-400 hover:text-white border-l-3 border-transparent'
                   }`}
                   onMouseEnter={(e) => {
-                    if (!router.asPath.startsWith('/admin/discounts')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/discounts')) {
                       e.currentTarget.style.backgroundColor = 'rgba(250, 204, 21, 0.1)';
                       e.currentTarget.style.color = '#FDE047';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!router.asPath.startsWith('/admin/discounts')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/discounts')) {
                       e.currentTarget.style.backgroundColor = 'transparent';
                       e.currentTarget.style.color = '';
                     }
@@ -595,20 +636,23 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
 
                 {/* Deals */}
                 <a
-                  href="/admin/deals"
+                  href={isBannershipOnlyAdmin ? "#" : "/admin/deals"}
+                  onClick={(e) => isBannershipOnlyAdmin && e.preventDefault()}
                   className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
-                    router.asPath.startsWith('/admin/deals')
-                      ? 'text-white bg-orange-500/15 border-l-3 border-orange-500'
-                      : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                    isBannershipOnlyAdmin 
+                      ? 'text-gray-600 cursor-not-allowed opacity-40' 
+                      : router.asPath.startsWith('/admin/deals')
+                        ? 'text-white bg-orange-500/15 border-l-3 border-orange-500'
+                        : 'text-gray-400 hover:text-white border-l-3 border-transparent'
                   }`}
                   onMouseEnter={(e) => {
-                    if (!router.asPath.startsWith('/admin/deals')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/deals')) {
                       e.currentTarget.style.backgroundColor = 'rgba(251, 146, 60, 0.1)';
                       e.currentTarget.style.color = '#FDBA74';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!router.asPath.startsWith('/admin/deals')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/deals')) {
                       e.currentTarget.style.backgroundColor = 'transparent';
                       e.currentTarget.style.color = '';
                     }
@@ -623,20 +667,23 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
 
                 {/* Credits */}
                 <a
-                  href="/admin/credits"
+                  href={isBannershipOnlyAdmin ? "#" : "/admin/credits"}
+                  onClick={(e) => isBannershipOnlyAdmin && e.preventDefault()}
                   className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
-                    router.asPath.startsWith('/admin/credits')
-                      ? 'text-white bg-green-500/15 border-l-3 border-green-500'
-                      : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                    isBannershipOnlyAdmin 
+                      ? 'text-gray-600 cursor-not-allowed opacity-40' 
+                      : router.asPath.startsWith('/admin/credits')
+                        ? 'text-white bg-green-500/15 border-l-3 border-green-500'
+                        : 'text-gray-400 hover:text-white border-l-3 border-transparent'
                   }`}
                   onMouseEnter={(e) => {
-                    if (!router.asPath.startsWith('/admin/credits')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/credits')) {
                       e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.1)';
                       e.currentTarget.style.color = '#86EFAC';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!router.asPath.startsWith('/admin/credits')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/credits')) {
                       e.currentTarget.style.backgroundColor = 'transparent';
                       e.currentTarget.style.color = '';
                     }
@@ -650,20 +697,23 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
 
                 {/* Wholesale */}
                 <a
-                  href="/admin/wholesale"
+                  href={isBannershipOnlyAdmin ? "#" : "/admin/wholesale"}
+                  onClick={(e) => isBannershipOnlyAdmin && e.preventDefault()}
                   className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
-                    router.asPath.startsWith('/admin/wholesale')
-                      ? 'text-white bg-indigo-500/15 border-l-3 border-indigo-500'
-                      : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                    isBannershipOnlyAdmin 
+                      ? 'text-gray-600 cursor-not-allowed opacity-40' 
+                      : router.asPath.startsWith('/admin/wholesale')
+                        ? 'text-white bg-indigo-500/15 border-l-3 border-indigo-500'
+                        : 'text-gray-400 hover:text-white border-l-3 border-transparent'
                   }`}
                   onMouseEnter={(e) => {
-                    if (!router.asPath.startsWith('/admin/wholesale')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/wholesale')) {
                       e.currentTarget.style.backgroundColor = 'rgba(99, 102, 241, 0.1)';
                       e.currentTarget.style.color = '#A5B4FC';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!router.asPath.startsWith('/admin/wholesale')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/wholesale')) {
                       e.currentTarget.style.backgroundColor = 'transparent';
                       e.currentTarget.style.color = '';
                     }
@@ -677,20 +727,23 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
 
                 {/* Alerts */}
                 <a
-                  href="/admin/alerts"
+                  href={isBannershipOnlyAdmin ? "#" : "/admin/alerts"}
+                  onClick={(e) => isBannershipOnlyAdmin && e.preventDefault()}
                   className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
-                    router.asPath.startsWith('/admin/alerts')
-                      ? 'text-white bg-pink-500/15 border-l-3 border-pink-500'
-                      : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                    isBannershipOnlyAdmin 
+                      ? 'text-gray-600 cursor-not-allowed opacity-40' 
+                      : router.asPath.startsWith('/admin/alerts')
+                        ? 'text-white bg-pink-500/15 border-l-3 border-pink-500'
+                        : 'text-gray-400 hover:text-white border-l-3 border-transparent'
                   }`}
                   onMouseEnter={(e) => {
-                    if (!router.asPath.startsWith('/admin/alerts')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/alerts')) {
                       e.currentTarget.style.backgroundColor = 'rgba(236, 72, 153, 0.1)';
                       e.currentTarget.style.color = '#F9A8D4';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!router.asPath.startsWith('/admin/alerts')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/alerts')) {
                       e.currentTarget.style.backgroundColor = 'transparent';
                       e.currentTarget.style.color = '';
                     }
@@ -704,20 +757,23 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
 
                 {/* Blogs */}
                 <a
-                  href="/admin/blogs"
+                  href={isBannershipOnlyAdmin ? "#" : "/admin/blogs"}
+                  onClick={(e) => isBannershipOnlyAdmin && e.preventDefault()}
                   className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
-                    router.asPath.startsWith('/admin/blogs')
-                      ? 'text-white bg-indigo-500/15 border-l-3 border-indigo-500'
-                      : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                    isBannershipOnlyAdmin 
+                      ? 'text-gray-600 cursor-not-allowed opacity-40' 
+                      : router.asPath.startsWith('/admin/blogs')
+                        ? 'text-white bg-indigo-500/15 border-l-3 border-indigo-500'
+                        : 'text-gray-400 hover:text-white border-l-3 border-transparent'
                   }`}
                   onMouseEnter={(e) => {
-                    if (!router.asPath.startsWith('/admin/blogs')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/blogs')) {
                       e.currentTarget.style.backgroundColor = 'rgba(99, 102, 241, 0.1)';
                       e.currentTarget.style.color = '#A5B4FC';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!router.asPath.startsWith('/admin/blogs')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/blogs')) {
                       e.currentTarget.style.backgroundColor = 'transparent';
                       e.currentTarget.style.color = '';
                     }
@@ -731,20 +787,23 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
 
                 {/* Marketplace */}
                 <a
-                  href="/admin/marketspace"
+                  href={isBannershipOnlyAdmin ? "#" : "/admin/marketspace"}
+                  onClick={(e) => isBannershipOnlyAdmin && e.preventDefault()}
                   className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
-                    router.asPath.startsWith('/admin/marketspace')
-                      ? 'text-white bg-emerald-500/15 border-l-3 border-emerald-500'
-                      : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                    isBannershipOnlyAdmin 
+                      ? 'text-gray-600 cursor-not-allowed opacity-40' 
+                      : router.asPath.startsWith('/admin/marketspace')
+                        ? 'text-white bg-emerald-500/15 border-l-3 border-emerald-500'
+                        : 'text-gray-400 hover:text-white border-l-3 border-transparent'
                   }`}
                   onMouseEnter={(e) => {
-                    if (!router.asPath.startsWith('/admin/marketspace')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/marketspace')) {
                       e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
                       e.currentTarget.style.color = '#6EE7B7';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!router.asPath.startsWith('/admin/marketspace')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/marketspace')) {
                       e.currentTarget.style.backgroundColor = 'transparent';
                       e.currentTarget.style.color = '';
                     }
@@ -758,20 +817,23 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
 
                 {/* Shared Carts */}
                 <a
-                  href="/admin/shared-carts"
+                  href={isBannershipOnlyAdmin ? "#" : "/admin/shared-carts"}
+                  onClick={(e) => isBannershipOnlyAdmin && e.preventDefault()}
                   className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
-                    router.asPath.startsWith('/admin/shared-carts')
-                      ? 'text-white bg-teal-500/15 border-l-3 border-teal-500'
-                      : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                    isBannershipOnlyAdmin 
+                      ? 'text-gray-600 cursor-not-allowed opacity-40' 
+                      : router.asPath.startsWith('/admin/shared-carts')
+                        ? 'text-white bg-teal-500/15 border-l-3 border-teal-500'
+                        : 'text-gray-400 hover:text-white border-l-3 border-transparent'
                   }`}
                   onMouseEnter={(e) => {
-                    if (!router.asPath.startsWith('/admin/shared-carts')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/shared-carts')) {
                       e.currentTarget.style.backgroundColor = 'rgba(20, 184, 166, 0.1)';
                       e.currentTarget.style.color = '#5EEAD4';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!router.asPath.startsWith('/admin/shared-carts')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/shared-carts')) {
                       e.currentTarget.style.backgroundColor = 'transparent';
                       e.currentTarget.style.color = '';
                     }
@@ -785,20 +847,23 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
 
                 {/* Analytics */}
                 <a
-                  href="/admin/analytics"
+                  href={isBannershipOnlyAdmin ? "#" : "/admin/analytics"}
+                  onClick={(e) => isBannershipOnlyAdmin && e.preventDefault()}
                   className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
-                    router.asPath.startsWith('/admin/analytics')
-                      ? 'text-white bg-orange-500/15 border-l-3 border-orange-500'
-                      : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                    isBannershipOnlyAdmin 
+                      ? 'text-gray-600 cursor-not-allowed opacity-40' 
+                      : router.asPath.startsWith('/admin/analytics')
+                        ? 'text-white bg-orange-500/15 border-l-3 border-orange-500'
+                        : 'text-gray-400 hover:text-white border-l-3 border-transparent'
                   }`}
                   onMouseEnter={(e) => {
-                    if (!router.asPath.startsWith('/admin/analytics')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/analytics')) {
                       e.currentTarget.style.backgroundColor = 'rgba(249, 115, 22, 0.1)';
                       e.currentTarget.style.color = '#FDBA74';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!router.asPath.startsWith('/admin/analytics')) {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/analytics')) {
                       e.currentTarget.style.backgroundColor = 'transparent';
                       e.currentTarget.style.color = '';
                     }

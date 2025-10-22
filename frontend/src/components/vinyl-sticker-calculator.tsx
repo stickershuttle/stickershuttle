@@ -550,7 +550,8 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
     const numValue = parseFloat(numericValue)
     
     // Check if user is admin
-    const isAdmin = user?.email === 'justin@stickershuttle.com'
+    const ADMIN_EMAILS = ['justin@stickershuttle.com']
+    const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email)
     const maxSize = isAdmin ? 50 : 14 // Admin can go up to 50", regular users limited to 14"
     
     if (numValue < 0.5 && numericValue !== "") {

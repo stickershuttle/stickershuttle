@@ -105,7 +105,7 @@ export default function Bannership() {
       <Layout 
         title="Bannership - Premium Custom Banners & Vinyl Displays"
         description="Professional custom banners, vinyl displays, and signage with fast printing. Trusted by Amazon, Nike, Harry Potter and thousands of businesses. Free shipping, high quality materials."
-        ogImage="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png"
+        ogImage="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1761143822/Thumbnail_wo6mhl.png"
         keywords="custom banners, vinyl banners, mesh banners, fabric banners, outdoor banners, indoor banners, business signage, promotional banners, display banners"
         canonical="https://stickershuttle.com/bannership"
         structuredData={structuredData}

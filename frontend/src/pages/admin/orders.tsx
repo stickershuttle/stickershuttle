@@ -145,7 +145,7 @@ const MARK_ORDER_AS_DELIVERED = gql`
 `;
 
 // Admin check - add your admin email(s) here
-const ADMIN_EMAILS = ['justin@stickershuttle.com']; // Add all admin emails here
+const ADMIN_EMAILS = ['justin@stickershuttle.com', 'tommy@bannership.com']; // Add all admin emails here
 
 // Helper function to check if an item is a sample pack
 const isSamplePackItem = (item: any) => {
@@ -275,6 +275,7 @@ const defaultColumns = [
 export default function AdminOrders() {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isBannershipOnlyAdmin, setIsBannershipOnlyAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderTab, setOrderTab] = useState<'all' | 'marketspace' | 'bannership'>('all');
@@ -522,6 +523,15 @@ export default function AdminOrders() {
         if (!ADMIN_EMAILS.includes(session.user.email || '')) {
           router.push('/account/dashboard');
           return;
+        }
+
+        // Check if user is Bannership-only admin
+        const isBannershipAdmin = session.user.email === 'tommy@bannership.com';
+        setIsBannershipOnlyAdmin(isBannershipAdmin);
+        
+        // Auto-set to bannership tab for Bannership-only admins
+        if (isBannershipAdmin) {
+          setOrderTab('bannership');
         }
 
         setIsAdmin(true);
@@ -2717,26 +2727,30 @@ export default function AdminOrders() {
                             backdropFilter: 'blur(12px)'
                           }}
                         >
-                          <button
-                            onClick={() => setOrderTab('all')}
-                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                              orderTab === 'all'
-                                ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
-                                : 'text-gray-400 hover:text-white'
-                            }`}
-                          >
-                            Custom Orders
-                          </button>
-                          <button
-                            onClick={() => setOrderTab('marketspace')}
-                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                              orderTab === 'marketspace'
-                                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
-                                : 'text-gray-400 hover:text-white'
-                            }`}
-                          >
-                            Market Space
-                          </button>
+                          {!isBannershipOnlyAdmin && (
+                            <button
+                              onClick={() => setOrderTab('all')}
+                              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                                orderTab === 'all'
+                                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                                  : 'text-gray-400 hover:text-white'
+                              }`}
+                            >
+                              Custom Orders
+                            </button>
+                          )}
+                          {!isBannershipOnlyAdmin && (
+                            <button
+                              onClick={() => setOrderTab('marketspace')}
+                              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                                orderTab === 'marketspace'
+                                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                                  : 'text-gray-400 hover:text-white'
+                              }`}
+                            >
+                              Market Space
+                            </button>
+                          )}
                           <button
                             onClick={() => setOrderTab('bannership')}
                             className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
@@ -2880,26 +2894,30 @@ export default function AdminOrders() {
                         backdropFilter: 'blur(12px)'
                       }}
                     >
-                      <button
-                        onClick={() => setOrderTab('all')}
-                        className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                          orderTab === 'all'
-                            ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
-                            : 'text-gray-400 hover:text-white'
-                        }`}
-                      >
-                        Custom Orders
-                      </button>
-                      <button
-                        onClick={() => setOrderTab('marketspace')}
-                        className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                          orderTab === 'marketspace'
-                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
-                            : 'text-gray-400 hover:text-white'
-                        }`}
-                      >
-                        Market Space
-                      </button>
+                      {!isBannershipOnlyAdmin && (
+                        <button
+                          onClick={() => setOrderTab('all')}
+                          className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                            orderTab === 'all'
+                              ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                              : 'text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          Custom Orders
+                        </button>
+                      )}
+                      {!isBannershipOnlyAdmin && (
+                        <button
+                          onClick={() => setOrderTab('marketspace')}
+                          className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                            orderTab === 'marketspace'
+                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                              : 'text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          Market Space
+                        </button>
+                      )}
                       <button
                         onClick={() => setOrderTab('bannership')}
                         className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${

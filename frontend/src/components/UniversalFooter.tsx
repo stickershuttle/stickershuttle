@@ -127,10 +127,10 @@ export default function UniversalFooter({ forceBannershipMode }: UniversalFooter
               </h3>
               <ul className="space-y-1">
                 <li>
-                  <Link href="/contact-us" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center text-sm">
+                  <a href="mailto:orbit@stickershuttle.com" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center text-sm">
                     <span className="mr-2">💬</span>
                     Help
-                  </Link>
+                  </a>
                 </li>
                 <li>
                   <Link href="/returns" className="text-gray-300 hover:text-white transition-colors duration-200 flex items-center text-sm">

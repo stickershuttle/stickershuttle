@@ -46,7 +46,7 @@ export default function BannershipVinylBanners() {
     <Layout 
       title="Vinyl Banners - Professional Signage | Bannership"
       description="Heavy-duty vinyl banners perfect for outdoor advertising, events, and business signage. Weather-resistant and professionally finished."
-      ogImage="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749652827/StickerShuttle_VinylBanner_VinylBanner_chvbfs.png"
+      ogImage="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1761143822/Thumbnail_wo6mhl.png"
       customLogo="/bannership-logo.svg"
       customLogoAlt="Bannership Logo"
     >

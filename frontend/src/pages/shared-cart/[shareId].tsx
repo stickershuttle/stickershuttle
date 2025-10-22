@@ -623,7 +623,8 @@ export default function SharedCartPage() {
           setUser(session?.user || null);
           
           // Check if user is admin
-          if (session?.user?.email === 'justin@stickershuttle.com') {
+          const ADMIN_EMAILS = ['justin@stickershuttle.com'];
+          if (session?.user?.email && ADMIN_EMAILS.includes(session.user.email)) {
             setIsAdmin(true);
           }
         }
