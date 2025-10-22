@@ -33,7 +33,7 @@ export default function UniversalHeader({ customLogo, customLogoAlt, forceBanner
   const router = useRouter();
 
   // Admin emails list - same as in admin dashboard
-  const ADMIN_EMAILS = ['justin@stickershuttle.com'];
+  const ADMIN_EMAILS = ['justin@stickershuttle.com', 'tommy@bannership.com'];
   
   // Check if we're on an admin page
   const isAdminPage = router.pathname.startsWith('/admin');
@@ -114,6 +114,7 @@ export default function UniversalHeader({ customLogo, customLogoAlt, forceBanner
   });
 
   const isWholesale = !!profileData?.getUserProfile?.isWholesaleCustomer;
+  const isProMember = !!profileData?.getUserProfile?.isProMember;
 
 
 
@@ -411,8 +412,8 @@ export default function UniversalHeader({ customLogo, customLogoAlt, forceBanner
                     />
                   )}
                   
-                  {/* Admin SSPro Logo - Show only for admin users */}
-                  {!customLogo && isAdmin && (
+                  {/* Admin/Pro SSPro Logo - Show for admin users or Pro members */}
+                  {!customLogo && (isAdmin || isProMember) && (
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755791936/SSPro_wxtsdq.png" 
                       alt="SSPro Logo" 
@@ -421,8 +422,8 @@ export default function UniversalHeader({ customLogo, customLogoAlt, forceBanner
                     />
                   )}
                   
-                  {/* Main Sticker Shuttle Logo - Show for non-admin users or when not admin */}
-                  {!customLogo && !isAdmin && (
+                  {/* Main Sticker Shuttle Logo - Show for non-admin and non-Pro users */}
+                  {!customLogo && !isAdmin && !isProMember && (
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
                       alt="Sticker Shuttle Logo" 
@@ -431,8 +432,8 @@ export default function UniversalHeader({ customLogo, customLogoAlt, forceBanner
                     />
                   )}
                   
-                  {/* Marketspace Logo with back arrow - Only show for non-admin users and no custom logo */}
-                  {!customLogo && !isAdmin && (
+                  {/* Marketspace Logo with back arrow - Only show for non-admin, non-Pro users and no custom logo */}
+                  {!customLogo && !isAdmin && !isProMember && (
                     <div className={`absolute top-0 left-0 flex items-center gap-2 transition-all duration-500 ${isMarketspacePage ? 'logo-in' : 'logo-out'}`}>
                       {/* Back arrow for marketspace */}
                       {isMarketspacePage && (
@@ -468,8 +469,8 @@ export default function UniversalHeader({ customLogo, customLogoAlt, forceBanner
                   />
                 )}
                 
-                {/* Admin SSPro Logo - Show only for admin users */}
-                {!customLogo && isAdmin && (
+                {/* Admin/Pro SSPro Logo - Show for admin users or Pro members */}
+                {!customLogo && (isAdmin || isProMember) && (
                   <img 
                     src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755791936/SSPro_wxtsdq.png" 
                     alt="SSPro Logo" 
@@ -478,8 +479,8 @@ export default function UniversalHeader({ customLogo, customLogoAlt, forceBanner
                   />
                 )}
                 
-                {/* Main Sticker Shuttle Logo - Show for non-admin users */}
-                {!customLogo && !isAdmin && (
+                {/* Main Sticker Shuttle Logo - Show for non-admin and non-Pro users */}
+                {!customLogo && !isAdmin && !isProMember && (
                   <img 
                     src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591683/White_Logo_ojmn3s.png" 
                     alt="Sticker Shuttle Logo" 
@@ -488,8 +489,8 @@ export default function UniversalHeader({ customLogo, customLogoAlt, forceBanner
                   />
                 )}
                 
-                {/* Marketplace Logo - Only show for non-admin users and no custom logo */}
-                {!customLogo && !isAdmin && (
+                {/* Marketplace Logo - Only show for non-admin, non-Pro users and no custom logo */}
+                {!customLogo && !isAdmin && !isProMember && (
                   <img 
                     src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755176111/MarketspaceLogo_y4s7os.svg" 
                     alt="Marketspace Logo" 
@@ -1154,6 +1155,22 @@ export default function UniversalHeader({ customLogo, customLogoAlt, forceBanner
                           </Link>
                         )}
 
+                        {/* Pro Membership - Only show for Pro members */}
+                        {profile?.isProMember && (
+                          <Link 
+                            href="/account/dashboard?view=pro-membership"
+                            className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
+                            onClick={() => setShowProfileDropdown(false)}
+                          >
+                            <img 
+                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                              alt="Pro Logo" 
+                              className="w-5 h-5 object-contain"
+                            />
+                            <span>Pro Membership</span>
+                          </Link>
+                        )}
+
                         <Link 
                           href="/account/dashboard?view=financial"
                           className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white"
@@ -1510,7 +1527,7 @@ export default function UniversalHeader({ customLogo, customLogoAlt, forceBanner
         <div className="p-6">
           {/* Menu Header */}
           <div className="flex items-center justify-between mb-8">
-            {isAdmin ? (
+            {(isAdmin || isProMember) ? (
               <img 
                 src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755791936/SSPro_wxtsdq.png" 
                 alt="SSPro Logo" 

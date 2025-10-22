@@ -1,6 +1,7 @@
 import React from 'react';
 import Head from 'next/head';
 import Image from 'next/image';
+import Link from 'next/link';
 import UniversalHeader from '../components/UniversalHeader';
 import UniversalFooter from '../components/UniversalFooter';
 import { Check, Star, ShieldCheck, Truck, Tag, Headphones, Sparkles, ArrowRight } from 'lucide-react';
@@ -150,37 +151,39 @@ const StickerShuttlePro = () => {
                 />
               </div>
               
-              <h1 className="text-3xl md:text-5xl font-bold text-white mb-6" style={{ fontFamily: 'Rubik, sans-serif', fontWeight: 'bold' }}>
+              <h1 className="text-3xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white mb-6 lg:mb-8" style={{ fontFamily: 'Rubik, sans-serif', fontWeight: 'bold' }}>
                 <span className="block">Join <span className="pro-gradient">Pro</span> and</span>
-                <span className="block min-h-[3.6em]" dangerouslySetInnerHTML={{
+                <span className="block min-h-[3.6em] lg:min-h-[2.8em]" dangerouslySetInnerHTML={{
                   __html: displayText + '<span class="animate-pulse">|</span>'
                 }}></span>
               </h1>
               
-              <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
+              <p className="text-xl md:text-2xl lg:text-3xl text-gray-300 mb-8 max-w-3xl lg:max-w-4xl mx-auto">
                 Pro is only $39/month. Cancel anytime.
               </p>
               
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-                                  <button className="px-18 py-5 rounded-xl text-lg font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] flex items-center gap-2 animate-pulse-subtle button-gradient"
+                                  <Link href={`/pro/upload?plan=${selectedPlan}`}>
+                    <button className="px-18 py-5 lg:px-24 lg:py-6 rounded-xl text-lg lg:text-xl font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] flex items-center gap-2 lg:gap-3 animate-pulse-subtle button-gradient"
                           style={{
                             backdropFilter: 'blur(25px) saturate(180%)',
                             border: '1px solid rgba(61, 209, 249, 0.4)',
                             boxShadow: 'rgba(61, 209, 249, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                           }}>
                     Join Pro
-                    <ArrowRight className="w-5 h-5 transition-transform duration-300 hover:translate-x-1" />
-                  </button>
+                      <ArrowRight className="w-5 h-5 transition-transform duration-300 hover:translate-x-1" />
+                    </button>
+                  </Link>
               </div>
               
               {/* Founding 500 Progress Bar */}
-              <div className="mb-8 max-w-xs mx-auto">
+              <div className="mb-8 max-w-xs lg:max-w-md xl:max-w-lg mx-auto">
                 <div className="text-center mb-3">
-                  <span className="text-sm font-bold text-blue-300 tracking-wider">
+                  <span className="text-sm lg:text-base font-bold text-blue-300 tracking-wider">
                     Founding 500 Members
                   </span>
                 </div>
-                <div className="relative w-full h-3 bg-gray-700/30 rounded-full overflow-hidden"
+                <div className="relative w-full h-3 lg:h-4 bg-gray-700/30 rounded-full overflow-hidden"
                      style={{
                        border: '1px solid rgba(255, 255, 255, 0.1)',
                        boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
@@ -189,129 +192,148 @@ const StickerShuttlePro = () => {
                   <div className="h-full bg-gradient-to-r from-yellow-400 to-red-500 rounded-full transition-all duration-1000 ease-out"
                        style={{ width: '48.4%' }}></div>
                 </div>
-                <div className="flex justify-between text-xs text-gray-400 mt-2">
+                <div className="flex justify-between text-xs lg:text-sm text-gray-400 mt-2">
                   <span>242 members</span>
                   <span>258 spots left</span>
                 </div>
               </div>
               
               {/* Value Proposition */}
-              <i className="text-gray-300">Save <b>$1,294 per year</b> with Pro membership</i>
+              <i className="text-gray-300 text-base lg:text-lg">Save <b>$1,294 per year</b> with Pro membership</i>
               
               {/* Benefits List */}
-              <div className="mt-8 flex justify-center">
-                <ul className="space-y-2 text-gray-300" style={{ fontFamily: 'Rubik, sans-serif' }}>
+              <div className="mt-8 lg:mt-12 flex justify-center">
+                <ul className="space-y-2 lg:space-y-3 text-gray-300 text-base lg:text-lg max-w-2xl lg:max-w-4xl" style={{ fontFamily: 'Rubik, sans-serif' }}>
                   {/* Main Benefits Section Header */}
-                  <li className="flex items-center justify-center mb-4">
-                    <span className="text-m font-medium text-green-300 uppercase tracking-wide">What's Included?</span>
+                  <li className="flex items-center justify-center mb-4 lg:mb-6">
+                    <span className="text-m lg:text-lg font-medium text-green-300 uppercase tracking-wide">What's Included?</span>
+                    <span className="text-sm lg:text-base text-gray-400 ml-2">$150/mo in value</span>
                   </li>
                   
                   <li className="flex items-center justify-center">
-                    <span className="text-xl mr-3 flex-shrink-0">📦</span>
+                    <span className="text-xl lg:text-2xl mr-3 lg:mr-4 flex-shrink-0">📦</span>
                     <span><span style={{ fontWeight: 'bold' }}>100 custom stickers</span> delivered monthly <span className="line-through text-red-400" style={{ fontFamily: 'Rubik, sans-serif', fontWeight: 'bold' }}>$87</span></span>
                   </li>
                   
                   {/* Divider */}
                   <div className="flex justify-center">
-                    <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
+                    <div className="w-32 lg:w-64 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
                   </div>
                   
                   <li className="flex items-center justify-center">
-                    <span className="text-xl mr-3 flex-shrink-0">✈️</span>
+                    <span className="text-xl lg:text-2xl mr-3 lg:mr-4 flex-shrink-0">✈️</span>
                     <span><span style={{ fontWeight: 'bold' }}>2-Day Air</span> shipping on custom orders <span className="line-through text-red-400" style={{ fontFamily: 'Rubik, sans-serif', fontWeight: 'bold' }}>$20</span></span>
                   </li>
                   
                   {/* Divider */}
                   <div className="flex justify-center">
-                    <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
+                    <div className="w-32 lg:w-64 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
                   </div>
                   
                   <li className="flex items-center justify-center">
-                    <span className="text-xl mr-3 flex-shrink-0">🎫</span>
+                    <span className="text-xl lg:text-2xl mr-3 lg:mr-4 flex-shrink-0">🎫</span>
                     <span><span style={{ fontWeight: 'bold' }}>Fast Pass</span> - faster printing time&#160;</span> <span className="line-through text-red-400" style={{ fontFamily: 'Rubik, sans-serif', fontWeight: 'bold' }}>40% fee</span>
                   </li>
                   
                   {/* Divider */}
                   <div className="flex justify-center">
-                    <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
+                    <div className="w-32 lg:w-64 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
                   </div>
                   
-                  <li className="flex items-center justify-center mb-8">
+                  <li className="flex items-center justify-center mb-8 lg:mb-10">
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
                       alt="Coin Icon" 
-                      className="w-5 h-5 mr-3 flex-shrink-0"
+                      className="w-5 h-5 lg:w-6 lg:h-6 mr-3 lg:mr-4 flex-shrink-0"
                     />
                     <span><span style={{ fontWeight: 'bold' }}>Earn 5% back</span> on custom  orders</span>
                   </li>
                   
                   {/* Additional Benefits Section Header */}
-                  <li className="flex items-center justify-center mb-4">
-                    <span className="text-m font-medium text-blue-300 uppercase tracking-wide">+ Additional Benefits</span>
+                  <li className="flex items-center justify-center mb-4 lg:mb-6">
+                    <span className="text-m lg:text-lg font-medium text-blue-300 uppercase tracking-wide">+ Additional Benefits</span>
                   </li>
                   
                   <li className="flex items-center justify-center">
-                    <span className="text-xl mr-3 flex-shrink-0">🤫</span>
-                    <span><span style={{ fontWeight: 'bold' }}>Access to Pro only</span> deals & discounts</span>
+                    <span className="text-xl lg:text-2xl mr-3 lg:mr-4 flex-shrink-0">🤫</span>
+                    <span><span style={{ fontWeight: 'bold' }}>Access to Pro only</span> discounts on stickers</span>
                   </li>
                   
                   {/* Divider */}
                   <div className="flex justify-center">
-                    <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
+                    <div className="w-32 lg:w-64 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
                   </div>
                   
                   <li className="flex items-center justify-center">
-                    <span className="text-xl mr-3 flex-shrink-0">🤝</span>
-                    <span><span style={{ fontWeight: 'bold' }}>15% off</span> everything in the Marketspace</span>
+                    <span className="text-xl lg:text-2xl mr-3 lg:mr-4 flex-shrink-0">🤝</span>
+                    <span><span style={{ fontWeight: 'bold' }}>Exclusive deals</span> with 100+ small businesses</span>
                   </li>
 
                   {/* Divider */}
                   <div className="flex justify-center">
-                    <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
+                    <div className="w-32 lg:w-64 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
                   </div>
 
-                  <li className="flex items-center justify-center mb-8">
-                    <span className="text-xl mr-3 flex-shrink-0">💬</span>
+                  <li className="flex items-center justify-center mb-8 lg:mb-10">
+                    <span className="text-xl lg:text-2xl mr-3 lg:mr-4 flex-shrink-0">💬</span>
                     <span><span style={{ fontWeight: 'bold' }}>Exclusive text support</span> for instant help</span>
                   </li>
                   
                   
                   {/* Bonus Section */}
-                  <li className="flex items-center justify-center mb-4">
-                    <span className="text-m font-medium text-yellow-300 uppercase tracking-wide">+ Founding 500 Bonuses</span>
+                  <li className="flex items-center justify-center mb-4 lg:mb-6">
+                    <span className="text-m lg:text-lg font-medium text-yellow-300 uppercase tracking-wide">+ Founding 500 Bonuses</span>
                   </li>
+                       
+                  <li className="flex items-center justify-center">
+                    <span className="text-xl lg:text-2xl mr-3 lg:mr-4 flex-shrink-0">🎁</span>
+                    <span><span style={{ fontWeight: 'bold' }}>Additional 25 stickers for your first month</span></span>
+                  </li>
+
+                  <div className="flex justify-center">
+                    <div className="w-32 lg:w-64 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
+                  </div>
+
+                  <li className="flex items-center justify-center">
+                    <span className="text-xl lg:text-2xl mr-3 lg:mr-4 flex-shrink-0">💎</span>
+                    <span><span style={{ fontWeight: 'bold' }}>Exclusive Pro Sticker Pack</span></span>
+                  </li>
+
+                  <div className="flex justify-center">
+                    <div className="w-32 lg:w-64 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
+                  </div>
                   
                   <li className="flex items-center justify-center">
-                    <span className="text-xl mr-3 flex-shrink-0">🎁</span>
+                    <span className="text-xl lg:text-2xl mr-3 lg:mr-4 flex-shrink-0">📖</span>
                     <span><span style={{ fontWeight: 'bold' }}>FREE 30-Day Small Business Challenge</span></span>
                   </li>
                   
                   {/* Divider */}
                   <div className="flex justify-center">
-                    <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
+                    <div className="w-32 lg:w-64 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
                   </div>
                   
 
                   <li className="flex items-center justify-center">
-                    <span className="text-xl mr-3 flex-shrink-0">🎁</span>
+                    <span className="text-xl lg:text-2xl mr-3 lg:mr-4 flex-shrink-0">🗺️</span>
                     <span><span style={{ fontWeight: 'bold' }}>FREE Roadmap to Your First 100 Sales</span></span>
                   </li>
                                     {/* Divider */}
                                     <div className="flex justify-center">
-                    <div className="w-32 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
+                    <div className="w-32 lg:w-64 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
                   </div>
                   <li className="flex items-center justify-center">
-                    <span className="text-xl mr-3 flex-shrink-0">🎁</span>
+                    <span className="text-xl lg:text-2xl mr-3 lg:mr-4 flex-shrink-0">🎨</span>
                     <span><span style={{ fontWeight: 'bold' }}>150+ Exclusive Customizable Designs</span></span>
                   </li>
                 </ul>
               </div>
               
               {/* Trusted Brands Section */}
-              <div className="mt-12">
-                <div className="flex justify-center mb-8">
+              <div className="mt-12 lg:mt-16">
+                <div className="flex justify-center mb-8 lg:mb-12">
                   <div 
-                    className="px-4 py-1.5 rounded-full text-center text-sm text-gray-300"
+                    className="px-4 lg:px-6 py-1.5 lg:py-2 rounded-full text-center text-sm lg:text-base text-gray-300"
                     style={{
                       background: 'rgba(255, 255, 255, 0.05)',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -324,7 +346,7 @@ const StickerShuttlePro = () => {
                 </div>
                 <div className="relative overflow-hidden">
                   <div 
-                    className="flex gap-4 animate-scroll"
+                    className="flex gap-4 lg:gap-6 animate-scroll"
                     style={{
                       animation: 'scroll 35s linear infinite',
                       width: 'max-content'
@@ -370,11 +392,11 @@ const StickerShuttlePro = () => {
               </div>
               
               {/* Pricing Selection */}
-              <div className="mt-16 max-w-4xl mx-auto">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div className="mt-16 lg:mt-20 max-w-4xl lg:max-w-5xl mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 mb-8 lg:mb-12">
                   {/* Pro Monthly */}
                   <div 
-                    className={`p-8 rounded-2xl text-center cursor-pointer transition-all duration-300 hover:scale-105 backdrop-blur-md ${
+                    className={`p-8 lg:p-10 rounded-2xl lg:rounded-3xl text-center cursor-pointer transition-all duration-300 hover:scale-105 backdrop-blur-md ${
                       selectedPlan === 'monthly'
                         ? 'bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue'
                         : 'border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70'
@@ -383,21 +405,21 @@ const StickerShuttlePro = () => {
                       border: selectedPlan === 'monthly' ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
                     }}
                     onClick={() => setSelectedPlan('monthly')}>
-                    <div className="flex items-start justify-center gap-2 mb-4">
+                    <div className="flex items-start justify-center gap-2 lg:gap-3 mb-4 lg:mb-6">
                       <img 
                         src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
                         alt="Sticker Shuttle Pro Logo" 
-                        className="h-8 w-auto object-contain"
+                        className="h-8 lg:h-10 w-auto object-contain"
                       />
-                      <span className="text-2xl font-bold -mt-1">Monthly</span>
+                      <span className="text-2xl lg:text-3xl font-bold -mt-1">Monthly</span>
                     </div>
-                    <div className="text-4xl font-bold mb-2" style={{ fontFamily: 'Rubik, sans-serif' }}>$39</div>
-                    <div className="text-sm">per month</div>
+                    <div className="text-4xl lg:text-5xl font-bold mb-2 lg:mb-3" style={{ fontFamily: 'Rubik, sans-serif' }}>$39</div>
+                    <div className="text-sm lg:text-base">per month</div>
                   </div>
                   
                   {/* Pro Annual */}
                   <div 
-                    className={`p-8 rounded-2xl text-center cursor-pointer transition-all duration-300 hover:scale-105 backdrop-blur-md ${
+                    className={`p-8 lg:p-10 rounded-2xl lg:rounded-3xl text-center cursor-pointer transition-all duration-300 hover:scale-105 backdrop-blur-md ${
                       selectedPlan === 'annual'
                         ? 'bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue'
                         : 'border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70'
@@ -407,7 +429,7 @@ const StickerShuttlePro = () => {
                     }}
                     onClick={() => setSelectedPlan('annual')}>
                     {selectedPlan === 'annual' && (
-                      <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-blue-300 mb-4"
+                      <div className="inline-flex items-center px-3 lg:px-4 py-1 lg:py-1.5 rounded-full text-xs lg:text-sm font-medium text-blue-300 mb-4 lg:mb-6"
                            style={{
                              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
                              backdropFilter: 'blur(25px) saturate(180%)',
@@ -416,17 +438,17 @@ const StickerShuttlePro = () => {
                         Best Value
                       </div>
                     )}
-                    <div className="flex items-start justify-center gap-2 mb-2">
+                    <div className="flex items-start justify-center gap-2 lg:gap-3 mb-2 lg:mb-3">
                       <img 
                         src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
                         alt="Sticker Shuttle Pro Logo" 
-                        className="h-8 w-auto object-contain"
+                        className="h-8 lg:h-10 w-auto object-contain"
                       />
-                      <span className="text-2xl font-bold -mt-1">Annual</span>
+                      <span className="text-2xl lg:text-3xl font-bold -mt-1">Annual</span>
                     </div>
-                    <div className="flex items-center justify-center gap-3 mb-2">
-                      <div className="text-4xl font-bold" style={{ fontFamily: 'Rubik, sans-serif' }}>$347</div>
-                      <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold text-white"
+                    <div className="flex items-center justify-center gap-3 lg:gap-4 mb-2 lg:mb-3">
+                      <div className="text-4xl lg:text-5xl font-bold" style={{ fontFamily: 'Rubik, sans-serif' }}>$347</div>
+                      <div className="inline-flex items-center px-2 lg:px-3 py-1 lg:py-1.5 rounded-full text-xs lg:text-sm font-bold text-white"
                            style={{
                              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.8) 0%, rgba(220, 38, 38, 0.8) 100%)',
                              backdropFilter: 'blur(25px) saturate(180%)',
@@ -436,8 +458,8 @@ const StickerShuttlePro = () => {
                         Save $121
                       </div>
                     </div>
-                    <div className="flex justify-center mb-2">
-                      <div className="text-sm font-bold tracking-widest"
+                    <div className="flex justify-center mb-2 lg:mb-3">
+                      <div className="text-sm lg:text-base font-bold tracking-widest"
                            style={{
                              background: 'linear-gradient(135deg, #FFD700 0%, #FFC107 50%, #FF8F00 100%)',
                              WebkitBackgroundClip: 'text',
@@ -447,7 +469,7 @@ const StickerShuttlePro = () => {
                         FOUNDING MEMBER SPECIAL
                       </div>
                     </div>
-                    <div className={selectedPlan === 'annual' ? 'text-blue-200' : 'text-gray-300'}>
+                    <div className={`${selectedPlan === 'annual' ? 'text-blue-200' : 'text-gray-300'} text-sm lg:text-base`}>
                       <span className="line-through text-gray-500 mr-2">(originally $468)</span>
                     </div>
                   </div>
@@ -455,15 +477,17 @@ const StickerShuttlePro = () => {
                 
                 {/* Join Pro Button */}
                 <div className="flex justify-center">
-                  <button className="px-12 py-5 rounded-xl text-xl font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] flex items-center gap-3 animate-pulse-subtle button-gradient"
+                  <Link href={`/pro/upload?plan=${selectedPlan}`}>
+                    <button className="px-12 py-5 lg:px-16 lg:py-7 rounded-xl lg:rounded-2xl text-xl lg:text-2xl font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] flex items-center gap-3 lg:gap-4 animate-pulse-subtle button-gradient"
                           style={{
                             backdropFilter: 'blur(25px) saturate(180%)',
                             border: '1px solid rgba(61, 209, 249, 0.4)',
                             boxShadow: 'rgba(61, 209, 249, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                           }}>
-                    Join Pro
-                    <ArrowRight className="w-6 h-6 transition-transform duration-300 hover:translate-x-1" />
-                  </button>
+                      Upload Design & Join Pro
+                      <ArrowRight className="w-6 h-6 lg:w-7 lg:h-7 transition-transform duration-300 hover:translate-x-1" />
+                    </button>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -474,18 +498,18 @@ const StickerShuttlePro = () => {
 
         {/* FAQ Section */}
         <div className="py-0" style={{ backgroundColor: '#030140' }}>
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#030140' }}>
-                         <div className="text-center mb-8">
-               <div className="flex justify-center mb-6">
+          <div className="max-w-4xl lg:max-w-5xl mx-auto px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#030140' }}>
+                         <div className="text-center mb-8 lg:mb-12">
+               <div className="flex justify-center mb-6 lg:mb-8">
                  <img 
                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755794735/faq_wbkcw7.png" 
                    alt="Frequently Asked Questions" 
-                   className="h-16 w-auto object-contain"
+                   className="h-16 lg:h-20 w-auto object-contain"
                  />
                </div>
              </div>
             
-            <div className="space-y-6" style={{ backgroundColor: '#030140' }}>
+            <div className="space-y-6 lg:space-y-8" style={{ backgroundColor: '#030140' }}>
               {[
                 {
                   question: "Do you design the stickers for me?",
@@ -512,7 +536,7 @@ const StickerShuttlePro = () => {
                   answer: "Pro members get a direct SMS line to our support team for faster response times and personalized assistance with orders and design questions. We're here to help!"
                 }
               ].map((faq, index) => (
-                <div key={index} className="flex gap-3">
+                <div key={index} className="flex gap-3 lg:gap-4">
                   {/* Question Bubble */}
                   <div className="flex-shrink-0">
                     <img 
@@ -523,34 +547,34 @@ const StickerShuttlePro = () => {
                         "https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751390215/StickerShuttle_Avatar1_dmnkat.png"
                       ][index % 4]}
                       alt="User Avatar" 
-                      className="w-10 h-10 rounded-full object-cover"
+                      className="w-10 h-10 lg:w-12 lg:h-12 rounded-full object-cover"
                     />
                   </div>
                   <div className="flex-1">
-                    <div className="bg-blue-500/20 rounded-2xl rounded-tl-md px-4 pt-4 pb-3 mb-4"
+                    <div className="bg-blue-500/20 rounded-2xl lg:rounded-3xl rounded-tl-md px-4 lg:px-6 pt-4 lg:pt-5 pb-3 lg:pb-4 mb-4 lg:mb-5"
                          style={{
                            border: '1px solid rgba(59, 130, 246, 0.3)',
                            boxShadow: 'rgba(59, 130, 246, 0.2) 0px 4px 16px'
                          }}>
-                      <h3 className="text-lg font-semibold text-white">{faq.question}</h3>
+                      <h3 className="text-lg lg:text-xl font-semibold text-white">{faq.question}</h3>
                     </div>
                     
                     {/* Answer Bubble */}
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 lg:gap-4">
                       <div className="flex-shrink-0">
                         <img 
                           src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591685/Candy_Gradient_-_Circle_Peel_-_SA_o742cg.png" 
                           alt="Sticker Shuttle Avatar" 
-                          className="w-8 h-8 rounded-full object-cover"
+                          className="w-8 h-8 lg:w-10 lg:h-10 rounded-full object-cover"
                         />
                       </div>
                       <div className="flex-1">
-                        <div className="bg-gray-700/30 rounded-2xl rounded-tl-md p-4"
+                        <div className="bg-gray-700/30 rounded-2xl lg:rounded-3xl rounded-tl-md p-4 lg:p-6"
                              style={{
                                border: '1px solid rgba(255, 255, 255, 0.1)',
                                boxShadow: 'rgba(0, 0, 0, 0.2) 0px 4px 16px'
                              }}>
-                          <p className="text-gray-200">{faq.answer}</p>
+                          <p className="text-gray-200 text-base lg:text-lg">{faq.answer}</p>
                         </div>
                       </div>
                     </div>
@@ -560,16 +584,18 @@ const StickerShuttlePro = () => {
             </div>
             
             {/* Join Pro Button */}
-            <div className="flex justify-center mt-12 mb-16">
-              <button className="px-12 py-5 rounded-xl text-xl font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] flex items-center gap-3 animate-pulse-subtle button-gradient"
+            <div className="flex justify-center mt-12 lg:mt-16 mb-16 lg:mb-20">
+              <Link href={`/pro/upload?plan=${selectedPlan}`}>
+                <button className="px-12 py-5 lg:px-16 lg:py-7 rounded-xl lg:rounded-2xl text-xl lg:text-2xl font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] flex items-center gap-3 lg:gap-4 animate-pulse-subtle button-gradient"
                       style={{
                         backdropFilter: 'blur(25px) saturate(180%)',
                         border: '1px solid rgba(61, 209, 249, 0.4)',
                         boxShadow: 'rgba(61, 209, 249, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                       }}>
-                Join Pro
-                <ArrowRight className="w-6 h-6 transition-transform duration-300 hover:translate-x-1" />
-              </button>
+                  Join Pro
+                  <ArrowRight className="w-6 h-6 lg:w-7 lg:h-7 transition-transform duration-300 hover:translate-x-1" />
+                </button>
+              </Link>
             </div>
           </div>
         </div>

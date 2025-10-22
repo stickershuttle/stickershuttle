@@ -176,6 +176,20 @@ const DefaultView: React.FC<DefaultViewProps> = ({
   // Default view content is rendered here
   return (
     <>
+      <style jsx global>{`
+        @keyframes gradient-move {
+          0% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
+          100% {
+            background-position: 0% 50%;
+          }
+        }
+      `}</style>
+      
       {/* Order Completion Success Message */}
       {showOrderCompleteMessage && (
         <div className="mb-6 p-4 rounded-xl bg-green-500/20 border-2 border-green-400/50 animate-pulse">
@@ -280,6 +294,87 @@ const DefaultView: React.FC<DefaultViewProps> = ({
             >
               <i className="fas fa-times"></i>
             </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Pro Membership Status Card */}
+      {profile?.isProMember && (
+        <div 
+          className="mb-6 p-6 rounded-2xl relative overflow-hidden"
+          style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+            backdropFilter: 'blur(12px)'
+          }}
+        >
+          {/* Animated gradient background */}
+          <div 
+            className="absolute inset-0 opacity-10"
+            style={{
+              background: 'linear-gradient(45deg, #3dd1f9, #2bb8d9, #4dd8ff, #7ee3ff, #3dd1f9)',
+              backgroundSize: '300% 300%',
+              animation: 'gradient-move 3s ease-in-out infinite',
+            }}
+          />
+
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <img 
+                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                  alt="Pro Badge" 
+                  className="h-12 w-auto"
+                />
+                <div>
+                  <h2 className="text-xl font-bold text-white">Active Pro Member</h2>
+                  <p className="text-sm text-cyan-400">
+                    {profile?.pro_plan === 'monthly' ? 'Monthly Plan' : 
+                     profile?.pro_plan === 'annual' ? 'Annual Plan' : 'Pro Plan'}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-400">Status</p>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-semibold text-green-400">Active</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Membership Period */}
+            {profile?.pro_current_period_start && profile?.pro_current_period_end && (
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <p className="text-xs text-gray-400 mb-2">Current Billing Period</p>
+                <p className="text-sm text-white">
+                  {new Date(profile.pro_current_period_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  {' → '}
+                  {new Date(profile.pro_current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+              </div>
+            )}
+
+            {/* Quick Action Button */}
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <button
+                onClick={() => setCurrentView('pro-membership')}
+                className="px-4 py-2 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105"
+                style={{
+                  background: 'linear-gradient(45deg, #3dd1f9, #2bb8d9, #4dd8ff, #7ee3ff, #3dd1f9)',
+                  backgroundSize: '300% 300%',
+                  animation: 'gradient-move 3s ease-in-out infinite',
+                  border: '1px solid rgba(61, 209, 249, 0.4)',
+                  boxShadow: 'rgba(61, 209, 249, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                }}
+              >
+                <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+                View Pro Details
+              </button>
+            </div>
           </div>
         </div>
       )}

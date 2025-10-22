@@ -91,26 +91,36 @@ class StripeClient {
         }
       }
 
+      // Check if this is a subscription (Pro membership)
+      const isSubscription = orderData.metadata?.isSubscription === 'true';
+      const subscriptionInterval = orderData.metadata?.plan === 'monthly' ? 'month' : 'year';
+      
+      console.log('🔄 Payment mode:', isSubscription ? `subscription (${subscriptionInterval})` : 'one-time payment');
+
       const sessionConfig = {
         payment_method_types: ['card'],
         line_items: orderData.lineItems.map(item => {
           // Apply discount proportionally to each item
-          const itemTotalPrice = safeParseFloat(item.totalPrice, 0);
+          // Use totalPrice if available, otherwise calculate from unitPrice * quantity
+          const itemTotalPrice = item.totalPrice 
+            ? safeParseFloat(item.totalPrice, 0)
+            : safeParseFloat(item.unitPrice, 0) * (item.quantity || 1);
           const itemDiscountAmount = itemTotalPrice * discountRatio;
           const discountedItemPrice = itemTotalPrice - itemDiscountAmount;
           
           console.log(`📦 Item pricing: ${item.name}`, {
             originalPrice: itemTotalPrice,
             itemDiscountAmount,
-            discountedPrice: discountedItemPrice
+            discountedPrice: discountedItemPrice,
+            isSubscription
           });
 
-          return {
+          const lineItemConfig = {
             price_data: {
               currency: orderData.currency || 'usd',
               product_data: {
                 name: item.name || item.title,
-                description: item.description || `${item.name} - Custom Stickers (${item.quantity} pieces)${totalDiscounts > 0 ? ` (${orderData.cartMetadata.discountCode ? orderData.cartMetadata.discountCode + ' discount' : ''}${creditsApplied > 0 ? (orderData.cartMetadata.discountCode ? ' + ' : '') + '$' + creditsApplied.toFixed(2) + ' credits' : ''} applied)` : ''}`,
+                description: item.description || `${item.name} - Custom Stickers (${item.quantity} pieces)${totalDiscounts > 0 ? ` (${orderData.cartMetadata?.discountCode ? orderData.cartMetadata.discountCode + ' discount' : ''}${creditsApplied > 0 ? (orderData.cartMetadata?.discountCode ? ' + ' : '') + '$' + creditsApplied.toFixed(2) + ' credits' : ''} applied)` : ''}`,
                 metadata: {
                   productId: item.productId,
                   sku: item.sku,
@@ -134,8 +144,17 @@ class StripeClient {
             },
             quantity: 1, // Always 1, actual quantity is in product description and metadata
           };
+
+          // Add recurring configuration for subscriptions
+          if (isSubscription) {
+            lineItemConfig.price_data.recurring = {
+              interval: subscriptionInterval
+            };
+          }
+
+          return lineItemConfig;
         }),
-        mode: 'payment',
+        mode: isSubscription ? 'subscription' : 'payment',
         success_url: `${orderData.successUrl}?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: orderData.cancelUrl,
         metadata: {
@@ -157,24 +176,34 @@ class StripeClient {
           customerPhone: orderData.customerPhone || '',
           // Additional payment fields
           isAdditionalPayment: orderData.cartMetadata?.isAdditionalPayment?.toString() || 'false',
-          originalOrderId: orderData.cartMetadata?.originalOrderId || ''
-        },
-        shipping_address_collection: {
-          allowed_countries: ['US', 'CA'], // Add more countries as needed
-        },
-        // Enable phone number collection to get customer names
-        phone_number_collection: {
-          enabled: true
-        },
-        // Enable automatic tax calculation
-        automatic_tax: {
-          enabled: true
-        },
-        // Enable customer address updates for automatic tax calculation
-        customer_update: {
-          shipping: 'auto'
+          originalOrderId: orderData.cartMetadata?.originalOrderId || '',
+          // Subscription-specific metadata
+          isSubscription: isSubscription.toString(),
+          subscriptionInterval: isSubscription ? subscriptionInterval : '',
+          ...orderData.metadata // Include any additional metadata from the request
         }
       };
+
+      // Always collect shipping address (needed for both custom orders and Pro membership stickers)
+      sessionConfig.shipping_address_collection = {
+        allowed_countries: ['US', 'CA'], // Add more countries as needed
+      };
+
+      // Always enable phone number collection
+      sessionConfig.phone_number_collection = {
+        enabled: true
+      };
+
+      // Only enable automatic tax for non-subscription products
+      // (subscriptions are typically tax-exempt memberships)
+      if (!isSubscription) {
+        sessionConfig.automatic_tax = {
+          enabled: true
+        };
+        sessionConfig.customer_update = {
+          shipping: 'auto'
+        };
+      }
 
       // Add customer information
       if (customerId) {
@@ -409,10 +438,18 @@ class StripeClient {
         ];
       }
 
-      const session = await this.stripe.checkout.sessions.create({
-        ...sessionConfig,
-        shipping_options: shippingOptions,
-      });
+      // Create session with or without shipping options
+      const sessionCreateData = {
+        ...sessionConfig
+      };
+
+      // Only add shipping options for non-subscription products
+      // Subscriptions can collect addresses but can't have shipping_options
+      if (!isSubscription) {
+        sessionCreateData.shipping_options = shippingOptions;
+      }
+
+      const session = await this.stripe.checkout.sessions.create(sessionCreateData);
 
       return {
         success: true,

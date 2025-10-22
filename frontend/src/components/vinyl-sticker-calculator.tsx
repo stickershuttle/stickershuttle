@@ -177,11 +177,27 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
     return profile.is_wholesale_customer && profile.wholesale_status === 'approved';
   }
 
+  // Check if user is Pro member
+  const isProMember = () => {
+    if (!profile) return false;
+    return profile.is_pro_member === true;
+  }
+
   // Calculate wholesale discount (15% off)
   const calculateWholesaleDiscount = (originalPrice: number) => {
     if (!isWholesaleApproved()) return { discountAmount: 0, finalPrice: originalPrice };
     
     const discountAmount = originalPrice * 0.15; // 15% discount
+    const finalPrice = originalPrice - discountAmount;
+    
+    return { discountAmount, finalPrice };
+  }
+
+  // Calculate Pro member discount (5% off)
+  const calculateProDiscount = (originalPrice: number) => {
+    if (!isProMember() || isWholesaleApproved()) return { discountAmount: 0, finalPrice: originalPrice };
+    
+    const discountAmount = originalPrice * 0.05; // 5% discount
     const finalPrice = originalPrice - discountAmount;
     
     return { discountAmount, finalPrice };
@@ -779,10 +795,21 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
     const quantity = selectedQuantity === "Custom" ? Number.parseInt(customQuantity) || 0 : Number.parseInt(selectedQuantity);
     const { total, perSticker } = calculatePrice(quantity, area, isRushOrder, vibrancyBoost);
 
-    // Apply wholesale discount if applicable
-    const { discountAmount, finalPrice } = calculateWholesaleDiscount(total);
-    const finalUnitPrice = isWholesaleApproved() ? finalPrice / quantity : perSticker;
-    const finalTotalPrice = isWholesaleApproved() ? finalPrice : total;
+    // Apply discounts if applicable (wholesale takes priority over Pro)
+    const wholesaleDiscount = calculateWholesaleDiscount(total);
+    const proDiscount = calculateProDiscount(total);
+    
+    const finalUnitPrice = isWholesaleApproved() 
+      ? wholesaleDiscount.finalPrice / quantity 
+      : isProMember() 
+        ? proDiscount.finalPrice / quantity 
+        : perSticker;
+    
+    const finalTotalPrice = isWholesaleApproved() 
+      ? wholesaleDiscount.finalPrice 
+      : isProMember() 
+        ? proDiscount.finalPrice 
+        : total;
 
     return {
       id: generateCartItemId(),
@@ -1401,6 +1428,7 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
                       </div>
                     </div>
                   )}
+
                   
                   <div className="flex justify-between items-center">
                     {/* For wholesale accounts, flip the layout */}
@@ -1480,9 +1508,23 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
                       /* Regular customer layout */
                       <>
                         <div className="flex items-center gap-2">
-                          <span className="text-lg font-semibold text-white/80">Total:</span>
-                          <span className="text-lg font-medium text-green-200">
-                            {totalPrice}
+                          {isProMember() ? (
+                            <span className="flex items-center gap-2 text-lg font-semibold text-cyan-300">
+                              <img 
+                                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                                alt="Pro" 
+                                className="w-5 h-5 object-contain"
+                              />
+                              Pricing:
+                            </span>
+                          ) : (
+                            <span className="text-lg font-semibold text-white/80">Total:</span>
+                          )}
+                          <span className={`text-lg font-medium ${isProMember() ? 'text-cyan-200' : 'text-green-200'}`}>
+                            {isProMember() 
+                              ? `$${calculateProDiscount(parseFloat(totalPrice.replace('$', ''))).finalPrice.toFixed(2)}`
+                              : totalPrice
+                            }
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1564,7 +1606,9 @@ export default function StickerCalculator({ initialBasePricing, realPricingData,
                           const originalPrice = parseFloat(totalPrice.replace('$', ''));
                           const finalPrice = isWholesaleApproved() 
                             ? calculateWholesaleDiscount(originalPrice).finalPrice 
-                            : originalPrice;
+                            : isProMember()
+                              ? calculateProDiscount(originalPrice).finalPrice
+                              : originalPrice;
                           return (finalPrice * getCreditRate()).toFixed(2);
                         })()} in store credit on this order!
                       </span>

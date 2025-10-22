@@ -62,6 +62,12 @@ export const GET_USER_PROFILE = gql`
       taxExemptExpiresAt
       taxExemptUpdatedAt
       taxExemptUpdatedBy
+      isProMember
+      proDesignApproved
+      proCurrentDesignFile
+      proDesignApprovedAt
+      proDesignLocked
+      proDesignLockedAt
       createdAt
       updatedAt
     }

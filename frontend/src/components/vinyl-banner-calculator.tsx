@@ -133,11 +133,27 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
     return profile.is_wholesale_customer && profile.wholesale_status === 'approved';
   };
 
+  // Check if user is Pro member
+  const isProMember = () => {
+    if (!profile) return false;
+    return profile.is_pro_member === true;
+  };
+
   // Calculate wholesale discount (15% off)
   const calculateWholesaleDiscount = (originalPrice: number) => {
     if (!isWholesaleApproved()) return { discountAmount: 0, finalPrice: originalPrice };
     
     const discountAmount = originalPrice * 0.15;
+    const finalPrice = originalPrice - discountAmount;
+    
+    return { discountAmount, finalPrice };
+  };
+
+  // Calculate Pro member discount (5% off)
+  const calculateProDiscount = (originalPrice: number) => {
+    if (!isProMember() || isWholesaleApproved()) return { discountAmount: 0, finalPrice: originalPrice };
+    
+    const discountAmount = originalPrice * 0.05; // 5% discount
     const finalPrice = originalPrice - discountAmount;
     
     return { discountAmount, finalPrice };
@@ -396,10 +412,21 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
     const sqFt = calculateSquareFootage();
     const quantity = selectedQuantity === 'Custom' ? parseInt(customQuantity) || 1 : parseInt(selectedQuantity);
     
-    // Apply wholesale discount if applicable
-    const { discountAmount, finalPrice } = calculateWholesaleDiscount(pricing.total);
-    const finalUnitPrice = isWholesaleApproved() ? finalPrice / quantity : pricing.perUnit;
-    const finalTotalPrice = isWholesaleApproved() ? finalPrice : pricing.total;
+    // Apply discounts if applicable (wholesale takes priority over Pro)
+    const wholesaleDiscount = calculateWholesaleDiscount(pricing.total);
+    const proDiscount = calculateProDiscount(pricing.total);
+    
+    const finalUnitPrice = isWholesaleApproved() 
+      ? wholesaleDiscount.finalPrice / quantity 
+      : isProMember() 
+        ? proDiscount.finalPrice / quantity 
+        : pricing.perUnit;
+    
+    const finalTotalPrice = isWholesaleApproved() 
+      ? wholesaleDiscount.finalPrice 
+      : isProMember() 
+        ? proDiscount.finalPrice 
+        : pricing.total;
 
     return {
       id: generateCartItemId(),
@@ -461,7 +488,11 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
           sqFt: sqFt,
           ...(isWholesaleApproved() && {
             originalPrice: pricing.total,
-            wholesaleDiscount: discountAmount
+            wholesaleDiscount: wholesaleDiscount.discountAmount
+          }),
+          ...(isProMember() && !isWholesaleApproved() && {
+            originalPrice: pricing.total,
+            proDiscount: proDiscount.discountAmount
           })
         }
       },
@@ -1146,13 +1177,38 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
                 
                 <div className="border-t border-white/20 pt-2 mt-3">
                   <div className="flex justify-between text-white font-semibold text-xl">
-                    <span>Total:</span>
-                    <span className="text-green-200">
-                      ${isWholesaleApproved() ? calculateWholesaleDiscount(pricing.total).finalPrice.toFixed(2) : pricing.total.toFixed(2)}
+                    {isProMember() && !isWholesaleApproved() ? (
+                      <div className="flex items-center gap-2">
+                        <img 
+                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                          alt="Pro" 
+                          className="w-5 h-5 object-contain"
+                        />
+                        <span className="text-cyan-300">Pricing:</span>
+                      </div>
+                    ) : (
+                      <span>Total:</span>
+                    )}
+                    <span className={`${isProMember() && !isWholesaleApproved() ? 'text-cyan-200' : 'text-green-200'}`}>
+                      ${isWholesaleApproved() 
+                        ? calculateWholesaleDiscount(pricing.total).finalPrice.toFixed(2) 
+                        : isProMember()
+                          ? calculateProDiscount(pricing.total).finalPrice.toFixed(2)
+                          : pricing.total.toFixed(2)
+                      }
                     </span>
                   </div>
                   <div className="text-right text-gray-300 text-sm">
-                    ${(isWholesaleApproved() ? calculateWholesaleDiscount(pricing.total).finalPrice / (selectedQuantity === 'Custom' ? parseInt(customQuantity) || 1 : parseInt(selectedQuantity)) : pricing.perUnit).toFixed(2)} per banner
+                    ${(() => {
+                      const quantity = selectedQuantity === 'Custom' ? parseInt(customQuantity) || 1 : parseInt(selectedQuantity);
+                      if (isWholesaleApproved()) {
+                        return (calculateWholesaleDiscount(pricing.total).finalPrice / quantity).toFixed(2);
+                      } else if (isProMember()) {
+                        return (calculateProDiscount(pricing.total).finalPrice / quantity).toFixed(2);
+                      } else {
+                        return pricing.perUnit.toFixed(2);
+                      }
+                    })()} per banner
                   </div>
                   {/* Store Credit Notification */}
                   <div className="mt-3 mb-2 px-3 py-1.5 rounded-lg text-xs font-medium text-left"
@@ -1167,7 +1223,14 @@ export default function VinylBannerCalculator({ initialBasePricing, realPricingD
                         alt="Credits" 
                         className="w-5 h-5 object-contain text-yellow-300"
                       />
-                      You'll earn ${((isWholesaleApproved() ? calculateWholesaleDiscount(pricing.total).finalPrice : pricing.total) * getCreditRate()).toFixed(2)} in store credit on this order!
+                      You'll earn ${(() => {
+                        const finalPrice = isWholesaleApproved() 
+                          ? calculateWholesaleDiscount(pricing.total).finalPrice 
+                          : isProMember()
+                            ? calculateProDiscount(pricing.total).finalPrice
+                            : pricing.total;
+                        return (finalPrice * getCreditRate()).toFixed(2);
+                      })()} in store credit on this order!
                     </span>
                   </div>
                 </div>

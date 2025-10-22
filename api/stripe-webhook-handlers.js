@@ -147,6 +147,37 @@ router.post('/', async (req, res) => {
       case 'charge.refunded':
         await handleChargeRefunded(event.data.object);
         break;
+
+      // Subscription events
+      case 'customer.subscription.created':
+        console.log('🔄 Processing customer.subscription.created event');
+        await handleSubscriptionCreated(event.data.object);
+        console.log('✅ customer.subscription.created processed successfully');
+        break;
+        
+      case 'customer.subscription.updated':
+        console.log('🔄 Processing customer.subscription.updated event');
+        await handleSubscriptionUpdated(event.data.object);
+        console.log('✅ customer.subscription.updated processed successfully');
+        break;
+        
+      case 'customer.subscription.deleted':
+        console.log('🔄 Processing customer.subscription.deleted event');
+        await handleSubscriptionDeleted(event.data.object);
+        console.log('✅ customer.subscription.deleted processed successfully');
+        break;
+        
+      case 'invoice.payment_succeeded':
+        console.log('💰 Processing invoice.payment_succeeded event');
+        await handleInvoicePaymentSucceeded(event.data.object);
+        console.log('✅ invoice.payment_succeeded processed successfully');
+        break;
+        
+      case 'invoice.payment_failed':
+        console.log('❌ Processing invoice.payment_failed event');
+        await handleInvoicePaymentFailed(event.data.object);
+        console.log('✅ invoice.payment_failed processed successfully');
+        break;
         
       // Stripe Connect events
       case 'account.updated':
@@ -2143,6 +2174,384 @@ async function handleTransferCreated(transfer) {
 
   } catch (error) {
     console.error('❌ Error handling transfer.created:', error);
+  }
+}
+
+// Subscription Event Handlers
+
+async function handleSubscriptionCreated(subscription) {
+  try {
+    console.log('🔄 Handling subscription created:', subscription.id);
+    
+    if (!supabase.isReady()) {
+      console.error('❌ Supabase not ready for subscription creation');
+      return;
+    }
+
+    const client = supabase.getServiceClient();
+    
+    // Get customer information
+    const customerId = subscription.customer;
+    const customer = await stripeClient.stripe.customers.retrieve(customerId);
+    
+    // Extract metadata from the subscription or customer
+    const userId = customer.metadata?.userId;
+    const plan = subscription.metadata?.plan || (subscription.items.data[0].price.recurring.interval === 'month' ? 'monthly' : 'annual');
+    
+    console.log('📋 Subscription details:', {
+      subscriptionId: subscription.id,
+      customerId,
+      userId,
+      plan,
+      status: subscription.status,
+      currentPeriodStart: new Date(subscription.current_period_start * 1000),
+      currentPeriodEnd: new Date(subscription.current_period_end * 1000)
+    });
+
+    // Create or update user profile with Pro status
+    if (userId && userId !== 'guest') {
+      // Get uploaded design file from customer metadata
+      const uploadedDesignFile = customer.metadata?.uploadedFileUrl;
+      
+      const { error: profileError } = await client
+        .from('user_profiles')
+        .upsert({
+          user_id: userId,
+          is_pro_member: true,
+          pro_subscription_id: subscription.id,
+          pro_plan: plan,
+          pro_status: subscription.status,
+          pro_current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+          pro_current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+          pro_current_design_file: uploadedDesignFile || null,
+          pro_design_approved: uploadedDesignFile ? false : null, // If file uploaded, needs approval
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (profileError) {
+        console.error('❌ Error updating user profile with Pro status:', profileError);
+      } else {
+        console.log('✅ User profile updated with Pro membership');
+      }
+    }
+
+    // Create initial Pro member order with uploaded design file
+    if (userId && userId !== 'guest') {
+      try {
+        console.log('📦 Creating initial Pro member order...');
+        
+        // Check if user has uploaded a design file during signup
+        const { data: userProfile, error: profileFetchError } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        if (!profileFetchError && userProfile) {
+          // Get uploaded design file from Pro signup metadata (stored in customer metadata)
+          const uploadedDesignFile = customer.metadata?.uploadedFileUrl;
+          
+          // Generate SS-XXXX format order number
+          const orderNumber = await generateOrderNumber(client);
+          
+          // Create the Pro member signup order
+          const orderData = {
+            user_id: userId,
+            order_number: orderNumber,
+            order_status: 'Pro Monthly Order',
+            fulfillment_status: 'unfulfilled',
+            financial_status: 'paid', // Pro orders are "paid" through membership
+            subtotal_price: 0.00,
+            total_tax: 0.00,
+            total_price: 0.00,
+            currency: 'USD',
+            customer_first_name: userProfile.first_name || '',
+            customer_last_name: userProfile.last_name || '',
+            customer_email: customer.email || userProfile.email || '',
+            customer_phone: userProfile.phone_number || '',
+            shipping_address: {}, // Will be updated when user provides address
+            billing_address: {},
+            order_tags: ['pro-monthly-stickers', 'pro-member', 'monthly-benefit', 'signup-order'],
+            order_note: `Initial Pro member signup order - 100 matte vinyl stickers. Plan: ${plan}`,
+            order_created_at: new Date().toISOString(),
+            order_updated_at: new Date().toISOString()
+          };
+
+          const order = await supabaseClient.createCustomerOrder(orderData);
+          
+          if (order) {
+            // Create the order item for 100 matte vinyl stickers
+            const orderItem = {
+              customer_order_id: order.id,
+              product_id: 'pro-monthly-stickers',
+              product_name: 'Pro Monthly Stickers',
+              product_category: 'vinyl-stickers',
+              sku: 'PRO-MONTHLY-100',
+              quantity: 100,
+              unit_price: 0.00,
+              total_price: 0.00,
+              calculator_selections: {
+                selectedShape: 'Custom',
+                selectedSize: '3"',
+                selectedQuantity: '100',
+                selectedMaterial: 'Matte',
+                selectedWhiteOption: 'White ink',
+                isProMember: true,
+                proMonthlyBenefit: true,
+                signupOrder: true
+              },
+              custom_files: uploadedDesignFile ? [uploadedDesignFile] : [],
+              customer_notes: `Initial Pro member signup order - 100 custom matte vinyl stickers (3"). Plan: ${plan}`,
+              fulfillment_status: 'unfulfilled',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+
+            const { error: itemError } = await client
+              .from('order_items')
+              .insert([orderItem]);
+
+            if (itemError) {
+              console.error(`❌ Error creating signup order item:`, itemError);
+            } else {
+              console.log(`✅ Successfully created Pro signup order ${orderNumber}`);
+            }
+          }
+        }
+      } catch (orderError) {
+        console.error('❌ Error creating initial Pro member order:', orderError);
+      }
+    }
+
+    // Send welcome notification
+    await notificationHelpers.sendDiscordNotification({
+      title: '🎉 New Pro Member!',
+      description: `New Pro subscription created: ${plan}`,
+      color: 0x00ff00,
+      fields: [
+        { name: 'Subscription ID', value: subscription.id, inline: true },
+        { name: 'Plan', value: plan, inline: true },
+        { name: 'Customer Email', value: customer.email || 'N/A', inline: true }
+      ]
+    });
+
+  } catch (error) {
+    console.error('❌ Error handling subscription created:', error);
+  }
+}
+
+async function handleSubscriptionUpdated(subscription) {
+  try {
+    console.log('🔄 Handling subscription updated:', subscription.id);
+    
+    if (!supabase.isReady()) {
+      console.error('❌ Supabase not ready for subscription update');
+      return;
+    }
+
+    const client = supabase.getServiceClient();
+    const customerId = subscription.customer;
+    const customer = await stripeClient.stripe.customers.retrieve(customerId);
+    const userId = customer.metadata?.userId;
+
+    if (userId && userId !== 'guest') {
+      const { error: profileError } = await client
+        .from('user_profiles')
+        .update({
+          pro_status: subscription.status,
+          pro_current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+          pro_current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('pro_subscription_id', subscription.id);
+
+      if (profileError) {
+        console.error('❌ Error updating subscription status:', profileError);
+      } else {
+        console.log('✅ Subscription status updated');
+      }
+    }
+
+  } catch (error) {
+    console.error('❌ Error handling subscription updated:', error);
+  }
+}
+
+async function handleSubscriptionDeleted(subscription) {
+  try {
+    console.log('🔄 Handling subscription deleted:', subscription.id);
+    
+    if (!supabase.isReady()) {
+      console.error('❌ Supabase not ready for subscription deletion');
+      return;
+    }
+
+    const client = supabase.getServiceClient();
+    const customerId = subscription.customer;
+    const customer = await stripeClient.stripe.customers.retrieve(customerId);
+    const userId = customer.metadata?.userId;
+
+    if (userId && userId !== 'guest') {
+      const { error: profileError } = await client
+        .from('user_profiles')
+        .update({
+          is_pro_member: false,
+          pro_status: 'canceled',
+          pro_canceled_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('pro_subscription_id', subscription.id);
+
+      if (profileError) {
+        console.error('❌ Error updating canceled subscription:', profileError);
+      } else {
+        console.log('✅ Pro membership canceled');
+      }
+    }
+
+    // Send cancellation notification
+    await notificationHelpers.sendDiscordNotification({
+      title: '😢 Pro Member Canceled',
+      description: `Pro subscription canceled: ${subscription.id}`,
+      color: 0xff0000,
+      fields: [
+        { name: 'Subscription ID', value: subscription.id, inline: true },
+        { name: 'Customer Email', value: customer.email || 'N/A', inline: true },
+        { name: 'Canceled At', value: new Date().toISOString(), inline: true }
+      ]
+    });
+
+  } catch (error) {
+    console.error('❌ Error handling subscription deleted:', error);
+  }
+}
+
+async function handleInvoicePaymentSucceeded(invoice) {
+  try {
+    console.log('💰 Handling invoice payment succeeded:', invoice.id);
+    
+    if (!supabase.isReady()) {
+      console.error('❌ Supabase not ready for invoice processing');
+      return;
+    }
+
+    const client = supabase.getServiceClient();
+    
+    // Check if this is a subscription invoice
+    if (invoice.subscription) {
+      const subscription = await stripeClient.stripe.subscriptions.retrieve(invoice.subscription);
+      const customer = await stripeClient.stripe.customers.retrieve(subscription.customer);
+      const userId = customer.metadata?.userId;
+      
+      console.log('📋 Invoice details:', {
+        invoiceId: invoice.id,
+        subscriptionId: subscription.id,
+        userId,
+        amount: invoice.amount_paid / 100,
+        periodStart: new Date(invoice.period_start * 1000),
+        periodEnd: new Date(invoice.period_end * 1000)
+      });
+
+      if (userId && userId !== 'guest') {
+        // Update subscription period in user profile
+        const { error: profileError } = await client
+          .from('user_profiles')
+          .update({
+            pro_current_period_start: new Date(invoice.period_start * 1000).toISOString(),
+            pro_current_period_end: new Date(invoice.period_end * 1000).toISOString(),
+            pro_last_payment_date: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('pro_subscription_id', subscription.id);
+
+        if (profileError) {
+          console.error('❌ Error updating subscription period:', profileError);
+        } else {
+          console.log('✅ Subscription period updated after payment');
+        }
+      }
+
+      // Send renewal notification (only for recurring payments, not initial)
+      if (invoice.billing_reason === 'subscription_cycle') {
+        await notificationHelpers.sendDiscordNotification({
+          title: '🔄 Pro Membership Renewed',
+          description: `Pro subscription renewed successfully`,
+          color: 0x00ff00,
+          fields: [
+            { name: 'Customer Email', value: customer.email || 'N/A', inline: true },
+            { name: 'Amount', value: `$${(invoice.amount_paid / 100).toFixed(2)}`, inline: true },
+            { name: 'Next Billing', value: new Date(invoice.period_end * 1000).toLocaleDateString(), inline: true }
+          ]
+        });
+      }
+    }
+
+  } catch (error) {
+    console.error('❌ Error handling invoice payment succeeded:', error);
+  }
+}
+
+async function handleInvoicePaymentFailed(invoice) {
+  try {
+    console.log('❌ Handling invoice payment failed:', invoice.id);
+    
+    if (!supabase.isReady()) {
+      console.error('❌ Supabase not ready for failed invoice processing');
+      return;
+    }
+
+    const client = supabase.getServiceClient();
+    
+    // Check if this is a subscription invoice
+    if (invoice.subscription) {
+      const subscription = await stripeClient.stripe.subscriptions.retrieve(invoice.subscription);
+      const customer = await stripeClient.stripe.customers.retrieve(subscription.customer);
+      const userId = customer.metadata?.userId;
+      
+      console.log('📋 Failed invoice details:', {
+        invoiceId: invoice.id,
+        subscriptionId: subscription.id,
+        userId,
+        amount: invoice.amount_due / 100,
+        attemptCount: invoice.attempt_count
+      });
+
+      if (userId && userId !== 'guest') {
+        // Update user profile with payment failure info
+        const { error: profileError } = await client
+          .from('user_profiles')
+          .update({
+            pro_payment_failed: true,
+            pro_last_payment_failure: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('pro_subscription_id', subscription.id);
+
+        if (profileError) {
+          console.error('❌ Error updating payment failure status:', profileError);
+        } else {
+          console.log('✅ Payment failure status updated');
+        }
+      }
+
+      // Send payment failure notification
+      await notificationHelpers.sendDiscordNotification({
+        title: '⚠️ Pro Payment Failed',
+        description: `Pro subscription payment failed`,
+        color: 0xff6600,
+        fields: [
+          { name: 'Customer Email', value: customer.email || 'N/A', inline: true },
+          { name: 'Amount', value: `$${(invoice.amount_due / 100).toFixed(2)}`, inline: true },
+          { name: 'Attempt', value: `${invoice.attempt_count}/4`, inline: true },
+          { name: 'Next Attempt', value: invoice.next_payment_attempt ? new Date(invoice.next_payment_attempt * 1000).toLocaleDateString() : 'Final attempt', inline: true }
+        ]
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error handling invoice payment failed:', error);
   }
 }
 

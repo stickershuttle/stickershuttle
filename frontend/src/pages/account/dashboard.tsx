@@ -37,6 +37,7 @@ import OrderDetailsView from '../../components/dashboard/tabs/OrderDetailsView';
 import OrderDetailsPopupView from '../../components/dashboard/tabs/OrderDetailsPopupView';
 import CreatorView from '../../components/dashboard/tabs/CreatorView';
 import ProofReviewInterface from '../../components/dashboard/ProofReviewInterface';
+import ProMembershipView from '../../components/dashboard/tabs/ProMembershipView';
 
 // Mutation to update proof status
 const UPDATE_PROOF_STATUS = gql`
@@ -79,7 +80,7 @@ const UPDATE_PROOF_FILE_BY_CUSTOMER = gql`
 import useInvoiceGenerator, { InvoiceData } from '../../components/InvoiceGenerator';
 import gql from 'graphql-tag';
 
-type DashboardView = 'default' | 'all-orders' | 'financial' | 'items-analysis' | 'design-vault' | 'clients' | 'proofs' | 'creator' | 'order-details' | 'order-details-popup' | 'settings' | 'support';
+type DashboardView = 'default' | 'pro-membership' | 'all-orders' | 'financial' | 'items-analysis' | 'design-vault' | 'clients' | 'proofs' | 'creator' | 'order-details' | 'order-details-popup' | 'settings' | 'support';
 
 function Dashboard() {
   const router = useRouter();
@@ -964,6 +965,9 @@ function Dashboard() {
           }
           break;
           
+        case 'pro-membership':
+          orderText = '> ACCESSING PRO MEMBERSHIP...';
+          break;
         case 'all-orders':
           orderText = '> LOADING ORDERS...';
           // After typing LOADING ORDERS..., show order list with typing effect
@@ -1129,7 +1133,7 @@ function Dashboard() {
       const orderNumber = router.query.orderNumber as string;
       
       if (requestedView) {
-        const validViews: DashboardView[] = ['default', 'all-orders', 'financial', 'items-analysis', 'design-vault', 'clients', 'proofs', 'creator', 'order-details', 'order-details-popup', 'settings', 'support'];
+        const validViews: DashboardView[] = ['default', 'pro-membership', 'all-orders', 'financial', 'items-analysis', 'design-vault', 'clients', 'proofs', 'creator', 'order-details', 'order-details-popup', 'settings', 'support'];
         
         if (validViews.includes(requestedView as DashboardView)) {
           // Only update if the view is actually different
@@ -2284,6 +2288,13 @@ function Dashboard() {
             isOrderShippedWithTracking={isOrderShippedWithTracking}
           />
         );
+      case 'pro-membership':
+        return (
+          <ProMembershipView
+            profile={profile}
+            user={user}
+          />
+        );
       case 'financial':
         return (
           <FinancialView
@@ -3092,6 +3103,42 @@ function Dashboard() {
                   </div>
                 </button>
 
+                {/* Pro Membership Button - Only show for Pro members */}
+                {profile?.isProMember && (
+                  <button 
+                    onClick={() => updateCurrentView('pro-membership')}
+                    className={`block p-4 shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 w-full text-left relative overflow-hidden rounded-2xl ${
+                      currentView === 'pro-membership' ? '' : ''
+                    }`}
+                    style={currentView === 'pro-membership' ? {
+                      background: 'linear-gradient(135deg, rgba(61, 209, 249, 0.4) 0%, rgba(61, 209, 249, 0.25) 50%, rgba(61, 209, 249, 0.1) 100%)',
+                      backdropFilter: 'blur(25px) saturate(180%)',
+                      border: '1px solid rgba(61, 209, 249, 0.4)',
+                      boxShadow: '0 4px 16px rgba(61, 209, 249, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                    } : {
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                      backdropFilter: 'blur(12px)'
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-transparent">
+                        <img 
+                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                          alt="Pro Logo" 
+                          className="w-7 h-7 object-contain"
+                          style={{ filter: 'drop-shadow(0 4px 12px rgba(61, 209, 249, 0.15))' }}
+                        />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-white text-sm">Pro Membership</h4>
+                        <p className="text-xs text-gray-300">Monthly sticker benefits</p>
+                      </div>
+                    </div>
+                  </button>
+                )}
+
                 {/* Stats - Grid Layout */}
                 <div className="grid grid-cols-1 gap-3">
 
@@ -3537,6 +3584,38 @@ function Dashboard() {
               </span>
             )}
           </button>
+
+          {/* Pro Membership Button - Only show for Pro members */}
+          {profile?.isProMember && (
+            <button
+              onClick={() => {
+                updateCurrentView('pro-membership');
+                setExpandedPillButton(expandedPillButton === 'pro-membership' ? null : 'pro-membership');
+              }}
+              className={`relative flex items-center p-2.5 rounded-full transition-all duration-300 ${
+                currentView === 'pro-membership' 
+                  ? 'text-cyan-300' 
+                  : 'text-white hover:text-gray-200'
+              } ${expandedPillButton === 'pro-membership' ? 'gap-2 pr-5' : ''}`}
+            >
+              {currentView === 'pro-membership' && (
+                <div className="absolute inset-px rounded-full" style={{
+                  background: 'rgba(61, 209, 249, 0.2)',
+                  boxShadow: '0 0 12px rgba(61, 209, 249, 0.5)'
+                }}></div>
+              )}
+              <img 
+                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                alt="Pro Logo" 
+                className="w-5 h-5 relative z-10 flex-shrink-0 object-contain"
+              />
+              {expandedPillButton === 'pro-membership' && (
+                <span className="text-xs font-medium relative z-10 transition-all duration-300 truncate">
+                  Pro
+                </span>
+              )}
+            </button>
+          )}
 
           <button
             onClick={() => {

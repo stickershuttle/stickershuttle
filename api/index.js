@@ -76,6 +76,53 @@ function createSuccessResponse(message, data = null) {
     data
   };
 }
+
+// Generate SS-XXXX format order number
+async function generateOrderNumber(client) {
+  try {
+    // Get the highest existing order number
+    const { data: existingOrders, error } = await client
+      .from('orders_main')
+      .select('order_number')
+      .not('order_number', 'is', null)
+      .like('order_number', 'SS-%')  // Only consider our format
+      .order('order_number', { ascending: false })
+      .limit(1);
+    
+    if (error) {
+      console.error('Error getting highest order number:', error);
+      // Fallback to timestamp-based order number
+      return `SS-${Date.now().toString().slice(-6)}`;
+    }
+    
+    let nextNumber = 1000; // Start from 1000 for 4-digit format
+    
+    if (existingOrders && existingOrders.length > 0) {
+      const lastOrderNumber = existingOrders[0].order_number;
+      console.log('📊 Last order number found:', lastOrderNumber);
+      
+      // Extract the number from SS-1000 format (handles both old 5-digit and new 4-digit)
+      const match = lastOrderNumber.match(/SS-(\d+)/);
+      if (match) {
+        const lastNumber = parseInt(match[1]);
+        // If the last number is less than 1000 (old format), start from 1000
+        // Otherwise, increment from the last number
+        nextNumber = lastNumber < 1000 ? 1000 : lastNumber + 1;
+      }
+    }
+    
+    // Generate order number: SS-1000 (4 digit number starting from 1000)
+    const orderNumber = `SS-${nextNumber}`;
+    console.log('📝 Generated new order number:', orderNumber);
+    
+    return orderNumber;
+  } catch (error) {
+    console.error('Error in generateOrderNumber:', error);
+    // Fallback to timestamp-based order number
+    return `SS-${Date.now().toString().slice(-6)}`;
+  }
+}
+
 const uploadRoutes = require('./upload-routes');
 const supabaseClient = require('./supabase-client');
 const stripeClient = require('./stripe-client');
@@ -1003,6 +1050,7 @@ const typeDefs = gql`
     # User queries
     getAllUsers: [User!]!
     getUserProfile(userId: ID!): UserProfile
+    getAllProMembers: [UserProfile!]!
     
       # Creator queries
   getCreatorByUserId(userId: ID!): Creator
@@ -1205,6 +1253,15 @@ const typeDefs = gql`
     
     # Admin user management mutations
     adminChangeUserPassword(userId: ID!, newPassword: String!): AdminPasswordChangeResult!
+    
+    # Pro member monthly order mutations
+    generateProMemberMonthlyOrders: ProMonthlyOrderResult!
+    createProMemberOrder(userId: ID!): CustomerOrder
+    
+    # Pro member design management mutations
+    updateProMemberDesign(userId: ID!, designFile: String!): ProDesignUpdateResult!
+    approveProMemberDesign(userId: ID!): ProDesignUpdateResult!
+    lockProMemberDesign(userId: ID!): ProDesignUpdateResult!
   }
 
   type Customer {
@@ -1306,6 +1363,17 @@ const typeDefs = gql`
     taxExemptExpiresAt: String
     taxExemptUpdatedAt: String
     taxExemptUpdatedBy: String
+    isProMember: Boolean
+    proStatus: String
+    proPlan: String
+    proSubscriptionId: String
+    proCurrentPeriodStart: String
+    proCurrentPeriodEnd: String
+    proDesignApproved: Boolean
+    proCurrentDesignFile: String
+    proDesignApprovedAt: String
+    proDesignLocked: Boolean
+    proDesignLockedAt: String
     createdAt: String!
     updatedAt: String!
   }
@@ -2257,6 +2325,7 @@ const typeDefs = gql`
     name: String!
     description: String
     unitPrice: Float!
+    totalPrice: Float
     quantity: Int!
     productId: String
     sku: String
@@ -2661,6 +2730,20 @@ const typeDefs = gql`
   type AdminPasswordChangeResult {
     success: Boolean!
     message: String
+    error: String
+  }
+  
+  type ProMonthlyOrderResult {
+    success: Boolean!
+    message: String
+    ordersGenerated: Int!
+    errors: [String!]!
+  }
+  
+  type ProDesignUpdateResult {
+    success: Boolean!
+    message: String
+    userProfile: UserProfile
     error: String
   }
 `;
@@ -4486,11 +4569,87 @@ const resolvers = {
           taxExemptExpiresAt: profile.tax_exempt_expires_at,
           taxExemptUpdatedAt: profile.tax_exempt_updated_at,
           taxExemptUpdatedBy: profile.tax_exempt_updated_by,
+          isProMember: profile.is_pro_member || false,
+          proStatus: profile.pro_status,
+          proPlan: profile.pro_plan,
+          proSubscriptionId: profile.pro_subscription_id,
+          proCurrentPeriodStart: profile.pro_current_period_start,
+          proCurrentPeriodEnd: profile.pro_current_period_end,
+          proDesignApproved: profile.pro_design_approved || false,
+          proCurrentDesignFile: profile.pro_current_design_file || null,
+          proDesignApprovedAt: profile.pro_design_approved_at || null,
+          proDesignLocked: profile.pro_design_locked || false,
+          proDesignLockedAt: profile.pro_design_locked_at || null,
           createdAt: profile.created_at,
           updatedAt: profile.updated_at
         };
       } catch (error) {
         console.error('❌ Error in getUserProfile:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    getAllProMembers: async () => {
+      try {
+        console.log('💎 Fetching all Pro members');
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Profile service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Fetch all profiles where is_pro_member is true
+        const { data: profiles, error } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('is_pro_member', true)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('❌ Error fetching Pro members:', error);
+          throw new Error(`Failed to fetch Pro members: ${error.message}`);
+        }
+
+        console.log(`✅ Successfully fetched ${profiles?.length || 0} Pro members`);
+        
+        return profiles.map(profile => ({
+          id: profile.id,
+          userId: profile.user_id,
+          firstName: profile.first_name,
+          lastName: profile.last_name,
+          email: profile.email,
+          displayName: profile.display_name,
+          bio: profile.bio,
+          profilePhotoUrl: profile.profile_photo_url,
+          bannerImageUrl: profile.banner_image_url,
+          profilePhotoPublicId: profile.profile_photo_public_id,
+          bannerImagePublicId: profile.banner_image_public_id,
+          companyName: profile.company_name,
+          isWholesaleCustomer: profile.is_wholesale_customer || false,
+          wholesaleMonthlyCustomers: profile.wholesale_monthly_customers,
+          wholesaleOrderingFor: profile.wholesale_ordering_for,
+          wholesaleFitExplanation: profile.wholesale_fit_explanation,
+          wholesaleStatus: profile.wholesale_status,
+          wholesaleApprovedAt: profile.wholesale_approved_at,
+          wholesaleApprovedBy: profile.wholesale_approved_by,
+          isTaxExempt: profile.is_tax_exempt || false,
+          taxExemptId: profile.tax_exempt_id,
+          taxExemptReason: profile.tax_exempt_reason,
+          taxExemptExpiresAt: profile.tax_exempt_expires_at,
+          taxExemptUpdatedAt: profile.tax_exempt_updated_at,
+          taxExemptUpdatedBy: profile.tax_exempt_updated_by,
+          isProMember: profile.is_pro_member || false,
+          proStatus: profile.pro_status,
+          proPlan: profile.pro_plan,
+          proSubscriptionId: profile.pro_subscription_id,
+          proCurrentPeriodStart: profile.pro_current_period_start,
+          proCurrentPeriodEnd: profile.pro_current_period_end,
+          createdAt: profile.created_at,
+          updatedAt: profile.updated_at
+        }));
+      } catch (error) {
+        console.error('❌ Error in getAllProMembers:', error);
         throw new Error(error.message);
       }
     },
@@ -12632,6 +12791,502 @@ const resolvers = {
         return {
           success: false,
           message: 'Failed to change password',
+          error: error.message
+        };
+      }
+    },
+
+    // Generate Pro member monthly orders
+    generateProMemberMonthlyOrders: async (_, args, context) => {
+      try {
+        console.log('🎯 Generating Pro member monthly orders');
+        
+        // Check admin authentication
+        const user = context.user;
+        requireAdminAuth(user);
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get all active Pro members
+        const { data: proMembers, error: fetchError } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('is_pro_member', true)
+          .eq('pro_status', 'active')
+          .not('pro_current_period_start', 'is', null);
+
+        if (fetchError) {
+          console.error('❌ Error fetching Pro members:', fetchError);
+          throw new Error(`Failed to fetch Pro members: ${fetchError.message}`);
+        }
+
+        console.log(`📊 Found ${proMembers?.length || 0} active Pro members`);
+
+        const ordersGenerated = [];
+        const errors = [];
+        const now = new Date();
+
+        for (const member of proMembers || []) {
+          try {
+            // Calculate when their next stickers should be ordered (5 days before monthly anniversary)
+            const periodStart = new Date(member.pro_current_period_start);
+            const nextPeriodStart = new Date(periodStart);
+            nextPeriodStart.setMonth(nextPeriodStart.getMonth() + 1);
+            
+            // Order should be placed 5 days before the next period
+            const orderDate = new Date(nextPeriodStart);
+            orderDate.setDate(orderDate.getDate() - 5);
+            
+            // Check if we should generate an order today (within 24 hours of order date)
+            const timeDiff = Math.abs(now - orderDate);
+            const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
+            
+            if (daysDiff <= 1) {
+              console.log(`📦 Generating monthly order for ${member.email}`);
+              
+              // Check if order already exists for this period
+              const { data: existingOrders, error: checkError } = await client
+                .from('customer_orders')
+                .select('id')
+                .eq('user_id', member.user_id)
+                .contains('order_tags', ['pro-monthly-stickers'])
+                .gte('order_created_at', orderDate.toISOString().split('T')[0]);
+
+              if (checkError) {
+                console.error(`❌ Error checking existing orders for ${member.email}:`, checkError);
+                errors.push(`Failed to check existing orders for ${member.email}: ${checkError.message}`);
+                continue;
+              }
+
+              if (existingOrders && existingOrders.length > 0) {
+                console.log(`⏭️ Order already exists for ${member.email} this period`);
+                continue;
+              }
+
+              // Generate order number
+              const orderNumber = `PRO-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+
+              // Create the Pro member monthly order
+              const orderData = {
+                user_id: member.user_id,
+                order_number: orderNumber,
+                order_status: 'Pro Monthly Order',
+                fulfillment_status: 'unfulfilled',
+                financial_status: 'paid', // Pro orders are "paid" through membership
+                subtotal_price: 0.00,
+                total_tax: 0.00,
+                total_price: 0.00,
+                currency: 'USD',
+                customer_first_name: member.first_name || '',
+                customer_last_name: member.last_name || '',
+                customer_email: member.email || '',
+                customer_phone: member.phone_number || '',
+                shipping_address: {}, // Will be updated when user provides address
+                billing_address: {},
+                order_tags: ['pro-monthly-stickers', 'pro-member', 'monthly-benefit'],
+                order_note: `Monthly Pro member sticker benefit - 100 matte vinyl stickers. Scheduled for ${nextPeriodStart.toLocaleDateString()}.`,
+                order_created_at: new Date().toISOString(),
+                order_updated_at: new Date().toISOString()
+              };
+
+              const order = await supabaseClient.createCustomerOrder(orderData);
+              
+              if (order) {
+                // Create the order item for 100 matte vinyl stickers
+                const orderItem = {
+                  customer_order_id: order.id,
+                  product_id: 'pro-monthly-stickers',
+                  product_name: 'Pro Monthly Stickers',
+                  product_category: 'vinyl-stickers',
+                  sku: 'PRO-MONTHLY-100',
+                  quantity: 100,
+                  unit_price: 0.00,
+                  total_price: 0.00,
+                  calculator_selections: {
+                    selectedSize: '3" x 3"',
+                    selectedQuantity: '100',
+                    selectedMaterial: 'Matte',
+                    selectedWhiteOption: 'White ink',
+                    isProMember: true,
+                    proMonthlyBenefit: true
+                  },
+                  custom_files: [], // User will upload design later
+                  customer_notes: 'Pro member monthly benefit - 100 matte vinyl stickers',
+                  fulfillment_status: 'unfulfilled',
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                };
+
+                const { error: itemError } = await client
+                  .from('order_items')
+                  .insert([orderItem]);
+
+                if (itemError) {
+                  console.error(`❌ Error creating order item for ${member.email}:`, itemError);
+                  errors.push(`Failed to create order item for ${member.email}: ${itemError.message}`);
+                } else {
+                  ordersGenerated.push(order.id);
+                  console.log(`✅ Successfully created Pro monthly order ${orderNumber} for ${member.email}`);
+                }
+              }
+            }
+          } catch (memberError) {
+            console.error(`❌ Error processing Pro member ${member.email}:`, memberError);
+            errors.push(`Failed to process ${member.email}: ${memberError.message}`);
+          }
+        }
+
+        return {
+          success: true,
+          message: `Generated ${ordersGenerated.length} Pro member monthly orders`,
+          ordersGenerated: ordersGenerated.length,
+          errors: errors
+        };
+
+      } catch (error) {
+        console.error('❌ Error in generateProMemberMonthlyOrders:', error);
+        return {
+          success: false,
+          message: 'Failed to generate Pro member monthly orders',
+          ordersGenerated: 0,
+          errors: [error.message]
+        };
+      }
+    },
+
+    // Create individual Pro member order
+    createProMemberOrder: async (_, { userId }, context) => {
+      try {
+        console.log(`🎯 Creating Pro member order for user: ${userId}`);
+        
+        // Check authentication (user can create their own order, or admin can create any)
+        const user = context.user;
+        if (!user || (user.id !== userId && !isAdminUser(user))) {
+          throw new Error('Unauthorized to create Pro member order');
+        }
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get Pro member profile
+        const { data: profile, error: profileError } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('is_pro_member', true)
+          .single();
+
+        if (profileError || !profile) {
+          throw new Error('User is not a Pro member or profile not found');
+        }
+
+        // Generate SS-XXXX format order number
+        const orderNumber = await generateOrderNumber(client);
+
+        // Create the Pro member order
+        const orderData = {
+          user_id: userId,
+          order_number: orderNumber,
+          order_status: 'Pro Monthly Order',
+          fulfillment_status: 'unfulfilled',
+          financial_status: 'paid', // Pro orders are "paid" through membership
+          subtotal_price: 0.00,
+          total_tax: 0.00,
+          total_price: 0.00,
+          currency: 'USD',
+          customer_first_name: profile.first_name || '',
+          customer_last_name: profile.last_name || '',
+          customer_email: profile.email || '',
+          customer_phone: profile.phone_number || '',
+          shipping_address: {}, // Will be updated when user provides address
+          billing_address: {},
+          order_tags: ['pro-monthly-stickers', 'pro-member', 'monthly-benefit'],
+          order_note: `Pro member monthly sticker benefit - 100 matte vinyl stickers.`,
+          order_created_at: new Date().toISOString(),
+          order_updated_at: new Date().toISOString()
+        };
+
+        const order = await supabaseClient.createCustomerOrder(orderData);
+        
+        if (order) {
+          // Get user's current design file
+          const designFiles = profile.pro_current_design_file ? [profile.pro_current_design_file] : [];
+
+          // Create the order item for 100 matte vinyl stickers
+          const orderItem = {
+            customer_order_id: order.id,
+            product_id: 'pro-monthly-stickers',
+            product_name: 'Pro Monthly Stickers',
+            product_category: 'vinyl-stickers',
+            sku: 'PRO-MONTHLY-100',
+            quantity: 100,
+            unit_price: 0.00,
+            total_price: 0.00,
+            calculator_selections: {
+              selectedShape: 'Custom',
+              selectedSize: '3"',
+              selectedQuantity: '100',
+              selectedMaterial: 'Matte',
+              selectedWhiteOption: 'White ink',
+              isProMember: true,
+              proMonthlyBenefit: true
+            },
+            custom_files: designFiles,
+            customer_notes: `Pro member monthly benefit - 100 custom matte vinyl stickers (3")${designFiles.length > 0 ? ' (Design attached)' : ' (No design - will be uploaded later)'}`,
+            fulfillment_status: 'unfulfilled',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+
+          const { error: itemError } = await client
+            .from('order_items')
+            .insert([orderItem]);
+
+          if (itemError) {
+            console.error(`❌ Error creating order item:`, itemError);
+            throw new Error(`Failed to create order item: ${itemError.message}`);
+          }
+
+          console.log(`✅ Successfully created Pro monthly order ${orderNumber} for user ${userId}`);
+          return order;
+        } else {
+          throw new Error('Failed to create order');
+        }
+
+      } catch (error) {
+        console.error('❌ Error in createProMemberOrder:', error);
+        throw new Error(error.message);
+      }
+    },
+
+    // Update Pro member design
+    updateProMemberDesign: async (_, { userId, designFile }, context) => {
+      try {
+        console.log(`🎨 Updating Pro member design for user: ${userId}`);
+        
+        // Check authentication (user can update their own design, or admin can update any)
+        const user = context.user;
+        if (!user || (user.id !== userId && !isAdminUser(user))) {
+          throw new Error('Unauthorized to update design');
+        }
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Get Pro member profile
+        const { data: profile, error: profileError } = await client
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('is_pro_member', true)
+          .single();
+
+        if (profileError || !profile) {
+          throw new Error('User is not a Pro member or profile not found');
+        }
+
+        // Check if design is locked (within 5-day production window)
+        if (profile.pro_design_locked) {
+          const lockedAt = new Date(profile.pro_design_locked_at);
+          const now = new Date();
+          const daysSinceLocked = (now.getTime() - lockedAt.getTime()) / (1000 * 60 * 60 * 24);
+          
+          if (daysSinceLocked < 5) {
+            throw new Error('Design is locked for production. Cannot change design within 5 days of printing.');
+          }
+        }
+
+        // Update the design file and reset approval status
+        const { data: updatedProfile, error: updateError } = await client
+          .from('user_profiles')
+          .update({
+            pro_current_design_file: designFile,
+            pro_design_approved: false, // Reset approval when design changes
+            pro_design_approved_at: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', userId)
+          .select('*')
+          .single();
+
+        if (updateError) {
+          console.error(`❌ Error updating Pro design:`, updateError);
+          throw new Error(`Failed to update design: ${updateError.message}`);
+        }
+
+        console.log(`✅ Successfully updated Pro design for user ${userId}`);
+        
+        return {
+          success: true,
+          message: 'Design updated successfully. Approval required for next print.',
+          userProfile: {
+            id: updatedProfile.id,
+            userId: updatedProfile.user_id,
+            firstName: updatedProfile.first_name,
+            lastName: updatedProfile.last_name,
+            email: updatedProfile.email,
+            isProMember: updatedProfile.is_pro_member,
+            proDesignApproved: updatedProfile.pro_design_approved,
+            proCurrentDesignFile: updatedProfile.pro_current_design_file,
+            proDesignApprovedAt: updatedProfile.pro_design_approved_at,
+            proDesignLocked: updatedProfile.pro_design_locked,
+            proDesignLockedAt: updatedProfile.pro_design_locked_at,
+            createdAt: updatedProfile.created_at,
+            updatedAt: updatedProfile.updated_at
+          },
+          error: null
+        };
+
+      } catch (error) {
+        console.error('❌ Error in updateProMemberDesign:', error);
+        return {
+          success: false,
+          message: 'Failed to update design',
+          userProfile: null,
+          error: error.message
+        };
+      }
+    },
+
+    // Approve Pro member design
+    approveProMemberDesign: async (_, { userId }, context) => {
+      try {
+        console.log(`✅ Approving Pro member design for user: ${userId}`);
+        
+        // Check admin authentication
+        const user = context.user;
+        requireAdminAuth(user);
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Update the design approval status
+        const { data: updatedProfile, error: updateError } = await client
+          .from('user_profiles')
+          .update({
+            pro_design_approved: true,
+            pro_design_approved_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', userId)
+          .eq('is_pro_member', true)
+          .select('*')
+          .single();
+
+        if (updateError) {
+          console.error(`❌ Error approving Pro design:`, updateError);
+          throw new Error(`Failed to approve design: ${updateError.message}`);
+        }
+
+        console.log(`✅ Successfully approved Pro design for user ${userId}`);
+        
+        return {
+          success: true,
+          message: 'Design approved successfully',
+          userProfile: {
+            id: updatedProfile.id,
+            userId: updatedProfile.user_id,
+            firstName: updatedProfile.first_name,
+            lastName: updatedProfile.last_name,
+            email: updatedProfile.email,
+            isProMember: updatedProfile.is_pro_member,
+            proDesignApproved: updatedProfile.pro_design_approved,
+            proCurrentDesignFile: updatedProfile.pro_current_design_file,
+            proDesignApprovedAt: updatedProfile.pro_design_approved_at,
+            proDesignLocked: updatedProfile.pro_design_locked,
+            proDesignLockedAt: updatedProfile.pro_design_locked_at,
+            createdAt: updatedProfile.created_at,
+            updatedAt: updatedProfile.updated_at
+          },
+          error: null
+        };
+
+      } catch (error) {
+        console.error('❌ Error in approveProMemberDesign:', error);
+        return {
+          success: false,
+          message: 'Failed to approve design',
+          userProfile: null,
+          error: error.message
+        };
+      }
+    },
+
+    // Lock Pro member design (within 5-day production window)
+    lockProMemberDesign: async (_, { userId }, context) => {
+      try {
+        console.log(`🔒 Locking Pro member design for user: ${userId}`);
+        
+        // Check admin authentication
+        const user = context.user;
+        requireAdminAuth(user);
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Lock the design for production
+        const { data: updatedProfile, error: updateError } = await client
+          .from('user_profiles')
+          .update({
+            pro_design_locked: true,
+            pro_design_locked_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', userId)
+          .eq('is_pro_member', true)
+          .select('*')
+          .single();
+
+        if (updateError) {
+          console.error(`❌ Error locking Pro design:`, updateError);
+          throw new Error(`Failed to lock design: ${updateError.message}`);
+        }
+
+        console.log(`✅ Successfully locked Pro design for user ${userId}`);
+        
+        return {
+          success: true,
+          message: 'Design locked for production',
+          userProfile: {
+            id: updatedProfile.id,
+            userId: updatedProfile.user_id,
+            firstName: updatedProfile.first_name,
+            lastName: updatedProfile.last_name,
+            email: updatedProfile.email,
+            isProMember: updatedProfile.is_pro_member,
+            proDesignApproved: updatedProfile.pro_design_approved,
+            proCurrentDesignFile: updatedProfile.pro_current_design_file,
+            proDesignApprovedAt: updatedProfile.pro_design_approved_at,
+            proDesignLocked: updatedProfile.pro_design_locked,
+            proDesignLockedAt: updatedProfile.pro_design_locked_at,
+            createdAt: updatedProfile.created_at,
+            updatedAt: updatedProfile.updated_at
+          },
+          error: null
+        };
+
+      } catch (error) {
+        console.error('❌ Error in lockProMemberDesign:', error);
+        return {
+          success: false,
+          message: 'Failed to lock design',
+          userProfile: null,
           error: error.message
         };
       }

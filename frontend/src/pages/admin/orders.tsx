@@ -149,6 +149,7 @@ const ADMIN_EMAILS = ['justin@stickershuttle.com', 'tommy@bannership.com']; // A
 
 // Helper function to check if an item is a sample pack
 const isSamplePackItem = (item: any) => {
+  if (!item) return false;
   return item.productId === 'sample-pack' || 
          item.sku === 'SP-001' ||
          item.sku === 'SS-Sample' ||
@@ -173,6 +174,8 @@ const hasCustomItemsNeedingProofs = (order: Order) => {
 
 // Helper function to get product image with sample pack support
 const getProductImage = (item: any) => {
+  if (!item) return null;
+  
   // Check for sample pack first
   if (isSamplePackItem(item)) {
     return 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1750890354/Sample-Pack_jsy2yf.png';
@@ -278,7 +281,7 @@ export default function AdminOrders() {
   const [isBannershipOnlyAdmin, setIsBannershipOnlyAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [orderTab, setOrderTab] = useState<'all' | 'marketspace' | 'bannership'>('all');
+  const [orderTab, setOrderTab] = useState<'all' | 'marketspace' | 'bannership' | 'pro'>('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'status' | 'total'>('date');
@@ -581,6 +584,13 @@ export default function AdminOrders() {
     });
   };
 
+  // Helper function to check if order is a Pro member monthly order
+  const isProOrder = (order: Order) => {
+    return order.orderTags?.includes('pro-monthly-stickers') || 
+           order.orderTags?.includes('pro-member') ||
+           order.orderStatus === 'Pro Monthly Order';
+  };
+
   // Filter and sort orders
   const allFilteredOrders = React.useMemo(() => {
     if (!data?.getAllOrders) return [];
@@ -595,8 +605,11 @@ export default function AdminOrders() {
       orders = orders.filter(order => isMarketSpaceOrder(order));
     } else if (orderTab === 'bannership') {
       orders = orders.filter(order => isBannershipOrder(order));
+    } else if (orderTab === 'pro') {
+      orders = orders.filter(order => isProOrder(order));
     } else if (orderTab === 'all') {
       // Show orders that are not Market Space and not banner-only
+      // Pro orders should appear in BOTH Custom Orders and Pro Orders tabs
       // Mixed orders (banners + stickers) will show here AND in Bannership tab
       orders = orders.filter(order => !isMarketSpaceOrder(order) && !isBannerOnlyOrder(order));
     }
@@ -2284,8 +2297,11 @@ export default function AdminOrders() {
       allOrders = allOrders.filter(order => isMarketSpaceOrder(order));
     } else if (orderTab === 'bannership') {
       allOrders = allOrders.filter(order => isBannershipOrder(order));
+    } else if (orderTab === 'pro') {
+      allOrders = allOrders.filter(order => isProOrder(order));
     } else if (orderTab === 'all') {
       // Show all orders except Market Space and banner-only orders
+      // Pro orders should appear in BOTH Custom Orders and Pro Orders analytics
       allOrders = allOrders.filter(order => !isMarketSpaceOrder(order) && !isBannerOnlyOrder(order));
     }
     
@@ -2761,6 +2777,23 @@ export default function AdminOrders() {
                           >
                             Bannership
                           </button>
+                          {!isBannershipOnlyAdmin && (
+                            <button
+                              onClick={() => setOrderTab('pro')}
+                              className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
+                                orderTab === 'pro'
+                                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                                  : 'text-gray-400 hover:text-white'
+                              }`}
+                            >
+                              <img 
+                                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                                alt="Pro" 
+                                className="w-4 h-4 object-contain"
+                              />
+                              Pro Orders
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -2928,6 +2961,23 @@ export default function AdminOrders() {
                       >
                         Bannership
                       </button>
+                      {!isBannershipOnlyAdmin && (
+                        <button
+                          onClick={() => setOrderTab('pro')}
+                          className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
+                            orderTab === 'pro'
+                              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                              : 'text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          <img 
+                            src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                            alt="Pro" 
+                            className="w-4 h-4 object-contain"
+                          />
+                          Pro Orders
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -3062,8 +3112,8 @@ export default function AdminOrders() {
                         <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2">{date}</h3>
                         <div className="bg-black/20 border-y border-gray-700/50">
                           {orders.map((order: Order, orderIndex: number) => {
-                            const firstItem = order.items[0] || {};
-                            const totalQuantity = order.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
+                            const firstItem = (order.items || [])[0] || {};
+                            const totalQuantity = (order.items || []).reduce((sum: number, item: any) => sum + item.quantity, 0);
                             const itemImage = getProductImage(firstItem);
                             const proofStatus = getProofStatus(order);
                             
@@ -3278,11 +3328,11 @@ export default function AdminOrders() {
                       <tbody>
                         {filteredOrders.map((order) => {
                           // Get first item's image for preview with sample pack support
-                          const firstItemImage = getProductImage(order.items[0]);
-                          const totalQuantity = order.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
+                          const firstItemImage = getProductImage((order.items || [])[0]);
+                          const totalQuantity = (order.items || []).reduce((sum: number, item: any) => sum + item.quantity, 0);
 
                           // Get first item's selections for columns
-                          const firstItem = order.items[0] || {};
+                          const firstItem = (order.items || [])[0] || {};
                           const firstItemSelections = firstItem.calculatorSelections || {};
                           const firstItemSize = firstItemSelections.size || firstItemSelections.sizePreset || {};
 
@@ -3318,7 +3368,7 @@ export default function AdminOrders() {
                               {/* Image Preview */}
                               <td className="px-3 py-4">
                                 <div className="flex gap-2">
-                                  {order.items.slice(0, 2).map((item: {
+                                  {(order.items || []).slice(0, 2).map((item: {
                                     id: string;
                                     productName: string;
                                     productCategory?: string;
@@ -3368,7 +3418,7 @@ export default function AdminOrders() {
                                     );
                                   })}
                                   {/* Only show additional count if there are more than 2 items */}
-                                  {order.items.length > 2 && (
+                                  {(order.items || []).length > 2 && (
                                     <div 
                                       className="flex items-center justify-center rounded-lg text-gray-400 text-xs font-medium"
                                       style={{
@@ -3378,7 +3428,7 @@ export default function AdminOrders() {
                                         border: '1px solid rgba(255, 255, 255, 0.08)'
                                       }}
                                     >
-                                      +{order.items.length - 2}
+                                      +{(order.items || []).length - 2}
                                     </div>
                                   )}
                                 </div>
@@ -3431,9 +3481,26 @@ export default function AdminOrders() {
                               </td>
                               {/* Total */}
                               <td className="px-3 py-4">
-                                <div className="text-base font-semibold" style={{ color: '#86efac' }}>
-                                  {formatCurrency(order.totalPrice)}
-                                </div>
+                                {/* Check if this is a Pro monthly order */}
+                                {order.orderTags?.includes('pro-monthly-stickers') ? (
+                                  <div className="flex items-center gap-2">
+                                    <img 
+                                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                                      alt="Pro" 
+                                      className="w-4 h-4 object-contain"
+                                    />
+                                    <span className="text-base font-semibold text-cyan-300">
+                                      $0.00
+                                    </span>
+                                    <span className="text-xs text-cyan-400 opacity-75">
+                                      (Pro Benefit)
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="text-base font-semibold" style={{ color: '#86efac' }}>
+                                    {formatCurrency(order.totalPrice)}
+                                  </div>
+                                )}
                               </td>
                               {/* Quantity */}
                               <td className="px-3 py-4">

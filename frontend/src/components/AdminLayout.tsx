@@ -351,6 +351,18 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
             </svg>
           )
         });
+      } else if (segments[1] === 'pro-members') {
+        breadcrumbs.push({
+          label: 'Pro Members',
+          href: '/admin/pro-members',
+          icon: (
+            <img 
+              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+              alt="Pro" 
+              className="w-4 h-4 object-contain"
+            />
+          )
+        });
       } else if (segments[1] === 'marketspace') {
         breadcrumbs.push({
           label: 'Creators Space',
@@ -875,8 +887,36 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
                   Analytics
                 </a>
 
-
-
+                {/* Pro Members - Only for main admin */}
+                {!isBannershipOnlyAdmin && (
+                  <a
+                    href="/admin/pro-members"
+                    className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
+                      router.asPath.startsWith('/admin/pro-members')
+                        ? 'text-white bg-cyan-500/15 border-l-3 border-cyan-500'
+                        : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                    }`}
+                    onMouseEnter={(e) => {
+                      if (!router.asPath.startsWith('/admin/pro-members')) {
+                        e.currentTarget.style.backgroundColor = 'rgba(6, 182, 212, 0.1)';
+                        e.currentTarget.style.color = '#67E8F9';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!router.asPath.startsWith('/admin/pro-members')) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = '';
+                      }
+                    }}
+                  >
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                      alt="Pro" 
+                      className="w-5 h-5 mr-3 object-contain"
+                    />
+                    Pro Members
+                  </a>
+                )}
 
 
 
@@ -1254,6 +1294,29 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
             </a>
+            
+            {/* Pro Members - Only for main admin */}
+            {!isBannershipOnlyAdmin && (
+              <a
+                href="/admin/pro-members"
+                className={`relative p-2.5 rounded-full transition-colors ${
+                  router.asPath.startsWith('/admin/pro-members') 
+                    ? 'text-cyan-400' 
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                {router.asPath.startsWith('/admin/pro-members') && (
+                  <div className="absolute inset-px rounded-full bg-cyan-500/20" style={{
+                    boxShadow: '0 0 12px rgba(6, 182, 212, 0.5)'
+                  }}></div>
+                )}
+                <img 
+                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                  alt="Pro" 
+                  className="w-5 h-5 relative z-10 object-contain"
+                />
+              </a>
+            )}
             
             {/* Quick Actions Button */}
             <button
