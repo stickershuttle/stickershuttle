@@ -3,6 +3,30 @@
     "silent": true
   },
   "ignoreCommand": "git log -1 --pretty=%B | grep -q '^Bump\\|^build(deps)\\|^chore(deps)\\|dependabot' && exit 0 || exit 1",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "destination": "https://stickershuttle.com/bannership/:path*",
+      "permanent": true,
+      "has": [
+        {
+          "type": "host",
+          "value": "bannership.com"
+        }
+      ]
+    },
+    {
+      "source": "/:path*",
+      "destination": "https://stickershuttle.com/bannership/:path*",
+      "permanent": true,
+      "has": [
+        {
+          "type": "host",
+          "value": "www.bannership.com"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/",
@@ -15,7 +39,27 @@
       ]
     },
     {
-      "source": "/:path((?!bannership).*)",
+      "source": "/products",
+      "destination": "/bannership/products",
+      "has": [
+        {
+          "type": "host",
+          "value": "bannership.stickershuttle.com"
+        }
+      ]
+    },
+    {
+      "source": "/products/:path*",
+      "destination": "/bannership/products/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "bannership.stickershuttle.com"
+        }
+      ]
+    },
+    {
+      "source": "/:path*",
       "destination": "/bannership/:path*",
       "has": [
         {

@@ -350,6 +350,7 @@ export default function BannershipXBanners() {
     <Layout 
       title="X Banners - Professional Signage | Bannership"
       description="Professional X-stand banners perfect for trade shows, events, and business displays. Easy setup and portable."
+      canonical="https://bannership.stickershuttle.com/products/x-banners"
       ogImage="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749652827/StickerShuttle_VinylBanner_VinylBanner_chvbfs.png"
       customLogo="/bannership-logo.svg"
       customLogoAlt="Bannership Logo"

@@ -243,19 +243,22 @@ const nextConfig = {
 
   // Proxy API requests to backend server during development
   async rewrites() {
-    if (process.env.NODE_ENV === 'development') {
-      return [
-        {
-          source: '/api/:path*',
-          destination: 'http://localhost:4000/api/:path*',
-        },
-        {
-          source: '/webhooks/:path*',
-          destination: 'http://localhost:4000/webhooks/:path*',
-        },
-      ];
-    }
-    return [];
+    const devRewrites = process.env.NODE_ENV === 'development' ? [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:4000/api/:path*',
+      },
+      {
+        source: '/webhooks/:path*',
+        destination: 'http://localhost:4000/webhooks/:path*',
+      },
+    ] : [];
+
+    return {
+      beforeFiles: devRewrites,
+      afterFiles: [],
+      fallback: []
+    };
   },
 
   // Add redirects for SEO

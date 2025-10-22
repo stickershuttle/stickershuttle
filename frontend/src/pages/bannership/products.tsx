@@ -32,6 +32,7 @@ export default function BannershipProducts() {
     <Layout 
       title="Banner Products - Bannership"
       description="Professional custom banners, vinyl displays, and signage with fast printing. Choose from pop-up banners, vinyl banners, and X-banners."
+      canonical="https://bannership.stickershuttle.com/products"
       customLogo="/bannership-logo.svg"
       customLogoAlt="Bannership Logo"
     >
