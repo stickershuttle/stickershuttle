@@ -213,7 +213,7 @@ const StickerShuttlePro = () => {
                   </Link>
               </div>
               
-              {/* Founding 100 Progress Bar */}
+              {/* Pro Members Count */}
               <div className="mb-8 max-w-xs lg:max-w-md xl:max-w-lg mx-auto">
                 <div className="text-center mb-3">
                   <span className="text-sm lg:text-base font-bold text-blue-300 tracking-wider">
@@ -229,8 +229,7 @@ const StickerShuttlePro = () => {
                   <div className="h-full bg-gradient-to-r from-yellow-400 to-red-500 rounded-full transition-all duration-1000 ease-out"
                        style={{ width: `${Math.min(100, (proMemberCount / 100) * 100)}%` }}></div>
                 </div>
-                <div className="flex justify-between text-xs lg:text-sm text-gray-400 mt-2">
-                  <span>{proMemberCount} members</span>
+                <div className="text-center text-xs lg:text-sm text-gray-400 mt-2">
                   <span>{Math.max(0, 100 - proMemberCount)} spots left</span>
                 </div>
               </div>
@@ -277,6 +276,16 @@ const StickerShuttlePro = () => {
                     <div className="w-32 lg:w-64 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
                   </div>
                   
+                  <li className="flex items-center justify-center">
+                    <span className="text-xl lg:text-2xl mr-3 lg:mr-4 flex-shrink-0">💬</span>
+                    <span><span style={{ fontWeight: 'bold' }}>Exclusive text support</span> for instant help</span>
+                  </li>
+                  
+                  {/* Divider */}
+                  <div className="flex justify-center">
+                    <div className="w-32 lg:w-64 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
+                  </div>
+                  
                   <li className="flex items-center justify-center mb-8 lg:mb-10">
                     <img 
                       src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1753923671/StickerShuttle_CoinIcon_aperue.png" 
@@ -292,8 +301,12 @@ const StickerShuttlePro = () => {
                   </li>
                   
                   <li className="flex items-center justify-center">
-                    <span className="text-xl lg:text-2xl mr-3 lg:mr-4 flex-shrink-0">🤫</span>
-                    <span><span style={{ fontWeight: 'bold' }}>Access to Pro only</span> discounts on stickers</span>
+                    <img 
+                      src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                      alt="Pro Logo" 
+                      className="h-5 lg:h-6 w-auto mr-3 lg:mr-4 flex-shrink-0"
+                    />
+                    <span><span style={{ fontWeight: 'bold' }}>Pro only</span> discounts on stickers</span>
                   </li>
                   
                   {/* Divider */}
@@ -303,19 +316,10 @@ const StickerShuttlePro = () => {
                   
                   <li className="flex items-center justify-center">
                     <span className="text-xl lg:text-2xl mr-3 lg:mr-4 flex-shrink-0">🤝</span>
-                    <span><span style={{ fontWeight: 'bold' }}>Exclusive deals</span> with 100+ small businesses</span>
+                    <span><span style={{ fontWeight: 'bold' }}>Discounts</span> for 100+ small businesses</span>
                   </li>
 
-                  {/* Divider */}
-                  <div className="flex justify-center">
-                    <div className="w-32 lg:w-64 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent opacity-30"></div>
-                  </div>
 
-                  <li className="flex items-center justify-center mb-8 lg:mb-10">
-                    <span className="text-xl lg:text-2xl mr-3 lg:mr-4 flex-shrink-0">💬</span>
-                    <span><span style={{ fontWeight: 'bold' }}>Exclusive text support</span> for instant help</span>
-                  </li>
-                  
                   
                   {/* Bonus Section */}
                   <li className="flex items-center justify-center mb-4 mt-12 lg:mb-6">
