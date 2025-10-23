@@ -334,7 +334,7 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                   className="h-12 w-auto"
                 />
                 <div>
-                  <h2 className="text-xl font-bold text-white">Active Pro Member</h2>
+                  <h2 className="text-xl font-bold text-white">by Sticker Shuttle</h2>
                   <p className="text-sm text-cyan-400">
                     {profile?.pro_plan === 'monthly' ? 'Monthly Plan' : 
                      profile?.pro_plan === 'annual' ? 'Annual Plan' : 'Pro Plan'}
@@ -977,26 +977,28 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                           >
                             View Details
                           </button>
-                          <div className="flex-1 flex flex-col">
-                            <button
-                              onClick={() => handleReorder(order.id)}
-                              disabled={isOrderFromDeal(order)}
-                              className="px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                              style={{
-                                background: isOrderFromDeal(order) 
-                                  ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(107, 114, 128, 0.25) 50%, rgba(107, 114, 128, 0.1) 100%)'
-                                  : 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
-                                backdropFilter: 'blur(25px) saturate(180%)',
-                                border: isOrderFromDeal(order) 
-                                  ? '1px solid rgba(107, 114, 128, 0.4)'
-                                  : '1px solid rgba(245, 158, 11, 0.4)',
-                                boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
-                                color: 'white'
-                              }}
-                            >
-                              {isOrderFromDeal(order) ? 'Reorder (Disabled on Deals)' : 'Reorder'}
-                            </button>
-                          </div>
+                          {!isProMemberOrder(order) && (
+                            <div className="flex-1 flex flex-col">
+                              <button
+                                onClick={() => handleReorder(order.id)}
+                                disabled={isOrderFromDeal(order)}
+                                className="px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{
+                                  background: isOrderFromDeal(order) 
+                                    ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(107, 114, 128, 0.25) 50%, rgba(107, 114, 128, 0.1) 100%)'
+                                    : 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
+                                  backdropFilter: 'blur(25px) saturate(180%)',
+                                  border: isOrderFromDeal(order) 
+                                    ? '1px solid rgba(107, 114, 128, 0.4)'
+                                    : '1px solid rgba(245, 158, 11, 0.4)',
+                                  boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                                  color: 'white'
+                                }}
+                              >
+                                {isOrderFromDeal(order) ? 'Reorder (Disabled on Deals)' : 'Reorder'}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1549,26 +1551,28 @@ const DefaultView: React.FC<DefaultViewProps> = ({
                           >
                             View Details
                           </button>
-                          <div className="flex-1 flex flex-col">
-                            <button
-                              onClick={() => handleReorder(order.id)}
-                              disabled={isOrderFromDeal(order)}
-                              className="px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                              style={{
-                                background: isOrderFromDeal(order) 
-                                  ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(107, 114, 128, 0.25) 50%, rgba(107, 114, 128, 0.1) 100%)'
-                                  : 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
-                                backdropFilter: 'blur(25px) saturate(180%)',
-                                border: isOrderFromDeal(order) 
-                                  ? '1px solid rgba(107, 114, 128, 0.4)'
-                                  : '1px solid rgba(245, 158, 11, 0.4)',
-                                boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
-                                color: 'white'
-                              }}
-                            >
-                              {isOrderFromDeal(order) ? 'Reorder (Disabled on Deals)' : 'Reorder'}
-                            </button>
-                          </div>
+                          {!isProMemberOrder(order) && (
+                            <div className="flex-1 flex flex-col">
+                              <button
+                                onClick={() => handleReorder(order.id)}
+                                disabled={isOrderFromDeal(order)}
+                                className="px-3 py-2 rounded text-xs font-medium transition-all duration-200 hover:scale-105 flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{
+                                  background: isOrderFromDeal(order) 
+                                    ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(107, 114, 128, 0.25) 50%, rgba(107, 114, 128, 0.1) 100%)'
+                                    : 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.25) 50%, rgba(245, 158, 11, 0.1) 100%)',
+                                  backdropFilter: 'blur(25px) saturate(180%)',
+                                  border: isOrderFromDeal(order) 
+                                    ? '1px solid rgba(107, 114, 128, 0.4)'
+                                    : '1px solid rgba(245, 158, 11, 0.4)',
+                                  boxShadow: 'rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
+                                  color: 'white'
+                                }}
+                              >
+                                {isOrderFromDeal(order) ? 'Reorder (Disabled on Deals)' : 'Reorder'}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

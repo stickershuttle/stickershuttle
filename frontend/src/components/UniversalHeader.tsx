@@ -1108,8 +1108,18 @@ export default function UniversalHeader({ customLogo, customLogoAlt, forceBanner
                             </div>
                           )}
                         </div>
-                        <div>
-                          <h3 className="text-white font-semibold">{getUserDisplayName()}</h3>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-white font-semibold">{getUserDisplayName()}</h3>
+                            {(profile?.is_pro_member || isProMember) && (
+                              <img 
+                                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                                alt="Pro Member" 
+                                className="w-5 h-5 object-contain"
+                                title="Pro Member"
+                              />
+                            )}
+                          </div>
                           <p className="text-gray-300 text-sm">{user?.email}</p>
                         </div>
                       </div>

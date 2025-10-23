@@ -3,33 +3,11 @@ import Head from 'next/head';
 import UniversalHeader from '../../components/UniversalHeader';
 import UniversalFooter from '../../components/UniversalFooter';
 import { useRouter } from 'next/router';
-import { useMutation } from '@apollo/client';
-import { CREATE_STRIPE_CHECKOUT_SESSION } from '@/lib/stripe-mutations';
-import { getSupabase } from '@/lib/supabase';
 
 const ProJoinPage = () => {
   const router = useRouter();
   const { plan: queryPlan } = router.query;
-  const [user, setUser] = useState<any>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string>((queryPlan as string) || 'annual');
-  const [error, setError] = useState<string | null>(null);
-
-  const [createCheckoutSession] = useMutation(CREATE_STRIPE_CHECKOUT_SESSION);
-
-  // Fetch user data on mount
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const supabase = getSupabase();
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        setUser(currentUser);
-      } catch (error) {
-        console.error('Error fetching user:', error);
-      }
-    };
-    fetchUser();
-  }, []);
 
   // Update selected plan when query param changes
   useEffect(() => {
@@ -38,56 +16,9 @@ const ProJoinPage = () => {
     }
   }, [queryPlan]);
 
-  const handleJoinPro = async () => {
-    try {
-      setIsProcessing(true);
-      setError(null);
-
-      // Determine the price based on the selected plan
-      const priceAmount = selectedPlan === 'monthly' ? 39.00 : 347.00;
-      const productName = selectedPlan === 'monthly' 
-        ? 'Sticker Shuttle Pro - Monthly Membership' 
-        : 'Sticker Shuttle Pro - Annual Membership';
-
-      // Create checkout session
-      const { data } = await createCheckoutSession({
-        variables: {
-          input: {
-            lineItems: [
-              {
-                name: productName,
-                description: 'Premium sticker subscription with exclusive benefits',
-                unitPrice: priceAmount,
-                totalPrice: priceAmount,
-                quantity: 1,
-                productId: `pro-${selectedPlan}`,
-                sku: `PRO-${selectedPlan.toUpperCase()}`
-              }
-            ],
-            successUrl: `${window.location.origin}/pro/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancelUrl: `${window.location.origin}/pro/join?plan=${selectedPlan}`,
-            customerEmail: user?.email || undefined,
-            userId: user?.id || undefined,
-            metadata: {
-              type: 'pro_membership',
-              plan: selectedPlan,
-              isSubscription: 'true'
-            }
-          }
-        }
-      });
-
-      if (data?.createStripeCheckoutSession?.success && data?.createStripeCheckoutSession?.checkoutUrl) {
-        // Redirect to Stripe checkout
-        window.location.href = data.createStripeCheckoutSession.checkoutUrl;
-      } else {
-        throw new Error(data?.createStripeCheckoutSession?.error || 'Failed to create checkout session');
-      }
-    } catch (error) {
-      console.error('Error creating checkout session:', error);
-      setError(error instanceof Error ? error.message : 'Failed to proceed to checkout');
-      setIsProcessing(false);
-    }
+  const handleJoinPro = () => {
+    // Redirect to signup page with selected plan
+    router.push(`/pro/signup?plan=${selectedPlan}`);
   };
 
   return (
@@ -203,34 +134,22 @@ const ProJoinPage = () => {
             </div>
           </div>
 
-          {/* Error Message */}
-          {error && (
-            <div className="mb-8 p-4 rounded-xl bg-red-500/20 border border-red-500/30">
-              <p className="text-red-300 text-center">{error}</p>
-            </div>
-          )}
-
           {/* Join Button */}
           <div className="flex justify-center">
             <button
               onClick={handleJoinPro}
-              disabled={isProcessing}
-              className="px-12 lg:px-16 py-5 lg:py-6 rounded-xl lg:rounded-2xl text-xl lg:text-2xl font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="px-12 lg:px-16 py-5 lg:py-6 rounded-xl lg:rounded-2xl text-xl lg:text-2xl font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl"
               style={{
-                background: !isProcessing
-                  ? 'linear-gradient(45deg, #3dd1f9, #2bb8d9, #4dd8ff, #7ee3ff, #3dd1f9)'
-                  : 'rgba(255, 255, 255, 0.1)',
+                background: 'linear-gradient(45deg, #3dd1f9, #2bb8d9, #4dd8ff, #7ee3ff, #3dd1f9)',
                 backgroundSize: '300% 300%',
-                animation: !isProcessing ? 'gradient-move 3s ease-in-out infinite' : 'none',
+                animation: 'gradient-move 3s ease-in-out infinite',
                 backdropFilter: 'blur(25px) saturate(180%)',
                 border: '1px solid rgba(61, 209, 249, 0.4)',
-                boxShadow: !isProcessing
-                  ? 'rgba(61, 209, 249, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                  : 'none',
+                boxShadow: 'rgba(61, 209, 249, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset',
                 fontFamily: 'Rubik, sans-serif'
               }}
             >
-              {isProcessing ? 'Processing...' : 'Join Pro Now'}
+              Continue
             </button>
           </div>
         </div>

@@ -2261,14 +2261,50 @@ async function handleSubscriptionCreated(subscription) {
       hasShippingAddress: !!shippingAddress
     });
 
-    // Create or update user profile with Pro status
+    // Create or update Pro subscription and user profile
     if (userId && userId !== 'guest') {
       // Get uploaded design file from customer metadata
       const uploadedDesignFile = customer.metadata?.uploadedFileUrl;
       
+      // STEP 1: Insert into pro_subscriptions table (new dedicated table)
+      const subscriptionData = {
+        user_id: userId,
+        stripe_subscription_id: subscription.id,
+        stripe_customer_id: customerId,
+        plan: plan,
+        status: subscription.status,
+        subscription_start_date: new Date(subscription.current_period_start * 1000).toISOString(),
+        current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+        current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+        current_design_file: uploadedDesignFile || null,
+        design_approved: uploadedDesignFile ? false : null,
+        default_shipping_address: shippingAddress || null,
+        shipping_address_updated_at: shippingAddress ? new Date().toISOString() : null,
+        metadata: {
+          source: 'stripe_webhook',
+          checkout_session_id: subscription.metadata?.checkout_session_id,
+          created_via: 'subscription.created'
+        }
+      };
+      
+      const { error: subscriptionError } = await client
+        .from('pro_subscriptions')
+        .upsert(subscriptionData, {
+          onConflict: 'user_id'
+        });
+
+      if (subscriptionError) {
+        console.error('❌ Error creating Pro subscription:', subscriptionError);
+      } else {
+        console.log('✅ Pro subscription created in dedicated table');
+      }
+      
+      // STEP 2: Update user_profiles with is_pro_member flag (for quick lookups)
+      // Keep minimal data in user_profiles, detailed data is in pro_subscriptions
       const profileUpdate = {
         user_id: userId,
         is_pro_member: true,
+        // Legacy columns kept for backward compatibility (can be removed later)
         pro_subscription_id: subscription.id,
         pro_stripe_subscription_id: subscription.id,
         pro_stripe_customer_id: customerId,
@@ -2278,7 +2314,7 @@ async function handleSubscriptionCreated(subscription) {
         pro_current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
         pro_current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
         pro_current_design_file: uploadedDesignFile || null,
-        pro_design_approved: uploadedDesignFile ? false : null, // If file uploaded, needs approval
+        pro_design_approved: uploadedDesignFile ? false : null,
         updated_at: new Date().toISOString()
       };
       
@@ -2297,8 +2333,8 @@ async function handleSubscriptionCreated(subscription) {
       if (profileError) {
         console.error('❌ Error updating user profile with Pro status:', profileError);
       } else {
-        console.log('✅ User profile updated with Pro membership');
-        console.log('📋 Pro member data saved:', {
+        console.log('✅ User profile updated with Pro membership flag');
+        console.log('📋 Pro member data saved to both tables:', {
           userId,
           subscriptionId: subscription.id,
           customerId,
@@ -2359,7 +2395,7 @@ async function handleSubscriptionCreated(subscription) {
           if (order) {
             // Create the order item for 100 matte vinyl stickers
             const orderItem = {
-              customer_order_id: order.id,
+              order_id: order.id,
               product_id: 'pro-monthly-stickers',
               product_name: 'Pro Monthly Stickers',
               product_category: 'vinyl-stickers',
@@ -2385,7 +2421,7 @@ async function handleSubscriptionCreated(subscription) {
             };
 
             const { error: itemError } = await client
-              .from('order_items')
+              .from('order_items_new')
               .insert([orderItem]);
 
             if (itemError) {
@@ -2449,6 +2485,24 @@ async function handleSubscriptionUpdated(subscription) {
     const userId = customer.metadata?.userId;
 
     if (userId && userId !== 'guest') {
+      // STEP 1: Update pro_subscriptions table
+      const { error: subscriptionError } = await client
+        .from('pro_subscriptions')
+        .update({
+          status: subscription.status,
+          current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+          cancel_at_period_end: subscription.cancel_at_period_end || false
+        })
+        .eq('stripe_subscription_id', subscription.id);
+
+      if (subscriptionError) {
+        console.error('❌ Error updating Pro subscription:', subscriptionError);
+      } else {
+        console.log('✅ Pro subscription updated in dedicated table');
+      }
+      
+      // STEP 2: Update user_profiles (legacy columns for backward compatibility)
       const { error: profileError } = await client
         .from('user_profiles')
         .update({
@@ -2460,9 +2514,9 @@ async function handleSubscriptionUpdated(subscription) {
         .eq('pro_subscription_id', subscription.id);
 
       if (profileError) {
-        console.error('❌ Error updating subscription status:', profileError);
+        console.error('❌ Error updating user profile subscription status:', profileError);
       } else {
-        console.log('✅ Subscription status updated');
+        console.log('✅ User profile subscription status updated');
         
         // Handle paused or past_due subscriptions
         if (subscription.status === 'past_due' || subscription.status === 'paused') {
@@ -2518,6 +2572,22 @@ async function handleSubscriptionDeleted(subscription) {
     const userId = customer.metadata?.userId;
 
     if (userId && userId !== 'guest') {
+      // STEP 1: Update pro_subscriptions table
+      const { error: subscriptionError } = await client
+        .from('pro_subscriptions')
+        .update({
+          status: 'canceled',
+          canceled_at: new Date().toISOString()
+        })
+        .eq('stripe_subscription_id', subscription.id);
+
+      if (subscriptionError) {
+        console.error('❌ Error updating Pro subscription cancellation:', subscriptionError);
+      } else {
+        console.log('✅ Pro subscription marked as canceled in dedicated table');
+      }
+      
+      // STEP 2: Update user_profiles (legacy columns for backward compatibility)
       const { data: userProfile, error: profileError } = await client
         .from('user_profiles')
         .update({
@@ -2531,9 +2601,9 @@ async function handleSubscriptionDeleted(subscription) {
         .single();
 
       if (profileError) {
-        console.error('❌ Error updating canceled subscription:', profileError);
+        console.error('❌ Error updating user profile cancellation:', profileError);
       } else {
-        console.log('✅ Pro membership canceled');
+        console.log('✅ User profile Pro membership canceled');
         
         // Send cancellation email to customer
         try {

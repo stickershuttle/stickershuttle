@@ -78,7 +78,7 @@ class CreatorPaymentProcessor {
 
       // Get order items separately to avoid schema cache issues
       const { data: orderItems, error: itemsError } = await client
-        .from('order_items')
+        .from('order_items_new')
         .select(`
           id,
           product_id,

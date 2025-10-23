@@ -1121,7 +1121,7 @@ function Dashboard() {
       // Clear all timers comprehensively
       clearAllTimers();
     };
-  }, [currentView, orders, creditBalance]);
+  }, [currentView]);
 
   // Redirect to login if not authenticated
   useEffect(() => {

@@ -1,11 +1,29 @@
 import React, { useState } from 'react';
-import { useQuery } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client';
+import { gql } from '@apollo/client';
 import AdminLayout from '@/components/AdminLayout';
 import { GET_ALL_PRO_MEMBERS, GET_PRO_MEMBER_ANALYTICS } from '@/lib/admin-mutations';
+import AIFileImage from '@/components/AIFileImage';
+
+// Mutation to approve Pro member design
+const APPROVE_PRO_DESIGN = gql`
+  mutation ApproveProMemberDesign($userId: ID!) {
+    approveProMemberDesign(userId: $userId) {
+      success
+      message
+      userProfile {
+        proDesignApproved
+        proDesignApprovedAt
+      }
+    }
+  }
+`;
 
 export default function ProMembersPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [showDesignModal, setShowDesignModal] = useState(false);
 
   // Fetch Pro members and analytics
   const { data: membersData, loading: membersLoading, error: membersError, refetch: refetchMembers } = useQuery(GET_ALL_PRO_MEMBERS);
@@ -13,6 +31,15 @@ export default function ProMembersPage() {
 
   const members = membersData?.getAllProMembers || [];
   const analytics = analyticsData?.getProMemberAnalytics || {};
+
+  // Mutation
+  const [approveDesign, { loading: approvingDesign }] = useMutation(APPROVE_PRO_DESIGN, {
+    onCompleted: () => {
+      refetchMembers();
+      setShowDesignModal(false);
+      setSelectedMember(null);
+    }
+  });
 
   // Filter members
   const filteredMembers = members.filter((member: any) => {
@@ -333,13 +360,25 @@ export default function ProMembersPage() {
                             ❌ No Design
                           </span>
                         ) : member.proDesignApproved ? (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-500/30">
+                          <button
+                            onClick={() => {
+                              setSelectedMember(member);
+                              setShowDesignModal(true);
+                            }}
+                            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-500/30 hover:bg-green-500/30 transition-colors cursor-pointer"
+                          >
                             ✓ Approved
-                          </span>
+                          </button>
                         ) : (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">
+                          <button
+                            onClick={() => {
+                              setSelectedMember(member);
+                              setShowDesignModal(true);
+                            }}
+                            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 hover:bg-yellow-500/30 transition-colors cursor-pointer"
+                          >
                             ⏳ Pending
-                          </span>
+                          </button>
                         )}
                       </td>
                       <td className="px-6 py-4">
@@ -373,6 +412,137 @@ export default function ProMembersPage() {
           </div>
         )}
       </div>
+
+      {/* Design Review Modal */}
+      {showDesignModal && selectedMember && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDesignModal(false)}>
+          <div 
+            className="max-w-4xl w-full max-h-[90vh] overflow-y-auto rounded-2xl p-6"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+              backdropFilter: 'blur(12px)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-1">Design Review</h2>
+                <p className="text-gray-400">{selectedMember.firstName} {selectedMember.lastName} ({selectedMember.email})</p>
+              </div>
+              <button
+                onClick={() => setShowDesignModal(false)}
+                className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                title="Close modal"
+                aria-label="Close modal"
+              >
+                <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Design Image */}
+            {selectedMember.proCurrentDesignFile && (
+              <div className="mb-6">
+                <div className="rounded-xl overflow-hidden border border-cyan-400/30 bg-white/5 backdrop-blur-md">
+                  <AIFileImage
+                    src={selectedMember.proCurrentDesignFile}
+                    filename={`${selectedMember.firstName}'s Design`}
+                    alt="Pro member design"
+                    className="w-full h-auto max-h-[500px] object-contain p-8"
+                    size="preview"
+                    showFileType={false}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Design Info */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                <p className="text-xs text-gray-400 mb-1">Status</p>
+                <p className="text-sm font-medium text-white">
+                  {selectedMember.proDesignApproved ? (
+                    <span className="text-green-400">✓ Approved</span>
+                  ) : (
+                    <span className="text-yellow-400">⏳ Pending Approval</span>
+                  )}
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                <p className="text-xs text-gray-400 mb-1">Plan</p>
+                <p className="text-sm font-medium text-white">
+                  {selectedMember.proPlan === 'monthly' ? '📅 Monthly' : '📆 Annual'}
+                </p>
+              </div>
+              {selectedMember.proDesignApprovedAt && (
+                <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                  <p className="text-xs text-gray-400 mb-1">Approved At</p>
+                  <p className="text-sm font-medium text-white">
+                    {new Date(selectedMember.proDesignApprovedAt).toLocaleString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+              )}
+              {selectedMember.proCurrentPeriodEnd && (
+                <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                  <p className="text-xs text-gray-400 mb-1">Next Billing Cycle</p>
+                  <p className="text-sm font-medium text-white">
+                    {new Date(selectedMember.proCurrentPeriodEnd).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              {!selectedMember.proDesignApproved && (
+                <button
+                  onClick={() => {
+                    if (confirm(`Approve design for ${selectedMember.firstName} ${selectedMember.lastName}?`)) {
+                      approveDesign({ variables: { userId: selectedMember.userId } });
+                    }
+                  }}
+                  disabled={approvingDesign}
+                  className="flex-1 px-6 py-3 rounded-xl font-semibold text-white transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.4) 0%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(34, 197, 94, 0.4)',
+                    boxShadow: 'rgba(34, 197, 94, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                  }}
+                >
+                  {approvingDesign ? 'Approving...' : '✓ Approve Design'}
+                </button>
+              )}
+              <button
+                onClick={() => setShowDesignModal(false)}
+                className="px-6 py-3 rounded-xl font-semibold text-white transition-all hover:scale-105"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(107, 114, 128, 0.25) 50%, rgba(107, 114, 128, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(180%)',
+                  border: '1px solid rgba(107, 114, 128, 0.4)',
+                  boxShadow: 'rgba(107, 114, 128, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

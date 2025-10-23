@@ -141,13 +141,20 @@ class ProOrderScheduler {
           const designFiles = member.pro_current_design_file ? [member.pro_current_design_file] : [];
           const shippingAddress = member.pro_default_shipping_address || {};
 
+          // Determine proof status based on design approval
+          // If design is already approved (same design from last month), skip proof and go to printing
+          // If design is new/changed (not approved), start with building_proof
+          const proofStatus = member.pro_design_approved ? 'approved' : 'building_proof';
+          const orderStatus = member.pro_design_approved ? 'Printing' : 'Processing';
+
           // Create the order
           const orderData = {
             user_id: member.user_id,
             order_number: orderNumber,
-            order_status: 'Pro Monthly Order',
+            order_status: orderStatus,
             fulfillment_status: 'unfulfilled',
             financial_status: 'paid',
+            proof_status: proofStatus,
             subtotal_price: 0.00,
             total_tax: 0.00,
             total_price: 0.00,
@@ -159,7 +166,7 @@ class ProOrderScheduler {
             shipping_address: shippingAddress,
             billing_address: {},
             order_tags: ['pro-monthly-stickers', 'pro-member', 'monthly-benefit', 'auto-generated'],
-            order_note: `Monthly Pro member sticker benefit - 100 custom matte vinyl stickers (3"). Auto-generated.${designFiles.length === 0 ? ' Design pending upload.' : ''}${!shippingAddress.address1 ? ' Shipping address pending.' : ''}`,
+            order_note: `Monthly Pro member sticker benefit - 100 custom matte vinyl stickers (3"). Auto-generated.${designFiles.length === 0 ? ' Design pending upload.' : member.pro_design_approved ? ' Design pre-approved - going directly to printing.' : ' New design requires proof approval.'}${!shippingAddress.address1 ? ' Shipping address pending.' : ''}`,
             order_created_at: new Date().toISOString(),
             order_updated_at: new Date().toISOString()
           };
@@ -169,7 +176,7 @@ class ProOrderScheduler {
           if (order) {
             // Create order item
             const orderItem = {
-              customer_order_id: order.id,
+              order_id: order.id,
               product_id: 'pro-monthly-stickers',
               product_name: 'Pro Monthly Stickers',
               product_category: 'vinyl-stickers',
@@ -195,7 +202,7 @@ class ProOrderScheduler {
             };
 
             const { error: itemError } = await client
-              .from('order_items')
+              .from('order_items_new')
               .insert([orderItem]);
 
             if (itemError) {

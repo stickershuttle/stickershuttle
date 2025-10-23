@@ -18,6 +18,25 @@ import {
 import { GET_USER_PROFILE } from '../../lib/profile-mutations';
 
 
+// GraphQL query to get upcoming Pro orders
+const GET_UPCOMING_PRO_ORDERS = gql`
+  query GetUpcomingProOrders {
+    getAllProMembers {
+      id
+      userId
+      firstName
+      lastName
+      email
+      proCurrentDesignFile
+      proDesignApproved
+      proCurrentPeriodEnd
+      proPlan
+      proStatus
+      proDefaultShippingAddress
+    }
+  }
+`;
+
 // GraphQL query to get all orders for admin
 const GET_ALL_ORDERS = gql`
   query GetAllOrders {
@@ -282,6 +301,9 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderTab, setOrderTab] = useState<'all' | 'marketspace' | 'bannership' | 'pro'>('all');
+  const [showUpcomingProOrders, setShowUpcomingProOrders] = useState(false);
+  const [upcomingPage, setUpcomingPage] = useState(1);
+  const [upcomingSortBy, setUpcomingSortBy] = useState<'date' | 'name' | 'status'>('date');
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'status' | 'total'>('date');
@@ -366,6 +388,9 @@ export default function AdminOrders() {
   }, []);
 
   const { data, loading: ordersLoading, error, refetch } = useQuery(GET_ALL_ORDERS);
+  const { data: upcomingProData, loading: upcomingLoading } = useQuery(GET_UPCOMING_PRO_ORDERS, {
+    skip: !showUpcomingProOrders || orderTab !== 'pro'
+  });
 
   // Function to fetch customer profile
   const fetchCustomerProfile = async (userId: string) => {
@@ -630,10 +655,10 @@ export default function AdminOrders() {
     } else if (orderTab === 'pro') {
       orders = orders.filter(order => isProOrder(order));
     } else if (orderTab === 'all') {
-      // Show orders that are not Market Space and not banner-only
-      // Pro orders should appear in BOTH Custom Orders and Pro Orders tabs
+      // Show orders that are not Market Space, not banner-only, and not Pro orders
+      // Pro orders only appear in the Pro Orders tab
       // Mixed orders (banners + stickers) will show here AND in Bannership tab
-      orders = orders.filter(order => !isMarketSpaceOrder(order) && !isBannerOnlyOrder(order));
+      orders = orders.filter(order => !isMarketSpaceOrder(order) && !isBannerOnlyOrder(order) && !isProOrder(order));
     }
 
     // Apply status filter
@@ -2322,9 +2347,9 @@ export default function AdminOrders() {
     } else if (orderTab === 'pro') {
       allOrders = allOrders.filter(order => isProOrder(order));
     } else if (orderTab === 'all') {
-      // Show all orders except Market Space and banner-only orders
-      // Pro orders should appear in BOTH Custom Orders and Pro Orders analytics
-      allOrders = allOrders.filter(order => !isMarketSpaceOrder(order) && !isBannerOnlyOrder(order));
+      // Show all orders except Market Space, banner-only, and Pro orders
+      // Pro orders only appear in the Pro Orders tab analytics
+      allOrders = allOrders.filter(order => !isMarketSpaceOrder(order) && !isBannerOnlyOrder(order) && !isProOrder(order));
     }
     
     const filteredOrders = getFilteredOrdersByTime(allOrders, timeFilter);
@@ -2779,6 +2804,23 @@ export default function AdminOrders() {
                           )}
                           {!isBannershipOnlyAdmin && (
                             <button
+                              onClick={() => setOrderTab('pro')}
+                              className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
+                                orderTab === 'pro'
+                                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                                  : 'text-gray-400 hover:text-white'
+                              }`}
+                            >
+                              <img 
+                                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                                alt="Pro" 
+                                className="w-4 h-4 object-contain"
+                              />
+                              Pro Orders
+                            </button>
+                          )}
+                          {!isBannershipOnlyAdmin && (
+                            <button
                               onClick={() => setOrderTab('marketspace')}
                               className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
                                 orderTab === 'marketspace'
@@ -2799,23 +2841,6 @@ export default function AdminOrders() {
                           >
                             Bannership
                           </button>
-                          {!isBannershipOnlyAdmin && (
-                            <button
-                              onClick={() => setOrderTab('pro')}
-                              className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
-                                orderTab === 'pro'
-                                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                                  : 'text-gray-400 hover:text-white'
-                              }`}
-                            >
-                              <img 
-                                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
-                                alt="Pro" 
-                                className="w-4 h-4 object-contain"
-                              />
-                              Pro Orders
-                            </button>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -2985,7 +3010,10 @@ export default function AdminOrders() {
                       </button>
                       {!isBannershipOnlyAdmin && (
                         <button
-                          onClick={() => setOrderTab('pro')}
+                          onClick={() => {
+                            setOrderTab('pro');
+                            setShowUpcomingProOrders(false);
+                          }}
                           className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
                             orderTab === 'pro'
                               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
@@ -2998,6 +3026,21 @@ export default function AdminOrders() {
                             className="w-4 h-4 object-contain"
                           />
                           Pro Orders
+                        </button>
+                      )}
+                      {!isBannershipOnlyAdmin && orderTab === 'pro' && (
+                        <button
+                          onClick={() => setShowUpcomingProOrders(!showUpcomingProOrders)}
+                          className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-2 ${
+                            showUpcomingProOrders
+                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                              : 'bg-white/5 text-gray-400 hover:text-white border border-white/10'
+                          }`}
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          {showUpcomingProOrders ? 'Hide Upcoming' : 'Show Upcoming'}
                         </button>
                       )}
                     </div>
@@ -3115,6 +3158,210 @@ export default function AdminOrders() {
                     </button>
                   </div>
                 </div>
+
+                {/* Upcoming Pro Orders Section */}
+                {showUpcomingProOrders && orderTab === 'pro' && (
+                  <div className="mb-6">
+                    <div 
+                      className="p-6 rounded-2xl"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(168, 85, 247, 0.1))',
+                        border: '1px solid rgba(139, 92, 246, 0.3)',
+                        boxShadow: 'rgba(139, 92, 246, 0.2) 0px 8px 32px',
+                        backdropFilter: 'blur(12px)'
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <svg className="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <div>
+                            <h3 className="text-lg font-semibold text-white">Upcoming Pro Orders</h3>
+                            <p className="text-xs text-gray-400">Auto-generated 5 days before billing cycle</p>
+                          </div>
+                        </div>
+                        
+                        {/* Sort Controls */}
+                        <div className="flex items-center gap-2">
+                          <label htmlFor="upcoming-sort" className="text-xs text-gray-400">Sort by:</label>
+                          <select
+                            id="upcoming-sort"
+                            value={upcomingSortBy}
+                            onChange={(e) => setUpcomingSortBy(e.target.value as 'date' | 'name' | 'status')}
+                            className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            aria-label="Sort upcoming Pro orders"
+                          >
+                            <option value="date">Date</option>
+                            <option value="name">Name</option>
+                            <option value="status">Status</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {upcomingLoading ? (
+                        <div className="text-center py-8">
+                          <div className="flex items-center justify-center gap-2 text-gray-400">
+                            <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Loading upcoming orders...
+                          </div>
+                        </div>
+                      ) : (() => {
+                        // Process and sort upcoming orders
+                        const upcomingOrders = upcomingProData?.getAllProMembers
+                          ?.filter((member: any) => member.proStatus === 'active' && member.proCurrentPeriodEnd)
+                          ?.map((member: any) => {
+                            const periodEnd = new Date(member.proCurrentPeriodEnd);
+                            const orderDate = new Date(periodEnd);
+                            orderDate.setDate(orderDate.getDate() - 5);
+                            const today = new Date();
+                            const daysUntil = Math.ceil((orderDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                            
+                            return {
+                              ...member,
+                              orderDate,
+                              daysUntil,
+                              sortKey: upcomingSortBy === 'date' ? orderDate.getTime() :
+                                      upcomingSortBy === 'name' ? `${member.firstName} ${member.lastName}`.toLowerCase() :
+                                      member.proDesignApproved ? '1' : '0'
+                            };
+                          })
+                          .sort((a: any, b: any) => {
+                            if (upcomingSortBy === 'date') {
+                              return a.sortKey - b.sortKey;
+                            } else if (upcomingSortBy === 'name') {
+                              return a.sortKey.localeCompare(b.sortKey);
+                            } else {
+                              return a.sortKey.localeCompare(b.sortKey);
+                            }
+                          }) || [];
+
+                        const itemsPerPage = 12;
+                        const totalPages = Math.ceil(upcomingOrders.length / itemsPerPage);
+                        const startIndex = (upcomingPage - 1) * itemsPerPage;
+                        const paginatedOrders = upcomingOrders.slice(startIndex, startIndex + itemsPerPage);
+
+                        return upcomingOrders.length === 0 ? (
+                          <div className="text-center py-8 text-gray-400">
+                            No upcoming Pro orders scheduled
+                          </div>
+                        ) : (
+                          <>
+                            {/* Summary Stats */}
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                              <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                                <p className="text-xs text-gray-400 mb-1">Total Scheduled</p>
+                                <p className="text-2xl font-bold text-white">{upcomingOrders.length}</p>
+                              </div>
+                              <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                                <p className="text-xs text-gray-400 mb-1">Approved Designs</p>
+                                <p className="text-2xl font-bold text-green-400">
+                                  {upcomingOrders.filter((o: any) => o.proDesignApproved).length}
+                                </p>
+                              </div>
+                              <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                                <p className="text-xs text-gray-400 mb-1">Pending Approval</p>
+                                <p className="text-2xl font-bold text-yellow-400">
+                                  {upcomingOrders.filter((o: any) => !o.proDesignApproved).length}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Orders Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                              {paginatedOrders.map((member: any) => (
+                                <div 
+                                  key={member.id}
+                                  className="p-3 rounded-lg hover:bg-white/5 transition-colors"
+                                  style={{
+                                    background: 'rgba(255, 255, 255, 0.02)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                  }}
+                                >
+                                  <div className="flex items-start gap-2 mb-2">
+                                    {member.proCurrentDesignFile ? (
+                                      <div className="w-12 h-12 rounded overflow-hidden border border-purple-400/30 bg-white/5 flex-shrink-0">
+                                        <img
+                                          src={member.proCurrentDesignFile}
+                                          alt={`${member.firstName}'s design`}
+                                          className="w-full h-full object-contain p-0.5"
+                                        />
+                                      </div>
+                                    ) : (
+                                      <div className="w-12 h-12 rounded bg-gray-500/20 border border-gray-500/30 flex items-center justify-center flex-shrink-0">
+                                        <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                      </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-semibold text-white truncate">{member.firstName} {member.lastName}</p>
+                                      <p className="text-xs text-gray-500 truncate">{member.email}</p>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="space-y-1.5">
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-gray-400">Gen Date:</span>
+                                      <span className="font-medium text-cyan-400">
+                                        {member.orderDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                      </span>
+                                    </div>
+                                    {member.daysUntil > 0 && (
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className="text-gray-400">In:</span>
+                                        <span className="font-medium text-purple-400">{member.daysUntil}d</span>
+                                      </div>
+                                    )}
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-gray-400">Status:</span>
+                                      {member.proDesignApproved ? (
+                                        <span className="font-medium text-green-400">Approved</span>
+                                      ) : (
+                                        <span className="font-medium text-yellow-400">Pending</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Pagination */}
+                            {totalPages > 1 && (
+                              <div className="mt-6 flex items-center justify-between">
+                                <p className="text-xs text-gray-400">
+                                  Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, upcomingOrders.length)} of {upcomingOrders.length}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => setUpcomingPage(Math.max(1, upcomingPage - 1))}
+                                    disabled={upcomingPage === 1}
+                                    className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                  >
+                                    Previous
+                                  </button>
+                                  <span className="text-xs text-gray-400">
+                                    Page {upcomingPage} of {totalPages}
+                                  </span>
+                                  <button
+                                    onClick={() => setUpcomingPage(Math.min(totalPages, upcomingPage + 1))}
+                                    disabled={upcomingPage === totalPages}
+                                    className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                  >
+                                    Next
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
 
                 {/* Mobile/Tablet Orders List */}
                 <div className="xl:hidden">
@@ -4712,65 +4959,65 @@ export default function AdminOrders() {
                                   {/* Specifications Grid */}
                                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-3">
                                     {selections.cut?.displayValue && (
-                                      <div className="flex flex-col">
+                                      <div className="flex flex-col min-w-0">
                                         <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Shape</span>
-                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-blue-300"
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-blue-300 break-words"
                                           style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
                                           {selections.cut.displayValue}
                                         </span>
                                       </div>
                                     )}
                                     {(size.width && size.height) || size.displayValue ? (
-                                      <div className="flex flex-col">
+                                      <div className="flex flex-col min-w-0">
                                         <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Size</span>
-                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-orange-300 whitespace-nowrap"
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-orange-300 break-words"
                                           style={{ backgroundColor: 'rgba(251, 146, 60, 0.2)', border: '1px solid rgba(251, 146, 60, 0.3)' }}>
                                           {size.width && size.height ? `${size.width}" × ${size.height}"` : size.displayValue}
                                         </span>
                                       </div>
                                     ) : null}
                                     {selections.frameType?.displayValue && (
-                                      <div className="flex flex-col">
+                                      <div className="flex flex-col min-w-0">
                                         <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Frame Type</span>
-                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-purple-300 whitespace-nowrap"
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-purple-300 break-words"
                                           style={{ backgroundColor: 'rgba(168, 85, 247, 0.2)', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
                                           {selections.frameType.displayValue}
                                         </span>
                                       </div>
                                     )}
                                     {selections.finishing?.displayValue && (
-                                      <div className="flex flex-col">
+                                      <div className="flex flex-col min-w-0">
                                         <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Finishing</span>
-                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-teal-300 whitespace-nowrap"
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-teal-300 break-words"
                                           style={{ backgroundColor: 'rgba(20, 184, 166, 0.2)', border: '1px solid rgba(20, 184, 166, 0.3)' }}>
                                           {selections.finishing.displayValue}
                                         </span>
                                       </div>
                                     )}
                                     {selections.material?.displayValue && (
-                                      <div className="flex flex-col">
+                                      <div className="flex flex-col min-w-0">
                                         <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">
                                           {item.productCategory === 'vinyl-banners' || item.productCategory === 'pop-up-banners' || item.productCategory === 'x-banners' ? 'Material' : 'Material'}
                                         </span>
-                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-green-300 whitespace-nowrap"
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-green-300 break-words"
                                           style={{ backgroundColor: 'rgba(145, 200, 72, 0.2)', border: '1px solid rgba(145, 200, 72, 0.3)' }}>
                                           {selections.material.displayValue}
                                         </span>
                                       </div>
                                     )}
                                     {selections.whiteOption?.displayValue && (
-                                      <div className="flex flex-col">
+                                      <div className="flex flex-col min-w-0">
                                         <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">White Ink</span>
-                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-cyan-300 whitespace-nowrap"
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-cyan-300 break-words"
                                           style={{ backgroundColor: 'rgba(6, 182, 212, 0.2)', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
                                           {selections.whiteOption.displayValue}
                                         </span>
                                       </div>
                                     )}
                                     {selections.kissOption?.displayValue && (
-                                      <div className="flex flex-col">
+                                      <div className="flex flex-col min-w-0">
                                         <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Cut Options</span>
-                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-pink-300 whitespace-nowrap"
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-pink-300 break-words"
                                           style={{ backgroundColor: 'rgba(236, 72, 153, 0.2)', border: '1px solid rgba(236, 72, 153, 0.3)' }}>
                                           {selections.kissOption.displayValue}
                                         </span>

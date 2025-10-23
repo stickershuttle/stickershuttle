@@ -1491,6 +1491,7 @@ const typeDefs = gql`
     proDesignApproved: Boolean
     proCurrentDesignFile: String
     proDesignApprovedAt: String
+    proDesignUpdatedAt: String
     proDesignLocked: Boolean
     proDesignLockedAt: String
     proDefaultShippingAddress: JSON
@@ -4723,6 +4724,7 @@ const resolvers = {
           proDesignApproved: profile.pro_design_approved || false,
           proCurrentDesignFile: profile.pro_current_design_file || null,
           proDesignApprovedAt: profile.pro_design_approved_at || null,
+          proDesignUpdatedAt: profile.pro_design_updated_at || null,
           proDesignLocked: profile.pro_design_locked || false,
           proDesignLockedAt: profile.pro_design_locked_at || null,
           createdAt: profile.created_at,
@@ -4821,28 +4823,27 @@ const resolvers = {
         
         if (!supabaseClient.isReady()) {
           console.error('❌ Supabase not ready, returning fallback count');
-          return 242; // Fallback
+          return 0; // Fallback
         }
 
         const client = supabaseClient.getServiceClient();
         
-        // Count all active Pro members
+        // Count all active Pro members from pro_subscriptions table
         const { count, error } = await client
-          .from('user_profiles')
+          .from('pro_subscriptions')
           .select('*', { count: 'exact', head: true })
-          .eq('is_pro_member', true)
-          .eq('pro_status', 'active');
+          .eq('status', 'active');
 
         if (error) {
           console.error('❌ Error fetching Pro member count:', error);
-          return 242; // Fallback on error
+          return 0; // Fallback on error
         }
 
-        console.log(`✅ Pro member count: ${count}`);
+        console.log(`✅ Pro member count from pro_subscriptions: ${count}`);
         return count || 0;
       } catch (error) {
         console.error('❌ Error in getProMemberCount:', error);
-        return 242; // Fallback on exception
+        return 0; // Fallback on exception
       }
     },
 
@@ -12928,7 +12929,7 @@ const resolvers = {
 
         // Create order items
         const orderItems = cartItems.map((item, index) => ({
-          customer_order_id: newOrder.id,
+          order_id: newOrder.id,
           product_id: item.productId || item.product.id,
           product_name: item.productName || item.product.name,
           product_category: item.productCategory || item.product.category,
@@ -12947,7 +12948,7 @@ const resolvers = {
         }));
 
         const { error: itemsError } = await client
-          .from('order_items')
+          .from('order_items_new')
           .insert(orderItems);
 
         if (itemsError) {
@@ -13203,7 +13204,7 @@ const resolvers = {
               if (order) {
                 // Create the order item for 100 custom matte vinyl stickers
                 const orderItem = {
-                  customer_order_id: order.id,
+                  order_id: order.id,
                   product_id: 'pro-monthly-stickers',
                   product_name: 'Pro Monthly Stickers',
                   product_category: 'vinyl-stickers',
@@ -13228,7 +13229,7 @@ const resolvers = {
                 };
 
                 const { error: itemError } = await client
-                  .from('order_items')
+                  .from('order_items_new')
                   .insert([orderItem]);
 
                 if (itemError) {
@@ -13327,7 +13328,7 @@ const resolvers = {
 
           // Create the order item for 100 matte vinyl stickers
           const orderItem = {
-            customer_order_id: order.id,
+            order_id: order.id,
             product_id: 'pro-monthly-stickers',
             product_name: 'Pro Monthly Stickers',
             product_category: 'vinyl-stickers',
@@ -13352,12 +13353,12 @@ const resolvers = {
           };
 
           const { error: itemError } = await client
-            .from('order_items')
+            .from('order_items_new')
             .insert([orderItem]);
 
           if (itemError) {
             console.error(`❌ Error creating order item:`, itemError);
-            throw new Error(`Failed to create order item: ${itemError.message}`);
+            throw new Error(`Failed to create order item: ${itemError.message || JSON.stringify(itemError)}`);
           }
 
           console.log(`✅ Successfully created Pro monthly order ${orderNumber} for user ${userId}`);
@@ -13413,13 +13414,15 @@ const resolvers = {
         }
 
         // Update the design file and reset approval status
+        const now = new Date().toISOString();
         const { data: updatedProfile, error: updateError } = await client
           .from('user_profiles')
           .update({
             pro_current_design_file: designFile,
             pro_design_approved: false, // Reset approval when design changes
             pro_design_approved_at: null,
-            updated_at: new Date().toISOString()
+            pro_design_updated_at: now, // Track when design was changed
+            updated_at: now
           })
           .eq('user_id', userId)
           .select('*')
@@ -13445,6 +13448,7 @@ const resolvers = {
             proDesignApproved: updatedProfile.pro_design_approved,
             proCurrentDesignFile: updatedProfile.pro_current_design_file,
             proDesignApprovedAt: updatedProfile.pro_design_approved_at,
+            proDesignUpdatedAt: updatedProfile.pro_design_updated_at,
             proDesignLocked: updatedProfile.pro_design_locked,
             proDesignLockedAt: updatedProfile.pro_design_locked_at,
             createdAt: updatedProfile.created_at,
@@ -13521,6 +13525,7 @@ const resolvers = {
             proDesignApproved: updatedProfile.pro_design_approved,
             proCurrentDesignFile: updatedProfile.pro_current_design_file,
             proDesignApprovedAt: updatedProfile.pro_design_approved_at,
+            proDesignUpdatedAt: updatedProfile.pro_design_updated_at,
             proDesignLocked: updatedProfile.pro_design_locked,
             proDesignLockedAt: updatedProfile.pro_design_locked_at,
             createdAt: updatedProfile.created_at,
@@ -13588,6 +13593,7 @@ const resolvers = {
             proDesignApproved: updatedProfile.pro_design_approved,
             proCurrentDesignFile: updatedProfile.pro_current_design_file,
             proDesignApprovedAt: updatedProfile.pro_design_approved_at,
+            proDesignUpdatedAt: updatedProfile.pro_design_updated_at,
             proDesignLocked: updatedProfile.pro_design_locked,
             proDesignLockedAt: updatedProfile.pro_design_locked_at,
             createdAt: updatedProfile.created_at,

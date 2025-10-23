@@ -83,17 +83,93 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
     return () => clearInterval(interval);
   }, [profile?.pro_current_period_end]);
 
-  // Get Pro orders from user's order history
+  // Get Pro orders from user's order history (all SS- orders)
   const proOrders = React.useMemo(() => {
     if (!ordersData?.getUserOrders) return [];
-    return ordersData.getUserOrders
-      .filter((order: any) => 
-        order.orderTags?.includes('pro-monthly-stickers') || 
-        order.orderTags?.includes('pro-member')
-      )
+    
+    console.log('📦 Total orders from query:', ordersData.getUserOrders.length);
+    console.log('📦 All orders:', ordersData.getUserOrders);
+    
+    // Filter for Pro orders - look for SS- prefix orders
+    const filtered = ordersData.getUserOrders
+      .filter((order: any) => {
+        const isSSOrder = order.orderNumber?.startsWith('SS-');
+        console.log(`📦 Checking order ${order.orderNumber}:`, { 
+          isSSOrder, 
+          orderNumber: order.orderNumber,
+          userId: order.userId,
+          currentUserId: user?.id 
+        });
+        return isSSOrder;
+      })
       .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 3); // Last 3 Pro orders
-  }, [ordersData]);
+    
+    console.log('📦 Filtered Pro orders (SS-):', filtered.length, filtered);
+    return filtered;
+  }, [ordersData, user?.id]);
+
+  // Get the current month's Pro order (most recent)
+  const currentMonthProOrder = React.useMemo(() => {
+    if (!ordersData?.getUserOrders) {
+      console.log('📦 No orders data available yet for current month');
+      return null;
+    }
+    
+    console.log('📦 Getting current month order from proOrders:', proOrders);
+    
+    // Get the most recent SS- order
+    const proOrdersList = ordersData.getUserOrders
+      .filter((order: any) => order.orderNumber?.startsWith('SS-'))
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    console.log('📦 Pro orders for current month:', proOrdersList.length);
+    if (proOrdersList.length > 0) {
+      console.log('📦 Current month order:', proOrdersList[0]);
+      console.log('📦 Order proof status:', proOrdersList[0].proof_status);
+      console.log('📦 Order items:', proOrdersList[0].items);
+      console.log('📦 Order custom files:', proOrdersList[0].items?.[0]?.customFiles);
+    }
+    
+    return proOrdersList.length > 0 ? proOrdersList[0] : null;
+  }, [ordersData, proOrders, user?.id]);
+
+  // Get status message based on proof_status
+  const getProofStatusMessage = (proofStatus: string | null | undefined) => {
+    switch (proofStatus) {
+      case 'building_proof':
+        return "We're working on your proof";
+      case 'awaiting_approval':
+        return "Your proof is awaiting approval";
+      case 'approved':
+      case 'printing':
+        return "We're printing this!";
+      case 'label_printed':
+        return "Label printed - ready to ship!";
+      case 'shipped':
+        return "Your order has shipped!";
+      case 'delivered':
+        return "Your order has been delivered!";
+      case 'changes_requested':
+        return "Changes requested on your proof";
+      default:
+        return "We're working on your proof";
+    }
+  };
+
+  // Get the uploaded image from the current month's order
+  const getCurrentMonthImage = () => {
+    if (!currentMonthProOrder?.items || currentMonthProOrder.items.length === 0) {
+      return null;
+    }
+    
+    // Find the first item with custom files
+    const itemWithFile = currentMonthProOrder.items.find((item: any) => 
+      item.customFiles && item.customFiles.length > 0
+    );
+    
+    return itemWithFile?.customFiles?.[0] || null;
+  };
 
   // Check if design is locked (within 5-day production window)
   const isDesignLocked = () => {
@@ -104,6 +180,71 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
     const daysSinceLocked = (now.getTime() - lockedAt.getTime()) / (1000 * 60 * 60 * 24);
     
     return daysSinceLocked < 5;
+  };
+
+  // Check if user can swap design (after label printed and before 5-day window)
+  const canSwapDesign = () => {
+    console.log('🔄 Checking if can swap design...');
+    console.log('🔄 proOrders:', proOrders);
+    
+    // Must have at least one Pro order
+    if (!proOrders || proOrders.length === 0) {
+      console.log('🔄 No Pro orders found');
+      return false;
+    }
+    
+    // Most recent order must have label printed (ready to ship or shipped)
+    const latestOrder = proOrders[0]; // Most recent order
+    console.log('🔄 Latest order:', latestOrder);
+    console.log('🔄 Latest order proof_status:', latestOrder?.proof_status);
+    console.log('🔄 Latest order trackingNumber:', latestOrder?.trackingNumber);
+    console.log('🔄 Latest order fulfillmentStatus:', latestOrder?.fulfillmentStatus);
+    
+    const isLabelPrinted = latestOrder?.proof_status === 'label_printed' || 
+                          latestOrder?.proof_status === 'shipped' || 
+                          latestOrder?.proof_status === 'delivered' ||
+                          latestOrder?.trackingNumber; // Has tracking number means label was created
+    
+    console.log('🔄 Is label printed?:', isLabelPrinted);
+    
+    if (!isLabelPrinted) {
+      console.log('🔄 Label not printed yet');
+      return false;
+    }
+    
+    // Check if we're within 5-day lock window
+    if (!profile?.pro_current_period_end) {
+      console.log('🔄 No period end date, allowing swap');
+      return true;
+    }
+    
+    const periodEnd = new Date(profile.pro_current_period_end);
+    const lockDate = new Date(periodEnd);
+    lockDate.setDate(periodEnd.getDate() - 5);
+    
+    const now = new Date();
+    const canSwap = now < lockDate;
+    
+    console.log('🔄 Period end:', periodEnd);
+    console.log('🔄 Lock date:', lockDate);
+    console.log('🔄 Now:', now);
+    console.log('🔄 Can swap?:', canSwap);
+    
+    return canSwap; // Can swap if we're before the lock date
+  };
+
+  // Get days until design swap window closes
+  const getDaysUntilSwapLockout = () => {
+    if (!profile?.pro_current_period_end) return null;
+    
+    const periodEnd = new Date(profile.pro_current_period_end);
+    const lockDate = new Date(periodEnd);
+    lockDate.setDate(periodEnd.getDate() - 5);
+    
+    const now = new Date();
+    const daysUntil = Math.ceil((lockDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
+    return daysUntil > 0 ? daysUntil : 0;
   };
 
   // Handle design swap
@@ -240,6 +381,23 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
     });
   };
 
+  // Get next business day (skip weekends)
+  const getNextBusinessDay = (date: Date): Date => {
+    const result = new Date(date);
+    const dayOfWeek = result.getDay();
+    
+    // If Saturday (6), add 2 days to get to Monday
+    if (dayOfWeek === 6) {
+      result.setDate(result.getDate() + 2);
+    }
+    // If Sunday (0), add 1 day to get to Monday
+    else if (dayOfWeek === 0) {
+      result.setDate(result.getDate() + 1);
+    }
+    
+    return result;
+  };
+
   // Upload functions
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -302,59 +460,9 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-3 rounded-xl" style={{
-          background: 'linear-gradient(135deg, rgba(61, 209, 249, 0.2), rgba(43, 184, 217, 0.2))',
-          border: '1px solid rgba(61, 209, 249, 0.3)',
-        }}>
-          <svg className="w-6 h-6 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-          </svg>
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-white">Pro Membership</h1>
-          <p className="text-sm text-gray-400">Your monthly sticker benefits</p>
-        </div>
-      </div>
+    
 
       {/* Alert Banners */}
-      {!profile?.pro_current_design_file && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-3">
-          <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <div>
-            <h3 className="text-sm font-semibold text-red-300 mb-1">No Design Uploaded</h3>
-            <p className="text-sm text-red-200/80">Please upload your monthly sticker design below to get started with your Pro membership benefits.</p>
-          </div>
-        </div>
-      )}
-
-      {profile?.pro_current_design_file && !profile?.pro_design_approved && (
-        <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-start gap-3">
-          <svg className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div>
-            <h3 className="text-sm font-semibold text-yellow-300 mb-1">Design Pending Approval</h3>
-            <p className="text-sm text-yellow-200/80">Your design is awaiting approval from our team. We'll send you an email once it's approved!</p>
-          </div>
-        </div>
-      )}
-
-      {(!profile?.pro_default_shipping_address || !profile?.pro_default_shipping_address?.address1) && (
-        <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-start gap-3">
-          <svg className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <div>
-            <h3 className="text-sm font-semibold text-orange-300 mb-1">Shipping Address Needed</h3>
-            <p className="text-sm text-orange-200/80">Please add a shipping address below to ensure your monthly stickers are delivered on time.</p>
-          </div>
-        </div>
-      )}
-
       {daysUntilLock !== null && daysUntilLock <= 3 && daysUntilLock > 0 && !profile?.pro_design_locked && (
         <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-start gap-3">
           <svg className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -398,7 +506,7 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
                 className="h-12 w-auto"
               />
               <div>
-                <h2 className="text-xl font-bold text-white">Active Member</h2>
+                <h2 className="text-xl font-bold text-white">by Sticker Shuttle</h2>
                 <p className="text-sm text-cyan-400">
                   {profile?.pro_plan === 'monthly' ? 'Monthly Plan' : 
                    profile?.pro_plan === 'annual' ? 'Annual Plan' : 'Pro Plan'}
@@ -545,68 +653,6 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
         </div>
       )}
 
-      {/* Pro Benefits */}
-      <div 
-        className="p-6 rounded-2xl"
-        style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-          backdropFilter: 'blur(12px)'
-        }}
-      >
-        <h3 className="text-lg font-semibold text-white mb-4">Your Pro Benefits</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-purple-500/20 flex-shrink-0">
-              <svg className="w-5 h-5 text-purple-400" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
-              </svg>
-            </div>
-            <div>
-              <p className="font-medium text-white">100 Monthly Stickers</p>
-              <p className="text-sm text-gray-400">Custom design every month</p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/20 flex-shrink-0">
-              <svg className="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-              </svg>
-            </div>
-            <div>
-              <p className="font-medium text-white">FREE 2-Day Air Shipping</p>
-              <p className="text-sm text-gray-400">On all orders</p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-green-500/20 flex-shrink-0">
-              <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-              </svg>
-            </div>
-            <div>
-              <p className="font-medium text-white">Priority Printing</p>
-              <p className="text-sm text-gray-400">Your orders print first</p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-yellow-500/20 flex-shrink-0">
-              <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
-              </svg>
-            </div>
-            <div>
-              <p className="font-medium text-white">Exclusive Discounts</p>
-              <p className="text-sm text-gray-400">Bigger savings on bulk orders</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Current Month's Sticker Design */}
       <div 
         className="p-6 rounded-2xl"
@@ -617,12 +663,199 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
           backdropFilter: 'blur(12px)'
         }}
       >
-        <h3 className="text-lg font-semibold text-white mb-4">Here's what we're printing this month:</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-white">
+            {currentMonthProOrder && (
+              currentMonthProOrder.proof_status === 'shipped' || 
+              currentMonthProOrder.proof_status === 'delivered' ||
+              currentMonthProOrder.trackingNumber
+            )
+              ? "Here's what we're printing next month:"
+              : currentMonthProOrder 
+              ? "Here's what we're printing this month:" 
+              : "Upload your design to get started"}
+          </h3>
+          {currentMonthProOrder && (
+            <Link 
+              href={`/account/dashboard?view=orders&orderId=${currentMonthProOrder.id}`}
+              className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-2"
+            >
+              <span>Order #{currentMonthProOrder.orderNumber}</span>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          )}
+        </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Design Preview */}
           <div className="space-y-4">
-            {uploadedFile ? (
+            {(() => {
+              // Check both snake_case and camelCase versions
+              const profileDesignFile = profile?.pro_current_design_file || profile?.proCurrentDesignFile;
+              const showNextMonth = profileDesignFile && currentMonthProOrder && canSwapDesign();
+              
+              console.log('🖼️ Design display check:', {
+                profileDesignFile,
+                currentMonthProOrder: !!currentMonthProOrder,
+                canSwap: canSwapDesign(),
+                showNextMonth,
+                profile
+              });
+              
+              return showNextMonth;
+            })() ? (
+              <div className="space-y-3">
+                <div className="rounded-xl overflow-hidden border border-purple-400/30 bg-white/5 backdrop-blur-md">
+                  <AIFileImage
+                    src={profile?.pro_current_design_file || profile?.proCurrentDesignFile}
+                    filename="Next Month Design"
+                    alt="Next month's sticker design"
+                    className="w-full h-64 object-contain p-4"
+                    size="preview"
+                    showFileType={false}
+                  />
+                </div>
+                
+                {/* Status message for next month's design */}
+                <div 
+                  className="p-4 rounded-xl"
+                  style={{
+                    background: 'rgba(139, 92, 246, 0.1)',
+                    border: '1px solid rgba(139, 92, 246, 0.3)',
+                  }}
+                >
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="flex-1">
+                      {profile?.pro_design_approved ? (
+                        <>
+                          <p className="font-medium mb-1 text-green-300">
+                            This design has already been approved and will be automatically printed if the design is not changed
+                          </p>
+                          {(profile?.pro_current_period_end || profile?.proCurrentPeriodEnd) && (
+                            <p className="text-xs text-cyan-400 mt-2">
+                              Prints on {(() => {
+                                const periodEnd = new Date(profile?.pro_current_period_end || profile?.proCurrentPeriodEnd);
+                                return getNextBusinessDay(periodEnd).toLocaleDateString('en-US', {
+                                  month: 'long',
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                });
+                              })()}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-medium mb-1 text-purple-300">
+                            This design will be sent for proofing 5 days before your next billing cycle.
+                          </p>
+                          {(profile?.pro_current_period_end || profile?.proCurrentPeriodEnd) && (
+                            <p className="text-xs text-cyan-400 mt-1">
+                              This proof will be sent on {(() => {
+                                const periodEnd = new Date(profile?.pro_current_period_end || profile?.proCurrentPeriodEnd);
+                                const proofDate = new Date(periodEnd);
+                                proofDate.setDate(periodEnd.getDate() - 5);
+                                return getNextBusinessDay(proofDate).toLocaleDateString('en-US', {
+                                  month: 'long',
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                });
+                              })()}
+                            </p>
+                          )}
+                          {(profile?.pro_design_updated_at || profile?.proDesignUpdatedAt) && (
+                            <p className="text-xs text-gray-500 mt-2">
+                              Design swapped: {new Date(profile?.pro_design_updated_at || profile?.proDesignUpdatedAt).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : currentMonthProOrder && getCurrentMonthImage() ? (
+              <div className="space-y-3">
+                <div className="rounded-xl overflow-hidden border border-cyan-400/30 bg-white/5 backdrop-blur-md">
+                  <AIFileImage
+                    src={getCurrentMonthImage()}
+                    filename="Current Month Design"
+                    alt="Current month's sticker design"
+                    className="w-full h-64 object-contain p-4"
+                    size="preview"
+                    showFileType={false}
+                  />
+                </div>
+                
+                {/* Status message based on proof_status */}
+                <div 
+                  className="p-4 rounded-xl"
+                  style={{
+                    background: currentMonthProOrder.proof_status === 'printing' || currentMonthProOrder.proof_status === 'approved'
+                      ? 'rgba(34, 197, 94, 0.1)'
+                      : currentMonthProOrder.proof_status === 'awaiting_approval'
+                      ? 'rgba(251, 191, 36, 0.1)'
+                      : 'rgba(59, 130, 246, 0.1)',
+                    border: currentMonthProOrder.proof_status === 'printing' || currentMonthProOrder.proof_status === 'approved'
+                      ? '1px solid rgba(34, 197, 94, 0.3)'
+                      : currentMonthProOrder.proof_status === 'awaiting_approval'
+                      ? '1px solid rgba(251, 191, 36, 0.3)'
+                      : '1px solid rgba(59, 130, 246, 0.3)',
+                  }}
+                >
+                  <div className="flex items-start gap-3">
+                    <svg 
+                      className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                        currentMonthProOrder.proof_status === 'printing' || currentMonthProOrder.proof_status === 'approved'
+                          ? 'text-green-400'
+                          : currentMonthProOrder.proof_status === 'awaiting_approval'
+                          ? 'text-yellow-400'
+                          : 'text-blue-400'
+                      }`}
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="flex-1">
+                      <p className={`font-medium mb-1 ${
+                        currentMonthProOrder.proof_status === 'printing' || currentMonthProOrder.proof_status === 'approved'
+                          ? 'text-green-300'
+                          : currentMonthProOrder.proof_status === 'awaiting_approval'
+                          ? 'text-yellow-300'
+                          : 'text-blue-300'
+                      }`}>
+                        {getProofStatusMessage(currentMonthProOrder.proof_status)}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Order #{currentMonthProOrder.orderNumber}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Note about requesting changes after proof */}
+                {(currentMonthProOrder.proof_status === 'awaiting_approval' || 
+                  currentMonthProOrder.proof_status === 'building_proof') && (
+                  <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                    <p className="text-xs text-blue-300">
+                      <strong>Need changes?</strong> Once we send you the proof, you can request revisions by responding to the proof email or contacting support.
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : uploadedFile && !canSwapDesign() ? (
               <div className="rounded-xl p-4 bg-green-500/20 backdrop-blur-md border border-green-400/30">
                 <div className="flex gap-4 items-start">
                   {/* Image Preview */}
@@ -803,7 +1036,13 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
                 <div>
                   <p className="font-medium text-white">Print Date</p>
                   <p className="text-sm text-cyan-400">
-                    {nextPrintDate ? formatDate(nextPrintDate) : 'TBD'}
+                    {currentMonthProOrder && (currentMonthProOrder.proof_status === 'printing' || currentMonthProOrder.proof_status === 'approved') && currentMonthProOrder.proof_status !== 'delivered' && currentMonthProOrder.proof_status !== 'shipped'
+                      ? formatDate(getNextBusinessDay(new Date(currentMonthProOrder.createdAt)))
+                      : (profile?.pro_current_period_end || profile?.proCurrentPeriodEnd)
+                      ? formatDate(getNextBusinessDay(new Date(profile?.pro_current_period_end || profile?.proCurrentPeriodEnd)))
+                      : nextPrintDate 
+                      ? formatDate(getNextBusinessDay(nextPrintDate)) 
+                      : 'TBD'}
                   </p>
                 </div>
               </div>
@@ -817,10 +1056,22 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
                 <div>
                   <p className="font-medium text-white">Estimated Delivery</p>
                   <p className="text-sm text-green-400">
-                    {nextPrintDate ? 
-                      formatDate(new Date(nextPrintDate.getTime() + (5 * 24 * 60 * 60 * 1000))) : 
-                      'TBD'
-                    }
+                    {(() => {
+                      let deliveryDate: Date;
+                      if (currentMonthProOrder && (currentMonthProOrder.proof_status === 'printing' || currentMonthProOrder.proof_status === 'approved') && currentMonthProOrder.proof_status !== 'delivered' && currentMonthProOrder.proof_status !== 'shipped') {
+                        deliveryDate = new Date(currentMonthProOrder.createdAt);
+                        deliveryDate.setDate(deliveryDate.getDate() + 5);
+                      } else if (profile?.pro_current_period_end || profile?.proCurrentPeriodEnd) {
+                        deliveryDate = new Date(profile?.pro_current_period_end || profile?.proCurrentPeriodEnd);
+                        deliveryDate.setDate(deliveryDate.getDate() + 5);
+                      } else if (nextPrintDate) {
+                        deliveryDate = new Date(nextPrintDate);
+                        deliveryDate.setDate(deliveryDate.getDate() + 5);
+                      } else {
+                        return 'TBD';
+                      }
+                      return formatDate(getNextBusinessDay(deliveryDate));
+                    })()}
                   </p>
                 </div>
               </div>
@@ -837,6 +1088,114 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
                 </div>
               </div>
             </div>
+
+            {/* Design Swap Section - Show when order is delivered/shipped */}
+            {canSwapDesign() && (
+              <div className="mt-4 p-4 rounded-xl" style={{
+                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(168, 85, 247, 0.1))',
+                border: '1px solid rgba(139, 92, 246, 0.3)',
+              }}>
+                <div className="flex items-start gap-3 mb-3">
+                  <svg className="w-5 h-5 text-purple-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-semibold text-white mb-1">Swap Design for Next Month</h4>
+                    <p className="text-xs text-gray-300">
+                      Upload a new design for your next monthly order.
+                      {profile?.pro_current_period_end && (
+                        <span className="block mt-1 text-cyan-400">
+                          Next print: {new Date(profile.pro_current_period_end).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      )}
+                    </p>
+                    {getDaysUntilSwapLockout() !== null && getDaysUntilSwapLockout()! <= 7 && getDaysUntilSwapLockout()! > 0 && (
+                      <p className="text-xs text-yellow-300 mt-2">
+                        ⏰ Swap window closes in {getDaysUntilSwapLockout()} day{getDaysUntilSwapLockout() !== 1 ? 's' : ''}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Upload interface */}
+                {uploadedFile ? (
+                  <div className="space-y-2">
+                    <div className="flex gap-2 items-center p-2 rounded-lg bg-purple-500/20 border border-purple-400/30">
+                      <div className="w-12 h-12 rounded overflow-hidden border border-purple-400/30 bg-white/5 flex-shrink-0">
+                        <AIFileImage
+                          src={uploadedFile.secure_url}
+                          filename={uploadedFile.original_filename}
+                          alt={uploadedFile.original_filename}
+                          className="w-full h-full object-contain p-1"
+                          size="thumbnail"
+                          showFileType={false}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-white truncate">{uploadedFile.original_filename}</p>
+                        <p className="text-xs text-gray-400">
+                          {(uploadedFile.bytes / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setUploadedFile(null)}
+                        className="text-red-300 hover:text-red-200 p-1.5 hover:bg-red-500/20 rounded transition-colors"
+                        title="Remove file"
+                        aria-label="Remove file"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    <button
+                      onClick={handleSwapDesign}
+                      disabled={isSwappingDesign}
+                      className="w-full px-3 py-2 rounded-lg font-medium text-sm text-white transition-all hover:scale-105 disabled:opacity-50"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.4) 0%, rgba(139, 92, 246, 0.25) 50%, rgba(139, 92, 246, 0.1) 100%)',
+                        backdropFilter: 'blur(25px) saturate(180%)',
+                        border: '1px solid rgba(139, 92, 246, 0.4)',
+                        boxShadow: 'rgba(139, 92, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                      }}
+                    >
+                      {isSwappingDesign ? 'Updating...' : 'Confirm Design Swap'}
+                    </button>
+                  </div>
+                ) : (
+                  <div 
+                    className="border-2 border-dashed border-purple-400/30 rounded-lg p-4 text-center hover:border-purple-400/50 transition-colors cursor-pointer"
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onClick={() => document.getElementById('pro-file-input')?.click()}
+                  >
+                    <svg className="w-8 h-8 mx-auto text-purple-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p className="text-white font-medium text-sm">Upload New Design</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      AI, EPS, SVG, PSD, PNG, JPG, PDF
+                    </p>
+                  </div>
+                )}
+
+                {/* Success/Error messages */}
+                {swapSuccess && (
+                  <div className="mt-2 p-2 rounded-lg bg-green-500/20 border border-green-500/30">
+                    <p className="text-xs text-green-300">{swapSuccess}</p>
+                  </div>
+                )}
+                {swapError && (
+                  <div className="mt-2 p-2 rounded-lg bg-red-500/20 border border-red-500/30">
+                    <p className="text-xs text-red-300">{swapError}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {withinWindow && (
               <div 
@@ -855,6 +1214,88 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
           </div>
         </div>
       </div>
+
+      {/* Order History */}
+      {proOrders.length > 0 && (
+        <div 
+          className="p-6 rounded-2xl"
+          style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px',
+            backdropFilter: 'blur(12px)'
+          }}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded-lg bg-cyan-500/20">
+              <svg className="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-white">Recent Pro Orders</h3>
+          </div>
+          <div className="space-y-3">
+            {proOrders.map((order: any) => {
+              // Get the order's design image
+              const orderDesignImage = order.items?.[0]?.customFiles?.[0];
+              
+              return (
+                <div 
+                  key={order.id}
+                  className="p-4 rounded-xl flex items-center justify-between"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    {orderDesignImage ? (
+                      <div className="w-12 h-12 rounded-lg overflow-hidden border border-cyan-400/30 bg-white/5 flex-shrink-0">
+                        <AIFileImage
+                          src={orderDesignImage}
+                          filename="Order Design"
+                          alt="Order design"
+                          className="w-full h-full object-contain p-1"
+                          size="thumbnail"
+                          showFileType={false}
+                        />
+                      </div>
+                    ) : (
+                      <img 
+                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                        alt="Pro" 
+                        className="w-6 h-6"
+                      />
+                    )}
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        {order.orderNumber || order.id.substring(0, 8).toUpperCase()}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                      order.fulfillmentStatus === 'fulfilled' 
+                        ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                        : order.fulfillmentStatus === 'unfulfilled'
+                        ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                        : 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
+                    }`}>
+                      {order.fulfillmentStatus === 'fulfilled' && '✓ Shipped'}
+                      {order.fulfillmentStatus === 'unfulfilled' && '⏳ Processing'}
+                      {order.fulfillmentStatus === 'partial' && '📦 Partial'}
+                      {!order.fulfillmentStatus && 'Pending'}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Shipping Address Management */}
       <div 
@@ -983,69 +1424,67 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
         </div>
       )}
 
-      {/* Order History */}
-      {proOrders.length > 0 && (
-        <div 
-          className="p-6 rounded-2xl"
-          style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px',
-            backdropFilter: 'blur(12px)'
-          }}
-        >
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 rounded-lg bg-cyan-500/20">
-              <svg className="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+      {/* Pro Benefits */}
+      <div 
+        className="p-6 rounded-2xl"
+        style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+          backdropFilter: 'blur(12px)'
+        }}
+      >
+        <h3 className="text-lg font-semibold text-white mb-4">Your Pro Benefits</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-purple-500/20 flex-shrink-0">
+              <svg className="w-5 h-5 text-purple-400" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-white">Recent Pro Orders</h3>
+            <div>
+              <p className="font-medium text-white">100 Monthly Stickers</p>
+              <p className="text-sm text-gray-400">Custom design every month</p>
+            </div>
           </div>
-          <div className="space-y-3">
-            {proOrders.map((order: any) => (
-              <div 
-                key={order.id}
-                className="p-4 rounded-xl flex items-center justify-between"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)'
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
-                    alt="Pro" 
-                    className="w-6 h-6"
-                  />
-                  <div>
-                    <p className="text-sm font-semibold text-white">
-                      {order.orderNumber || order.id.substring(0, 8).toUpperCase()}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                    order.fulfillmentStatus === 'fulfilled' 
-                      ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                      : order.fulfillmentStatus === 'unfulfilled'
-                      ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
-                      : 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
-                  }`}>
-                    {order.fulfillmentStatus === 'fulfilled' && '✓ Shipped'}
-                    {order.fulfillmentStatus === 'unfulfilled' && '⏳ Processing'}
-                    {order.fulfillmentStatus === 'partial' && '📦 Partial'}
-                    {!order.fulfillmentStatus && 'Pending'}
-                  </div>
-                </div>
-              </div>
-            ))}
+
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-blue-500/20 flex-shrink-0">
+              <svg className="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-white">FREE 2-Day Air Shipping</p>
+              <p className="text-sm text-gray-400">On all orders</p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-green-500/20 flex-shrink-0">
+              <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-white">Priority Printing</p>
+              <p className="text-sm text-gray-400">Your orders print first</p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-yellow-500/20 flex-shrink-0">
+              <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-white">Exclusive Discounts</p>
+              <p className="text-sm text-gray-400">Bigger savings on bulk orders</p>
+            </div>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Subscription Management */}
       <div 
