@@ -227,11 +227,11 @@ const StickerShuttlePro = () => {
                        backdropFilter: 'blur(12px)'
                      }}>
                   <div className="h-full bg-gradient-to-r from-yellow-400 to-red-500 rounded-full transition-all duration-1000 ease-out"
-                       style={{ width: `${(proMemberCount / 100) * 100}%` }}></div>
+                       style={{ width: `${Math.min(100, (proMemberCount / 100) * 100)}%` }}></div>
                 </div>
                 <div className="flex justify-between text-xs lg:text-sm text-gray-400 mt-2">
                   <span>{proMemberCount} members</span>
-                  <span>{100 - proMemberCount} spots left</span>
+                  <span>{Math.max(0, 100 - proMemberCount)} spots left</span>
                 </div>
               </div>
               
