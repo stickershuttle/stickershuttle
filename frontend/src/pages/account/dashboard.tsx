@@ -397,7 +397,17 @@ function Dashboard() {
   const [uploadProgress, setUploadProgress] = useState<{ percentage: number } | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   
-  const orders: any[] = realOrders || [];
+  // Filter out Pro membership subscription purchases from order list
+  const orders: any[] = (realOrders || []).filter((order: any) => {
+    // Exclude orders that are just Pro membership subscriptions
+    // These have product names like "Sticker Shuttle Pro - Monthly Membership" or "Sticker Shuttle Pro - Annual Membership"
+    const isProSubscriptionPurchase = order.items?.some((item: any) => 
+      item.productName?.includes('Pro - Monthly Membership') || 
+      item.productName?.includes('Pro - Annual Membership')
+    );
+    
+    return !isProSubscriptionPurchase;
+  });
   const loading = userLoading;
   const [reorderingId, setReorderingId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<DashboardView>('default');
