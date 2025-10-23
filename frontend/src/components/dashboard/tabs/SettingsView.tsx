@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-import FileUploadToEmail from '../../FileUploadToEmail';
 
 interface SettingsViewProps {
   user: any;
@@ -77,6 +76,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleUpdateProfile = async () => {
     if (!user) return;
+    
+    // Validate required fields
+    if (!settingsData.firstName?.trim() || !settingsData.lastName?.trim()) {
+      setSettingsNotification({
+        message: 'First name and last name are required for all users. Please complete your profile information.',
+        type: 'error'
+      });
+      setTimeout(() => setSettingsNotification(null), 5000);
+      return;
+    }
     
     setIsUpdatingProfile(true);
     try {
@@ -346,12 +355,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-3">Profile Photo</label>
             <div className="flex items-center gap-6">
-              <div 
+              <div
                 className="w-24 h-24 aspect-square rounded-full cursor-pointer transition-all duration-200 transform hover:scale-105 flex items-center justify-center relative group"
                 style={{
                   backgroundColor: 'rgba(255, 255, 255, 0.1)',
                   backdropFilter: 'blur(10px)',
-                  border: '2px solid rgba(255, 255, 255, 0.2)'
+                  border: profile?.is_pro_member || profile?.isProMember ? '2px solid #3dd1f9' : '2px solid rgba(255, 255, 255, 0.2)'
                 }}
                 onClick={(e) => handleProfilePictureClick(e)}
                 title="Click to change profile photo"
@@ -483,6 +492,31 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
             </div>
           </div>
+
+          {/* OAuth Name Warning Banner */}
+          {user?.app_metadata?.provider && (!settingsData.firstName?.trim() || !settingsData.lastName?.trim()) && (
+            <div 
+              className="p-4 rounded-xl border-2 border-yellow-400/60 bg-yellow-500/20 mb-6"
+              style={{
+                boxShadow: '0 0 20px rgba(251, 191, 36, 0.3), inset 0 0 10px rgba(251, 191, 36, 0.1)',
+                backdropFilter: 'blur(12px)'
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-yellow-500/40 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-yellow-300" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-yellow-200 text-sm">Complete Your Profile</h3>
+                  <p className="text-yellow-300/80 text-xs mt-1">
+                    Since you signed up with Google, we need you to provide your first and last name to ensure orders are processed correctly.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* First and Last Name */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -795,51 +829,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
       
-      {/* File Upload to Support Section */}
-      <div 
-        className="p-6 rounded-2xl"
-        style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(12px)'
-        }}
-      >
-        <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-          <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-          </svg>
-          Send File To Admin
-        </h3>
-        
-        <div className="mb-4">
-          <p className="text-gray-300 text-sm mb-2">
-            Upload design files, documents, or other materials for our team to review. Your file will be sent directly to orbit@stickershuttle.com.
-          </p>
-        </div>
-        
-        <FileUploadToEmail
-          userData={{
-            email: (user as any)?.email || '',
-            name: getUserDisplayName()
-          }}
-          onUploadComplete={(success) => {
-            if (success) {
-              setSettingsNotification({
-                message: 'File uploaded and sent successfully!',
-                type: 'success'
-              });
-              setTimeout(() => setSettingsNotification(null), 5000);
-            } else {
-              setSettingsNotification({
-                message: 'Failed to upload file. Please try again.',
-                type: 'error'
-              });
-              setTimeout(() => setSettingsNotification(null), 5000);
-            }
-          }}
-        />
-      </div>
     </div>
   );
 };

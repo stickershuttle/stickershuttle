@@ -223,6 +223,11 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
         phone: user?.user_metadata?.phone || ''
       };
 
+      // Validate that we have required customer information
+      if (!customerInfo.firstName.trim() || !customerInfo.lastName.trim()) {
+        throw new Error('First name and last name are required for checkout. Please ensure your account has complete name information or provide it during checkout.');
+      }
+
       // Track Started Checkout event in Klaviyo for abandoned cart recovery
       const customerEmail = customerInfo.email;
       if (customerEmail) {

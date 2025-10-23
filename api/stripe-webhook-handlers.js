@@ -52,6 +52,38 @@ router.get('/health', (req, res) => {
   });
 });
 
+// Test endpoint to manually trigger customer update handler
+router.post('/test-customer-update', async (req, res) => {
+  try {
+    const { customerId } = req.body;
+    
+    if (!customerId) {
+      return res.status(400).json({ error: 'customerId is required' });
+    }
+
+    console.log('🧪 Testing customer update handler for:', customerId);
+    
+    // Fetch customer from Stripe
+    const customer = await stripeClient.stripe.customers.retrieve(customerId);
+    console.log('📋 Fetched customer:', customer.id);
+    
+    // Call the handler
+    await handleCustomerUpdated(customer);
+    
+    res.json({ 
+      success: true, 
+      message: 'Customer update handler executed',
+      customerId: customer.id 
+    });
+  } catch (error) {
+    console.error('❌ Error in test customer update:', error);
+    res.status(500).json({ 
+      error: 'Failed to test customer update',
+      message: error.message 
+    });
+  }
+});
+
 // Main webhook endpoint (raw body parsing is now handled at the app level)
 router.post('/', async (req, res) => {
   const sig = req.headers['stripe-signature'];
@@ -165,6 +197,13 @@ router.post('/', async (req, res) => {
         console.log('🔄 Processing customer.subscription.deleted event');
         await handleSubscriptionDeleted(event.data.object);
         console.log('✅ customer.subscription.deleted processed successfully');
+        break;
+        
+      case 'customer.updated':
+        console.log('🔄 Processing customer.updated event');
+        console.log('📋 Customer data:', JSON.stringify(event.data.object, null, 2));
+        await handleCustomerUpdated(event.data.object);
+        console.log('✅ customer.updated processed successfully');
         break;
         
       case 'invoice.payment_succeeded':
@@ -1392,8 +1431,8 @@ async function handleCheckoutSessionCompleted(session) {
       total_tax: ((fullSession.amount_total - fullSession.amount_subtotal) / 100).toFixed(2),
       total_price: (fullSession.amount_total / 100).toFixed(2),
       currency: fullSession.currency.toUpperCase(),
-      customer_first_name: shippingDetails.name?.split(' ')[0] || customer.name?.split(' ')[0] || metadata.customerFirstName || '',
-      customer_last_name: shippingDetails.name?.split(' ').slice(1).join(' ') || customer.name?.split(' ').slice(1).join(' ') || metadata.customerLastName || '',
+      customer_first_name: shippingDetails.name?.split(' ')[0] || customer.name?.split(' ')[0] || metadata.customerFirstName || 'Unknown',
+      customer_last_name: shippingDetails.name?.split(' ').slice(1).join(' ') || customer.name?.split(' ').slice(1).join(' ') || metadata.customerLastName || 'Customer',
       customer_email: customer.email || metadata.customerEmail,
       customer_phone: shippingDetails.phone || customer.phone || metadata.customerPhone,
       shipping_address: shippingAddress.line1 ? {
@@ -2518,8 +2557,9 @@ async function handleSubscriptionUpdated(subscription) {
       } else {
         console.log('✅ User profile subscription status updated');
         
-        // Handle paused or past_due subscriptions
-        if (subscription.status === 'past_due' || subscription.status === 'paused') {
+        // Handle paused, past_due, unpaid, or incomplete subscriptions
+        if (subscription.status === 'past_due' || subscription.status === 'paused' || 
+            subscription.status === 'unpaid' || subscription.status === 'incomplete') {
           console.log(`⏸️ Subscription ${subscription.status} - pausing order generation`);
           
           try {
@@ -2645,6 +2685,104 @@ async function handleSubscriptionDeleted(subscription) {
 
   } catch (error) {
     console.error('❌ Error handling subscription deleted:', error);
+  }
+}
+
+async function handleCustomerUpdated(customer) {
+  try {
+    console.log('🔄 Handling customer updated:', customer.id);
+    console.log('📋 Customer metadata:', customer.metadata);
+    console.log('📋 Customer address:', customer.address);
+    console.log('📋 Customer name:', customer.name);
+    
+    if (!supabaseClient.isReady()) {
+      console.error('❌ Supabase not ready for customer update');
+      return;
+    }
+
+    const client = supabaseClient.getServiceClient();
+    const userId = customer.metadata?.userId;
+
+    console.log('📋 Extracted userId:', userId);
+
+    if (!userId || userId === 'guest') {
+      console.log('⚠️ Customer has no userId or is guest, skipping address sync');
+      return;
+    }
+
+    // Check if this customer has a Pro subscription
+    const { data: proSubscription, error: subscriptionError } = await client
+      .from('pro_subscriptions')
+      .select('*')
+      .eq('stripe_customer_id', customer.id)
+      .eq('status', 'active')
+      .single();
+
+    if (subscriptionError || !proSubscription) {
+      console.log('⚠️ No active Pro subscription found for customer, skipping address sync');
+      return;
+    }
+
+    console.log('✅ Found active Pro subscription, syncing address updates');
+
+    // Extract shipping address from customer
+    let shippingAddress = null;
+    if (customer.address) {
+      shippingAddress = {
+        first_name: customer.name?.split(' ')[0] || '',
+        last_name: customer.name?.split(' ').slice(1).join(' ') || '',
+        address1: customer.address.line1 || '',
+        address2: customer.address.line2 || '',
+        city: customer.address.city || '',
+        province: customer.address.state || '',
+        zip: customer.address.postal_code || '',
+        country: customer.address.country || 'US',
+        phone: customer.phone || ''
+      };
+      console.log('📍 Extracted shipping address from customer:', shippingAddress);
+    }
+
+    // Update user_profiles with new shipping address
+    const updateData = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (shippingAddress) {
+      updateData.pro_default_shipping_address = shippingAddress;
+      updateData.pro_shipping_address_updated_at = new Date().toISOString();
+    }
+
+    const { error: profileError } = await client
+      .from('user_profiles')
+      .update(updateData)
+      .eq('user_id', userId);
+
+    if (profileError) {
+      console.error('❌ Error updating user profile with new address:', profileError);
+    } else {
+      console.log('✅ User profile updated with new shipping address');
+    }
+
+    // Update pro_subscriptions table with new address
+    if (shippingAddress) {
+      const { error: subscriptionUpdateError } = await client
+        .from('pro_subscriptions')
+        .update({
+          default_shipping_address: shippingAddress,
+          shipping_address_updated_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('stripe_customer_id', customer.id);
+
+      if (subscriptionUpdateError) {
+        console.error('❌ Error updating Pro subscription with new address:', subscriptionUpdateError);
+      } else {
+        console.log('✅ Pro subscription updated with new shipping address');
+      }
+    }
+
+  } catch (error) {
+    console.error('❌ Error handling customer updated:', error);
   }
 }
 
@@ -2794,4 +2932,5 @@ async function handleInvoicePaymentFailed(invoice) {
   }
 }
 
-module.exports = router; 
+module.exports = router;
+module.exports.handleCustomerUpdated = handleCustomerUpdated; 

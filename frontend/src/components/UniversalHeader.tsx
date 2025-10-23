@@ -348,7 +348,9 @@ export default function UniversalHeader({ customLogo, customLogoAlt, forceBanner
                 style={{ background: 'transparent', border: 'none' }}
               >
                 {/* Profile Avatar */}
-                <div className="w-10 h-10 aspect-square rounded-full overflow-hidden border border-white/20 transition-all duration-200 hover:border-white/40">
+                <div className={`w-10 h-10 aspect-square rounded-full overflow-hidden transition-all duration-200 hover:border-white/40 ${
+                  isProMember ? 'border-2 border-[#3dd1f9]' : 'border border-white/20'
+                }`}>
                   {profile?.profile_photo_url ? (
                     <img 
                       src={profile.profile_photo_url} 
@@ -1057,7 +1059,9 @@ export default function UniversalHeader({ customLogo, customLogoAlt, forceBanner
                   onBlur={() => setTimeout(() => setShowProfileDropdown(false), 200)}
                 >
                   {/* Profile Picture */}
-                  <div className="w-10 h-10 aspect-square rounded-full overflow-hidden border border-white/15 transition-all duration-200 hover:border-white/40 hover:brightness-75">
+                  <div className={`w-10 h-10 aspect-square rounded-full overflow-hidden transition-all duration-200 hover:border-white/40 hover:brightness-75 ${
+                    isProMember ? 'border-2 border-[#3dd1f9]' : 'border border-white/15'
+                  }`}>
                     {profile?.profile_photo_url ? (
                       <img 
                         src={profile.profile_photo_url} 
@@ -1095,7 +1099,9 @@ export default function UniversalHeader({ customLogo, customLogoAlt, forceBanner
                     <div className="p-4">
                       {/* Profile Header */}
                       <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/10">
-                        <div className="w-12 h-12 aspect-square rounded-full overflow-hidden">
+                        <div className={`w-12 h-12 aspect-square rounded-full overflow-hidden ${
+                          isProMember ? 'border-2 border-[#3dd1f9]' : ''
+                        }`}>
                           {profile?.profile_photo_url ? (
                             <img 
                               src={profile.profile_photo_url} 
@@ -1341,7 +1347,9 @@ export default function UniversalHeader({ customLogo, customLogoAlt, forceBanner
           <div className="p-4">
             {/* Profile Header */}
             <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/10">
-              <div className="w-10 h-10 flex-shrink-0 rounded-full overflow-hidden">
+              <div className={`w-10 h-10 flex-shrink-0 rounded-full overflow-hidden ${
+                isProMember ? 'border-2 border-[#3dd1f9]' : ''
+              }`}>
                 {profile?.profile_photo_url ? (
                   <img 
                     src={profile.profile_photo_url} 

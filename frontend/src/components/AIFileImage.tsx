@@ -63,8 +63,8 @@ export default function AIFileImage({
   };
 
   const imageUrl = getImageUrl();
-  const isDesign = isDesignFile(filename);
-  const fileExtension = filename.toLowerCase().split('.').pop();
+  const isDesign = isDesignFile(filename || '');
+  const fileExtension = filename ? filename.toLowerCase().split('.').pop() : '';
 
   const handleLoad = () => {
     setLoading(false);

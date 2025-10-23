@@ -201,6 +201,9 @@ class StripeClient {
         enabled: true
       };
 
+      // Always collect customer name - REQUIRED for all orders
+      sessionConfig.customer_creation = 'always';
+
       // Only enable automatic tax for non-subscription products
       // (subscriptions are typically tax-exempt memberships)
       if (!isSubscription) {

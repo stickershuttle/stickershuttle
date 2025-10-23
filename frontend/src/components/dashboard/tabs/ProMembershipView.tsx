@@ -288,10 +288,15 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
   // Open Stripe Customer Portal for subscription management
   const handleManageSubscription = async () => {
     console.log('🔍 Debug - Profile data:', profile);
-    console.log('🔍 Debug - Stripe Customer ID:', profile?.pro_stripe_customer_id);
     
-    if (!profile?.pro_stripe_customer_id) {
-      console.error('❌ No Stripe customer ID found');
+    // Check both snake_case and camelCase
+    const stripeCustomerId = profile?.pro_stripe_customer_id || profile?.proStripeCustomerId;
+    console.log('🔍 Debug - Stripe Customer ID:', stripeCustomerId);
+    console.log('🔍 Debug - Profile keys:', Object.keys(profile || {}));
+    
+    if (!stripeCustomerId) {
+      console.error('❌ No Stripe customer ID found in profile');
+      console.error('❌ Profile:', profile);
       alert('Unable to manage subscription: No Stripe customer ID found. Please contact support.');
       return;
     }
@@ -301,6 +306,7 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
 
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
       console.log('🔍 Debug - Backend URL:', backendUrl);
+      console.log('🔍 Debug - Sending customer ID:', stripeCustomerId);
       
       const response = await fetch(`${backendUrl}/api/create-portal-session`, {
         method: 'POST',
@@ -308,7 +314,7 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          customerId: profile.pro_stripe_customer_id,
+          customerId: stripeCustomerId,
           returnUrl: `${window.location.origin}/account/dashboard?view=pro-membership`
         }),
       });
@@ -479,7 +485,7 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
 
       {/* Membership Status Card */}
       <div 
-        className="p-6 rounded-2xl relative overflow-hidden"
+        className="px-6 pt-6 pb-4 rounded-2xl relative overflow-hidden"
         style={{
           background: 'rgba(255, 255, 255, 0.05)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -506,11 +512,18 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
                 className="h-12 w-auto"
               />
               <div>
-                <h2 className="text-xl font-bold text-white">by Sticker Shuttle</h2>
+                <h2 className="text-xl font-bold text-white">Active Member</h2>
                 <p className="text-sm text-cyan-400">
                   {profile?.pro_plan === 'monthly' ? 'Monthly Plan' : 
                    profile?.pro_plan === 'annual' ? 'Annual Plan' : 'Pro Plan'}
                 </p>
+                <button
+                  onClick={handleManageSubscription}
+                  disabled={isLoadingPortal}
+                  className="text-xs text-cyan-300 hover:text-cyan-200 underline mt-1 transition-colors disabled:opacity-50"
+                >
+                  {isLoadingPortal ? 'Opening...' : 'Manage Subscription'}
+                </button>
               </div>
             </div>
             <div className="text-right">
@@ -1229,7 +1242,7 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 rounded-lg bg-cyan-500/20">
               <svg className="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <h3 className="text-lg font-semibold text-white">Recent Pro Orders</h3>
@@ -1242,41 +1255,39 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
               return (
                 <div 
                   key={order.id}
-                  className="p-4 rounded-xl flex items-center justify-between"
+                  className="p-4 rounded-xl"
                   style={{
                     background: 'rgba(255, 255, 255, 0.03)',
                     border: '1px solid rgba(255, 255, 255, 0.1)'
                   }}
                 >
-                  <div className="flex items-center gap-3">
-                    {orderDesignImage ? (
-                      <div className="w-12 h-12 rounded-lg overflow-hidden border border-cyan-400/30 bg-white/5 flex-shrink-0">
-                        <AIFileImage
-                          src={orderDesignImage}
-                          filename="Order Design"
-                          alt="Order design"
-                          className="w-full h-full object-contain p-1"
-                          size="thumbnail"
-                          showFileType={false}
+                  {/* Header Row */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      {orderDesignImage ? (
+                        <div className="w-10 h-10 rounded-lg overflow-hidden border border-cyan-400/30 bg-white/5 flex-shrink-0">
+                          <AIFileImage
+                            src={orderDesignImage}
+                            filename="Order Design"
+                            alt="Order design"
+                            className="w-full h-full object-contain p-1"
+                            size="thumbnail"
+                            showFileType={false}
+                          />
+                        </div>
+                      ) : (
+                        <img 
+                          src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                          alt="Pro" 
+                          className="w-6 h-6"
                         />
+                      )}
+                      <div>
+                        <p className="text-sm font-semibold text-white">
+                          {order.orderNumber || order.id.substring(0, 8).toUpperCase()}
+                        </p>
                       </div>
-                    ) : (
-                      <img 
-                        src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
-                        alt="Pro" 
-                        className="w-6 h-6"
-                      />
-                    )}
-                    <div>
-                      <p className="text-sm font-semibold text-white">
-                        {order.orderNumber || order.id.substring(0, 8).toUpperCase()}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        {new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </p>
                     </div>
-                  </div>
-                  <div className="text-right">
                     <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
                       order.fulfillmentStatus === 'fulfilled' 
                         ? 'bg-green-500/20 text-green-300 border border-green-500/30'
@@ -1284,10 +1295,44 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
                         ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
                         : 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
                     }`}>
-                      {order.fulfillmentStatus === 'fulfilled' && '✓ Shipped'}
+                      {order.fulfillmentStatus === 'fulfilled' && '✓ Delivered'}
                       {order.fulfillmentStatus === 'unfulfilled' && '⏳ Processing'}
                       {order.fulfillmentStatus === 'partial' && '📦 Partial'}
                       {!order.fulfillmentStatus && 'Pending'}
+                    </div>
+                  </div>
+
+                  {/* Timeline Row */}
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div className={`p-2 rounded-lg border ${
+                      order.trackingNumber 
+                        ? 'bg-cyan-500/10 border-cyan-500/20' 
+                        : 'bg-gray-500/5 border-gray-500/10'
+                    }`}>
+                      <p className="text-xs text-gray-400 mb-1">Shipped</p>
+                      <p className={`text-xs font-medium ${
+                        order.trackingNumber ? 'text-cyan-300' : 'text-gray-500'
+                      }`}>
+                        {order.trackingNumber 
+                          ? new Date(order.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                          : 'Pending'
+                        }
+                      </p>
+                    </div>
+                    <div className={`p-2 rounded-lg border ${
+                      order.fulfillmentStatus === 'fulfilled'
+                        ? 'bg-green-500/10 border-green-500/20' 
+                        : 'bg-gray-500/5 border-gray-500/10'
+                    }`}>
+                      <p className="text-xs text-gray-400 mb-1">Delivered</p>
+                      <p className={`text-xs font-medium ${
+                        order.fulfillmentStatus === 'fulfilled' ? 'text-green-300' : 'text-gray-500'
+                      }`}>
+                        {order.fulfillmentStatus === 'fulfilled'
+                          ? new Date(order.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                          : 'Pending'
+                        }
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1296,94 +1341,6 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
           </div>
         </div>
       )}
-
-      {/* Shipping Address Management */}
-      <div 
-        className="rounded-xl p-6"
-        style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(12px)'
-        }}
-      >
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-cyan-500/20">
-              <svg className="w-6 h-6 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-white">Shipping Address</h3>
-              <p className="text-sm text-gray-400">Default address for monthly sticker shipments</p>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              console.log('🏠 Edit address via Stripe clicked');
-              handleManageSubscription();
-            }}
-            disabled={isLoadingPortal}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-50"
-            style={{
-              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-              backdropFilter: 'blur(25px) saturate(180%)',
-              border: '1px solid rgba(59, 130, 246, 0.4)',
-              boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-            }}
-          >
-            {isLoadingPortal ? 'Opening...' : 'Edit Address'}
-          </button>
-        </div>
-
-
-         {/* Display current address */}
-         <div className="space-y-2">
-           {(() => {
-             console.log('🔍 Checking shipping address condition:');
-             console.log('profile?.pro_default_shipping_address:', profile?.pro_default_shipping_address);
-             console.log('profile?.pro_default_shipping_address?.address1:', profile?.pro_default_shipping_address?.address1);
-             console.log('Full profile:', profile);
-             
-             return profile?.pro_default_shipping_address?.address1;
-           })() ? (
-             <>
-               <p className="text-white">
-                 {profile.pro_default_shipping_address.first_name} {profile.pro_default_shipping_address.last_name}
-               </p>
-               <p className="text-gray-300">{profile.pro_default_shipping_address.address1}</p>
-               {profile.pro_default_shipping_address.address2 && (
-                 <p className="text-gray-300">{profile.pro_default_shipping_address.address2}</p>
-               )}
-               <p className="text-gray-300">
-                 {profile.pro_default_shipping_address.city}, {profile.pro_default_shipping_address.province} {profile.pro_default_shipping_address.zip}
-               </p>
-               <p className="text-gray-300">{profile.pro_default_shipping_address.country}</p>
-               {profile.pro_default_shipping_address.phone && (
-                 <p className="text-gray-300">Phone: {profile.pro_default_shipping_address.phone}</p>
-               )}
-             </>
-           ) : (
-             <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-               <p className="text-yellow-300">⚠️ No shipping address on file. Please add one to ensure smooth delivery.</p>
-             </div>
-           )}
-         </div>
-
-         {/* Stripe Portal Info */}
-         <div className="mt-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
-           <div className="flex items-start gap-2">
-             <svg className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-             </svg>
-             <p className="text-sm text-blue-300">
-               <strong>Note:</strong> Click "Edit Address" to open your Stripe Customer Portal where you can securely update your shipping address and billing information.
-             </p>
-           </div>
-         </div>
-      </div>
 
       {/* Next Order Countdown */}
       {daysUntilNextOrder !== null && (
@@ -1481,135 +1438,6 @@ export default function ProMembershipView({ profile, user }: ProMembershipViewPr
             <div>
               <p className="font-medium text-white">Exclusive Discounts</p>
               <p className="text-sm text-gray-400">Bigger savings on bulk orders</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Subscription Management */}
-      <div 
-        className="p-6 rounded-2xl"
-        style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-          backdropFilter: 'blur(12px)'
-        }}
-      >
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-3 rounded-xl bg-orange-500/20">
-            <svg className="w-6 h-6 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-white">Subscription Management</h3>
-            <p className="text-sm text-gray-400">Manage payment method and subscription</p>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          {/* Payment Method Management */}
-          <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30">
-            <div className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-              </svg>
-              <div className="flex-1">
-                <h4 className="text-sm font-semibold text-blue-300 mb-1">Update Payment Method</h4>
-                <p className="text-sm text-blue-200/80 mb-3">
-                  Change your credit card, update billing details, or view your payment history.
-                </p>
-                
-                <button
-                  onClick={() => {
-                    console.log('💳 Update payment method clicked');
-                    handleManageSubscription();
-                  }}
-                  disabled={isLoadingPortal}
-                  className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-50"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                    backdropFilter: 'blur(25px) saturate(180%)',
-                    border: '1px solid rgba(59, 130, 246, 0.4)',
-                    boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                  }}
-                >
-                  {isLoadingPortal ? 'Opening...' : 'Manage Payment Methods'}
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30">
-            <div className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <div className="flex-1">
-                <h4 className="text-sm font-semibold text-red-300 mb-1">Cancel Your Membership</h4>
-                <p className="text-sm text-red-200/80 mb-3">
-                  Cancel your Pro membership permanently. You'll continue to receive benefits until the end of your current billing period, then your membership will end.
-                </p>
-                
-                {/* Benefits End Date */}
-                {(() => {
-                  console.log('🔍 Profile data for benefits end date:', {
-                    pro_current_period_end: profile?.pro_current_period_end,
-                    proCurrentPeriodEnd: profile?.proCurrentPeriodEnd,
-                    fullProfile: profile
-                  });
-                  
-                  const endDate = profile?.pro_current_period_end || profile?.proCurrentPeriodEnd;
-                  
-                  return endDate ? (
-                    <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/40">
-                      <div className="flex items-center gap-2 mb-2">
-                        <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <span className="text-sm font-semibold text-red-300">Benefits End Date</span>
-                      </div>
-                      <p className="text-sm text-red-200">
-                        <strong>{new Date(endDate).toLocaleDateString('en-US', { 
-                          weekday: 'long',
-                          year: 'numeric', 
-                          month: 'long', 
-                          day: 'numeric' 
-                        })}</strong>
-                      </p>
-
-                    </div>
-                  ) : null;
-                })()}
-                
-                <button
-                  onClick={() => {
-                    console.log('🔴 Cancel button clicked');
-                    handleManageSubscription();
-                  }}
-                  disabled={isLoadingPortal}
-                  className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-50"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0.25) 50%, rgba(239, 68, 68, 0.1) 100%)',
-                    backdropFilter: 'blur(25px) saturate(180%)',
-                    border: '1px solid rgba(239, 68, 68, 0.4)',
-                    boxShadow: 'rgba(239, 68, 68, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                  }}
-                >
-                  {isLoadingPortal ? 'Opening...' : 'Cancel Membership'}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
-            <div className="flex items-start gap-2">
-              <svg className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-sm text-blue-300">
-                <strong>Note:</strong> This will open your Stripe Customer Portal where you can manage all subscription settings, including payment methods and billing history.
-              </p>
             </div>
           </div>
         </div>

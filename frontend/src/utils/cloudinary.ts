@@ -268,6 +268,7 @@ export const getPreviewUrl = (cloudinaryUrl: string): string => {
  * Detects if a file is a design file (AI, EPS, PSD) that needs conversion
  */
 export const isDesignFile = (filename: string): boolean => {
+  if (!filename) return false;
   const designExtensions = ['ai', 'eps', 'psd'];
   const extension = filename.toLowerCase().split('.').pop();
   return designExtensions.includes(extension || '');

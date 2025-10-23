@@ -983,9 +983,17 @@ app.post('/api/create-portal-session', express.json(), async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error creating Stripe portal session:', error);
+    console.error('❌ Error details:', {
+      message: error.message,
+      type: error.type,
+      code: error.code,
+      statusCode: error.statusCode,
+      raw: error.raw
+    });
     res.status(500).json({ 
       success: false,
-      error: 'Failed to create portal session' 
+      error: error.message || 'Failed to create portal session',
+      details: error.type || 'Unknown error'
     });
   }
 });
@@ -8112,6 +8120,11 @@ const resolvers = {
 
         if (supabaseClient.isReady()) {
           try {
+            // Validate required customer information
+            if (!input.customerInfo.firstName?.trim() || !input.customerInfo.lastName?.trim()) {
+              throw new Error('First name and last name are required for all orders');
+            }
+
             const customerOrderData = {
               user_id: (input.userId && input.userId !== 'guest') ? input.userId : null,
               guest_email: (input.userId === 'guest') ? input.customerInfo.email : (input.guestEmail || null),
@@ -8128,8 +8141,8 @@ const resolvers = {
               credits_applied: actualCreditsApplied || 0,
               credit_transaction_id: creditTransactionId || null,
               currency: 'USD',
-              customer_first_name: input.customerInfo.firstName,
-              customer_last_name: input.customerInfo.lastName,
+              customer_first_name: input.customerInfo.firstName.trim(),
+              customer_last_name: input.customerInfo.lastName.trim(),
               customer_email: input.customerInfo.email,
               customer_phone: input.customerInfo.phone,
               shipping_address: input.shippingAddress,
@@ -13282,7 +13295,7 @@ const resolvers = {
 
         const client = supabaseClient.getServiceClient();
         
-        // Get Pro member profile
+        // Get Pro member profile with subscription status
         const { data: profile, error: profileError } = await client
           .from('user_profiles')
           .select('*')
@@ -13292,6 +13305,22 @@ const resolvers = {
 
         if (profileError || !profile) {
           throw new Error('User is not a Pro member or profile not found');
+        }
+
+        // Check if subscription is active
+        if (profile.pro_status !== 'active') {
+          throw new Error(`Pro subscription is ${profile.pro_status}. Cannot create orders for inactive subscriptions.`);
+        }
+
+        // Check order generation log status
+        const { data: orderLog, error: logError } = await client
+          .from('pro_order_generation_log')
+          .select('status')
+          .eq('user_id', userId)
+          .single();
+
+        if (!logError && orderLog && (orderLog.status === 'canceled' || orderLog.status === 'paused')) {
+          throw new Error(`Order generation is ${orderLog.status} for this user. Cannot create orders.`);
         }
 
         // Generate SS-XXXX format order number

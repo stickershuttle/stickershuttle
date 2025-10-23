@@ -300,7 +300,7 @@ export default function AdminOrders() {
   const [isBannershipOnlyAdmin, setIsBannershipOnlyAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [orderTab, setOrderTab] = useState<'all' | 'marketspace' | 'bannership' | 'pro'>('all');
+  const [orderTab, setOrderTab] = useState<'all' | 'bannership' | 'pro'>('all');
   const [showUpcomingProOrders, setShowUpcomingProOrders] = useState(false);
   const [upcomingPage, setUpcomingPage] = useState(1);
   const [upcomingSortBy, setUpcomingSortBy] = useState<'date' | 'name' | 'status'>('date');
@@ -574,16 +574,6 @@ export default function AdminOrders() {
     checkAdmin();
   }, []); // Remove router dependency to prevent loops
 
-  // Helper function to check if order contains Market Space items
-  const isMarketSpaceOrder = (order: Order) => {
-    if (!order.items || !Array.isArray(order.items)) return false;
-    return order.items.some(item => {
-      const category = item.productCategory || '';
-      return category === 'marketplace' || 
-             category === 'marketplace-stickers' || 
-             category === 'marketplace-pack';
-    });
-  };
 
   // Helper function to check if order contains Bannership items
   // Shows orders with any Bannership products (pop-up banners, X-banners, vinyl banners)
@@ -648,17 +638,15 @@ export default function AdminOrders() {
     orders = orders.filter(order => order.financialStatus === 'paid');
 
     // Apply tab filters
-    if (orderTab === 'marketspace') {
-      orders = orders.filter(order => isMarketSpaceOrder(order));
-    } else if (orderTab === 'bannership') {
+    if (orderTab === 'bannership') {
       orders = orders.filter(order => isBannershipOrder(order));
     } else if (orderTab === 'pro') {
       orders = orders.filter(order => isProOrder(order));
     } else if (orderTab === 'all') {
-      // Show orders that are not Market Space, not banner-only, and not Pro orders
+      // Show orders that are not banner-only and not Pro orders
       // Pro orders only appear in the Pro Orders tab
       // Mixed orders (banners + stickers) will show here AND in Bannership tab
-      orders = orders.filter(order => !isMarketSpaceOrder(order) && !isBannerOnlyOrder(order) && !isProOrder(order));
+      orders = orders.filter(order => !isBannerOnlyOrder(order) && !isProOrder(order));
     }
 
     // Apply status filter
@@ -2340,16 +2328,14 @@ export default function AdminOrders() {
     let allOrders = data.getAllOrders.filter((order: Order) => order.financialStatus === 'paid');
     
     // Apply tab filter to analytics
-    if (orderTab === 'marketspace') {
-      allOrders = allOrders.filter(order => isMarketSpaceOrder(order));
-    } else if (orderTab === 'bannership') {
+    if (orderTab === 'bannership') {
       allOrders = allOrders.filter(order => isBannershipOrder(order));
     } else if (orderTab === 'pro') {
       allOrders = allOrders.filter(order => isProOrder(order));
     } else if (orderTab === 'all') {
-      // Show all orders except Market Space, banner-only, and Pro orders
+      // Show all orders except banner-only and Pro orders
       // Pro orders only appear in the Pro Orders tab analytics
-      allOrders = allOrders.filter(order => !isMarketSpaceOrder(order) && !isBannerOnlyOrder(order) && !isProOrder(order));
+      allOrders = allOrders.filter(order => !isBannerOnlyOrder(order) && !isProOrder(order));
     }
     
     const filteredOrders = getFilteredOrdersByTime(allOrders, timeFilter);
@@ -2819,18 +2805,6 @@ export default function AdminOrders() {
                               Pro Orders
                             </button>
                           )}
-                          {!isBannershipOnlyAdmin && (
-                            <button
-                              onClick={() => setOrderTab('marketspace')}
-                              className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                                orderTab === 'marketspace'
-                                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
-                                  : 'text-gray-400 hover:text-white'
-                              }`}
-                            >
-                              Market Space
-                            </button>
-                          )}
                           <button
                             onClick={() => setOrderTab('bannership')}
                             className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
@@ -2984,18 +2958,6 @@ export default function AdminOrders() {
                           }`}
                         >
                           Custom Orders
-                        </button>
-                      )}
-                      {!isBannershipOnlyAdmin && (
-                        <button
-                          onClick={() => setOrderTab('marketspace')}
-                          className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                            orderTab === 'marketspace'
-                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
-                              : 'text-gray-400 hover:text-white'
-                          }`}
-                        >
-                          Market Space
                         </button>
                       )}
                       <button
@@ -5661,7 +5623,14 @@ export default function AdminOrders() {
                       </h3>
                       <div className="space-y-4">
                         <div>
-                          <p className="font-medium text-white text-lg">{selectedOrder.customerFirstName} {selectedOrder.customerLastName}</p>
+                          <p className="font-medium text-white text-lg">
+                            {(() => {
+                              const firstName = selectedOrder.customerFirstName || '';
+                              const lastName = selectedOrder.customerLastName || '';
+                              const fullName = `${firstName} ${lastName}`.trim();
+                              return fullName || 'Customer Name Not Available';
+                            })()}
+                          </p>
                           <p className="text-sm text-gray-400 mt-1">
                             {selectedOrder.userId ? 
                               (customerProfiles[selectedOrder.userId]?.companyName || 'Registered Customer') : 
@@ -6822,7 +6791,12 @@ export default function AdminOrders() {
                         Order #{order.orderNumber || order.id.substring(0, 8).toUpperCase()}
                       </h2>
                       <p style={{ fontSize: '14px', color: '#374151', marginBottom: '4px' }}>
-                        <strong>Customer:</strong> {order.customerFirstName} {order.customerLastName}
+                        <strong>Customer:</strong> {(() => {
+                          const firstName = order.customerFirstName || '';
+                          const lastName = order.customerLastName || '';
+                          const fullName = `${firstName} ${lastName}`.trim();
+                          return fullName || 'Customer Name Not Available';
+                        })()}
                       </p>
                       <p style={{ fontSize: '14px', color: '#374151', marginBottom: '4px' }}>
                         <strong>Email:</strong> {order.customerEmail}

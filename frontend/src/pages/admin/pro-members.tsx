@@ -24,6 +24,7 @@ export default function ProMembersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [showDesignModal, setShowDesignModal] = useState(false);
+  const [showAddressModal, setShowAddressModal] = useState(false);
 
   // Fetch Pro members and analytics
   const { data: membersData, loading: membersLoading, error: membersError, refetch: refetchMembers } = useQuery(GET_ALL_PRO_MEMBERS);
@@ -383,9 +384,12 @@ export default function ProMembersPage() {
                       </td>
                       <td className="px-6 py-4">
                         {member.proDefaultShippingAddress?.address1 ? (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-500/30">
+                          <button
+                            onClick={() => { setSelectedMember(member); setShowAddressModal(true); }}
+                            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-500/30 hover:bg-green-500/30 transition-colors cursor-pointer"
+                          >
                             ✓ On File
-                          </span>
+                          </button>
                         ) : (
                           <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-orange-500/20 text-orange-300 border border-orange-500/30">
                             ⚠️ Missing
@@ -529,6 +533,105 @@ export default function ProMembersPage() {
               )}
               <button
                 onClick={() => setShowDesignModal(false)}
+                className="px-6 py-3 rounded-xl font-semibold text-white transition-all hover:scale-105"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(107, 114, 128, 0.25) 50%, rgba(107, 114, 128, 0.1) 100%)',
+                  backdropFilter: 'blur(25px) saturate(180%)',
+                  border: '1px solid rgba(107, 114, 128, 0.4)',
+                  boxShadow: 'rgba(107, 114, 128, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Address Details Modal */}
+      {showAddressModal && selectedMember && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowAddressModal(false)}>
+          <div 
+            className="max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-2xl p-6"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+              backdropFilter: 'blur(12px)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">Shipping Address</h2>
+              <button
+                onClick={() => setShowAddressModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+                title="Close address modal"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                <h3 className="text-lg font-semibold text-white mb-3">
+                  {selectedMember.firstName} {selectedMember.lastName}
+                </h3>
+                <p className="text-sm text-gray-400 mb-4">{selectedMember.email}</p>
+                
+                {selectedMember.proDefaultShippingAddress ? (
+                  <div className="space-y-2">
+                    <p className="text-white font-medium">
+                      {selectedMember.proDefaultShippingAddress.first_name} {selectedMember.proDefaultShippingAddress.last_name}
+                    </p>
+                    <p className="text-gray-300">{selectedMember.proDefaultShippingAddress.address1}</p>
+                    {selectedMember.proDefaultShippingAddress.address2 && (
+                      <p className="text-gray-300">{selectedMember.proDefaultShippingAddress.address2}</p>
+                    )}
+                    <p className="text-gray-300">
+                      {selectedMember.proDefaultShippingAddress.city}, {selectedMember.proDefaultShippingAddress.province} {selectedMember.proDefaultShippingAddress.zip}
+                    </p>
+                    <p className="text-gray-300">{selectedMember.proDefaultShippingAddress.country}</p>
+                    {selectedMember.proDefaultShippingAddress.phone && (
+                      <p className="text-gray-300">Phone: {selectedMember.proDefaultShippingAddress.phone}</p>
+                    )}
+                    {selectedMember.proShippingAddressUpdatedAt && (
+                      <p className="text-xs text-gray-500 mt-3">
+                        Last updated: {new Date(selectedMember.proShippingAddressUpdatedAt).toLocaleDateString('en-US', { 
+                          month: 'long', 
+                          day: 'numeric', 
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-orange-300">No shipping address on file</p>
+                )}
+              </div>
+
+              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm text-blue-300">
+                      <strong>Note:</strong> This address is automatically synced from the Stripe Customer Portal. 
+                      When the customer updates their address in Stripe, it will be reflected here and used for future orders.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setShowAddressModal(false)}
                 className="px-6 py-3 rounded-xl font-semibold text-white transition-all hover:scale-105"
                 style={{
                   background: 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(107, 114, 128, 0.25) 50%, rgba(107, 114, 128, 0.1) 100%)',

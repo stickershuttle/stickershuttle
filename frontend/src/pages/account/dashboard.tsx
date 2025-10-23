@@ -1482,7 +1482,7 @@ function Dashboard() {
     // Set invoice data for PDF generation
     if (order) {
       const userEmail = (user as any)?.email || '';
-      const userName = profile?.full_name || profile?.name || userEmail.split('@')[0] || 'Customer';
+      const userName = profile?.full_name || profile?.name || `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() || userEmail.split('@')[0] || 'Customer';
       
       setInvoiceData({
         orderNumber: order.orderNumber || order.id,
@@ -2753,7 +2753,7 @@ function Dashboard() {
                       style={{
                         backgroundColor: 'rgba(255, 255, 255, 0.1)',
                         backdropFilter: 'blur(10px)',
-                        border: '2px solid rgba(255, 255, 255, 0.2)',
+                        border: profile?.is_pro_member || profile?.isProMember ? '2px solid #3dd1f9' : '2px solid rgba(255, 255, 255, 0.2)',
                         marginTop: '2px'
                       }}
                       onClick={(e) => handleProfilePictureClick(e)}
