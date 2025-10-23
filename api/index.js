@@ -1211,6 +1211,7 @@ const typeDefs = gql`
     
     # Pro Member Analytics
     getProMemberAnalytics: ProAnalytics!
+    getProMemberCount: Int!
   }
 
   type Mutation {
@@ -4810,6 +4811,38 @@ const resolvers = {
       } catch (error) {
         console.error('❌ Error in getAllProMembers:', error);
         throw new Error(error.message);
+      }
+    },
+
+    // Get Pro Member Count (public endpoint)
+    getProMemberCount: async () => {
+      try {
+        console.log('📊 Fetching Pro member count (public)');
+        
+        if (!supabaseClient.isReady()) {
+          console.error('❌ Supabase not ready, returning fallback count');
+          return 242; // Fallback
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Count all active Pro members
+        const { count, error } = await client
+          .from('user_profiles')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_pro_member', true)
+          .eq('pro_status', 'active');
+
+        if (error) {
+          console.error('❌ Error fetching Pro member count:', error);
+          return 242; // Fallback on error
+        }
+
+        console.log(`✅ Pro member count: ${count}`);
+        return count || 0;
+      } catch (error) {
+        console.error('❌ Error in getProMemberCount:', error);
+        return 242; // Fallback on exception
       }
     },
 

@@ -5,23 +5,16 @@ import UniversalFooter from '../../components/UniversalFooter';
 import AIFileImage from '../../components/AIFileImage';
 import { uploadToCloudinary, validateFile, CloudinaryUploadResult, UploadProgress } from '@/utils/cloudinary';
 import { useRouter } from 'next/router';
-import { useMutation } from '@apollo/client';
-import { CREATE_STRIPE_CHECKOUT_SESSION } from '@/lib/stripe-mutations';
 import { getSupabase } from '@/lib/supabase';
 
 const ProUploadPage = () => {
   const router = useRouter();
-  const { plan: queryPlan } = router.query;
   const [uploadedFile, setUploadedFile] = useState<CloudinaryUploadResult | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<string>((queryPlan as string) || 'annual');
-  const [showPlanSelection, setShowPlanSelection] = useState(false);
-
-  const [createCheckoutSession] = useMutation(CREATE_STRIPE_CHECKOUT_SESSION);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Fetch user data on mount
   useEffect(() => {
@@ -109,70 +102,29 @@ const ProUploadPage = () => {
   const handleRemoveFile = () => {
     setUploadedFile(null);
     setUploadError(null);
+    setSuccessMessage(null);
   };
 
-  const handleProceedToPlanSelection = () => {
-    setShowPlanSelection(true);
-  };
-
-  const handleContinue = async () => {
-    try {
-      setIsProcessing(true);
-
-      // Determine the price based on the selected plan
-      const priceAmount = selectedPlan === 'monthly' ? 39.00 : 347.00; // in dollars
-      const productName = selectedPlan === 'monthly' 
-        ? 'Sticker Shuttle Pro - Monthly Membership' 
-        : 'Sticker Shuttle Pro - Annual Membership';
-
-      // Create checkout session
-      const { data } = await createCheckoutSession({
-        variables: {
-          input: {
-            lineItems: [
-              {
-                name: productName,
-                description: 'Premium sticker subscription with exclusive benefits',
-                unitPrice: priceAmount,
-                totalPrice: priceAmount, // Backend expects totalPrice
-                quantity: 1,
-                productId: `pro-${selectedPlan}`,
-                sku: `PRO-${selectedPlan.toUpperCase()}`
-              }
-            ],
-            successUrl: `${window.location.origin}/pro/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancelUrl: `${window.location.origin}/pro/upload?plan=${selectedPlan}`,
-            customerEmail: user?.email || undefined,
-            userId: user?.id || undefined,
-            metadata: {
-              type: 'pro_membership',
-              plan: selectedPlan,
-              uploadedFileUrl: uploadedFile?.secure_url || '',
-              uploadedFileName: uploadedFile?.original_filename || '',
-              isSubscription: 'true' // Mark as subscription
-            }
-          }
-        }
-      });
-
-      if (data?.createStripeCheckoutSession?.success && data?.createStripeCheckoutSession?.checkoutUrl) {
-        // Redirect to Stripe checkout
-        window.location.href = data.createStripeCheckoutSession.checkoutUrl;
-      } else {
-        throw new Error(data?.createStripeCheckoutSession?.error || 'Failed to create checkout session');
-      }
-    } catch (error) {
-      console.error('Error creating checkout session:', error);
-      setUploadError(error instanceof Error ? error.message : 'Failed to proceed to checkout');
-      setIsProcessing(false);
+  const handleSaveDesign = () => {
+    if (!uploadedFile) {
+      setUploadError('Please upload a file first');
+      return;
     }
+
+    // Show success message
+    setSuccessMessage('Design uploaded successfully! You can view and manage it from your Pro Dashboard.');
+    
+    // Redirect to dashboard after 2 seconds
+    setTimeout(() => {
+      router.push('/account/dashboard?view=pro-membership');
+    }, 2000);
   };
 
   return (
     <>
       <Head>
         <title>Upload Your Design - Sticker Shuttle Pro</title>
-        <meta name="description" content="Upload your design to start your Pro membership with Sticker Shuttle" />
+        <meta name="description" content="Upload or update your monthly sticker design for your Pro membership" />
         <link rel="canonical" href="https://stickershuttle.com/pro/upload" />
       </Head>
 
@@ -190,16 +142,22 @@ const ProUploadPage = () => {
               />
             </div>
             <h1 className="text-3xl lg:text-4xl font-bold text-white mb-4" style={{ fontFamily: 'Rubik, sans-serif' }}>
-              {showPlanSelection 
-                ? 'Choose your Pro membership plan' 
-                : 'Upload your design to start your Pro membership.'}
+              Upload Your Monthly Sticker Design
             </h1>
-            
+            <p className="text-lg text-gray-300 max-w-2xl mx-auto">
+              Upload your design file for your Pro membership's monthly 100 stickers
+            </p>
           </div>
 
-          {/* Upload Section - Only show if plan not selected yet */}
-          {!showPlanSelection && (
-            <div className="mb-8">
+          {/* Success Message */}
+          {successMessage && (
+            <div className="mb-8 p-4 rounded-xl bg-green-500/20 border border-green-500/30 text-center">
+              <p className="text-green-300 font-medium">{successMessage}</p>
+            </div>
+          )}
+
+          {/* Upload Section */}
+          <div className="mb-8">
               <div 
                 className="p-6 lg:p-8 rounded-2xl lg:rounded-3xl"
                 style={{
@@ -363,152 +321,79 @@ const ProUploadPage = () => {
                 )}
               </div>
             </div>
-          )}
 
-            {/* Continue Button - Only show when file is uploaded */}
-            {!showPlanSelection && (
-              <div className="flex flex-col items-center justify-center gap-4 mb-8">
-                <button
-                  onClick={handleProceedToPlanSelection}
-                  disabled={!uploadedFile}
-                  className="px-12 lg:px-16 py-5 lg:py-6 rounded-xl lg:rounded-2xl text-xl lg:text-2xl font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                  style={{
-                    background: uploadedFile
-                      ? 'linear-gradient(45deg, #3dd1f9, #2bb8d9, #4dd8ff, #7ee3ff, #3dd1f9)'
-                      : 'rgba(255, 255, 255, 0.1)',
-                    backgroundSize: '300% 300%',
-                    animation: uploadedFile ? 'gradient-move 3s ease-in-out infinite' : 'none',
-                    backdropFilter: 'blur(25px) saturate(180%)',
-                    border: '1px solid rgba(61, 209, 249, 0.4)',
-                    boxShadow: uploadedFile
-                      ? 'rgba(61, 209, 249, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
-                      : 'none',
-                    fontFamily: 'Rubik, sans-serif'
-                  }}
-                >
-                  {uploadedFile ? 'Continue with Design' : 'Upload Design to Continue'}
-                </button>
-                
-                {!uploadedFile && (
-                  <p className="text-sm text-gray-400 text-center max-w-md">
-                    Please upload your design file to proceed with Pro membership. This ensures your first monthly stickers are ready to print!
-                  </p>
-                )}
-              </div>
-            )}
-
-          {/* Plan Selection - Show after first continue */}
-          {showPlanSelection && (
-            <>
-            <div className="mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-              {/* Pro Monthly */}
-              <div 
-                className={`p-6 lg:p-8 rounded-2xl lg:rounded-3xl text-center cursor-pointer transition-all duration-300 hover:scale-105 backdrop-blur-md ${
-                  selectedPlan === 'monthly'
-                    ? 'bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue'
-                    : 'border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70'
-                }`}
-                style={{
-                  border: selectedPlan === 'monthly' ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
-                }}
-                onClick={() => setSelectedPlan('monthly')}>
-                <div className="flex items-start justify-center gap-2 lg:gap-3 mb-4">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
-                    alt="Sticker Shuttle Pro Logo" 
-                    className="h-8 lg:h-10 w-auto object-contain"
-                  />
-                  <span className="text-2xl lg:text-3xl font-bold -mt-1">Monthly</span>
-                </div>
-                <div className="text-4xl lg:text-5xl font-bold mb-2" style={{ fontFamily: 'Rubik, sans-serif' }}>$39</div>
-                <div className="text-sm lg:text-base">per month</div>
-              </div>
-              
-              {/* Pro Annual */}
-              <div 
-                className={`p-6 lg:p-8 rounded-2xl lg:rounded-3xl text-center cursor-pointer transition-all duration-300 hover:scale-105 backdrop-blur-md ${
-                  selectedPlan === 'annual'
-                    ? 'bg-blue-500/20 text-blue-200 font-medium button-selected animate-glow-blue'
-                    : 'border-2 border-dashed border-blue-400/50 opacity-65 hover:border-blue-400/70 hover:bg-white/5 hover:opacity-80 text-white/70'
-                }`}
-                style={{
-                  border: selectedPlan === 'annual' ? '1.5px solid rgba(59, 130, 246, 0.5)' : undefined
-                }}
-                onClick={() => setSelectedPlan('annual')}>
-                {selectedPlan === 'annual' && (
-                  <div className="inline-flex items-center px-3 lg:px-4 py-1 lg:py-1.5 rounded-full text-xs lg:text-sm font-medium text-blue-300 mb-4"
-                       style={{
-                         background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
-                         backdropFilter: 'blur(25px) saturate(180%)',
-                         border: '1px solid rgba(59, 130, 246, 0.4)'
-                       }}>
-                    Best Value
-                  </div>
-                )}
-                <div className="flex items-start justify-center gap-2 lg:gap-3 mb-2">
-                  <img 
-                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
-                    alt="Sticker Shuttle Pro Logo" 
-                    className="h-8 lg:h-10 w-auto object-contain"
-                  />
-                  <span className="text-2xl lg:text-3xl font-bold -mt-1">Annual</span>
-                </div>
-                <div className="flex items-center justify-center gap-3 lg:gap-4 mb-2">
-                  <div className="text-4xl lg:text-5xl font-bold" style={{ fontFamily: 'Rubik, sans-serif' }}>$347</div>
-                  <div className="inline-flex items-center px-2 lg:px-3 py-1 lg:py-1.5 rounded-full text-xs lg:text-sm font-bold text-white"
-                       style={{
-                         background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.8) 0%, rgba(220, 38, 38, 0.8) 100%)',
-                         backdropFilter: 'blur(25px) saturate(180%)',
-                         border: '1px solid rgba(239, 68, 68, 0.4)',
-                         boxShadow: 'rgba(239, 68, 68, 0.3) 0px 4px 16px'
-                       }}>
-                    Save $121
-                  </div>
-                </div>
-                <div className="flex justify-center mb-2">
-                  <div className="text-sm lg:text-base font-bold tracking-widest"
-                       style={{
-                         background: 'linear-gradient(135deg, #FFD700 0%, #FFC107 50%, #FF8F00 100%)',
-                         WebkitBackgroundClip: 'text',
-                         WebkitTextFillColor: 'transparent',
-                         backgroundClip: 'text'
-                       }}>
-                    FOUNDING MEMBER SPECIAL
-                  </div>
-                </div>
-                <div className={`${selectedPlan === 'annual' ? 'text-blue-200' : 'text-gray-300'} text-sm lg:text-base`}>
-                  <span className="line-through text-gray-500 mr-2">(originally $468)</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Final Continue Button - Proceed to Checkout */}
-          <div className="flex justify-center">
+          {/* Save Design Button */}
+          <div className="flex flex-col items-center justify-center gap-4 mb-8">
             <button
-              onClick={handleContinue}
-              disabled={isProcessing}
+              onClick={handleSaveDesign}
+              disabled={!uploadedFile || !!successMessage}
               className="px-12 lg:px-16 py-5 lg:py-6 rounded-xl lg:rounded-2xl text-xl lg:text-2xl font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               style={{
-                background: uploadedFile && !isProcessing
+                background: uploadedFile && !successMessage
                   ? 'linear-gradient(45deg, #3dd1f9, #2bb8d9, #4dd8ff, #7ee3ff, #3dd1f9)'
                   : 'rgba(255, 255, 255, 0.1)',
                 backgroundSize: '300% 300%',
-                animation: uploadedFile && !isProcessing ? 'gradient-move 3s ease-in-out infinite' : 'none',
+                animation: uploadedFile && !successMessage ? 'gradient-move 3s ease-in-out infinite' : 'none',
                 backdropFilter: 'blur(25px) saturate(180%)',
                 border: '1px solid rgba(61, 209, 249, 0.4)',
-                boxShadow: uploadedFile && !isProcessing
+                boxShadow: uploadedFile && !successMessage
                   ? 'rgba(61, 209, 249, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                   : 'none',
                 fontFamily: 'Rubik, sans-serif'
               }}
             >
-              {isProcessing ? 'Processing...' : 'Continue'}
+              {uploadedFile ? 'Save Design' : 'Upload Design to Continue'}
             </button>
+            
+            {!uploadedFile && (
+              <p className="text-sm text-gray-400 text-center max-w-md">
+                Upload your design file for your monthly stickers. We'll send you a proof for approval before printing!
+              </p>
+            )}
           </div>
-          </>
-          )}
+
+          {/* Info Card */}
+          <div 
+            className="p-6 lg:p-8 rounded-2xl"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+              backdropFilter: 'blur(12px)'
+            }}
+          >
+            <h3 className="text-xl font-bold text-white mb-4 text-center">What Happens Next?</h3>
+            <div className="space-y-4 text-left max-w-2xl mx-auto">
+              <div className="flex items-start gap-3">
+                <div className="text-2xl flex-shrink-0">📋</div>
+                <div>
+                  <p className="text-white font-medium">We review your design</p>
+                  <p className="text-sm text-gray-400">Our team checks your file for quality and print readiness</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="text-2xl flex-shrink-0">✅</div>
+                <div>
+                  <p className="text-white font-medium">Proof for approval</p>
+                  <p className="text-sm text-gray-400">You'll receive a proof to approve before we print</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="text-2xl flex-shrink-0">🖨️</div>
+                <div>
+                  <p className="text-white font-medium">We print your stickers</p>
+                  <p className="text-sm text-gray-400">100 custom stickers printed to perfection</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="text-2xl flex-shrink-0">📦</div>
+                <div>
+                  <p className="text-white font-medium">FREE 2-Day Air shipping</p>
+                  <p className="text-sm text-gray-400">Your stickers arrive fast with premium shipping</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="hidden md:block">
@@ -540,19 +425,6 @@ const ProUploadPage = () => {
         
         .animate-glow-green {
           animation: glow-green 2s ease-in-out infinite;
-        }
-
-        @keyframes glow-blue {
-          0%, 100% {
-            box-shadow: 0 0 5px rgba(59, 130, 246, 0.2), 0 0 10px rgba(59, 130, 246, 0.1), 0 0 15px rgba(59, 130, 246, 0.05);
-          }
-          50% {
-            box-shadow: 0 0 10px rgba(59, 130, 246, 0.4), 0 0 20px rgba(59, 130, 246, 0.2), 0 0 30px rgba(59, 130, 246, 0.1);
-          }
-        }
-        
-        .animate-glow-blue {
-          animation: glow-blue 2s ease-in-out infinite;
         }
       `}</style>
     </>

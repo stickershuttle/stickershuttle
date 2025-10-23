@@ -73,6 +73,13 @@ class StripeClient {
               isTaxExempt: isTaxExempt.toString()
             }
           };
+          
+          // For Pro subscriptions, add uploaded file URL to customer metadata
+          if (orderData.metadata?.isSubscription === 'true' && orderData.metadata?.uploadedFileUrl) {
+            customerData.metadata.uploadedFileUrl = orderData.metadata.uploadedFileUrl;
+            customerData.metadata.uploadedFileName = orderData.metadata.uploadedFileName || '';
+            console.log('📁 Storing Pro design file in customer metadata:', orderData.metadata.uploadedFileUrl);
+          }
 
           if (orderData.existingCustomerId) {
             // Update existing customer

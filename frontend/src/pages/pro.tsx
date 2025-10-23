@@ -11,6 +11,7 @@ const StickerShuttlePro = () => {
   const [currentMessageIndex, setCurrentMessageIndex] = React.useState(0);
   const [displayText, setDisplayText] = React.useState('');
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [proMemberCount, setProMemberCount] = React.useState(242); // Default fallback
 
   const messages = [
     'never worry about<br/>getting your stickers<br/>on time again.',
@@ -27,6 +28,42 @@ const StickerShuttlePro = () => {
     'never watch competitors<br/>hand out cool stickers<br/>while you stand empty-handed.',
     'quit being the brand<br/>people forget because<br/>you have nothing sticky.'
   ];
+
+  // Fetch Pro member count
+  React.useEffect(() => {
+    const fetchProMemberCount = async () => {
+      try {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+        const response = await fetch(`${backendUrl}/graphql`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            query: `
+              query {
+                getProMemberCount
+              }
+            `
+          })
+        });
+
+        const result = await response.json();
+        console.log('📊 Pro member count response:', result);
+        
+        if (result.data?.getProMemberCount !== undefined) {
+          const count = result.data.getProMemberCount;
+          setProMemberCount(count);
+          console.log('✅ Pro member count fetched:', count);
+        }
+      } catch (error) {
+        console.error('Error fetching Pro member count:', error);
+        // Keep default fallback value
+      }
+    };
+
+    fetchProMemberCount();
+  }, []);
 
   React.useEffect(() => {
     const currentMessage = messages[currentMessageIndex];
@@ -163,7 +200,7 @@ const StickerShuttlePro = () => {
               </p>
               
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-                                  <Link href={`/pro/upload?plan=${selectedPlan}`}>
+                                  <Link href={`/pro/join?plan=${selectedPlan}`}>
                     <button className="px-18 py-5 lg:px-24 lg:py-6 rounded-xl text-lg lg:text-xl font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] flex items-center gap-2 lg:gap-3 animate-pulse-subtle button-gradient"
                           style={{
                             backdropFilter: 'blur(25px) saturate(180%)',
@@ -176,11 +213,11 @@ const StickerShuttlePro = () => {
                   </Link>
               </div>
               
-              {/* Founding 500 Progress Bar */}
+              {/* Founding 100 Progress Bar */}
               <div className="mb-8 max-w-xs lg:max-w-md xl:max-w-lg mx-auto">
                 <div className="text-center mb-3">
                   <span className="text-sm lg:text-base font-bold text-blue-300 tracking-wider">
-                    Founding 500 Members
+                    Founding 100 Members
                   </span>
                 </div>
                 <div className="relative w-full h-3 lg:h-4 bg-gray-700/30 rounded-full overflow-hidden"
@@ -190,11 +227,11 @@ const StickerShuttlePro = () => {
                        backdropFilter: 'blur(12px)'
                      }}>
                   <div className="h-full bg-gradient-to-r from-yellow-400 to-red-500 rounded-full transition-all duration-1000 ease-out"
-                       style={{ width: '48.4%' }}></div>
+                       style={{ width: `${(proMemberCount / 100) * 100}%` }}></div>
                 </div>
                 <div className="flex justify-between text-xs lg:text-sm text-gray-400 mt-2">
-                  <span>242 members</span>
-                  <span>258 spots left</span>
+                  <span>{proMemberCount} members</span>
+                  <span>{100 - proMemberCount} spots left</span>
                 </div>
               </div>
               
@@ -206,7 +243,7 @@ const StickerShuttlePro = () => {
                 <ul className="space-y-2 lg:space-y-3 text-gray-300 text-base lg:text-lg max-w-2xl lg:max-w-4xl" style={{ fontFamily: 'Rubik, sans-serif' }}>
                   {/* Main Benefits Section Header */}
                   <li className="flex items-center justify-center mb-4 lg:mb-6">
-                    <span className="text-m lg:text-lg font-medium text-green-300 uppercase tracking-wide">What's Included?</span>
+                    <span className="text-lg lg:text-xl font-bold text-green-300 uppercase tracking-wide">What's Included?</span>
                     <span className="text-sm lg:text-base text-gray-400 ml-2">$150/mo in value</span>
                   </li>
                   
@@ -250,8 +287,8 @@ const StickerShuttlePro = () => {
                   </li>
                   
                   {/* Additional Benefits Section Header */}
-                  <li className="flex items-center justify-center mb-4 lg:mb-6">
-                    <span className="text-m lg:text-lg font-medium text-blue-300 uppercase tracking-wide">+ Additional Benefits</span>
+                  <li className="flex items-center justify-center mb-4 lg:mb-6 mt-12 lg:mt-12">
+                    <span className="text-lg lg:text-xl font-bold text-blue-300 uppercase tracking-wide">+ Additional Benefits</span>
                   </li>
                   
                   <li className="flex items-center justify-center">
@@ -281,8 +318,8 @@ const StickerShuttlePro = () => {
                   
                   
                   {/* Bonus Section */}
-                  <li className="flex items-center justify-center mb-4 lg:mb-6">
-                    <span className="text-m lg:text-lg font-medium text-yellow-300 uppercase tracking-wide">+ Founding 500 Bonuses</span>
+                  <li className="flex items-center justify-center mb-4 mt-12 lg:mb-6">
+                    <span className="text-lg lg:text-xl font-bold text-yellow-300 uppercase tracking-wide">+ Founding 100 Bonuses</span>
                   </li>
                        
                   <li className="flex items-center justify-center">
@@ -296,7 +333,7 @@ const StickerShuttlePro = () => {
 
                   <li className="flex items-center justify-center">
                     <span className="text-xl lg:text-2xl mr-3 lg:mr-4 flex-shrink-0">💎</span>
-                    <span><span style={{ fontWeight: 'bold' }}>Exclusive Pro Sticker Pack</span></span>
+                    <span><span style={{ fontWeight: 'bold' }}>Exclusive Founding Member Sticker Pack</span></span>
                   </li>
 
                   <div className="flex justify-center">
@@ -477,14 +514,14 @@ const StickerShuttlePro = () => {
                 
                 {/* Join Pro Button */}
                 <div className="flex justify-center">
-                  <Link href={`/pro/upload?plan=${selectedPlan}`}>
+                  <Link href={`/pro/join?plan=${selectedPlan}`}>
                     <button className="px-12 py-5 lg:px-16 lg:py-7 rounded-xl lg:rounded-2xl text-xl lg:text-2xl font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] flex items-center gap-3 lg:gap-4 animate-pulse-subtle button-gradient"
                           style={{
                             backdropFilter: 'blur(25px) saturate(180%)',
                             border: '1px solid rgba(61, 209, 249, 0.4)',
                             boxShadow: 'rgba(61, 209, 249, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                           }}>
-                      Upload Design & Join Pro
+                      Join Pro
                       <ArrowRight className="w-6 h-6 lg:w-7 lg:h-7 transition-transform duration-300 hover:translate-x-1" />
                     </button>
                   </Link>
@@ -585,7 +622,7 @@ const StickerShuttlePro = () => {
             
             {/* Join Pro Button */}
             <div className="flex justify-center mt-12 lg:mt-16 mb-16 lg:mb-20">
-              <Link href={`/pro/upload?plan=${selectedPlan}`}>
+              <Link href={`/pro/join?plan=${selectedPlan}`}>
                 <button className="px-12 py-5 lg:px-16 lg:py-7 rounded-xl lg:rounded-2xl text-xl lg:text-2xl font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] flex items-center gap-3 lg:gap-4 animate-pulse-subtle button-gradient"
                       style={{
                         backdropFilter: 'blur(25px) saturate(180%)',

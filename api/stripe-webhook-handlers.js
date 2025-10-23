@@ -271,11 +271,24 @@ async function handleCheckoutSessionCompleted(session) {
     // Log the original webhook session data first
     console.log('🔍 Original webhook session data:', {
       id: session.id,
+      mode: session.mode,
       shipping_cost: session.shipping_cost,
       shipping_details: session.shipping_details,
       amount_total: session.amount_total,
       payment_status: session.payment_status
     });
+    
+    // Check if this is a subscription checkout - if so, skip order creation
+    // Subscriptions are handled by the customer.subscription.created webhook
+    if (session.mode === 'subscription') {
+      console.log('✅ Subscription checkout detected - will be handled by customer.subscription.created webhook');
+      console.log('📋 Session details:', {
+        sessionId: session.id,
+        subscription: session.subscription,
+        customer: session.customer
+      });
+      return; // Exit early - subscription creation webhook will handle everything
+    }
     
     // Get full session details to access metadata and line items
     const stripe = require('./stripe-client');
@@ -286,8 +299,15 @@ async function handleCheckoutSessionCompleted(session) {
       hasLineItems: !!fullSession.line_items?.data,
       lineItemCount: fullSession.line_items?.data?.length || 0,
       hasMetadata: !!fullSession.metadata,
-      hasShippingCost: !!fullSession.shipping_cost
+      hasShippingCost: !!fullSession.shipping_cost,
+      mode: fullSession.mode
     });
+    
+    // Double-check subscription mode
+    if (fullSession.mode === 'subscription') {
+      console.log('✅ Subscription mode confirmed - skipping order creation');
+      return;
+    }
     
     // If shipping cost is not available, wait a moment and try again
     // Sometimes Stripe needs a moment to populate all session data
@@ -302,6 +322,12 @@ async function handleCheckoutSessionCompleted(session) {
     
     console.log('📋 Full session metadata:', metadata);
     console.log('🛒 Cart metadata:', cartMetadata);
+    
+    // Check if this is a subscription via metadata (backup check)
+    if (metadata.isSubscription === 'true' || metadata.type === 'pro_membership') {
+      console.log('✅ Subscription detected via metadata - skipping order creation');
+      return;
+    }
     
     // Check if this is an additional payment
     if (metadata.isAdditionalPayment === 'true' && metadata.originalOrderId) {
@@ -2244,6 +2270,8 @@ async function handleSubscriptionCreated(subscription) {
         user_id: userId,
         is_pro_member: true,
         pro_subscription_id: subscription.id,
+        pro_stripe_subscription_id: subscription.id,
+        pro_stripe_customer_id: customerId,
         pro_plan: plan,
         pro_status: subscription.status,
         pro_subscription_start_date: new Date(subscription.current_period_start * 1000).toISOString(),
@@ -2270,6 +2298,14 @@ async function handleSubscriptionCreated(subscription) {
         console.error('❌ Error updating user profile with Pro status:', profileError);
       } else {
         console.log('✅ User profile updated with Pro membership');
+        console.log('📋 Pro member data saved:', {
+          userId,
+          subscriptionId: subscription.id,
+          customerId,
+          plan,
+          hasDesignFile: !!uploadedDesignFile,
+          hasShippingAddress: !!shippingAddress
+        });
       }
     }
 
