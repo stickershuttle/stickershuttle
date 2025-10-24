@@ -201,8 +201,18 @@ class StripeClient {
         enabled: true
       };
 
-      // Always collect customer name - REQUIRED for all orders
-      sessionConfig.customer_creation = 'always';
+      // Add customer information
+      if (customerId) {
+        sessionConfig.customer = customerId;
+        // When using existing customer, allow updates
+        sessionConfig.customer_update = {
+          shipping: 'auto'
+        };
+      } else {
+        // For new customers, always create and collect email
+        sessionConfig.customer_creation = 'always';
+        sessionConfig.customer_email = orderData.customerEmail;
+      }
 
       // Only enable automatic tax for non-subscription products
       // (subscriptions are typically tax-exempt memberships)
@@ -210,16 +220,6 @@ class StripeClient {
         sessionConfig.automatic_tax = {
           enabled: true
         };
-        sessionConfig.customer_update = {
-          shipping: 'auto'
-        };
-      }
-
-      // Add customer information
-      if (customerId) {
-        sessionConfig.customer = customerId;
-      } else {
-        sessionConfig.customer_email = orderData.customerEmail;
       }
 
       // Determine shipping options based on product type
