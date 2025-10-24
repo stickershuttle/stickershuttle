@@ -11,7 +11,7 @@ const StickerShuttlePro = () => {
   const [currentMessageIndex, setCurrentMessageIndex] = React.useState(0);
   const [displayText, setDisplayText] = React.useState('');
   const [isDeleting, setIsDeleting] = React.useState(false);
-  const [proMemberCount, setProMemberCount] = React.useState(242); // Default fallback
+  const [proMemberCount, setProMemberCount] = React.useState(0); // Default fallback (will be updated from API)
 
   const messages = [
     'never worry about<br/>getting your stickers<br/>on time again.',

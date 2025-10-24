@@ -60,42 +60,47 @@ class StripeClient {
       const isTaxExempt = orderData.customerTaxExempt || false;
       console.log('🏛️ Tax exemption status:', { isTaxExempt, customerEmail: orderData.customerEmail });
 
-      // Create/update customer if tax exemption is needed
+      // ALWAYS create/update customer (required for Stripe Accounts V2)
+      // Stripe Accounts V2 requires a customer for all checkout sessions
       let customerId = null;
-      if (orderData.userId && orderData.userId !== 'guest') {
-        try {
-          // Create or update customer with tax exemption status
-          const customerData = {
-            email: orderData.customerEmail,
-            tax_exempt: isTaxExempt ? 'exempt' : 'none',
-            metadata: {
-              userId: orderData.userId,
-              isTaxExempt: isTaxExempt.toString()
-            }
-          };
-          
-          // For Pro subscriptions, add uploaded file URL to customer metadata
-          if (orderData.metadata?.isSubscription === 'true' && orderData.metadata?.uploadedFileUrl) {
-            customerData.metadata.uploadedFileUrl = orderData.metadata.uploadedFileUrl;
-            customerData.metadata.uploadedFileName = orderData.metadata.uploadedFileName || '';
-            console.log('📁 Storing Pro design file in customer metadata:', orderData.metadata.uploadedFileUrl);
+      try {
+        // Build customer data
+        const customerData = {
+          email: orderData.customerEmail,
+          name: `${orderData.customerFirstName || ''} ${orderData.customerLastName || ''}`.trim(),
+          tax_exempt: isTaxExempt ? 'exempt' : 'none',
+          metadata: {
+            userId: orderData.userId || 'guest',
+            isTaxExempt: isTaxExempt.toString()
           }
-
-          if (orderData.existingCustomerId) {
-            // Update existing customer
-            await this.stripe.customers.update(orderData.existingCustomerId, customerData);
-            customerId = orderData.existingCustomerId;
-          } else {
-            // Create new customer
-            const customer = await this.stripe.customers.create(customerData);
-            customerId = customer.id;
-          }
-
-          console.log('✅ Customer tax status updated:', { customerId, taxExempt: isTaxExempt });
-        } catch (customerError) {
-          console.warn('⚠️ Error managing customer tax status:', customerError);
-          // Continue without customer ID - guest checkout
+        };
+        
+        // Add phone if available
+        if (orderData.shippingAddress?.phone) {
+          customerData.phone = orderData.shippingAddress.phone;
         }
+        
+        // For Pro subscriptions, add uploaded file URL to customer metadata
+        if (orderData.metadata?.isSubscription === 'true' && orderData.metadata?.uploadedFileUrl) {
+          customerData.metadata.uploadedFileUrl = orderData.metadata.uploadedFileUrl;
+          customerData.metadata.uploadedFileName = orderData.metadata.uploadedFileName || '';
+          console.log('📁 Storing Pro design file in customer metadata:', orderData.metadata.uploadedFileUrl);
+        }
+
+        if (orderData.existingCustomerId) {
+          // Update existing customer
+          await this.stripe.customers.update(orderData.existingCustomerId, customerData);
+          customerId = orderData.existingCustomerId;
+          console.log('✅ Existing customer updated:', { customerId, taxExempt: isTaxExempt });
+        } else {
+          // Create new customer (required for Accounts V2)
+          const customer = await this.stripe.customers.create(customerData);
+          customerId = customer.id;
+          console.log('✅ New customer created:', { customerId, taxExempt: isTaxExempt, isGuest: orderData.userId === 'guest' || !orderData.userId });
+        }
+      } catch (customerError) {
+        console.error('❌ Error creating/updating customer:', customerError);
+        throw new Error(`Failed to create customer: ${customerError.message}`);
       }
 
       // Check if this is a subscription (Pro membership)
@@ -201,18 +206,12 @@ class StripeClient {
         enabled: true
       };
 
-      // Add customer information
-      if (customerId) {
-        sessionConfig.customer = customerId;
-        // When using existing customer, allow updates
-        sessionConfig.customer_update = {
-          shipping: 'auto'
-        };
-      } else {
-        // For new customers, always create and collect email
-        sessionConfig.customer_creation = 'always';
-        sessionConfig.customer_email = orderData.customerEmail;
-      }
+      // Add customer information (customer is now always created above)
+      sessionConfig.customer = customerId;
+      // Allow customer updates for shipping address
+      sessionConfig.customer_update = {
+        shipping: 'auto'
+      };
 
       // Only enable automatic tax for non-subscription products
       // (subscriptions are typically tax-exempt memberships)

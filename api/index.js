@@ -4836,19 +4836,20 @@ const resolvers = {
 
         const client = supabaseClient.getServiceClient();
         
-        // Count all Pro members from user_profiles table (founding members count)
-        // This includes all Pro members regardless of subscription status
+        // Count only ACTIVE Pro members from user_profiles table (founding members count)
+        // This ensures we only count members with active subscriptions
         const { count, error } = await client
           .from('user_profiles')
           .select('*', { count: 'exact', head: true })
-          .eq('is_pro_member', true);
+          .eq('is_pro_member', true)
+          .eq('pro_status', 'active');
 
         if (error) {
           console.error('❌ Error fetching Pro member count:', error);
           return 0; // Fallback on error
         }
 
-        console.log(`✅ Pro member count from user_profiles: ${count}`);
+        console.log(`✅ Active Pro member count from user_profiles: ${count}`);
         return count || 0;
       } catch (error) {
         console.error('❌ Error in getProMemberCount:', error);
