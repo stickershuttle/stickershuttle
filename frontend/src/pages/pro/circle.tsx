@@ -217,6 +217,7 @@ export default function ProCircle() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   // Check user authentication
   useEffect(() => {
@@ -275,14 +276,14 @@ export default function ProCircle() {
   // Filter businesses by category
   const filteredBusinesses = selectedCategory === 'all' 
     ? allBusinesses 
-    : allBusinesses.filter(business => business.category === selectedCategory);
+    : allBusinesses.filter((business: any) => business.category === selectedCategory);
 
   // Count businesses per category
   const categoryCounts = CATEGORIES.reduce((acc, cat) => {
     if (cat.value === 'all') {
       acc[cat.value] = allBusinesses.length;
     } else {
-      acc[cat.value] = allBusinesses.filter(b => b.category === cat.value).length;
+      acc[cat.value] = allBusinesses.filter((b: any) => b.category === cat.value).length;
     }
     return acc;
   }, {} as Record<string, number>);
@@ -479,7 +480,26 @@ export default function ProCircle() {
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Sidebar - Categories */}
             <div className="lg:w-80 flex-shrink-0">
-              <div className="sticky top-24 space-y-4">
+              {/* Mobile Filter Toggle Button */}
+              <button
+                onClick={() => setShowMobileFilters(!showMobileFilters)}
+                className="lg:hidden mb-4 w-full px-4 py-3 rounded-xl text-white font-medium flex items-center justify-center gap-2"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(12px)',
+                }}
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+                {showMobileFilters ? 'Hide Filters' : 'Show Filters'}
+                <svg className={`w-4 h-4 transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              <div className={`sticky top-24 space-y-4 ${showMobileFilters ? '' : 'hidden lg:block'}`}>
                 {/* Add My Business Button */}
                 <Link href="/pro/circle/add-my-business">
                  <button
@@ -628,21 +648,21 @@ export default function ProCircle() {
                     </label>
                     
                     <div className="space-y-1.5">
-                      {[...new Set(allBusinesses.map(b => b.state).filter(Boolean))].sort().map((state) => {
-                        const stateCount = allBusinesses.filter(b => b.state === state).length;
+                      {[...new Set(allBusinesses.map((b: any) => b.state).filter(Boolean))].sort().map((state: any) => {
+                        const stateCount = allBusinesses.filter((b: any) => b.state === state).length;
                         
                         return (
                           <button
-                            key={state}
+                            key={state as string}
                             className="w-full group relative p-3 rounded-xl transition-all duration-200 overflow-hidden hover:bg-white/5 bg-gray-800/30"
                           >
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full flex items-center justify-center">
-                                <span className="text-base">{STATE_ICONS[state] || '📍'}</span>
+                                <span className="text-base">{(STATE_ICONS as any)[state] || '📍'}</span>
                               </div>
                               <div className="flex-1 text-left">
                                 <h3 className="font-semibold text-sm text-white/80 group-hover:text-white">
-                                  {state}
+                                  {state as string}
                                 </h3>
                                 <p className="text-xs text-white/50 group-hover:text-white/60">
                                   {stateCount} business{stateCount !== 1 ? 'es' : ''}
@@ -655,14 +675,13 @@ export default function ProCircle() {
                     </div>
                   </div>
                 </div>
-
               </div>
             </div>
 
             {/* Business Cards Grid */}
             <div className="flex-1 pt-0">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
-                {filteredBusinesses.map((business) => (
+                {filteredBusinesses.map((business: any) => (
                  <div
                  key={business.id}
                  className="rounded-2xl transition-all duration-300 hover:scale-[1.0125] hover:shadow-2xl overflow-hidden relative"

@@ -259,10 +259,20 @@ export default function AddMyBusiness() {
 
         <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4 pt-24 pb-12">
           <div className="mb-8">
-            <h1 className="text-4xl font-bold mb-2" style={{ fontFamily: 'Rubik, sans-serif' }}>
-              Add Your Business to <span className="pro-gradient">Pro</span> Circle
+            <h1 className="text-3xl sm:text-4xl font-bold mb-2" style={{ fontFamily: 'Rubik, sans-serif' }}>
+              <span className="sm:flex sm:flex-wrap sm:items-center gap-2 sm:gap-3">
+                <span className="block">Add Your Business to</span>
+                <span className="flex items-center gap-2 sm:inline-flex">
+                  <img 
+                    src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                    alt="Pro" 
+                    className="h-8 sm:h-10 w-auto object-contain"
+                  />
+                  <span>Circle</span>
+                </span>
+              </span>
             </h1>
-            <p className="text-gray-300">Fill out the form below to submit your business for approval</p>
+            <p className="text-gray-300">Fill out the form below to submit your business for approval.</p>
           </div>
 
           <form onSubmit={handleSubmit}>
@@ -430,9 +440,11 @@ export default function AddMyBusiness() {
                       <div>
                         <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                         <p className="text-gray-300 mb-1">
-                          {uploading ? 'Uploading...' : 'Click to upload logo'}
+                          {uploading ? 'Uploading...' : 'Tap to upload logo'}
                         </p>
-                        <p className="text-xs text-gray-500">PNG, JPG up to 25MB</p>
+                        <p className="text-xs text-gray-500">
+                          Please upload a PNG of your logo with no background. PNG, JPG up to 25MB
+                        </p>
                       </div>
                     )}
                     <input
