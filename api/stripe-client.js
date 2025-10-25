@@ -361,90 +361,159 @@ class StripeClient {
           ];
         }
       } else {
-        // Custom products: Standard shipping options
-        console.log('🎨 Custom products detected - using standard shipping options');
-        shippingOptions = [
-          {
-            shipping_rate_data: {
-              type: 'fixed_amount',
-              fixed_amount: {
-                amount: 0, // Free shipping - adjust as needed
-                currency: 'usd',
-              },
-              display_name: 'UPS Ground',
-              delivery_estimate: {
-                minimum: {
-                  unit: 'business_day',
-                  value: 2,
+        // Custom products: Standard shipping options (adjusted for Pro members)
+        const isProMember = orderData.isProMember || false;
+        console.log(`🎨 Custom products detected - using ${isProMember ? 'Pro member' : 'standard'} shipping options`);
+        
+        if (isProMember) {
+          // Pro members get free 2-day air shipping
+          shippingOptions = [
+            {
+              shipping_rate_data: {
+                type: 'fixed_amount',
+                fixed_amount: {
+                  amount: 0, // Free 2-day air for Pro members
+                  currency: 'usd',
                 },
-                maximum: {
-                  unit: 'business_day',
-                  value: 3,
-                },
-              },
-            },
-          },
-          {
-            shipping_rate_data: {
-              type: 'fixed_amount',
-              fixed_amount: {
-                amount: 2000, // $20.00
-                currency: 'usd',
-              },
-              display_name: 'UPS 2nd Day Air',
-              delivery_estimate: {
-                minimum: {
-                  unit: 'business_day',
-                  value: 2,
-                },
-                maximum: {
-                  unit: 'business_day',
-                  value: 2,
+                display_name: 'UPS 2nd Day Air (Pro Member Benefit)',
+                delivery_estimate: {
+                  minimum: {
+                    unit: 'business_day',
+                    value: 2,
+                  },
+                  maximum: {
+                    unit: 'business_day',
+                    value: 2,
+                  },
                 },
               },
             },
-          },
-          {
-            shipping_rate_data: {
-              type: 'fixed_amount',
-              fixed_amount: {
-                amount: 4000, // $40.00
-                currency: 'usd',
-              },
-              display_name: 'UPS Next Day Air',
-              delivery_estimate: {
-                minimum: {
-                  unit: 'business_day',
-                  value: 1,
+            {
+              shipping_rate_data: {
+                type: 'fixed_amount',
+                fixed_amount: {
+                  amount: 4000, // $40.00
+                  currency: 'usd',
                 },
-                maximum: {
-                  unit: 'business_day',
-                  value: 1,
-                },
-              },
-            },
-          },
-          {
-            shipping_rate_data: {
-              type: 'fixed_amount',
-              fixed_amount: {
-                amount: 0, // Free local pickup
-                currency: 'usd',
-              },
-              display_name: 'Local Pickup (Denver, CO)',
-              delivery_estimate: {
-                minimum: {
-                  unit: 'business_day',
-                  value: 1,
-                },
-                maximum: {
-                  unit: 'business_day',
-                  value: 1,
+                display_name: 'UPS Next Day Air',
+                delivery_estimate: {
+                  minimum: {
+                    unit: 'business_day',
+                    value: 1,
+                  },
+                  maximum: {
+                    unit: 'business_day',
+                    value: 1,
+                  },
                 },
               },
             },
-          },
-        ];
+            {
+              shipping_rate_data: {
+                type: 'fixed_amount',
+                fixed_amount: {
+                  amount: 0, // Free local pickup
+                  currency: 'usd',
+                },
+                display_name: 'Local Pickup (Denver, CO)',
+                delivery_estimate: {
+                  minimum: {
+                    unit: 'business_day',
+                    value: 1,
+                  },
+                  maximum: {
+                    unit: 'business_day',
+                    value: 1,
+                  },
+                },
+              },
+            },
+          ];
+        } else {
+          // Standard shipping options for non-Pro members
+          shippingOptions = [
+            {
+              shipping_rate_data: {
+                type: 'fixed_amount',
+                fixed_amount: {
+                  amount: 0, // Free shipping - adjust as needed
+                  currency: 'usd',
+                },
+                display_name: 'UPS Ground',
+                delivery_estimate: {
+                  minimum: {
+                    unit: 'business_day',
+                    value: 2,
+                  },
+                  maximum: {
+                    unit: 'business_day',
+                    value: 3,
+                  },
+                },
+              },
+            },
+            {
+              shipping_rate_data: {
+                type: 'fixed_amount',
+                fixed_amount: {
+                  amount: 2000, // $20.00
+                  currency: 'usd',
+                },
+                display_name: 'UPS 2nd Day Air',
+                delivery_estimate: {
+                  minimum: {
+                    unit: 'business_day',
+                    value: 2,
+                  },
+                  maximum: {
+                    unit: 'business_day',
+                    value: 2,
+                  },
+                },
+              },
+            },
+            {
+              shipping_rate_data: {
+                type: 'fixed_amount',
+                fixed_amount: {
+                  amount: 4000, // $40.00
+                  currency: 'usd',
+                },
+                display_name: 'UPS Next Day Air',
+                delivery_estimate: {
+                  minimum: {
+                    unit: 'business_day',
+                    value: 1,
+                  },
+                  maximum: {
+                    unit: 'business_day',
+                    value: 1,
+                  },
+                },
+              },
+            },
+            {
+              shipping_rate_data: {
+                type: 'fixed_amount',
+                fixed_amount: {
+                  amount: 0, // Free local pickup
+                  currency: 'usd',
+                },
+                display_name: 'Local Pickup (Denver, CO)',
+                delivery_estimate: {
+                  minimum: {
+                    unit: 'business_day',
+                    value: 1,
+                  },
+                  maximum: {
+                    unit: 'business_day',
+                    value: 1,
+                  },
+                },
+              },
+            },
+          ];
+        }
       }
 
       // Create session with or without shipping options

@@ -1220,6 +1220,10 @@ const typeDefs = gql`
     # Pro Member Analytics
     getProMemberAnalytics: ProAnalytics!
     getProMemberCount: Int!
+    
+    # Pro Circle queries
+    getApprovedCircleBusinesses: [CircleBusiness!]!
+    getAllCircleBusinesses: [CircleBusiness!]!
   }
 
   type Mutation {
@@ -1387,6 +1391,10 @@ const typeDefs = gql`
     
     # Pro member shipping management mutations
     updateProMemberShippingAddress(userId: ID!, shippingAddress: AddressInput!): UserProfileResult!
+    
+    # Pro Circle mutations
+    createCircleBusiness(input: CreateCircleBusinessInput!): CircleBusinessResult!
+    updateBusinessStatus(businessId: ID!, status: String!): CircleBusinessResult!
   }
 
   type Customer {
@@ -2897,6 +2905,55 @@ const typeDefs = gql`
     lockedDesigns: Int!
     paymentFailures: Int!
     averageOrdersPerMember: Float!
+  }
+  
+  # Pro Circle Types
+  type CircleBusiness {
+    id: ID!
+    userId: ID!
+    companyName: String!
+    logoUrl: String!
+    logoPublicId: String
+    logoBackgroundColor: String
+    category: String!
+    state: String!
+    bio: String!
+    websiteUrl: String!
+    instagramHandle: String
+    tiktokHandle: String
+    discountType: String!
+    discountAmount: Float!
+    status: String!
+    isFeatured: Boolean!
+    isVerified: Boolean!
+    adminNotes: String
+    reviewedBy: ID
+    reviewedAt: String
+    createdAt: String!
+    updatedAt: String!
+  }
+  
+  type CircleBusinessResult {
+    success: Boolean!
+    message: String
+    business: CircleBusiness
+    error: String
+  }
+  
+  input CreateCircleBusinessInput {
+    userId: ID!
+    logoUrl: String!
+    logoPublicId: String
+    companyName: String!
+    category: String!
+    state: String!
+    bio: String!
+    website: String!
+    instagram: String
+    tiktok: String
+    discountType: String!
+    discountAmount: Float!
+    backgroundColor: String
   }
 `;
 
@@ -4854,6 +4911,111 @@ const resolvers = {
       } catch (error) {
         console.error('❌ Error in getProMemberCount:', error);
         return 0; // Fallback on exception
+      }
+    },
+    
+    // Get approved Circle businesses
+    getApprovedCircleBusinesses: async () => {
+      try {
+        console.log('🏪 Fetching approved Circle businesses');
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        const { data, error } = await client
+          .from('pro_circle_businesses')
+          .select('*')
+          .eq('status', 'approved')
+          .order('is_featured', { ascending: false })
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('❌ Error fetching Circle businesses:', error);
+          throw new Error('Failed to fetch businesses');
+        }
+
+        return data.map(business => ({
+          id: business.id,
+          userId: business.user_id,
+          companyName: business.company_name,
+          logoUrl: business.logo_url,
+          logoPublicId: business.logo_public_id,
+          logoBackgroundColor: business.logo_background_color,
+          category: business.category,
+          state: business.state,
+          bio: business.bio,
+          websiteUrl: business.website_url,
+          instagramHandle: business.instagram_handle,
+          tiktokHandle: business.tiktok_handle,
+          discountType: business.discount_type,
+          discountAmount: parseFloat(business.discount_amount),
+          status: business.status,
+          isFeatured: business.is_featured,
+          isVerified: business.is_verified,
+          adminNotes: business.admin_notes,
+          reviewedBy: business.reviewed_by,
+          reviewedAt: business.reviewed_at,
+          createdAt: business.created_at,
+          updatedAt: business.updated_at,
+        }));
+      } catch (error) {
+        console.error('❌ Error in getApprovedCircleBusinesses:', error);
+        throw error;
+      }
+    },
+    
+    // Get all Circle businesses (admin only)
+    getAllCircleBusinesses: async (_, args, context) => {
+      try {
+        console.log('🏪 Fetching all Circle businesses (admin)');
+        
+        requireAdminAuth(context.user);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        const { data, error } = await client
+          .from('pro_circle_businesses')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('❌ Error fetching all Circle businesses:', error);
+          throw new Error('Failed to fetch businesses');
+        }
+
+        return data.map(business => ({
+          id: business.id,
+          userId: business.user_id,
+          companyName: business.company_name,
+          logoUrl: business.logo_url,
+          logoPublicId: business.logo_public_id,
+          category: business.category,
+          state: business.state,
+          bio: business.bio,
+          websiteUrl: business.website_url,
+          instagramHandle: business.instagram_handle,
+          tiktokHandle: business.tiktok_handle,
+          discountType: business.discount_type,
+          discountAmount: parseFloat(business.discount_amount),
+          status: business.status,
+          isFeatured: business.is_featured,
+          isVerified: business.is_verified,
+          adminNotes: business.admin_notes,
+          reviewedBy: business.reviewed_by,
+          reviewedAt: business.reviewed_at,
+          createdAt: business.created_at,
+          updatedAt: business.updated_at,
+        }));
+      } catch (error) {
+        console.error('❌ Error in getAllCircleBusinesses:', error);
+        throw error;
       }
     },
 
@@ -8194,29 +8356,31 @@ const resolvers = {
           errors.push('Order tracking service is not available');
         }
 
-        // Step 3: Check tax exemption status and existing Stripe customer
+        // Step 3: Check tax exemption status, Pro member status, and existing Stripe customer
         let customerTaxExempt = false;
         let existingCustomerId = null;
+        let isProMember = false;
         
         if (input.userId && input.userId !== 'guest' && supabaseClient.isReady()) {
           try {
-            console.log('🏛️ Checking tax exemption status and Stripe customer for user:', input.userId);
+            console.log('🏛️ Checking tax exemption status, Pro member status, and Stripe customer for user:', input.userId);
             
             const client = supabaseClient.getServiceClient();
             const { data: userProfile, error: profileError } = await client
               .from('user_profiles')
-              .select('is_tax_exempt, tax_exempt_expires_at')
+              .select('is_tax_exempt, tax_exempt_expires_at, is_pro_member, pro_status')
               .eq('user_id', input.userId)
               .single();
             
             if (profileError) {
-              console.warn('⚠️ Could not fetch user profile for tax exemption check:', profileError);
+              console.warn('⚠️ Could not fetch user profile for tax exemption and Pro status check:', profileError);
             } else if (userProfile) {
               // Note: Stripe customer ID is not stored in database - will create new customer each time
               existingCustomerId = null;
               console.log('💳 No existing Stripe customer ID stored - will create new customer');
               
               customerTaxExempt = userProfile.is_tax_exempt || false;
+              isProMember = userProfile.is_pro_member === true && userProfile.pro_status === 'active';
               
               // Check if tax exemption has expired
               if (customerTaxExempt && userProfile.tax_exempt_expires_at) {
@@ -8228,17 +8392,20 @@ const resolvers = {
                 }
               }
               
-              console.log('🏛️ Tax exemption status determined:', { 
+              console.log('🏛️ Tax exemption and Pro status determined:', { 
                 userId: input.userId, 
                 isTaxExempt: customerTaxExempt,
+                isProMember: isProMember,
+                proStatus: userProfile.pro_status,
                 expiresAt: userProfile.tax_exempt_expires_at,
                 hasStripeCustomer: !!existingCustomerId
               });
             }
           } catch (taxExemptError) {
-            console.error('❌ Error checking tax exemption status:', taxExemptError);
-            // Default to not exempt on error
+            console.error('❌ Error checking tax exemption and Pro status:', taxExemptError);
+            // Default to not exempt and not Pro on error
             customerTaxExempt = false;
+            isProMember = false;
           }
         }
 
@@ -8392,6 +8559,7 @@ const resolvers = {
               userId: input.userId,
               customerOrderId: customerOrder?.id,
               customerTaxExempt: customerTaxExempt, // Pass tax exemption status
+              isProMember: isProMember, // Pass Pro member status for free 2-day air shipping
               existingCustomerId: existingCustomerId, // Pass existing customer ID if available
               creditsToApply: actualCreditsApplied, // Pass actual credits applied
               creditTransactionId: creditTransactionId, // Pass credit transaction ID for tracking
@@ -13728,6 +13896,190 @@ const resolvers = {
           success: false,
           message: 'Failed to update shipping address',
           userProfile: null
+        };
+      }
+    },
+    
+    // Create Circle Business
+    createCircleBusiness: async (_, { input }, context) => {
+      try {
+        console.log('🏪 Creating Circle business submission:', JSON.stringify(input, null, 2));
+        
+        // Check authentication
+        const user = context.user;
+        if (!user) {
+          throw new Error('You must be logged in to submit a business');
+        }
+        
+        if (user.id !== input.userId) {
+          throw new Error('Unauthorized');
+        }
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Verify user is a Pro member
+        const { data: userProfile, error: profileError } = await client
+          .from('user_profiles')
+          .select('is_pro_member, pro_status')
+          .eq('user_id', input.userId)
+          .single();
+          
+        if (profileError || !userProfile?.is_pro_member || userProfile?.pro_status !== 'active') {
+          throw new Error('Only active Pro members can submit businesses');
+        }
+        
+        // Insert the business
+        const { data: business, error: insertError } = await client
+          .from('pro_circle_businesses')
+          .insert({
+            user_id: input.userId,
+            company_name: input.companyName,
+            logo_url: input.logoUrl,
+            logo_public_id: input.logoPublicId,
+            logo_background_color: input.backgroundColor || '#9ca3af',
+            category: input.category,
+            state: input.state,
+            bio: input.bio,
+            website_url: input.website,
+            instagram_handle: input.instagram,
+            tiktok_handle: input.tiktok,
+            discount_type: input.discountType,
+            discount_amount: input.discountAmount,
+            status: 'pending', // All submissions start as pending
+            is_featured: false,
+            is_verified: true,
+          })
+          .select('*')
+          .single();
+
+        if (insertError) {
+          console.error('❌ Error creating Circle business:', insertError);
+          console.error('❌ Full error details:', JSON.stringify(insertError, null, 2));
+          throw new Error(`Failed to create business submission: ${insertError.message || insertError.code || 'Unknown error'}`);
+        }
+
+        console.log('✅ Circle business created successfully:', business.id);
+
+        return {
+          success: true,
+          message: 'Business submitted successfully! It will be reviewed and added to Pro Circle.',
+          business: {
+            id: business.id,
+            userId: business.user_id,
+            companyName: business.company_name,
+            logoUrl: business.logo_url,
+            logoPublicId: business.logo_public_id,
+            logoBackgroundColor: business.logo_background_color,
+            category: business.category,
+            state: business.state,
+            bio: business.bio,
+            websiteUrl: business.website_url,
+            instagramHandle: business.instagram_handle,
+            tiktokHandle: business.tiktok_handle,
+            discountType: business.discount_type,
+            discountAmount: parseFloat(business.discount_amount),
+            status: business.status,
+            isFeatured: business.is_featured,
+            isVerified: business.is_verified,
+            adminNotes: business.admin_notes,
+            reviewedBy: business.reviewed_by,
+            reviewedAt: business.reviewed_at,
+            createdAt: business.created_at,
+            updatedAt: business.updated_at,
+          },
+          error: null,
+        };
+      } catch (error) {
+        console.error('❌ Error in createCircleBusiness:', error);
+        return {
+          success: false,
+          message: error.message || 'Failed to submit business',
+          business: null,
+          error: error.message,
+        };
+      }
+    },
+    
+    // Update Business Status (Approve/Reject)
+    updateBusinessStatus: async (_, { businessId, status }, context) => {
+      try {
+        console.log(`🔄 Updating business ${businessId} status to: ${status}`);
+        
+        // Check admin authentication
+        requireAdminAuth(context.user);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Validate status
+        const validStatuses = ['pending', 'approved', 'rejected', 'inactive'];
+        if (!validStatuses.includes(status)) {
+          throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+        }
+        
+        // Update the business status
+        const { data: business, error: updateError } = await client
+          .from('pro_circle_businesses')
+          .update({
+            status: status,
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: context.user.id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', businessId)
+          .select('*')
+          .single();
+
+        if (updateError) {
+          console.error('❌ Error updating business status:', updateError);
+          throw new Error('Failed to update business status');
+        }
+
+        console.log(`✅ Business ${businessId} status updated to: ${status}`);
+
+        return {
+          success: true,
+          message: `Business ${status} successfully`,
+          business: {
+            id: business.id,
+            userId: business.user_id,
+            companyName: business.company_name,
+            logoUrl: business.logo_url,
+            logoPublicId: business.logo_public_id,
+            logoBackgroundColor: business.logo_background_color,
+            category: business.category,
+            state: business.state,
+            bio: business.bio,
+            websiteUrl: business.website_url,
+            instagramHandle: business.instagram_handle,
+            tiktokHandle: business.tiktok_handle,
+            discountType: business.discount_type,
+            discountAmount: parseFloat(business.discount_amount),
+            status: business.status,
+            isFeatured: business.is_featured,
+            isVerified: business.is_verified,
+            adminNotes: business.admin_notes,
+            reviewedBy: business.reviewed_by,
+            reviewedAt: business.reviewed_at,
+            createdAt: business.created_at,
+            updatedAt: business.updated_at,
+          },
+          error: null,
+        };
+      } catch (error) {
+        console.error('❌ Error in updateBusinessStatus:', error);
+        return {
+          success: false,
+          message: error.message || 'Failed to update business status',
+          business: null,
+          error: error.message,
         };
       }
     }

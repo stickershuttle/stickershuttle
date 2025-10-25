@@ -33,7 +33,20 @@ const StickerShuttlePro = () => {
   React.useEffect(() => {
     const fetchProMemberCount = async () => {
       try {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+        // Use same URL logic as Apollo Client
+        const getApiUrl = () => {
+          if (process.env.NEXT_PUBLIC_API_URL) {
+            return process.env.NEXT_PUBLIC_API_URL;
+          }
+          if (process.env.NODE_ENV === 'development') {
+            return 'http://localhost:4000';
+          }
+          return 'https://ss-beyond.up.railway.app';
+        };
+        
+        const backendUrl = getApiUrl();
+        console.log('🔍 Fetching Pro member count from:', backendUrl);
+        
         const response = await fetch(`${backendUrl}/graphql`, {
           method: 'POST',
           headers: {
@@ -48,16 +61,32 @@ const StickerShuttlePro = () => {
           })
         });
 
+        console.log('📡 Response status:', response.status, response.statusText);
+        
+        if (!response.ok) {
+          console.error('❌ Response not OK:', response.status, response.statusText);
+          const errorText = await response.text();
+          console.error('Error body:', errorText);
+          return;
+        }
+
         const result = await response.json();
         console.log('📊 Pro member count response:', result);
+        
+        if (result.errors) {
+          console.error('❌ GraphQL errors:', result.errors);
+          return;
+        }
         
         if (result.data?.getProMemberCount !== undefined) {
           const count = result.data.getProMemberCount;
           setProMemberCount(count);
           console.log('✅ Pro member count fetched:', count);
+        } else {
+          console.error('❌ No data in response:', result);
         }
       } catch (error) {
-        console.error('Error fetching Pro member count:', error);
+        console.error('❌ Error fetching Pro member count:', error);
         // Keep default fallback value
       }
     };

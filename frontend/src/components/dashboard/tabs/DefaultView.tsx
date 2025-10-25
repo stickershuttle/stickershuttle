@@ -84,8 +84,17 @@ const DefaultView: React.FC<DefaultViewProps> = ({
 
   // Helper function to check if an order is a Pro member order
   const isProMemberOrder = (order: any) => {
-    return order.orderTags?.includes('pro-monthly-stickers') || 
-           order.orderTags?.includes('pro-member');
+    // Check order tags
+    const hasProTag = order.orderTags?.includes('pro-monthly-stickers') || 
+                      order.orderTags?.includes('pro-member');
+    
+    // Also check if any item has "Pro Monthly" in the name
+    const hasProMonthlyItem = order.items?.some((item: any) => {
+      const itemName = (item.name || item.productName || '').toLowerCase();
+      return itemName.includes('pro monthly');
+    });
+    
+    return hasProTag || hasProMonthlyItem;
   };
 
   // Helper function to check if an order contains deal items

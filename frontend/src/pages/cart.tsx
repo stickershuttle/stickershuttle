@@ -427,27 +427,38 @@ const calculateNextTierSavings = (
 };
 
 // Calculate estimated delivery date (only count business days)
-const calculateDeliveryDate = (totalQuantity: number, hasRushOrder: boolean) => {
+const calculateDeliveryDate = (totalQuantity: number, hasRushOrder: boolean, isProMember: boolean = false) => {
   const now = new Date();
   let productionDays = 2; // Default: 2 business days
   let shippingDays = 3; // Standard shipping (business days)
   let isHighVolume = false;
   
+  // Pro members always get 2-day air shipping
+  if (isProMember) {
+    shippingDays = 2; // 2-day air for Pro members
+  }
+  
   // 5,000+ stickers require extended processing
   if (totalQuantity >= 5000) {
     productionDays = 4; // 3-4 business days, using 4 for calculation
-    shippingDays = 3; // Standard shipping (business days)
+    if (!isProMember) {
+      shippingDays = 3; // Standard shipping (business days) for non-Pro
+    }
     isHighVolume = true;
   }
   // 1,001-4,999 stickers get expedited shipping
   else if (totalQuantity >= 1001) {
     productionDays = 2;
-    shippingDays = 1; // Next day air (business days)
+    if (!isProMember) {
+      shippingDays = 1; // Next day air (business days) for non-Pro
+    }
   }
   // 1,000 stickers or less get 1 day processing
   else if (totalQuantity <= 1000) {
     productionDays = 1;
-    shippingDays = 3; // Standard shipping (business days)
+    if (!isProMember) {
+      shippingDays = 3; // Standard shipping (business days) for non-Pro
+    }
   }
   
   // Rush orders reduce production time (but minimum 2 days for 5k+ orders)
@@ -480,7 +491,8 @@ const calculateDeliveryDate = (totalQuantity: number, hasRushOrder: boolean) => 
     productionDays,
     shippingDays,
     isExpedited: totalQuantity >= 1000 && totalQuantity < 5000,
-    isHighVolume
+    isHighVolume,
+    isProMember
   };
 };
 
@@ -589,6 +601,7 @@ export default function CartPage() {
 
   const userProfile = profileData?.getUserProfile;
   const isWholesale = userProfile?.isWholesaleCustomer || false;
+  const isProMember = userProfile?.isProMember === true && userProfile?.proStatus === 'active';
   const creditRate = isWholesale ? 2.5 : 5;
   const creditRateDecimal = isWholesale ? 0.025 : 0.05;
   
@@ -1370,7 +1383,10 @@ export default function CartPage() {
   }, 0);
   const wholesaleDiscount = isWholesale ? nonDealSubtotal * 0.15 : 0;
   
-  const afterDiscounts = safeSubtotal - safeReorderDiscount - safeDiscountAmount - wholesaleDiscount;
+  // Calculate Pro member discount (5% off, not stackable with wholesale)
+  const proDiscount = (isProMember && !isWholesale) ? nonDealSubtotal * 0.05 : 0;
+  
+  const afterDiscounts = safeSubtotal - safeReorderDiscount - safeDiscountAmount - wholesaleDiscount - proDiscount;
   const finalTotal = Math.max(0, afterDiscounts - safeCreditToApply + blindShipmentFee + additionalPaymentTotal);
 
   // Calculate rush order breakdown
@@ -1393,7 +1409,7 @@ export default function CartPage() {
 
   const totalQuantity = updatedCart.reduce((sum, item) => sum + item.quantity, 0);
   const hasRushOrder = updatedCart.some(item => item.customization.selections?.rush?.value === true);
-  const deliveryInfo = calculateDeliveryDate(totalQuantity, hasRushOrder);
+  const deliveryInfo = calculateDeliveryDate(totalQuantity, hasRushOrder, isProMember);
 
   // Calculate total discount saved
   const totalDiscount = updatedCart.reduce((sum, item) => {
@@ -2582,10 +2598,19 @@ export default function CartPage() {
                     )}
                     <hr className="border-white/20 my-3" />
                     {/* Total Savings */}
-                    {(reorderDiscount > 0 || discountAmount > 0 || creditToApply > 0 || wholesaleDiscount > 0) && (
-                      <div className="flex justify-between text-green-400 font-semibold">
-                        <span>Total Savings</span>
-                        <span>-${(reorderDiscount + discountAmount + creditToApply + wholesaleDiscount).toFixed(2)}</span>
+                    {(reorderDiscount > 0 || discountAmount > 0 || creditToApply > 0 || wholesaleDiscount > 0 || proDiscount > 0) && (
+                      <div className="flex justify-between font-semibold" style={{ color: '#3cd1fa' }}>
+                        <span className="flex items-center gap-2">
+                          Savings
+                          {isProMember && (
+                            <img 
+                              src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                              alt="Pro" 
+                              className="w-4 h-4 object-contain"
+                            />
+                          )}
+                        </span>
+                        <span>-${(reorderDiscount + discountAmount + creditToApply + wholesaleDiscount + proDiscount).toFixed(2)}</span>
                       </div>
                     )}
                     <div className="flex justify-between text-xl font-bold text-white">
@@ -3154,7 +3179,18 @@ export default function CartPage() {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-400">Shipping</span>
-                          <span className="text-white">{deliveryInfo.shippingDays} days</span>
+                          {isProMember ? (
+                            <span className="text-white flex items-center gap-1">
+                              2-Day Air
+                              <img 
+                                src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                                alt="Pro" 
+                                className="w-4 h-4 object-contain"
+                              />
+                            </span>
+                          ) : (
+                            <span className="text-white">{deliveryInfo.shippingDays} days</span>
+                          )}
                         </div>
                         <hr className="border-white/10" />
                         <div className="flex justify-between font-medium">

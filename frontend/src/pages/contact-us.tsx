@@ -27,7 +27,18 @@ const ContactUs: NextPage = () => {
     setSubmitStatus('idle');
 
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+      // Use same URL logic as Apollo Client
+      const getApiUrl = () => {
+        if (process.env.NEXT_PUBLIC_API_URL) {
+          return process.env.NEXT_PUBLIC_API_URL;
+        }
+        if (process.env.NODE_ENV === 'development') {
+          return 'http://localhost:4000';
+        }
+        return 'https://ss-beyond.up.railway.app';
+      };
+      
+      const backendUrl = getApiUrl();
       const response = await fetch(`${backendUrl}/api/contact`, {
         method: 'POST',
         headers: {

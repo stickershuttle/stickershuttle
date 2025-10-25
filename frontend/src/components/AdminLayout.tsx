@@ -824,6 +824,36 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
                   Blogs
                 </a>
 
+                {/* Circle Pending Review */}
+                <a
+                  href={isBannershipOnlyAdmin ? "#" : "/admin/circle-pending"}
+                  onClick={(e) => isBannershipOnlyAdmin && e.preventDefault()}
+                  className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
+                    isBannershipOnlyAdmin 
+                      ? 'text-gray-600 cursor-not-allowed opacity-40' 
+                      : router.asPath.startsWith('/admin/circle-pending')
+                        ? 'text-white bg-cyan-500/15 border-l-3 border-cyan-500'
+                        : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                  }`}
+                  onMouseEnter={(e) => {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/circle-pending')) {
+                      e.currentTarget.style.backgroundColor = 'rgba(6, 182, 212, 0.1)';
+                      e.currentTarget.style.color = '#7DD3FC';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/circle-pending')) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '';
+                    }
+                  }}
+                >
+                  <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Circle Pending
+                </a>
+
                 {/* Marketplace */}
                 <a
                   href={isBannershipOnlyAdmin ? "#" : "/admin/marketspace"}

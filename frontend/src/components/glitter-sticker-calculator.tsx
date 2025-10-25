@@ -1677,8 +1677,8 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                 {/* Left Column - Options */}
                 <div className="space-y-4 flex flex-col">
                   {/* Four Column Option Containers */}
+                  {/* TEMPORARILY HIDDEN - Skip Proofing, Rush Order, +25% Vibrancy, Upload Later 
                   <div className="grid grid-cols-4 gap-3">
-                    {/* Skip Proofing */}
                     <button
                       onClick={() => setSendProof(!sendProof)}
                       className={`group relative text-center p-3 rounded-xl transition-all duration-200 overflow-hidden ${
@@ -1698,7 +1698,6 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                       </div>
                     </button>
 
-                    {/* Rush Order */}
                     <button
                       onClick={() => updateAllItemsRushOrder(!isRushOrder)}
                       className={`relative text-center p-3 rounded-xl transition-all duration-200 overflow-hidden border-[1.5px] border-solid w-full ${
@@ -1715,7 +1714,6 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                       </div>
                     </button>
 
-                    {/* +25% Vibrancy */}
                     <button
                       onClick={() => setVibrancyBoost(!vibrancyBoost)}
                       className={`group relative text-center p-3 rounded-xl transition-all duration-200 overflow-hidden ${
@@ -1736,7 +1734,6 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                       </div>
                     </button>
 
-                    {/* Upload Later */}
                     <button
                       onClick={() => setUploadLater(!uploadLater)}
                       disabled={!!uploadedFile}
@@ -1757,8 +1754,9 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                       </div>
                     </button>
                   </div>
+                  */}
                   
-                  {/* Rush Order Disclaimer */}
+                  {/* TEMPORARILY HIDDEN - Disclaimers for hidden options
                   {isRushOrder && (
                     <div className="mt-3 space-y-2">
                       <div className="text-xs text-orange-300 font-medium flex items-center gap-2">
@@ -1771,7 +1769,6 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                     </div>
                   )}
                   
-                  {/* Vibrancy Boost Disclaimer */}
                   {vibrancyBoost && (
                     <div className="mt-3 space-y-2">
                       <div className="text-xs text-purple-300 font-medium flex items-center gap-2">
@@ -1784,14 +1781,12 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                     </div>
                   )}
                   
-                  {/* Skip Proofing Info */}
                   {!sendProof && (
                     <div className="text-sm text-red-200/80">
                       <p>Your order will proceed directly to production without proof approval. This speeds up delivery time.</p>
                     </div>
                   )}
                   
-                  {/* Upload Later Info */}
                   {uploadLater && !uploadedFile && (
                     <div className="text-sm text-blue-200/80 flex items-center">
                       <span role="img" aria-label="caution" className="mr-2">
@@ -1800,6 +1795,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                       Note: Please try to have your artwork submitted within 48hrs of placing an order.
                     </div>
                   )}
+                  */}
 
                   {/* Additional Instructions Section */}
                   <div className="flex-grow flex flex-col">
@@ -2023,6 +2019,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                     </div>
                   )}
                   
+                  {/* TEMPORARILY HIDDEN - Upload Artwork Later Toggle
                   {!uploadedFile && (
                     <div className="mt-4 flex items-center justify-start gap-3 p-3 rounded-lg text-sm font-medium"
                          style={{
@@ -2055,6 +2052,7 @@ export default function GlitterStickerCalculator({ initialBasePricing, realPrici
                       Note: Please try to have your artwork submitted within 48hrs of placing an order.
                     </div>
                   )}
+                  */}
                 </div>
               </div>
             </div>

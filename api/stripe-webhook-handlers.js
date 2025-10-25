@@ -428,9 +428,13 @@ async function handleCheckoutSessionCompleted(session) {
       isExpressShipping = false;
       console.log('✅ Detected USPS First-Class from $4 shipping cost');
     } else if (shippingCostAmount === 0) {
-      // Check if it's local pickup, USPS Stamp, or UPS Ground based on display_name
+      // Check if it's local pickup, USPS Stamp, Pro Member 2-day air, or UPS Ground based on display_name
       if (shippingOption && shippingOption.display_name) {
-        if (shippingOption.display_name.includes('Local Pickup')) {
+        if (shippingOption.display_name.includes('Pro Member Benefit')) {
+          shippingMethodName = 'UPS 2nd Day Air (Pro Member Benefit)';
+          isExpressShipping = true;
+          console.log('✅ Detected Pro Member 2-Day Air from display_name');
+        } else if (shippingOption.display_name.includes('Local Pickup')) {
           shippingMethodName = 'Local Pickup (Denver, CO)';
           isExpressShipping = false;
           console.log('✅ Detected Local Pickup from display_name');
