@@ -595,7 +595,7 @@ export default function BannershipXBanners() {
               </div>
 
               {/* Upload and Options Section - Two Column on Desktop, Stacked on Mobile */}
-              <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:items-center">
+              <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:items-start">
                 {/* File Upload Area - Left Column on Desktop, Full Width on Mobile */}
                 <div>
                   <input
@@ -645,6 +645,17 @@ export default function BannershipXBanners() {
                           </label>
                         </div>
                       )}
+                      {/* Size Hint - Outside Container */}
+                      {(() => {
+                        const dimensions = getSizeDimensions();
+                        return (
+                          <p className="text-sm text-blue-300/80 mt-2 text-center">
+                            💡 Recommended: {dimensions.width}" × {dimensions.height}" 
+                            {dimensions.width && dimensions.height ? 
+                              ` (1:${(dimensions.height / dimensions.width).toFixed(2)} ratio)` : ''}
+                          </p>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <div className="rounded-xl p-8 bg-green-500/20 backdrop-blur-md animate-glow-green"

@@ -53,10 +53,13 @@ export default function Waitlist() {
 
     try {
       // First, subscribe to the list
+      const listId = process.env.NEXT_PUBLIC_KLAVIYO_WAITLIST_LIST_ID || null;
+      console.log('📋 Subscribing with listId:', listId);
+      
       const result = await subscribeToWaitlist({
         variables: {
           email,
-          listId: process.env.NEXT_PUBLIC_KLAVIYO_WAITLIST_LIST_ID || null
+          listId
         }
       });
       
@@ -72,13 +75,17 @@ export default function Waitlist() {
         }
       });
       
+      console.log('📧 Subscription result:', result.data);
+      
       if (result.data?.subscribeToKlaviyo?.success) {
         setSubmitted(true);
       } else {
-        setError(result.data?.subscribeToKlaviyo?.message || 'Failed to join waitlist');
+        const errorMsg = result.data?.subscribeToKlaviyo?.error || result.data?.subscribeToKlaviyo?.message || 'Failed to join waitlist';
+        console.error('❌ Subscription failed:', errorMsg);
+        setError(errorMsg);
       }
     } catch (err: any) {
-      console.error('Error subscribing to waitlist:', err);
+      console.error('❌ Error subscribing to waitlist:', err);
       setError(err.message || 'Failed to join waitlist. Please try again.');
     }
   };
@@ -142,9 +149,12 @@ export default function Waitlist() {
             </div>
 
             {/* Coming Nov 28th Text */}
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-6" style={{ fontFamily: 'Rubik, sans-serif' }}>
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-0.5" style={{ fontFamily: 'Rubik, sans-serif' }}>
               COMING NOV.28TH
             </h1>
+            <p className="text-xs md:text-sm text-gray-400 mb-6 uppercase tracking-wider">
+              (TO THE PUBLIC)
+            </p>
             <p className="text-lg md:text-xl text-gray-300 mb-4 max-w-2xl mx-auto pb-4">
             Early Access members will get access on November 21st.
             </p>
