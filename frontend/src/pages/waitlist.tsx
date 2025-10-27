@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Head from 'next/head';
 import { useMutation, gql } from '@apollo/client';
+import { useRouter } from 'next/router';
 import UniversalHeader from '../components/UniversalHeader';
 
 const SUBSCRIBE_TO_WAITLIST = gql`
@@ -24,6 +25,7 @@ const SYNC_CUSTOMER = gql`
 `;
 
 export default function Waitlist() {
+  const router = useRouter();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -54,7 +56,7 @@ export default function Waitlist() {
       const result = await subscribeToWaitlist({
         variables: {
           email,
-          listId: process.env.NEXT_PUBLIC_KLAVIYO_NEWSLETTER_LIST_ID || null
+          listId: process.env.NEXT_PUBLIC_KLAVIYO_WAITLIST_LIST_ID || null
         }
       });
       
@@ -143,25 +145,39 @@ export default function Waitlist() {
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-6" style={{ fontFamily: 'Rubik, sans-serif' }}>
               COMING NOV.28TH
             </h1>
-            <p className="text-lg md:text-xl text-gray-300 mb-4 max-w-2xl mx-auto">
-              Be the first to know when Pro launches. Join our exclusive waitlist.
+            <p className="text-lg md:text-xl text-gray-300 mb-4 max-w-2xl mx-auto pb-4">
+            Early Access members will get access on November 21st.
             </p>
-            <p className="text-base md:text-lg text-gray-400 mb-8 max-w-2xl mx-auto italic">
-              🎁 Early Access members will receive an exclusive reveal one week before launch.
-            </p>
+
 
             {/* Success Message */}
             {submitted && (
-              <div className="mb-8 p-6 rounded-2xl text-center max-w-md mx-auto" style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(34, 197, 94, 0.3)',
-                boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
-                backdropFilter: 'blur(12px)'
-              }}>
-                <p className="text-green-300 font-medium text-lg">
-                  ✓ You're on the list! We'll notify you when Pro launches.
-                </p>
-              </div>
+              <>
+                <div className="mb-8 p-6 rounded-2xl text-center max-w-md mx-auto" style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                  backdropFilter: 'blur(12px)'
+                }}>
+                  <p className="text-blue-400 font-medium text-lg">
+                    You're on the list! We'll send you updates and give you a head start when Pro launches.
+                  </p>
+                </div>
+                <div className="max-w-md mx-auto">
+                  <button
+                    onClick={() => router.push('/deals')}
+                    className="w-full px-6 py-3 rounded-xl text-white font-medium transition-all duration-300 hover:scale-105"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                      backdropFilter: 'blur(25px) saturate(180%)',
+                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                      boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                    }}
+                  >
+                    Shop Deals
+                  </button>
+                </div>
+              </>
             )}
 
             {/* Error Message */}
