@@ -480,27 +480,8 @@ export default function ProCircle() {
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Sidebar - Categories */}
             <div className="lg:w-80 flex-shrink-0">
-              {/* Mobile Filter Toggle Button */}
-              <button
-                onClick={() => setShowMobileFilters(!showMobileFilters)}
-                className="lg:hidden mb-4 w-full px-4 py-3 rounded-xl text-white font-medium flex items-center justify-center gap-2"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(12px)',
-                }}
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-                {showMobileFilters ? 'Hide Filters' : 'Show Filters'}
-                <svg className={`w-4 h-4 transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              <div className={`sticky top-24 space-y-4 ${showMobileFilters ? '' : 'hidden lg:block'}`}>
-                {/* Add My Business Button */}
+              <div className="lg:hidden mb-4">
+                {/* Add My Business Button - Always Visible on Mobile */}
                 <Link href="/pro/circle/add-my-business">
                  <button
                    className="w-full text-center px-4 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-[1.00375] relative overflow-hidden cursor-pointer"
@@ -528,6 +509,39 @@ export default function ProCircle() {
                   </span>
                 </button>
                 </Link>
+              </div>
+
+              <div className="sticky top-24 space-y-4">
+                {/* Add My Business Button - Desktop */}
+                <div className="hidden lg:block">
+                <Link href="/pro/circle/add-my-business">
+                 <button
+                   className="w-full text-center px-4 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-[1.00375] relative overflow-hidden cursor-pointer"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.01)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    boxShadow: '2px 2px 0px rgba(0, 0, 0, 0.75), rgba(255, 255, 255, 0.33) 0px 1px 0px inset',
+                    backdropFilter: 'blur(12px)',
+                  }}
+                >
+                  {/* Holographic moving gradient overlay */}
+                  <div 
+                    className="absolute inset-0 opacity-30"
+                    style={{
+                      background: 'linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57, #ff9ff3, #54a0ff)',
+                      backgroundSize: '400% 400%',
+                      animation: 'holographicMove 3s ease-in-out infinite'
+                    }}
+                  ></div>
+                  <span className="inline-flex items-center justify-center relative z-10 text-white">
+                    Add My Business
+                    <svg className="w-4 h-4 ml-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                </button>
+                </Link>
+                </div>
 
                 {/* Filters Section */}
                 <div
@@ -541,21 +555,33 @@ export default function ProCircle() {
                   }}
                 >
                   {/* Filter Header */}
-                  <div className="flex items-center gap-3 pb-4 border-b border-white/10">
+                  <div className={`flex items-center gap-3 ${showMobileFilters ? 'pb-4 border-b border-white/10 lg:border-b lg:border-white/10' : 'lg:pb-4 lg:border-b lg:border-white/10'}`}>
                     <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
                     </svg>
                     <h2 className="text-lg font-semibold text-white">Filters</h2>
-                    <div className="ml-auto">
+                    <div className="ml-auto flex items-center gap-3">
                       <button
                         onClick={() => setSelectedCategory('all')}
-                        className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                        className="text-xs text-blue-400 hover:text-blue-300 transition-colors lg:block hidden"
                       >
                         Clear All
+                      </button>
+                      {/* Mobile Arrow - Only visible on mobile, positioned where Clear All was */}
+                      <button
+                        onClick={() => setShowMobileFilters(!showMobileFilters)}
+                        className="lg:hidden"
+                      >
+                        <svg className={`w-5 h-5 text-white transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
                       </button>
                     </div>
                   </div>
 
+                  {/* Collapsible Filter Content */}
+                  <div className={`overflow-hidden transition-all duration-300 ease-in-out ${showMobileFilters ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0 lg:max-h-full lg:opacity-100'}`}>
+                    <div className="lg:block">
                   {/* Browse by Category Section */}
                   <div className="mb-6">
                     <label className="block text-sm font-semibold text-white mb-3">
@@ -674,6 +700,8 @@ export default function ProCircle() {
                       })}
                     </div>
                   </div>
+                  </div>
+                    </div>
                 </div>
               </div>
             </div>

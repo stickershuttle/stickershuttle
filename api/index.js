@@ -1395,6 +1395,7 @@ const typeDefs = gql`
     # Pro Circle mutations
     createCircleBusiness(input: CreateCircleBusinessInput!): CircleBusinessResult!
     updateBusinessStatus(businessId: ID!, status: String!): CircleBusinessResult!
+    deleteCircleBusiness(businessId: ID!): CircleBusinessResult!
   }
 
   type Customer {
@@ -14078,6 +14079,58 @@ const resolvers = {
         return {
           success: false,
           message: error.message || 'Failed to update business status',
+          business: null,
+          error: error.message,
+        };
+      }
+    },
+
+    // Delete Circle Business
+    deleteCircleBusiness: async (_, { businessId }, context) => {
+      try {
+        console.log('🗑️ Deleting Circle business:', businessId);
+        
+        // Check authentication
+        const user = context.user;
+        if (!user) {
+          throw new Error('You must be logged in to delete a business');
+        }
+
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Check admin permissions using the standard admin auth check
+        requireAdminAuth(user);
+
+        // Delete the business
+        const { data: deleteData, error: deleteError } = await client
+          .from('pro_circle_businesses')
+          .delete()
+          .eq('id', businessId)
+          .select();
+
+        if (deleteError) {
+          console.error('❌ Error deleting Circle business:', deleteError);
+          throw new Error(`Failed to delete business: ${deleteError.message}`);
+        }
+
+        console.log('✅ Successfully deleted Circle business:', businessId);
+        console.log('Delete result data:', deleteData);
+
+        return {
+          success: true,
+          message: 'Business deleted successfully',
+          business: null,
+          error: null,
+        };
+      } catch (error) {
+        console.error('❌ Error in deleteCircleBusiness:', error);
+        return {
+          success: false,
+          message: error.message || 'Failed to delete business',
           business: null,
           error: error.message,
         };
