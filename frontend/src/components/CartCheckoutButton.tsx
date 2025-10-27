@@ -7,6 +7,7 @@ import { useCart } from '@/components/CartContext';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_USER_CREDIT_BALANCE } from '@/lib/credit-mutations';
 import { TRACK_KLAVIYO_EVENT } from '@/lib/klaviyo-mutations';
+import { GET_USER_PROFILE } from '@/lib/profile-mutations';
 import { trackCartEvent, trackUserEngagement } from '@/lib/business-analytics';
 
 interface CartCheckoutButtonProps {
@@ -69,6 +70,14 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
     variables: { userId: user?.id },
     skip: !user?.id
   });
+
+  // Fetch user profile data if logged in
+  const { data: profileData } = useQuery(GET_USER_PROFILE, {
+    variables: { userId: user?.id },
+    skip: !user?.id
+  });
+
+  const profile = profileData?.getUserProfile;
 
   // Helper function to capitalize first name
   const capitalizeFirstName = (firstName: string): string => {
@@ -205,7 +214,7 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
       
       console.log('🚀 Phase 2: Direct enhanced checkout...');
       const guestInfo = guestCheckoutData || { firstName: '', lastName: '', email: guestEmail || '' };
-      console.log('👤 User context:', user ? `Logged in as ${capitalizeFirstName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User')}` : `Guest user: ${guestInfo.email}`);
+      console.log('👤 User context:', user ? `Logged in as ${capitalizeFirstName(profile?.firstName || user.user_metadata?.first_name || user.email?.split('@')[0] || 'User')}` : `Guest user: ${guestInfo.email}`);
       
       // Set flag to detect return from Stripe
       sessionStorage.setItem('stripe_checkout_initiated', 'true');
@@ -217,8 +226,8 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
       
       // Create minimal customer info - Shopify will collect the rest
       const customerInfo = {
-        firstName: user?.user_metadata?.first_name || guestInfo.firstName || '',
-        lastName: user?.user_metadata?.last_name || guestInfo.lastName || '',
+        firstName: profile?.firstName || user?.user_metadata?.first_name || guestInfo.firstName || '',
+        lastName: profile?.lastName || user?.user_metadata?.last_name || guestInfo.lastName || '',
         email: user?.email || guestInfo.email || '',
         phone: user?.user_metadata?.phone || ''
       };
@@ -277,8 +286,8 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
 
       // Create minimal shipping address - Shopify will collect the full address
       const shippingAddress = {
-        first_name: user?.user_metadata?.first_name || guestInfo.firstName || '',
-        last_name: user?.user_metadata?.last_name || guestInfo.lastName || '',
+        first_name: profile?.firstName || user?.user_metadata?.first_name || guestInfo.firstName || '',
+        last_name: profile?.lastName || user?.user_metadata?.last_name || guestInfo.lastName || '',
         address1: '', // Let Shopify collect this
         address2: '',
         city: '',
@@ -461,7 +470,7 @@ const CartCheckoutButton: React.FC<CartCheckoutButtonProps> = ({
               {user && (
                 <>
                   <p className="text-xs text-green-200">
-                    Logged in as {capitalizeFirstName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User')}
+                    Logged in as {capitalizeFirstName(profile?.firstName || user.user_metadata?.first_name || user.email?.split('@')[0] || 'User')}
                   </p>
                   {creditData?.getUserCreditBalance?.balance > 0 && (
                     <p className="text-xs text-green-300 mt-1">
