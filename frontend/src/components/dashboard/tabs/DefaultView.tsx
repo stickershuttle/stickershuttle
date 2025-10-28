@@ -203,6 +203,50 @@ const DefaultView: React.FC<DefaultViewProps> = ({
             background-position: 0% 50%;
           }
         }
+
+        @keyframes gradient-shift {
+          0% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
+          100% {
+            background-position: 0% 50%;
+          }
+        }
+        
+        .pro-gradient {
+          background: linear-gradient(45deg, #3dd1f9, #2bb8d9, #4dd8ff, #7ee3ff, #3dd1f9);
+          background-size: 300% 300%;
+          background-clip: text;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: gradient-shift 3s ease infinite, big-load-in 1s ease-out;
+        }
+
+        @keyframes big-load-in {
+          0% {
+            opacity: 0;
+            transform: scale(0.3) translateY(-30px);
+            filter: blur(10px);
+          }
+          60% {
+            opacity: 1;
+            transform: scale(1.4) translateY(5px);
+            filter: blur(0);
+          }
+          75% {
+            transform: scale(0.9) translateY(-5px);
+          }
+          85% {
+            transform: scale(1.1) translateY(0);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
       `}</style>
       
       {/* Order Completion Success Message */}
@@ -472,6 +516,52 @@ const DefaultView: React.FC<DefaultViewProps> = ({
         </>
       )}
 
+      {/* Coming Soon Banner */}
+      <div 
+        className="mb-6 p-6 rounded-2xl relative overflow-hidden"
+        style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+          backdropFilter: 'blur(12px)'
+        }}
+      >
+        {/* Animated gradient background */}
+        <div 
+          className="absolute inset-0 opacity-10"
+          style={{
+            background: 'linear-gradient(45deg, #3dd1f9, #2bb8d9, #4dd8ff, #7ee3ff, #3dd1f9)',
+            backgroundSize: '300% 300%',
+            animation: 'gradient-move 3s ease-in-out infinite',
+          }}
+        />
+        <div className="relative z-10 flex items-center justify-between gap-4">
+          <h2 className="text-base md:text-xl font-bold text-white flex-shrink-0" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
+            Something <span className="pro-gradient">BIG</span> is coming soon<span className="hidden md:inline">...</span>
+          </h2>
+          
+          <a 
+            href="/waitlist"
+            className="flex items-center justify-center text-white transition-all duration-300 transform hover:scale-105 flex-shrink-0"
+            title="Learn more about what's coming"
+          >
+            <svg 
+              width="20" 
+              height="20" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="3" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          </a>
+        </div>
+      </div>
+
       {/* Store Credit Display - Compact */}
       {creditBalance > 0 && (
         <div 
@@ -534,8 +624,8 @@ const DefaultView: React.FC<DefaultViewProps> = ({
         </div>
       )}
 
-      {/* Current Deals - Mobile: Swipeable, Desktop: Grid */}
-      <div className="mt-3 lg:mt-0">
+      {/* Current Deals - Mobile: Swipeable, Desktop: Grid - HIDDEN */}
+      {false && <div className="mt-3 lg:mt-0">
         <div 
           className="rounded-2xl overflow-hidden mb-6"
           style={{
@@ -720,9 +810,7 @@ const DefaultView: React.FC<DefaultViewProps> = ({
             </div>
           </div>
         </div>
-      </div>
-
-
+      </div>}
 
       {/* Active Orders - Excel-Style Table */}
       {orders.filter(order => order.status !== 'Delivered' && order.status !== 'Cancelled').length > 0 ? (

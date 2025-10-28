@@ -2627,6 +2627,50 @@ function Dashboard() {
             backdrop-filter: blur(12px);
             border-radius: 0.75rem;
           }
+
+          @keyframes gradient-shift {
+            0% {
+              background-position: 0% 50%;
+            }
+            50% {
+              background-position: 100% 50%;
+            }
+            100% {
+              background-position: 0% 50%;
+            }
+          }
+          
+          .pro-gradient {
+            background: linear-gradient(45deg, #3dd1f9, #2bb8d9, #4dd8ff, #7ee3ff, #3dd1f9);
+            background-size: 300% 300%;
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradient-shift 3s ease infinite, big-load-in 1s ease-out;
+          }
+
+          @keyframes big-load-in {
+            0% {
+              opacity: 0;
+              transform: scale(0.3) translateY(-30px);
+              filter: blur(10px);
+            }
+            60% {
+              opacity: 1;
+              transform: scale(1.4) translateY(5px);
+              filter: blur(0);
+            }
+            75% {
+              transform: scale(0.9) translateY(-5px);
+            }
+            85% {
+              transform: scale(1.1) translateY(0);
+            }
+            100% {
+              opacity: 1;
+              transform: scale(1) translateY(0);
+            }
+          }
         `}</style>
         
         <div className="min-h-screen" style={{ backgroundColor: '#030140' }}>

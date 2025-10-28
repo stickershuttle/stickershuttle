@@ -190,6 +190,56 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Coming Soon Banner */}
+        <section className="pt-2 pb-4">
+          <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
+            <div 
+              className="p-6 rounded-2xl relative overflow-hidden animate-fade-in-up"
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                backdropFilter: 'blur(12px)'
+              }}
+            >
+              {/* Animated gradient background */}
+              <div 
+                className="absolute inset-0 opacity-10"
+                style={{
+                  background: 'linear-gradient(45deg, #3dd1f9, #2bb8d9, #4dd8ff, #7ee3ff, #3dd1f9)',
+                  backgroundSize: '300% 300%',
+                  animation: 'gradient-move 3s ease-in-out infinite',
+                }}
+              />
+              <div className="relative z-10 flex items-center justify-center gap-4">
+                <h2 className="text-base md:text-xl font-bold text-white flex-shrink-0" style={{ fontFamily: 'Rubik, Inter, system-ui, -apple-system, sans-serif', fontWeight: 700 }}>
+                  Something <span className="pro-gradient">BIG</span> is coming soon<span className="hidden md:inline">...</span>
+                </h2>
+                
+                <a 
+                  href="/waitlist"
+                  className="flex items-center justify-center text-white transition-all duration-300 transform hover:scale-105 flex-shrink-0"
+                  title="Learn more about what's coming"
+                >
+                  <svg 
+                    width="20" 
+                    height="20" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="3" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  >
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                    <polyline points="12 5 19 12 12 19"></polyline>
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Brands Section - Infinite Scroll */}
         <section className="py-4">
           <div className="w-[95%] md:w-[90%] xl:w-[95%] 2xl:w-[75%] mx-auto px-4">
@@ -1321,6 +1371,57 @@ export default function Home() {
             .hero-banner {
               background-image: url('https://res.cloudinary.com/dxcnvqk6b/image/upload/v1751382016/StickerShuttle_Banner_Main_nlzoro.png');
             }
+          }
+
+          /* Gradient animation for coming soon banner */
+          @keyframes gradient-move {
+            0%, 100% {
+              background-position: 0% 50%;
+            }
+            50% {
+              background-position: 100% 50%;
+            }
+          }
+
+          .pro-gradient {
+            background: linear-gradient(45deg, #3dd1f9, #2bb8d9, #4dd8ff, #7ee3ff, #3dd1f9);
+            background-size: 300% 300%;
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradient-move 3s ease-in-out infinite;
+          }
+
+          /* Fade in up animation for coming soon banner */
+          @keyframes fade-in-up {
+            0% {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+
+          .animate-fade-in-up {
+            animation: fade-in-up 0.6s ease-out forwards;
+          }
+
+          /* Pulse animation for arrow */
+          @keyframes pulse {
+            0%, 100% {
+              opacity: 1;
+              transform: scale(1);
+            }
+            50% {
+              opacity: 0.7;
+              transform: scale(1.1);
+            }
+          }
+
+          .pulse-animation {
+            animation: pulse 2s ease-in-out infinite;
           }
 
         `}</style>

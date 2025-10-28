@@ -4,7 +4,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import UniversalHeader from '../components/UniversalHeader';
 import UniversalFooter from '../components/UniversalFooter';
-import { Check, Star, ShieldCheck, Truck, Tag, Headphones, Sparkles, ArrowRight } from 'lucide-react';
+import { Check, Star, ShieldCheck, Truck, Tag, Headphones, Sparkles, ArrowRight, Lock } from 'lucide-react';
+import { getSupabase } from '../lib/supabase';
 
 const StickerShuttlePro = () => {
   const [selectedPlan, setSelectedPlan] = React.useState('annual');
@@ -12,6 +13,11 @@ const StickerShuttlePro = () => {
   const [displayText, setDisplayText] = React.useState('');
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [proMemberCount, setProMemberCount] = React.useState(0); // Default fallback (will be updated from API)
+  const [isAuthorized, setIsAuthorized] = React.useState(false);
+  const [passwordInput, setPasswordInput] = React.useState('');
+  const [passwordError, setPasswordError] = React.useState('');
+  const [isCheckingAuth, setIsCheckingAuth] = React.useState(true);
+  const [userEmail, setUserEmail] = React.useState<string | null>(null);
 
   const messages = [
     'never worry about<br/>getting your stickers<br/>on time again.',
@@ -28,6 +34,54 @@ const StickerShuttlePro = () => {
     'never watch competitors<br/>hand out cool stickers<br/>while you stand empty-handed.',
     'quit being the brand<br/>people forget because<br/>you have nothing sticky.'
   ];
+
+  // Check authorization on mount
+  React.useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        // Check if password was already entered in session
+        const sessionPassword = sessionStorage.getItem('pro_page_access');
+        if (sessionPassword === 'Demo123') {
+          setIsAuthorized(true);
+          setIsCheckingAuth(false);
+          return;
+        }
+
+        // Check if user is logged in and is justin@stickershuttle.com
+        const supabase = getSupabase();
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user?.email) {
+          setUserEmail(user.email);
+          if (user.email === 'justin@stickershuttle.com') {
+            setIsAuthorized(true);
+            setIsCheckingAuth(false);
+            return;
+          }
+        }
+        
+        setIsCheckingAuth(false);
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  // Handle password submission
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordInput === 'Demo123') {
+      sessionStorage.setItem('pro_page_access', 'Demo123');
+      setIsAuthorized(true);
+      setPasswordError('');
+    } else {
+      setPasswordError('Incorrect password. Please try again.');
+      setPasswordInput('');
+    }
+  };
 
   // Fetch Pro member count
   React.useEffect(() => {
@@ -204,6 +258,71 @@ const StickerShuttlePro = () => {
 
       <div className="min-h-screen text-white" style={{ backgroundColor: '#030140', minHeight: '100vh' }}>
         <UniversalHeader />
+        
+        {/* Password Protection Overlay */}
+        {!isAuthorized && !isCheckingAuth && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+               style={{
+                 backgroundColor: 'rgba(3, 1, 64, 0.98)',
+                 backdropFilter: 'blur(12px)'
+               }}>
+            <div className="max-w-md w-full p-8 rounded-2xl text-center"
+                 style={{
+                   background: 'rgba(255, 255, 255, 0.05)',
+                   border: '1px solid rgba(255, 255, 255, 0.1)',
+                   boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                   backdropFilter: 'blur(12px)'
+                 }}>
+              <div className="flex justify-center mb-6">
+                <img 
+                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" 
+                  alt="Sticker Shuttle Pro Logo" 
+                  className="h-24 w-auto object-contain"
+                />
+              </div>
+              
+              <div className="flex justify-center mb-6">
+                <Lock className="w-16 h-16 text-blue-400" />
+              </div>
+              
+              <h2 className="text-3xl font-bold mb-4 text-white">Access Required</h2>
+              <p className="text-gray-300 mb-6">
+                Please enter the password to view this page.
+              </p>
+              
+              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                <input
+                  type="password"
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  placeholder="Enter password"
+                  className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                  }}
+                  autoFocus
+                />
+                
+                {passwordError && (
+                  <p className="text-red-400 text-sm">{passwordError}</p>
+                )}
+                
+                <button
+                  type="submit"
+                  className="w-full px-6 py-3 rounded-lg text-white font-bold transition-all duration-300 hover:scale-105"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%)',
+                    backdropFilter: 'blur(25px) saturate(180%)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    boxShadow: 'rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
+                  }}>
+                  Submit
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
         
         {/* Hero Section */}
         <div className="relative overflow-hidden pt-20 pb-16">
