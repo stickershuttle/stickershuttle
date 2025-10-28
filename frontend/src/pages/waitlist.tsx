@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useMutation, gql } from '@apollo/client';
 import { useRouter } from 'next/router';
 import UniversalHeader from '../components/UniversalHeader';
-import DynamicSEOHead from '../components/DynamicSEOHead';
+import SEOHead from '../components/SEOHead';
 import { getSupabase } from '../lib/supabase';
+import { GetServerSideProps } from 'next';
 
 const SUBSCRIBE_TO_WAITLIST = gql`
   mutation SubscribeToWaitlist($email: String!, $listId: String) {
@@ -25,7 +26,11 @@ const SYNC_CUSTOMER = gql`
   }
 `;
 
-export default function Waitlist() {
+interface WaitlistProps {
+  seoData?: any;
+}
+
+export default function Waitlist({ seoData }: WaitlistProps) {
   const router = useRouter();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -178,7 +183,19 @@ export default function Waitlist() {
 
   return (
     <>
-      <DynamicSEOHead />
+      <SEOHead
+        title={seoData?.title}
+        description={seoData?.description}
+        keywords={seoData?.keywords}
+        robots={seoData?.robots}
+        ogTitle={seoData?.ogTitle}
+        ogDescription={seoData?.ogDescription}
+        ogImage={seoData?.ogImage}
+        ogType={seoData?.ogType}
+        ogUrl={seoData?.ogUrl}
+        twitterCard={seoData?.twitterCard}
+        canonical={seoData?.canonicalUrl}
+      />
 
       <style jsx global>{`
         @keyframes gradient-move {
@@ -423,3 +440,72 @@ export default function Waitlist() {
     </>
   );
 }
+
+export const getServerSideProps: GetServerSideProps = async () => {
+  try {
+    // Fetch SEO data from the backend API
+    const getApiUrl = () => {
+      if (process.env.NEXT_PUBLIC_API_URL) {
+        return process.env.NEXT_PUBLIC_API_URL;
+      }
+      if (process.env.NODE_ENV === 'development') {
+        return 'http://localhost:4000';
+      }
+      return 'https://ss-beyond.up.railway.app';
+    };
+    
+    const backendUrl = getApiUrl();
+    
+    const response = await fetch(`${backendUrl}/graphql`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: `
+          query GetPageSEOByPath($pagePath: String!) {
+            getPageSEOByPath(pagePath: $pagePath) {
+              id
+              pagePath
+              pageName
+              title
+              description
+              keywords
+              robots
+              ogTitle
+              ogDescription
+              ogImage
+              ogType
+              ogUrl
+              twitterCard
+              twitterTitle
+              twitterDescription
+              twitterImage
+              canonicalUrl
+              structuredData
+            }
+          }
+        `,
+        variables: {
+          pagePath: '/waitlist'
+        }
+      })
+    });
+
+    const result = await response.json();
+    
+    if (result.errors) {
+      console.error('GraphQL errors fetching SEO:', result.errors);
+      return { props: { seoData: null } };
+    }
+
+    return {
+      props: {
+        seoData: result.data?.getPageSEOByPath || null
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching SEO data:', error);
+    return { props: { seoData: null } };
+  }
+};

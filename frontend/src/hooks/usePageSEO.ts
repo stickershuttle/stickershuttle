@@ -26,8 +26,17 @@ export function usePageSEO() {
   
   const { data, loading, error } = useQuery(GET_PAGE_SEO_BY_PATH, {
     variables: { pagePath },
+    // Skip query if no pathname yet
+    skip: !pagePath,
     // Don't show errors in console for missing SEO entries (many pages won't have custom SEO)
-    onError: () => {},
+    onError: (err) => {
+      console.log('SEO fetch for', pagePath, '- no custom SEO found (using defaults)');
+    },
+    onCompleted: (data) => {
+      if (data?.getPageSEOByPath) {
+        console.log('✅ Custom SEO loaded for', pagePath, data.getPageSEOByPath);
+      }
+    },
     // Cache the results
     fetchPolicy: 'cache-first'
   });

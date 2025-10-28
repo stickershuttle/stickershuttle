@@ -40,7 +40,12 @@ export default function DynamicSEOHead({
   prefetch = []
 }: DynamicSEOHeadProps) {
   // Fetch SEO data from database based on current page path
-  const { seoData } = usePageSEO();
+  const { seoData, hasCustomSEO } = usePageSEO();
+  
+  // Debug logging
+  if (typeof window !== 'undefined') {
+    console.log('🔍 DynamicSEOHead - Has custom SEO:', hasCustomSEO, 'Data:', seoData);
+  }
   
   // Merge: manual props > database > defaults
   const title = manualTitle || seoData?.title || "Sticker Shuttle - Premium Custom Stickers & Vinyl Banners";
