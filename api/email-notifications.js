@@ -2842,6 +2842,93 @@ const sendProCancellationEmail = async (userProfile) => {
   return result;
 };
 
+// Send waitlist confirmation email
+const sendWaitlistConfirmationEmail = async (email, firstName, lastName) => {
+  try {
+    const name = firstName || 'there';
+    
+    console.log(`📧 Sending waitlist confirmation email to ${email}`);
+    
+    const template = getWaitlistConfirmationEmailTemplate(name);
+    const result = await sendEmail(email, template.subject, template.html);
+    
+    if (result.success) {
+      console.log(`✅ Waitlist confirmation email sent to ${email}`);
+    } else {
+      console.error(`❌ Failed to send waitlist confirmation email to ${email}:`, result.error);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error(`❌ Error sending waitlist confirmation email:`, error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Waitlist confirmation email template
+const getWaitlistConfirmationEmailTemplate = (name) => {
+  return {
+    subject: '🎉 You Have Early Access to Sticker Shuttle Pro!',
+    html: `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to Sticker Shuttle Pro Waitlist</title>
+</head>
+<body style="margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #ffffff; color: #333333; line-height: 1.6;">
+  
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 40px 20px;">
+    
+    <!-- Pro Logo -->
+    <div style="text-align: center; margin-bottom: 40px;">
+      <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1755785867/ProOnly_1_jgp5s4.png" alt="Sticker Shuttle Pro" style="height: 80px; width: auto;" />
+    </div>
+    
+    <!-- Main Content -->
+    <div style="text-align: center; margin-bottom: 40px;">
+      <h1 style="font-size: 28px; margin-bottom: 20px; color: #1a1a1a; font-weight: 600;">
+        You Now Have Early Access!
+      </h1>
+      
+      <p style="font-size: 18px; margin-bottom: 20px; color: #333333; line-height: 1.8;">
+        You'll get updates and be the first to access Pro.
+      </p>
+      
+      <p style="font-size: 18px; margin-bottom: 40px; color: #333333; line-height: 1.8;">
+        Stay tuned.
+      </p>
+    </div>
+    
+    <!-- Button -->
+    <div style="text-align: center; margin: 40px 0;">
+      <a href="https://stickershuttle.com" style="display: inline-block; background: linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.25) 50%, rgba(59, 130, 246, 0.1) 100%); color: #3b82f6; padding: 16px 32px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; border: 1px solid rgba(59, 130, 246, 0.4); box-shadow: rgba(59, 130, 246, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset;">
+        Visit Sticker Shuttle
+      </a>
+    </div>
+    
+    <!-- Footer -->
+    <div style="margin-top: 60px; padding-top: 30px; border-top: 1px solid #e9ecef; text-align: center;">
+      <p style="font-size: 14px; color: #666666; margin-bottom: 10px;">
+        Need help? Contact us at 
+        <a href="mailto:orbit@stickershuttle.com" style="color: #3b82f6; text-decoration: none;">
+          orbit@stickershuttle.com
+        </a>
+      </p>
+      <p style="font-size: 12px; color: #999999; margin: 20px 0 0;">
+        © 2025 Sticker Shuttle. All rights reserved.
+      </p>
+    </div>
+    
+  </div>
+  
+</body>
+</html>
+    `
+  };
+};
+
 // Export all functions for use in other modules
 module.exports = {
   sendEmail,
@@ -2871,5 +2958,7 @@ module.exports = {
   sendProDesignLockWarningEmail,
   sendProDesignLockedEmail,
   sendProPaymentFailedEmail,
-  sendProCancellationEmail
+  sendProCancellationEmail,
+  // Waitlist Email
+  sendWaitlistConfirmationEmail
 }; 

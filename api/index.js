@@ -10071,17 +10071,32 @@ const resolvers = {
           throw new Error('Klaviyo service is currently unavailable');
         }
 
+        // Normalize email to lowercase
+        const normalizedEmail = email ? email.toLowerCase().trim() : email;
+
         // If first name and last name are provided, create/update the profile with that data first
         if (firstName || lastName) {
-          console.log('📋 Creating/updating profile with name data:', { email, firstName, lastName });
+          console.log('📋 Creating/updating profile with name data:', { email: normalizedEmail, firstName, lastName });
           await klaviyoClient.createOrUpdateProfile({
-            email,
+            email: normalizedEmail,
             firstName: firstName || '',
             lastName: lastName || ''
           });
         }
 
-        const result = await klaviyoClient.subscribeToList(email, listId);
+        const result = await klaviyoClient.subscribeToList(normalizedEmail, listId);
+        
+        // Send confirmation email if subscription was successful
+        if (result.success) {
+          try {
+            console.log('📧 Sending waitlist confirmation email to:', normalizedEmail);
+            await emailNotifications.sendWaitlistConfirmationEmail(normalizedEmail, firstName, lastName);
+          } catch (emailError) {
+            console.error('⚠️ Failed to send confirmation email (subscription still succeeded):', emailError);
+            // Don't fail the subscription if email fails
+          }
+        }
+        
         return {
           success: result.success,
           message: result.success ? 'Successfully subscribed to Klaviyo' : 'Failed to subscribe to Klaviyo',
@@ -10105,7 +10120,10 @@ const resolvers = {
           throw new Error('Klaviyo service is currently unavailable');
         }
 
-        const result = await klaviyoClient.unsubscribeFromList(email, listId);
+        // Normalize email to lowercase
+        const normalizedEmail = email ? email.toLowerCase().trim() : email;
+
+        const result = await klaviyoClient.unsubscribeFromList(normalizedEmail, listId);
         return {
           success: result.success,
           message: result.success ? 'Successfully unsubscribed from Klaviyo' : 'Failed to unsubscribe from Klaviyo',
@@ -10234,9 +10252,12 @@ const resolvers = {
           throw new Error('Klaviyo service is currently unavailable');
         }
 
-        console.log('📊 Tracking Klaviyo event:', { email, eventName });
+        // Normalize email to lowercase
+        const normalizedEmail = email ? email.toLowerCase().trim() : email;
+
+        console.log('📊 Tracking Klaviyo event:', { email: normalizedEmail, eventName });
         
-        const result = await klaviyoClient.trackEvent(email, eventName, properties);
+        const result = await klaviyoClient.trackEvent(normalizedEmail, eventName, properties);
         return {
           success: result.success,
           message: result.success ? 'Successfully tracked event' : 'Failed to track event',

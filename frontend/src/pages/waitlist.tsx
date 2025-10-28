@@ -169,43 +169,7 @@ export default function Waitlist({ seoData }: WaitlistProps) {
       console.log('📧 Subscription result:', result);
       
       if (result.data?.subscribeToKlaviyo?.success) {
-        // Also sync customer data to ensure everything is up to date
-        try {
-          const syncResponse = await fetch(`${backendUrl}/graphql`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              query: `
-                mutation SyncCustomer($customerData: KlaviyoCustomerInput!) {
-                  syncCustomerToKlaviyo(customerData: $customerData) {
-                    success
-                    message
-                    error
-                  }
-                }
-              `,
-              variables: {
-                customerData: {
-                  email,
-                  firstName,
-                  lastName,
-                  marketingOptIn: true
-                }
-              }
-            })
-          });
-          
-          if (syncResponse.ok) {
-            const syncResult = await syncResponse.json();
-            console.log('✅ Customer data synced successfully:', syncResult);
-          }
-        } catch (syncError) {
-          console.warn('⚠️ Customer sync failed, but subscription succeeded:', syncError);
-          // Don't fail the whole operation if sync fails - subscription already succeeded
-        }
-        
+        // Success! subscribeToKlaviyo already created/updated the profile and subscribed them
         setSubmitted(true);
       } else {
         const errorMsg = result.data?.subscribeToKlaviyo?.error || result.data?.subscribeToKlaviyo?.message || 'Failed to join waitlist';

@@ -105,9 +105,12 @@ class KlaviyoClient {
     try {
       const client = this.getClient();
       
+      // Normalize email to lowercase to avoid duplicates
+      const normalizedEmail = profileData.email ? profileData.email.toLowerCase().trim() : profileData.email;
+      
       // Build attributes object, only including phone_number if it's valid
       const attributes = {
-        email: profileData.email,
+        email: normalizedEmail,
         first_name: profileData.firstName || '',
         last_name: profileData.lastName || '',
         location: {
@@ -138,9 +141,53 @@ class KlaviyoClient {
         }
       };
 
-      const response = await client.post('/profiles/', payload);
-      console.log('✅ Klaviyo profile created/updated:', profileData.email);
-      return response.data;
+      try {
+        // Try to create the profile first
+        const response = await client.post('/profiles/', payload);
+        console.log('✅ Klaviyo profile created:', normalizedEmail);
+        return response.data;
+      } catch (createError) {
+        // If we get a 409 conflict, the profile already exists - update it instead
+        if (createError.response?.status === 409) {
+          console.log('ℹ️ Profile already exists in Klaviyo, fetching and updating:', normalizedEmail);
+          
+          // Get the existing profile
+          const existingProfile = await this.getProfileByEmail(normalizedEmail);
+          
+          if (!existingProfile || !existingProfile.id) {
+            // Profile exists but we can't retrieve it (possibly suppressed/deleted)
+            console.warn('⚠️ Profile exists in Klaviyo but cannot be retrieved:', normalizedEmail);
+            
+            // Return a success response since the profile exists
+            return {
+              data: {
+                type: 'profile',
+                attributes: { email: normalizedEmail },
+                id: null
+              },
+              meta: { 
+                warning: 'Profile exists but could not be updated'
+              }
+            };
+          }
+
+          // Update the existing profile using PATCH
+          const updatePayload = {
+            data: {
+              type: 'profile',
+              id: existingProfile.id,
+              attributes: attributes
+            }
+          };
+
+          const updateResponse = await client.patch(`/profiles/${existingProfile.id}/`, updatePayload);
+          console.log('✅ Klaviyo profile updated:', normalizedEmail);
+          return updateResponse.data;
+        }
+        
+        // If it's not a 409, re-throw the error
+        throw createError;
+      }
     } catch (error) {
       console.error('❌ Error creating/updating Klaviyo profile:', error.response?.data || error.message);
       throw error;
@@ -151,7 +198,9 @@ class KlaviyoClient {
   async getProfileByEmail(email) {
     try {
       const client = this.getClient();
-      const response = await client.get(`/profiles/?filter=equals(email,"${email}")`);
+      // Normalize email to lowercase for consistency
+      const normalizedEmail = email ? email.toLowerCase().trim() : email;
+      const response = await client.get(`/profiles/?filter=equals(email,"${normalizedEmail}")`);
       
       if (response.data.data && response.data.data.length > 0) {
         return response.data.data[0];
@@ -167,6 +216,9 @@ class KlaviyoClient {
   // Subscribe profile to a list
   async subscribeToList(email, listId = null) {
     try {
+      // Normalize email to lowercase
+      const normalizedEmail = email ? email.toLowerCase().trim() : email;
+      
       const targetListId = listId || this.defaultListId;
       if (!targetListId) {
         throw new Error('No list ID provided and no default list configured');
@@ -175,11 +227,11 @@ class KlaviyoClient {
       const client = this.getClient();
       
       // First, get or create the profile
-      let profile = await this.getProfileByEmail(email);
+      let profile = await this.getProfileByEmail(normalizedEmail);
       if (!profile) {
-        console.log('🔄 Profile not found, creating new profile for:', email);
+        console.log('🔄 Profile not found, creating new profile for:', normalizedEmail);
         // Create basic profile if it doesn't exist
-        const createResponse = await this.createOrUpdateProfile({ email });
+        const createResponse = await this.createOrUpdateProfile({ email: normalizedEmail });
         
         // Use the profile from the creation response
         if (createResponse && createResponse.data) {
@@ -188,12 +240,12 @@ class KlaviyoClient {
         } else {
           // Fallback: try to fetch it again
           console.log('⚠️ No profile in response, attempting to fetch again...');
-          profile = await this.getProfileByEmail(email);
+          profile = await this.getProfileByEmail(normalizedEmail);
         }
       }
 
       if (!profile || !profile.id) {
-        console.error('❌ Failed to create or retrieve profile for:', email);
+        console.error('❌ Failed to create or retrieve profile for:', normalizedEmail);
         throw new Error('Failed to create or retrieve profile');
       }
 
@@ -208,7 +260,7 @@ class KlaviyoClient {
       };
 
       await client.post(`/lists/${targetListId}/relationships/profiles/`, payload);
-      console.log('✅ Subscribed to Klaviyo list:', email);
+      console.log('✅ Subscribed to Klaviyo list:', normalizedEmail);
       
       return { success: true, profileId: profile.id };
     } catch (error) {
@@ -220,6 +272,9 @@ class KlaviyoClient {
   // Unsubscribe profile from a list
   async unsubscribeFromList(email, listId = null) {
     try {
+      // Normalize email to lowercase
+      const normalizedEmail = email ? email.toLowerCase().trim() : email;
+      
       const targetListId = listId || this.defaultListId;
       if (!targetListId) {
         throw new Error('No list ID provided and no default list configured');
@@ -228,9 +283,9 @@ class KlaviyoClient {
       const client = this.getClient();
       
       // Get the profile
-      const profile = await this.getProfileByEmail(email);
+      const profile = await this.getProfileByEmail(normalizedEmail);
       if (!profile) {
-        console.log('Profile not found in Klaviyo:', email);
+        console.log('Profile not found in Klaviyo:', normalizedEmail);
         return { success: true, message: 'Profile not found' };
       }
 
@@ -246,7 +301,7 @@ class KlaviyoClient {
         }
       });
 
-      console.log('✅ Unsubscribed from Klaviyo list:', email);
+      console.log('✅ Unsubscribed from Klaviyo list:', normalizedEmail);
       return { success: true, profileId: profile.id };
     } catch (error) {
       console.error('❌ Error unsubscribing from Klaviyo list:', error.response?.data || error.message);
@@ -257,13 +312,16 @@ class KlaviyoClient {
   // Check if profile is subscribed to a list
   async isSubscribedToList(email, listId = null) {
     try {
+      // Normalize email to lowercase
+      const normalizedEmail = email ? email.toLowerCase().trim() : email;
+      
       const targetListId = listId || this.defaultListId;
       if (!targetListId) {
         return false;
       }
 
       const client = this.getClient();
-      const profile = await this.getProfileByEmail(email);
+      const profile = await this.getProfileByEmail(normalizedEmail);
       
       if (!profile) {
         return false;
@@ -281,19 +339,24 @@ class KlaviyoClient {
   // Sync customer data from your database to Klaviyo
   async syncCustomerToKlaviyo(customerData) {
     try {
-      console.log('🔄 Syncing customer to Klaviyo:', customerData.email);
+      // Normalize email to lowercase
+      const normalizedEmail = customerData.email ? customerData.email.toLowerCase().trim() : customerData.email;
+      console.log('🔄 Syncing customer to Klaviyo:', normalizedEmail);
       
-      // Create/update profile with full customer data
-      const profileResponse = await this.createOrUpdateProfile(customerData);
+      // Create/update profile with full customer data (email will be normalized again in createOrUpdateProfile)
+      const profileResponse = await this.createOrUpdateProfile({
+        ...customerData,
+        email: normalizedEmail
+      });
       console.log('✅ Profile created/updated successfully');
 
       // Handle subscription status
       if (customerData.marketingOptIn) {
         console.log('📋 Marketing opt-in is true, subscribing to list...');
-        await this.subscribeToList(customerData.email);
+        await this.subscribeToList(normalizedEmail);
       } else {
         console.log('📋 Marketing opt-in is false, unsubscribing from list...');
-        await this.unsubscribeFromList(customerData.email);
+        await this.unsubscribeFromList(normalizedEmail);
       }
 
       return { success: true };
@@ -306,6 +369,9 @@ class KlaviyoClient {
   // Track custom events (like order placed, proof approved, etc.)
   async trackEvent(email, eventName, properties = {}) {
     try {
+      // Normalize email to lowercase
+      const normalizedEmail = email ? email.toLowerCase().trim() : email;
+      
       const client = this.getClient();
       
       const payload = {
@@ -316,7 +382,7 @@ class KlaviyoClient {
               data: {
                 type: 'profile',
                 attributes: {
-                  email: email
+                  email: normalizedEmail
                 }
               }
             },
@@ -337,7 +403,7 @@ class KlaviyoClient {
       };
 
       await client.post('/events/', payload);
-      console.log('✅ Klaviyo event tracked:', eventName, 'for', email);
+      console.log('✅ Klaviyo event tracked:', eventName, 'for', normalizedEmail);
       return { success: true };
     } catch (error) {
       console.error('❌ Error tracking Klaviyo event:', error.response?.data || error.message);
