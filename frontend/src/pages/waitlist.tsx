@@ -19,6 +19,7 @@ export default function Waitlist({ seoData }: WaitlistProps) {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [timeLeft, setTimeLeft] = useState({
     days: 0,
     hours: 0,
@@ -105,9 +106,11 @@ export default function Waitlist({ seoData }: WaitlistProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSubmitting(true);
 
     if (!firstName || !lastName || !email) {
       setError('Please fill in all fields');
+      setSubmitting(false);
       return;
     }
 
@@ -115,6 +118,7 @@ export default function Waitlist({ seoData }: WaitlistProps) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       setError('Please enter a valid email address');
+      setSubmitting(false);
       return;
     }
 
@@ -167,7 +171,7 @@ export default function Waitlist({ seoData }: WaitlistProps) {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ HTTP error response:', errorText);
-        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+        throw new Error(`Server error (${response.status}). Please try again or contact support if this persists.`);
       }
 
       const result = await response.json();
@@ -177,21 +181,24 @@ export default function Waitlist({ seoData }: WaitlistProps) {
       if (result.errors && result.errors.length > 0) {
         const graphqlError = result.errors[0].message;
         console.error('❌ GraphQL error:', graphqlError);
-        throw new Error(graphqlError);
+        throw new Error(`Error: ${graphqlError}`);
       }
       
       if (result.data?.subscribeToKlaviyo?.success) {
         // Success! subscribeToKlaviyo already created/updated the profile and subscribed them
         console.log('✅ Successfully subscribed to waitlist!');
         setSubmitted(true);
+        setSubmitting(false);
       } else {
-        const errorMsg = result.data?.subscribeToKlaviyo?.error || result.data?.subscribeToKlaviyo?.message || 'Failed to join waitlist';
+        const errorMsg = result.data?.subscribeToKlaviyo?.error || result.data?.subscribeToKlaviyo?.message || 'Failed to join waitlist. Please try again.';
         console.error('❌ Subscription failed:', errorMsg);
         setError(errorMsg);
+        setSubmitting(false);
       }
     } catch (err: any) {
       console.error('❌ Error subscribing to waitlist:', err);
-      setError(err.message || 'Failed to join waitlist. Please try again.');
+      setError(err.message || 'Failed to join waitlist. Please try again or contact support.');
+      setSubmitting(false);
     }
   };
 
@@ -392,14 +399,25 @@ export default function Waitlist({ seoData }: WaitlistProps) {
 
                  <button
                    type="submit"
-                   className="button-gradient w-full px-6 py-4 rounded-xl text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] animate-pulse-subtle"
+                   disabled={submitting}
+                   className="button-gradient w-full px-6 py-4 rounded-xl text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:translate-y-[-2px] animate-pulse-subtle disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                    style={{
                      backdropFilter: 'blur(25px) saturate(180%)',
                      border: '1px solid rgba(61, 209, 249, 0.4)',
                      boxShadow: 'rgba(61, 209, 249, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.2) 0px 1px 0px inset'
                    }}
                  >
-                   Get Early Access
+                   {submitting ? (
+                     <span className="flex items-center justify-center gap-2">
+                       <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                       </svg>
+                       Subscribing...
+                     </span>
+                   ) : (
+                     'Get Early Access'
+                   )}
                  </button>
 
                  {/* Countdown Timer */}
