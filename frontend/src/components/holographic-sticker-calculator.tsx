@@ -1652,7 +1652,8 @@ export default function HolographicStickerCalculator({ initialBasePricing, realP
                             : isProMember()
                               ? calculateProDiscount(originalPrice).finalPrice
                               : originalPrice;
-                          return (finalPrice * getCreditRate()).toFixed(2);
+                          const creditEarned = finalPrice * getCreditRate();
+                          return Math.min(creditEarned, 100).toFixed(2);
                         })()} in store credit on this order!
                       </span>
                     </div>

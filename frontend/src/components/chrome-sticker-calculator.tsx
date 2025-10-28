@@ -1579,7 +1579,11 @@ export default function ChromeStickerCalculator({ initialBasePricing, realPricin
                         alt="Credits" 
                         className="w-5 h-5 object-contain text-yellow-300"
                       />
-                        You'll earn ${(parseFloat(totalPrice.replace('$', '')) * getCreditRate()).toFixed(2)} in store credit on this order!
+                        You'll earn ${(() => {
+                          const originalPrice = parseFloat(totalPrice.replace('$', ''));
+                          const creditEarned = originalPrice * getCreditRate();
+                          return Math.min(creditEarned, 100).toFixed(2);
+                        })()} in store credit on this order!
                       </span>
                     </div>
                   )}
