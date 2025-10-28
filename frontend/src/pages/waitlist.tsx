@@ -7,8 +7,8 @@ import { getSupabase } from '../lib/supabase';
 import { GetServerSideProps } from 'next';
 
 const SUBSCRIBE_TO_WAITLIST = gql`
-  mutation SubscribeToWaitlist($email: String!, $listId: String) {
-    subscribeToKlaviyo(email: $email, listId: $listId) {
+  mutation SubscribeToWaitlist($email: String!, $listId: String, $firstName: String, $lastName: String) {
+    subscribeToKlaviyo(email: $email, listId: $listId, firstName: $firstName, lastName: $lastName) {
       success
       message
       error
@@ -143,32 +143,41 @@ export default function Waitlist({ seoData }: WaitlistProps) {
     }
 
     try {
-      // First, subscribe to the list
+      // Subscribe to the list with full profile data (firstName and lastName)
       const listId = process.env.NEXT_PUBLIC_KLAVIYO_WAITLIST_LIST_ID || null;
       console.log('📋 Subscribing with listId:', listId);
+      console.log('📋 Profile data:', { email, firstName, lastName });
       
       const result = await subscribeToWaitlist({
         variables: {
           email,
-          listId
-        }
-      });
-      
-      // Then, sync customer data with first and last name
-      await syncCustomer({
-        variables: {
-          customerData: {
-            email,
-            firstName,
-            lastName,
-            marketingOptIn: true
-          }
+          listId,
+          firstName,
+          lastName
         }
       });
       
       console.log('📧 Subscription result:', result.data);
       
       if (result.data?.subscribeToKlaviyo?.success) {
+        // Also sync customer data to ensure everything is up to date
+        try {
+          await syncCustomer({
+            variables: {
+              customerData: {
+                email,
+                firstName,
+                lastName,
+                marketingOptIn: true
+              }
+            }
+          });
+          console.log('✅ Customer data synced successfully');
+        } catch (syncError) {
+          console.warn('⚠️ Customer sync failed, but subscription succeeded:', syncError);
+          // Don't fail the whole operation if sync fails - subscription already succeeded
+        }
+        
         setSubmitted(true);
       } else {
         const errorMsg = result.data?.subscribeToKlaviyo?.error || result.data?.subscribeToKlaviyo?.message || 'Failed to join waitlist';

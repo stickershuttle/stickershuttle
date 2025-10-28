@@ -90,6 +90,7 @@ export default function SEOHead({
       <meta property="og:url" content={finalOgUrl} />
       <meta property="og:site_name" content="Sticker Shuttle" />
       <meta property="og:locale" content="en_US" />
+      <meta property="fb:app_id" content="781057062997175" />
       
       {/* Additional OG image properties for better display */}
       <meta property="og:image:width" content="1200" />

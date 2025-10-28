@@ -1347,7 +1347,7 @@ const typeDefs = gql`
     delete_blog_categories_by_pk(id: ID!): BlogCategory
     
     # Klaviyo mutations
-    subscribeToKlaviyo(email: String!, listId: String): KlaviyoMutationResult!
+    subscribeToKlaviyo(email: String!, listId: String, firstName: String, lastName: String): KlaviyoMutationResult!
     unsubscribeFromKlaviyo(email: String!, listId: String): KlaviyoMutationResult!
     syncCustomerToKlaviyo(customerData: KlaviyoCustomerInput!): KlaviyoMutationResult!
     bulkSyncCustomersToKlaviyo(customers: [KlaviyoCustomerInput!]!): KlaviyoBulkSyncResult!
@@ -10065,10 +10065,20 @@ const resolvers = {
 
 
     // Klaviyo mutations
-    subscribeToKlaviyo: async (_, { email, listId }) => {
+    subscribeToKlaviyo: async (_, { email, listId, firstName, lastName }) => {
       try {
         if (!klaviyoClient || !klaviyoClient.isReady()) {
           throw new Error('Klaviyo service is currently unavailable');
+        }
+
+        // If first name and last name are provided, create/update the profile with that data first
+        if (firstName || lastName) {
+          console.log('📋 Creating/updating profile with name data:', { email, firstName, lastName });
+          await klaviyoClient.createOrUpdateProfile({
+            email,
+            firstName: firstName || '',
+            lastName: lastName || ''
+          });
         }
 
         const result = await klaviyoClient.subscribeToList(email, listId);

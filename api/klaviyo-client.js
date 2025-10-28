@@ -177,12 +177,23 @@ class KlaviyoClient {
       // First, get or create the profile
       let profile = await this.getProfileByEmail(email);
       if (!profile) {
+        console.log('🔄 Profile not found, creating new profile for:', email);
         // Create basic profile if it doesn't exist
-        await this.createOrUpdateProfile({ email });
-        profile = await this.getProfileByEmail(email);
+        const createResponse = await this.createOrUpdateProfile({ email });
+        
+        // Use the profile from the creation response
+        if (createResponse && createResponse.data) {
+          profile = createResponse.data;
+          console.log('✅ Profile created with ID:', profile.id);
+        } else {
+          // Fallback: try to fetch it again
+          console.log('⚠️ No profile in response, attempting to fetch again...');
+          profile = await this.getProfileByEmail(email);
+        }
       }
 
-      if (!profile) {
+      if (!profile || !profile.id) {
+        console.error('❌ Failed to create or retrieve profile for:', email);
         throw new Error('Failed to create or retrieve profile');
       }
 
@@ -270,13 +281,18 @@ class KlaviyoClient {
   // Sync customer data from your database to Klaviyo
   async syncCustomerToKlaviyo(customerData) {
     try {
-      // Create/update profile
-      await this.createOrUpdateProfile(customerData);
+      console.log('🔄 Syncing customer to Klaviyo:', customerData.email);
+      
+      // Create/update profile with full customer data
+      const profileResponse = await this.createOrUpdateProfile(customerData);
+      console.log('✅ Profile created/updated successfully');
 
       // Handle subscription status
       if (customerData.marketingOptIn) {
+        console.log('📋 Marketing opt-in is true, subscribing to list...');
         await this.subscribeToList(customerData.email);
       } else {
+        console.log('📋 Marketing opt-in is false, unsubscribing from list...');
         await this.unsubscribeFromList(customerData.email);
       }
 
