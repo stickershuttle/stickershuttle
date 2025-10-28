@@ -20,6 +20,7 @@ export default function Waitlist({ seoData }: WaitlistProps) {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string>('');
   const [timeLeft, setTimeLeft] = useState({
     days: 0,
     hours: 0,
@@ -106,6 +107,7 @@ export default function Waitlist({ seoData }: WaitlistProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setDebugInfo('');
     setSubmitting(true);
 
     if (!firstName || !lastName || !email) {
@@ -137,9 +139,7 @@ export default function Waitlist({ seoData }: WaitlistProps) {
       const backendUrl = getApiUrl();
       const listId = process.env.NEXT_PUBLIC_KLAVIYO_WAITLIST_LIST_ID || null;
       
-      console.log('📋 Backend URL:', backendUrl);
-      console.log('📋 Subscribing with listId:', listId);
-      console.log('📋 Profile data:', { email, firstName, lastName });
+      setDebugInfo(`Connecting to: ${backendUrl}`);
       
       // Subscribe to waitlist
       const response = await fetch(`${backendUrl}/graphql`, {
@@ -166,38 +166,37 @@ export default function Waitlist({ seoData }: WaitlistProps) {
         })
       });
 
-      console.log('📧 Response status:', response.status, response.statusText);
+      setDebugInfo(`Response: ${response.status} ${response.statusText}`);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ HTTP error response:', errorText);
-        throw new Error(`Server error (${response.status}). Please try again or contact support if this persists.`);
+        setDebugInfo(`Error response: ${errorText.substring(0, 200)}`);
+        throw new Error(`Server error (${response.status}). Please try again or contact support.`);
       }
 
       const result = await response.json();
-      console.log('📧 Full subscription result:', JSON.stringify(result, null, 2));
+      setDebugInfo(`Result: ${JSON.stringify(result).substring(0, 300)}`);
       
       // Check for GraphQL errors
       if (result.errors && result.errors.length > 0) {
         const graphqlError = result.errors[0].message;
-        console.error('❌ GraphQL error:', graphqlError);
         throw new Error(`Error: ${graphqlError}`);
       }
       
       if (result.data?.subscribeToKlaviyo?.success) {
-        // Success! subscribeToKlaviyo already created/updated the profile and subscribed them
-        console.log('✅ Successfully subscribed to waitlist!');
+        // Success!
         setSubmitted(true);
         setSubmitting(false);
+        setDebugInfo('');
       } else {
         const errorMsg = result.data?.subscribeToKlaviyo?.error || result.data?.subscribeToKlaviyo?.message || 'Failed to join waitlist. Please try again.';
-        console.error('❌ Subscription failed:', errorMsg);
         setError(errorMsg);
         setSubmitting(false);
       }
     } catch (err: any) {
-      console.error('❌ Error subscribing to waitlist:', err);
-      setError(err.message || 'Failed to join waitlist. Please try again or contact support.');
+      const errorMessage = err.message || 'Network error. Please check your connection and try again.';
+      setError(errorMessage);
+      setDebugInfo(`Exception: ${err.toString()}`);
       setSubmitting(false);
     }
   };
@@ -343,6 +342,18 @@ export default function Waitlist({ seoData }: WaitlistProps) {
                 backdropFilter: 'blur(12px)'
               }}>
                 <p className="text-red-300 font-medium text-lg">{error}</p>
+              </div>
+            )}
+
+            {/* Debug Info */}
+            {debugInfo && (
+              <div className="mb-8 p-4 rounded-xl text-left max-w-md mx-auto" style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+                boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                backdropFilter: 'blur(12px)'
+              }}>
+                <p className="text-blue-300 font-mono text-xs break-words">{debugInfo}</p>
               </div>
             )}
 
