@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useMutation, gql } from '@apollo/client';
 import { useRouter } from 'next/router';
 import UniversalHeader from '../components/UniversalHeader';
+import { getSupabase } from '../lib/supabase';
 
 const SUBSCRIBE_TO_WAITLIST = gql`
   mutation SubscribeToWaitlist($email: String!, $listId: String) {
@@ -31,9 +32,94 @@ export default function Waitlist() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [timeLeft, setTimeLeft] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0
+  });
   
   const [subscribeToWaitlist] = useMutation(SUBSCRIBE_TO_WAITLIST);
   const [syncCustomer] = useMutation(SYNC_CUSTOMER);
+
+  // Fetch user data
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        if (typeof window !== 'undefined') {
+          const supabase = getSupabase();
+          const { data: { session } } = await supabase.auth.getSession();
+          
+          if (session?.user) {
+            setUser(session.user);
+            
+            // Fetch profile data
+            const { data: profileData, error: profileError } = await supabase
+              .from('user_profiles')
+              .select('first_name, last_name, email')
+              .eq('id', session.user.id)
+              .single();
+            
+            if (!profileError && profileData) {
+              setProfile(profileData);
+              
+              // Pre-fill form with user data
+              setEmail(session.user.email || '');
+              
+              const firstName = profileData?.first_name || (session.user as any)?.user_metadata?.first_name || '';
+              const lastName = profileData?.last_name || (session.user as any)?.user_metadata?.last_name || '';
+              
+              setFirstName(firstName);
+              setLastName(lastName);
+            } else {
+              // Fallback to user_metadata if profile doesn't exist
+              setEmail(session.user.email || '');
+              setFirstName((session.user as any)?.user_metadata?.first_name || '');
+              setLastName((session.user as any)?.user_metadata?.last_name || '');
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchUserData();
+  }, []);
+
+  // Countdown timer
+  useEffect(() => {
+    const targetDate = new Date('2025-11-21T00:00:00').getTime();
+    
+    const updateCountdown = () => {
+      const now = new Date().getTime();
+      const distance = targetDate - now;
+      
+      if (distance > 0) {
+        setTimeLeft({
+          days: Math.floor(distance / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+          minutes: Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)),
+          seconds: Math.floor((distance % (1000 * 60)) / 1000)
+        });
+      } else {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+      }
+    };
+    
+    // Initial update
+    updateCountdown();
+    
+    // Update every second
+    const interval = setInterval(updateCountdown, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,7 +180,7 @@ export default function Waitlist() {
     <>
       <Head>
         <title>Pro Waitlist - Sticker Shuttle</title>
-        <meta name="description" content="Join the waitlist for Sticker Shuttle Pro launching this Black Friday" />
+        <meta name="description" content="Join the waitlist for Sticker Shuttle Pro launching November 28th, 2025" />
       </Head>
 
       <style jsx global>{`
@@ -150,14 +236,37 @@ export default function Waitlist() {
 
             {/* Coming Nov 28th Text */}
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-0.5" style={{ fontFamily: 'Rubik, sans-serif' }}>
-              COMING NOV.28TH
+              COMING NOV.28TH, 2025
             </h1>
             <p className="text-xs md:text-sm text-gray-400 mb-6 uppercase tracking-wider">
               (TO THE PUBLIC)
             </p>
-            <p className="text-lg md:text-xl text-gray-300 mb-4 max-w-2xl mx-auto pb-4">
-            Early Access members will get access on November 21st.
+            <p className="text-lg md:text-xl mb-4 max-w-2xl mx-auto pb-4 button-gradient animate-pulse-subtle" style={{ 
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              fontFamily: 'Rubik, sans-serif',
+              fontWeight: 'bold'
+            }}>
+            Early Access members will get access on November 21st, 2025.
             </p>
+
+            {/* Logged in message */}
+            {!loading && user && (
+              <div className="mb-6 p-4 rounded-xl text-center max-w-md mx-auto" style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                backdropFilter: 'blur(12px)'
+              }}>
+                <p className="text-green-400 font-medium text-sm flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Logged in as {user.email}
+                </p>
+              </div>
+            )}
 
 
             {/* Success Message */}
@@ -264,6 +373,51 @@ export default function Waitlist() {
                  >
                    Get Early Access
                  </button>
+
+                 {/* Countdown Timer */}
+                 <div className="mt-6 grid grid-cols-4 gap-3 max-w-md mx-auto">
+                   <div className="p-4 rounded-xl text-center" style={{
+                     background: 'rgba(255, 255, 255, 0.05)',
+                     border: '1px solid rgba(255, 255, 255, 0.1)',
+                     boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                     backdropFilter: 'blur(12px)'
+                   }}>
+                     <div className="text-3xl font-bold text-cyan-400">{timeLeft.days}</div>
+                     <div className="text-xs text-gray-400 uppercase mt-1">Days</div>
+                   </div>
+                   <div className="p-4 rounded-xl text-center" style={{
+                     background: 'rgba(255, 255, 255, 0.05)',
+                     border: '1px solid rgba(255, 255, 255, 0.1)',
+                     boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                     backdropFilter: 'blur(12px)'
+                   }}>
+                     <div className="text-3xl font-bold text-cyan-400">{timeLeft.hours}</div>
+                     <div className="text-xs text-gray-400 uppercase mt-1">Hours</div>
+                   </div>
+                   <div className="p-4 rounded-xl text-center" style={{
+                     background: 'rgba(255, 255, 255, 0.05)',
+                     border: '1px solid rgba(255, 255, 255, 0.1)',
+                     boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                     backdropFilter: 'blur(12px)'
+                   }}>
+                     <div className="text-3xl font-bold text-cyan-400">{timeLeft.minutes}</div>
+                     <div className="text-xs text-gray-400 uppercase mt-1">Minutes</div>
+                   </div>
+                   <div className="p-4 rounded-xl text-center" style={{
+                     background: 'rgba(255, 255, 255, 0.05)',
+                     border: '1px solid rgba(255, 255, 255, 0.1)',
+                     boxShadow: 'rgba(0, 0, 0, 0.3) 0px 8px 32px, rgba(255, 255, 255, 0.1) 0px 1px 0px inset',
+                     backdropFilter: 'blur(12px)'
+                   }}>
+                     <div className="text-3xl font-bold text-cyan-400">{timeLeft.seconds}</div>
+                     <div className="text-xs text-gray-400 uppercase mt-1">Seconds</div>
+                   </div>
+                 </div>
+
+                 {/* Founding Members Bonus */}
+                 <p className="text-center text-gray-300 text-sm mt-6 px-4" style={{ fontFamily: 'Rubik, sans-serif' }}>
+                   🎁 The first <span className="font-bold text-yellow-400">Founding 100</span> Pro members will receive <span className="font-bold text-cyan-400">5+ exclusive bonuses</span> and <span className="font-bold text-cyan-400">free stickers!</span>
+                 </p>
               </form>
             )}
           </div>
