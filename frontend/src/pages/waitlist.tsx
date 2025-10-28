@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import Head from 'next/head';
 import { useMutation, gql } from '@apollo/client';
 import { useRouter } from 'next/router';
 import UniversalHeader from '../components/UniversalHeader';
+import DynamicSEOHead from '../components/DynamicSEOHead';
 import { getSupabase } from '../lib/supabase';
 
 const SUBSCRIBE_TO_WAITLIST = gql`
@@ -178,10 +178,7 @@ export default function Waitlist() {
 
   return (
     <>
-      <Head>
-        <title>Pro Waitlist - Sticker Shuttle</title>
-        <meta name="description" content="Join the waitlist for Sticker Shuttle Pro launching November 28th, 2025" />
-      </Head>
+      <DynamicSEOHead />
 
       <style jsx global>{`
         @keyframes gradient-move {

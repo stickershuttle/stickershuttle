@@ -1,0 +1,36 @@
+-- Insert default entries for major pages
+-- This is a separate file to avoid syntax issues
+
+INSERT INTO page_seo (page_path, page_name, title, description, og_image) VALUES
+('/', 'Home', 'Sticker Shuttle - Premium Custom Stickers & Vinyl Banners', 'Custom stickers, vinyl banners, and decals with fast shipping.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/products', 'Products', 'Products - Sticker Shuttle', 'Browse our complete selection of custom stickers, vinyl banners, and promotional products.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/products/vinyl-stickers', 'Vinyl Stickers', 'Vinyl Stickers - Sticker Shuttle', 'Premium vinyl stickers with weather-resistant materials.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/products/holographic-stickers', 'Holographic Stickers', 'Holographic Stickers - Sticker Shuttle', 'Eye-catching holographic stickers that shine and shimmer.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/products/clear-stickers', 'Clear Stickers', 'Clear Stickers - Sticker Shuttle', 'Crystal clear stickers with professional printing.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/products/glitter-stickers', 'Glitter Stickers', 'Glitter Stickers - Sticker Shuttle', 'Sparkling glitter stickers that add shine and style.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/products/chrome-stickers', 'Chrome Stickers', 'Chrome Stickers - Sticker Shuttle', 'Metallic chrome stickers with a mirror-like finish.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/products/sticker-sheets', 'Sticker Sheets', 'Sticker Sheets - Sticker Shuttle', 'Full sticker sheets perfect for bulk orders.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/products/sample-packs', 'Sample Packs', 'Sample Packs - Sticker Shuttle', 'Try before you buy! Sample packs featuring our most popular materials.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/products/vinyl-banners', 'Vinyl Banners', 'Vinyl Banners - Sticker Shuttle', 'Large format vinyl banners for events and displays.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/pro', 'Pro Membership', 'Sticker Shuttle Pro - Never Run Out of Stickers', 'Automatic monthly sticker delivery for businesses.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/pro/circle', 'Pro Circle', 'Pro Circle - Connect with Fellow Businesses', 'Join our exclusive network of Pro members.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/pro/circle/add-my-business', 'Add My Business', 'Add My Business to Pro Circle', 'Submit your business to join the Pro Circle network.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/pro/join', 'Join Pro', 'Join Pro Membership', 'Start your Pro membership today.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/contact-us', 'Contact Us', 'Contact Us - Sticker Shuttle', 'Get in touch with our team for custom orders and support.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/blog', 'Blog', 'Blog - Sticker Shuttle', 'Latest tips, guides, and insights about custom stickers and branding.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/marketspace', 'Marketspace', 'Marketspace - Creator Marketplace', 'Shop unique sticker designs from independent creators.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/creators-space-apply', 'Creators Space Apply', 'Apply to Sell on Creators Space', 'Join our marketplace and start selling your designs.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/bannership', 'Bannership', 'Bannership - Custom Banners', 'Custom vinyl banners for events and promotional displays.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/bannership/products', 'Bannership Products', 'Bannership Products - Custom Banners', 'Browse our selection of custom vinyl banners.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/bannership/products/vinyl-banners', 'Bannership Vinyl Banners', 'Vinyl Banners - Bannership', 'Large format vinyl banners with weather-resistant materials.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/bannership/products/x-banners', 'X-Banners', 'X-Banners - Bannership', 'Retractable X-banner displays for trade shows.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/bannership/products/pop-up-banners', 'Pop-Up Banners', 'Pop-Up Banners - Bannership', 'Pop-up banner displays for quick setup.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/waitlist', 'Waitlist', 'Join the Waitlist', 'Be the first to know about new products and offers.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/store-credit', 'Store Credit', 'Store Credit - Sticker Shuttle', 'Manage your store credit balance and rewards.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/shipping-process', 'Shipping Process', 'How We Ship Your Orders', 'Learn about our shipping and packaging process.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/returns', 'Returns', 'Returns Policy', 'Our returns and refund policy.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/privacy-policy', 'Privacy Policy', 'Privacy Policy - Sticker Shuttle', 'Read how we protect your personal information.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/terms-and-conditions', 'Terms and Conditions', 'Terms - Sticker Shuttle', 'Read our terms and conditions.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png'),
+('/cookie-policy', 'Cookie Policy', 'Cookie Policy - Sticker Shuttle', 'Learn how we use cookies.', 'https://res.cloudinary.com/dxcnvqk6b/image/upload/v1752101226/StickerShuttle_Homepage_Share_fpoirg.png')
+ON CONFLICT (page_path) DO NOTHING;
+

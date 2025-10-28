@@ -1224,6 +1224,10 @@ const typeDefs = gql`
     # Pro Circle queries
     getApprovedCircleBusinesses: [CircleBusiness!]!
     getAllCircleBusinesses: [CircleBusiness!]!
+    
+    # Page SEO queries
+    getAllPageSEO: [PageSEO!]!
+    getPageSEOByPath(pagePath: String!): PageSEO
   }
 
   type Mutation {
@@ -1396,6 +1400,11 @@ const typeDefs = gql`
     createCircleBusiness(input: CreateCircleBusinessInput!): CircleBusinessResult!
     updateBusinessStatus(businessId: ID!, status: String!): CircleBusinessResult!
     deleteCircleBusiness(businessId: ID!): CircleBusinessResult!
+    
+    # Page SEO mutations
+    createPageSEO(input: PageSEOInput!): PageSEOResult!
+    updatePageSEO(id: ID!, input: UpdatePageSEOInput!): PageSEOResult!
+    deletePageSEO(id: ID!): PageSEOResult!
   }
 
   type Customer {
@@ -2955,6 +2964,78 @@ const typeDefs = gql`
     discountType: String!
     discountAmount: Float!
     backgroundColor: String
+  }
+  
+  # Page SEO Types
+  type PageSEO {
+    id: ID!
+    pagePath: String!
+    pageName: String!
+    title: String
+    description: String
+    keywords: String
+    robots: String
+    ogTitle: String
+    ogDescription: String
+    ogImage: String
+    ogType: String
+    ogUrl: String
+    twitterCard: String
+    twitterTitle: String
+    twitterDescription: String
+    twitterImage: String
+    canonicalUrl: String
+    structuredData: JSON
+    createdAt: String!
+    updatedAt: String!
+    createdBy: String
+    updatedBy: String
+  }
+  
+  type PageSEOResult {
+    success: Boolean!
+    message: String
+    pageSEO: PageSEO
+    error: String
+  }
+  
+  input PageSEOInput {
+    pagePath: String!
+    pageName: String!
+    title: String
+    description: String
+    keywords: String
+    robots: String
+    ogTitle: String
+    ogDescription: String
+    ogImage: String
+    ogType: String
+    ogUrl: String
+    twitterCard: String
+    twitterTitle: String
+    twitterDescription: String
+    twitterImage: String
+    canonicalUrl: String
+    structuredData: JSON
+  }
+  
+  input UpdatePageSEOInput {
+    pageName: String
+    title: String
+    description: String
+    keywords: String
+    robots: String
+    ogTitle: String
+    ogDescription: String
+    ogImage: String
+    ogType: String
+    ogUrl: String
+    twitterCard: String
+    twitterTitle: String
+    twitterDescription: String
+    twitterImage: String
+    canonicalUrl: String
+    structuredData: JSON
   }
 `;
 
@@ -5016,6 +5097,69 @@ const resolvers = {
         }));
       } catch (error) {
         console.error('❌ Error in getAllCircleBusinesses:', error);
+        throw error;
+      }
+    },
+    
+    // ==================== Page SEO Queries ====================
+    
+    // Get all page SEO entries
+    getAllPageSEO: async () => {
+      try {
+        console.log('📄 Fetching all page SEO entries');
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        const { data, error } = await client
+          .from('page_seo')
+          .select('*')
+          .order('page_path', { ascending: true });
+
+        if (error) {
+          console.error('❌ Error fetching page SEO:', error);
+          throw new Error('Failed to fetch page SEO');
+        }
+
+        return data.map(seo => mapPageSEOResponse(seo));
+      } catch (error) {
+        console.error('❌ Error in getAllPageSEO:', error);
+        throw error;
+      }
+    },
+    
+    // Get page SEO by path
+    getPageSEOByPath: async (_, { pagePath }) => {
+      try {
+        console.log('📄 Fetching page SEO for path:', pagePath);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        const { data, error } = await client
+          .from('page_seo')
+          .select('*')
+          .eq('page_path', pagePath)
+          .single();
+
+        if (error) {
+          if (error.code === 'PGRST116') {
+            // No rows returned
+            return null;
+          }
+          console.error('❌ Error fetching page SEO:', error);
+          throw new Error('Failed to fetch page SEO');
+        }
+
+        return mapPageSEOResponse(data);
+      } catch (error) {
+        console.error('❌ Error in getPageSEOByPath:', error);
         throw error;
       }
     },
@@ -14135,9 +14279,223 @@ const resolvers = {
           error: error.message,
         };
       }
+    },
+    
+    // ==================== Page SEO Mutations ====================
+    
+    // Create Page SEO
+    createPageSEO: async (_, { input }, context) => {
+      try {
+        console.log('📝 Creating page SEO:', input.pagePath);
+        
+        requireAdminAuth(context.user);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Check if page path already exists
+        const { data: existing } = await client
+          .from('page_seo')
+          .select('id')
+          .eq('page_path', input.pagePath)
+          .single();
+          
+        if (existing) {
+          throw new Error('Page path already exists. Use update instead.');
+        }
+        
+        // Insert new SEO entry
+        const { data: seo, error } = await client
+          .from('page_seo')
+          .insert({
+            page_path: input.pagePath,
+            page_name: input.pageName,
+            title: input.title,
+            description: input.description,
+            keywords: input.keywords,
+            robots: input.robots || 'index, follow',
+            og_title: input.ogTitle,
+            og_description: input.ogDescription,
+            og_image: input.ogImage,
+            og_type: input.ogType || 'website',
+            og_url: input.ogUrl,
+            twitter_card: input.twitterCard || 'summary_large_image',
+            twitter_title: input.twitterTitle,
+            twitter_description: input.twitterDescription,
+            twitter_image: input.twitterImage,
+            canonical_url: input.canonicalUrl,
+            structured_data: input.structuredData,
+            created_by: context.user.email,
+            updated_by: context.user.email
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('❌ Error creating page SEO:', error);
+          throw new Error('Failed to create page SEO');
+        }
+
+        console.log('✅ Successfully created page SEO');
+
+        return {
+          success: true,
+          message: 'Page SEO created successfully',
+          pageSEO: mapPageSEOResponse(seo),
+          error: null
+        };
+      } catch (error) {
+        console.error('❌ Error in createPageSEO:', error);
+        return {
+          success: false,
+          message: error.message || 'Failed to create page SEO',
+          pageSEO: null,
+          error: error.message
+        };
+      }
+    },
+    
+    // Update Page SEO
+    updatePageSEO: async (_, { id, input }, context) => {
+      try {
+        console.log('📝 Updating page SEO:', id);
+        
+        requireAdminAuth(context.user);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        // Build update object
+        const updateData = {};
+        if (input.pageName !== undefined) updateData.page_name = input.pageName;
+        if (input.title !== undefined) updateData.title = input.title;
+        if (input.description !== undefined) updateData.description = input.description;
+        if (input.keywords !== undefined) updateData.keywords = input.keywords;
+        if (input.robots !== undefined) updateData.robots = input.robots;
+        if (input.ogTitle !== undefined) updateData.og_title = input.ogTitle;
+        if (input.ogDescription !== undefined) updateData.og_description = input.ogDescription;
+        if (input.ogImage !== undefined) updateData.og_image = input.ogImage;
+        if (input.ogType !== undefined) updateData.og_type = input.ogType;
+        if (input.ogUrl !== undefined) updateData.og_url = input.ogUrl;
+        if (input.twitterCard !== undefined) updateData.twitter_card = input.twitterCard;
+        if (input.twitterTitle !== undefined) updateData.twitter_title = input.twitterTitle;
+        if (input.twitterDescription !== undefined) updateData.twitter_description = input.twitterDescription;
+        if (input.twitterImage !== undefined) updateData.twitter_image = input.twitterImage;
+        if (input.canonicalUrl !== undefined) updateData.canonical_url = input.canonicalUrl;
+        if (input.structuredData !== undefined) updateData.structured_data = input.structuredData;
+        
+        updateData.updated_by = context.user.email;
+        
+        // Update the SEO entry
+        const { data: seo, error } = await client
+          .from('page_seo')
+          .update(updateData)
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('❌ Error updating page SEO:', error);
+          throw new Error('Failed to update page SEO');
+        }
+
+        console.log('✅ Successfully updated page SEO');
+
+        return {
+          success: true,
+          message: 'Page SEO updated successfully',
+          pageSEO: mapPageSEOResponse(seo),
+          error: null
+        };
+      } catch (error) {
+        console.error('❌ Error in updatePageSEO:', error);
+        return {
+          success: false,
+          message: error.message || 'Failed to update page SEO',
+          pageSEO: null,
+          error: error.message
+        };
+      }
+    },
+    
+    // Delete Page SEO
+    deletePageSEO: async (_, { id }, context) => {
+      try {
+        console.log('🗑️ Deleting page SEO:', id);
+        
+        requireAdminAuth(context.user);
+        
+        if (!supabaseClient.isReady()) {
+          throw new Error('Database service is currently unavailable');
+        }
+
+        const client = supabaseClient.getServiceClient();
+        
+        const { error } = await client
+          .from('page_seo')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          console.error('❌ Error deleting page SEO:', error);
+          throw new Error('Failed to delete page SEO');
+        }
+
+        console.log('✅ Successfully deleted page SEO');
+
+        return {
+          success: true,
+          message: 'Page SEO deleted successfully',
+          pageSEO: null,
+          error: null
+        };
+      } catch (error) {
+        console.error('❌ Error in deletePageSEO:', error);
+        return {
+          success: false,
+          message: error.message || 'Failed to delete page SEO',
+          pageSEO: null,
+          error: error.message
+        };
+      }
     }
   }
 };
+
+// Helper function to map page SEO response
+function mapPageSEOResponse(data) {
+  if (!data) return null;
+  return {
+    id: data.id,
+    pagePath: data.page_path,
+    pageName: data.page_name,
+    title: data.title,
+    description: data.description,
+    keywords: data.keywords,
+    robots: data.robots,
+    ogTitle: data.og_title,
+    ogDescription: data.og_description,
+    ogImage: data.og_image,
+    ogType: data.og_type,
+    ogUrl: data.og_url,
+    twitterCard: data.twitter_card,
+    twitterTitle: data.twitter_title,
+    twitterDescription: data.twitter_description,
+    twitterImage: data.twitter_image,
+    canonicalUrl: data.canonical_url,
+    structuredData: data.structured_data,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+    createdBy: data.created_by,
+    updatedBy: data.updated_by
+  };
+}
 
 // Helper functions for order processing
 function generateOrderNote(cartItems, additionalNote = '') {
