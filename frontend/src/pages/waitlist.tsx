@@ -1,30 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useMutation, gql } from '@apollo/client';
 import { useRouter } from 'next/router';
 import UniversalHeader from '../components/UniversalHeader';
 import SEOHead from '../components/SEOHead';
 import { getSupabase } from '../lib/supabase';
 import { GetServerSideProps } from 'next';
-
-const SUBSCRIBE_TO_WAITLIST = gql`
-  mutation SubscribeToWaitlist($email: String!, $listId: String, $firstName: String, $lastName: String) {
-    subscribeToKlaviyo(email: $email, listId: $listId, firstName: $firstName, lastName: $lastName) {
-      success
-      message
-      error
-    }
-  }
-`;
-
-const SYNC_CUSTOMER = gql`
-  mutation SyncCustomer($customerData: KlaviyoCustomerInput!) {
-    syncCustomerToKlaviyo(customerData: $customerData) {
-      success
-      message
-      error
-    }
-  }
-`;
 
 interface WaitlistProps {
   seoData?: any;
@@ -46,9 +25,6 @@ export default function Waitlist({ seoData }: WaitlistProps) {
     minutes: 0,
     seconds: 0
   });
-  
-  const [subscribeToWaitlist] = useMutation(SUBSCRIBE_TO_WAITLIST);
-  const [syncCustomer] = useMutation(SYNC_CUSTOMER);
 
   // Fetch user data
   useEffect(() => {
@@ -143,36 +119,88 @@ export default function Waitlist({ seoData }: WaitlistProps) {
     }
 
     try {
-      // Subscribe to the list with full profile data (firstName and lastName)
+      // Use direct fetch instead of Apollo Client to avoid auth issues for logged-out users
+      const getApiUrl = () => {
+        if (process.env.NEXT_PUBLIC_API_URL) {
+          return process.env.NEXT_PUBLIC_API_URL;
+        }
+        if (process.env.NODE_ENV === 'development') {
+          return 'http://localhost:4000';
+        }
+        return 'https://ss-beyond.up.railway.app';
+      };
+      
+      const backendUrl = getApiUrl();
       const listId = process.env.NEXT_PUBLIC_KLAVIYO_WAITLIST_LIST_ID || null;
+      
       console.log('📋 Subscribing with listId:', listId);
       console.log('📋 Profile data:', { email, firstName, lastName });
       
-      const result = await subscribeToWaitlist({
-        variables: {
-          email,
-          listId,
-          firstName,
-          lastName
-        }
+      // Subscribe to waitlist
+      const response = await fetch(`${backendUrl}/graphql`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: `
+            mutation SubscribeToWaitlist($email: String!, $listId: String, $firstName: String, $lastName: String) {
+              subscribeToKlaviyo(email: $email, listId: $listId, firstName: $firstName, lastName: $lastName) {
+                success
+                message
+                error
+              }
+            }
+          `,
+          variables: {
+            email,
+            listId,
+            firstName,
+            lastName
+          }
+        })
       });
-      
-      console.log('📧 Subscription result:', result.data);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('📧 Subscription result:', result);
       
       if (result.data?.subscribeToKlaviyo?.success) {
         // Also sync customer data to ensure everything is up to date
         try {
-          await syncCustomer({
-            variables: {
-              customerData: {
-                email,
-                firstName,
-                lastName,
-                marketingOptIn: true
+          const syncResponse = await fetch(`${backendUrl}/graphql`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              query: `
+                mutation SyncCustomer($customerData: KlaviyoCustomerInput!) {
+                  syncCustomerToKlaviyo(customerData: $customerData) {
+                    success
+                    message
+                    error
+                  }
+                }
+              `,
+              variables: {
+                customerData: {
+                  email,
+                  firstName,
+                  lastName,
+                  marketingOptIn: true
+                }
               }
-            }
+            })
           });
-          console.log('✅ Customer data synced successfully');
+          
+          if (syncResponse.ok) {
+            const syncResult = await syncResponse.json();
+            console.log('✅ Customer data synced successfully:', syncResult);
+          }
         } catch (syncError) {
           console.warn('⚠️ Customer sync failed, but subscription succeeded:', syncError);
           // Don't fail the whole operation if sync fails - subscription already succeeded
