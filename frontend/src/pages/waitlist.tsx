@@ -133,6 +133,7 @@ export default function Waitlist({ seoData }: WaitlistProps) {
       const backendUrl = getApiUrl();
       const listId = process.env.NEXT_PUBLIC_KLAVIYO_WAITLIST_LIST_ID || null;
       
+      console.log('📋 Backend URL:', backendUrl);
       console.log('📋 Subscribing with listId:', listId);
       console.log('📋 Profile data:', { email, firstName, lastName });
       
@@ -161,15 +162,27 @@ export default function Waitlist({ seoData }: WaitlistProps) {
         })
       });
 
+      console.log('📧 Response status:', response.status, response.statusText);
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('❌ HTTP error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
-      console.log('📧 Subscription result:', result);
+      console.log('📧 Full subscription result:', JSON.stringify(result, null, 2));
+      
+      // Check for GraphQL errors
+      if (result.errors && result.errors.length > 0) {
+        const graphqlError = result.errors[0].message;
+        console.error('❌ GraphQL error:', graphqlError);
+        throw new Error(graphqlError);
+      }
       
       if (result.data?.subscribeToKlaviyo?.success) {
         // Success! subscribeToKlaviyo already created/updated the profile and subscribed them
+        console.log('✅ Successfully subscribed to waitlist!');
         setSubmitted(true);
       } else {
         const errorMsg = result.data?.subscribeToKlaviyo?.error || result.data?.subscribeToKlaviyo?.message || 'Failed to join waitlist';
