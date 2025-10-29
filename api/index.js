@@ -2205,6 +2205,11 @@ const typeDefs = gql`
     firstOrderDate: String
     lastOrderDate: String
     marketingOptIn: Boolean!
+    lifetimeValue: Float
+    timeSinceLastPurchase: Int
+    purchaseFrequency: Float
+    averageDaysBetweenOrders: Int
+    yearsSinceFirstOrder: Float
   }
 
   input CustomerInput {
@@ -2542,6 +2547,12 @@ const typeDefs = gql`
     newCustomers: Int
     existingCustomers: Int
     newSignups: Int
+    yearToDateTotal: Float
+    averageLifetimeValue: Float
+    averagePurchaseFrequency: Float
+    siteViews: Int
+    mostPopularPage: String
+    churnByMonths: [ChurnData]
   }
 
   type DailySalesData {
@@ -2549,6 +2560,12 @@ const typeDefs = gql`
     revenue: Float
     orders: Int
     averageOrderValue: Float
+  }
+
+  type ChurnData {
+    months: Int
+    churnRate: Float
+    customersLost: Int
   }
 
   type ProofMetrics {
@@ -4299,6 +4316,16 @@ const resolvers = {
 
 
 
+        // Calculate Year-to-Date total
+        const yearStart = new Date(now.getFullYear(), 0, 1);
+        const yearToDateOrders = orders.filter(order => {
+          const orderDate = new Date(order.order_created_at || order.created_at);
+          return orderDate >= yearStart && orderDate <= now && order.financial_status === 'paid';
+        });
+        // Add Shopify revenue from July (before Supabase migration)
+        const shopifyPreMigrationRevenue = 81472.03;
+        const yearToDateTotal = yearToDateOrders.reduce((sum, order) => sum + (order.total_price || 0), 0) + shopifyPreMigrationRevenue;
+
         // Calculate customer analytics
         const customerStatsMap = new Map();
         
@@ -4373,6 +4400,60 @@ const resolvers = {
           })
           .sort((a, b) => b.lifetimeValue - a.lifetimeValue);
 
+        // Calculate average lifetime value and purchase frequency
+        let averageLifetimeValue = 0;
+        let averagePurchaseFrequency = 0;
+        if (customerAnalytics.length > 0) {
+          averageLifetimeValue = customerAnalytics.reduce((sum, customer) => sum + customer.lifetimeValue, 0) / customerAnalytics.length;
+          const customersWithFrequency = customerAnalytics.filter(c => c.purchaseFrequency !== null);
+          if (customersWithFrequency.length > 0) {
+            averagePurchaseFrequency = customersWithFrequency.reduce((sum, customer) => sum + customer.purchaseFrequency, 0) / customersWithFrequency.length;
+          }
+        }
+
+        // Calculate churn by months
+        const churnByMonths = [];
+        const monthIntervals = [1, 3, 6, 12]; // 1 month, 3 months, 6 months, 12 months
+        
+        for (const months of monthIntervals) {
+          const cutoffDate = new Date();
+          cutoffDate.setMonth(cutoffDate.getMonth() - months);
+          
+          // Find customers who haven't ordered since the cutoff date
+          const activeBeforeCutoff = new Set();
+          const activeAfterCutoff = new Set();
+          
+          orders.forEach(order => {
+            const customerId = order.user_id || order.guest_email;
+            if (!customerId) return;
+            
+            const orderDate = new Date(order.order_created_at || order.created_at);
+            if (orderDate <= cutoffDate) {
+              activeBeforeCutoff.add(customerId);
+            }
+            if (orderDate > cutoffDate && orderDate <= now) {
+              activeAfterCutoff.add(customerId);
+            }
+          });
+          
+          const customersLost = Array.from(activeBeforeCutoff).filter(id => !activeAfterCutoff.has(id)).length;
+          const churnRate = activeBeforeCutoff.size > 0 ? (customersLost / activeBeforeCutoff.size) * 100 : 0;
+          
+          churnByMonths.push({
+            months,
+            churnRate,
+            customersLost
+          });
+        }
+
+        // Site metrics - these would normally come from analytics service
+        // For now, returning placeholder values
+        const siteViews = 0; // Would integrate with PostHog or similar
+        const mostPopularPage = '/products'; // Would come from analytics
+        
+        // TODO: Integrate PostHog analytics API to fetch actual site views
+        // Example: const siteViews = await posthogClient.getPageViews(timeRange);
+
         return {
           summary: {
             totalRevenue,
@@ -4388,7 +4469,13 @@ const resolvers = {
             avgProofApprovedToDeliveryTime,
             newCustomers,
             existingCustomers,
-            newSignups
+            newSignups,
+            yearToDateTotal,
+            averageLifetimeValue,
+            averagePurchaseFrequency,
+            siteViews,
+            mostPopularPage,
+            churnByMonths
           },
           dailySales,
           proofMetrics: {
@@ -10287,38 +10374,117 @@ const resolvers = {
           throw new Error('Database service is currently unavailable');
         }
 
-        console.log('🔄 Starting sync of all customers to Klaviyo...');
+        console.log('🔄 Starting sync of all customers to Klaviyo with metrics...');
+        const customerMetrics = require('./customer-metrics');
         
-        // Get all customers from database
+        // Get all customers who have orders (from user_profiles and guest orders)
         const client = supabaseClient.getServiceClient();
-        const { data: customers, error } = await client
-          .from('user_profiles')
-          .select(`
-            user_id,
-            first_name,
-            last_name,
-            email,
-            marketing_opt_in,
-            created_at,
-            updated_at
-          `)
-          .not('email', 'is', null);
+        
+        // Get unique customer emails from orders (both registered and guest)
+        const { data: orders, error: ordersError } = await client
+          .from('orders_main')
+          .select('user_id, customer_email, customer_first_name, customer_last_name, customer_phone, shipping_address')
+          .in('financial_status', ['paid', 'pending'])
+          .not('customer_email', 'is', null);
 
-        if (error) {
-          throw new Error(`Failed to fetch customers: ${error.message}`);
+        if (ordersError) {
+          throw new Error(`Failed to fetch orders: ${ordersError.message}`);
         }
 
-        // Convert to Klaviyo format
-        const klaviyoCustomers = customers.map(customer => ({
-          email: customer.email,
-          firstName: customer.first_name,
-          lastName: customer.last_name,
-          marketingOptIn: customer.marketing_opt_in,
-          createdAt: customer.created_at,
-          updatedAt: customer.updated_at
-        }));
+        console.log(`📊 Found ${orders.length} orders to analyze`);
 
-        console.log(`📊 Found ${klaviyoCustomers.length} customers to sync`);
+        // Group orders by email to get unique customers
+        const customerMap = new Map();
+        
+        orders.forEach(order => {
+          const email = order.customer_email?.toLowerCase().trim();
+          if (!email) return;
+
+          if (!customerMap.has(email)) {
+            customerMap.set(email, {
+              email,
+              userId: order.user_id,
+              firstName: order.customer_first_name,
+              lastName: order.customer_last_name,
+              phone: order.customer_phone,
+              shippingAddress: order.shipping_address || {}
+            });
+          }
+        });
+
+        console.log(`👥 Found ${customerMap.size} unique customers with orders`);
+
+        // Calculate metrics and prepare Klaviyo data for each customer
+        const klaviyoCustomers = [];
+        let processedCount = 0;
+
+        for (const [email, customerInfo] of customerMap.entries()) {
+          try {
+            processedCount++;
+            console.log(`📊 [${processedCount}/${customerMap.size}] Calculating metrics for: ${email}`);
+            
+            // Calculate customer metrics
+            const metrics = await customerMetrics.calculateCustomerMetrics(
+              email,
+              customerInfo.userId
+            );
+
+            // Get marketing opt-in from user profile if registered user
+            let marketingOptIn = true; // Default to opt-in
+            if (customerInfo.userId) {
+              try {
+                const { data: profile } = await client
+                  .from('user_profiles')
+                  .select('marketing_opt_in')
+                  .eq('user_id', customerInfo.userId)
+                  .single();
+                
+                if (profile) {
+                  marketingOptIn = profile.marketing_opt_in !== false;
+                }
+              } catch (profileError) {
+                // If profile doesn't exist or error, use default
+                console.log(`⚠️ Could not fetch marketing opt-in for ${email}, defaulting to true`);
+              }
+            }
+
+            // Prepare customer data with metrics
+            const shippingAddress = customerInfo.shippingAddress || {};
+            const customerData = {
+              email,
+              firstName: customerInfo.firstName || '',
+              lastName: customerInfo.lastName || '',
+              phone: customerInfo.phone || '',
+              city: shippingAddress.city || '',
+              state: shippingAddress.state || shippingAddress.province || '',
+              country: shippingAddress.country || 'US',
+              totalOrders: metrics.totalOrders,
+              totalSpent: metrics.totalSpent,
+              averageOrderValue: metrics.averageOrderValue,
+              firstOrderDate: metrics.firstOrderDate,
+              lastOrderDate: metrics.lastOrderDate,
+              // Add new customer metrics
+              lifetimeValue: metrics.lifetimeValue,
+              timeSinceLastPurchase: metrics.timeSinceLastPurchase,
+              purchaseFrequency: metrics.purchaseFrequency,
+              averageDaysBetweenOrders: metrics.averageDaysBetweenOrders,
+              yearsSinceFirstOrder: metrics.yearsSinceFirstOrder,
+              marketingOptIn
+            };
+
+            klaviyoCustomers.push(customerData);
+            
+            // Add small delay to avoid overwhelming the API
+            if (processedCount % 10 === 0) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+          } catch (customerError) {
+            console.error(`❌ Error processing customer ${email}:`, customerError);
+            // Continue with next customer even if one fails
+          }
+        }
+
+        console.log(`📊 Prepared ${klaviyoCustomers.length} customers with metrics for Klaviyo sync`);
         
         const result = await klaviyoClient.bulkSyncCustomers(klaviyoCustomers);
         

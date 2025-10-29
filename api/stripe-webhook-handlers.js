@@ -1646,6 +1646,88 @@ async function handleCheckoutSessionCompleted(session) {
         }
       }
 
+      // Calculate customer metrics and sync to Klaviyo (new order)
+      if (order && order.id && (customer.email || metadata.userId && metadata.userId !== 'guest')) {
+        try {
+          console.log('📊 Calculating customer metrics for Klaviyo sync...');
+          const customerMetrics = require('./customer-metrics');
+          const KlaviyoClient = require('./klaviyo-client');
+          const klaviyoClient = new KlaviyoClient();
+          
+          const customerEmail = customer.email || order.customer_email;
+          const userId = metadata.userId !== 'guest' ? metadata.userId : null;
+          
+          if (customerEmail && klaviyoClient && klaviyoClient.isReady()) {
+            // Calculate updated metrics after this new order
+            const metrics = await customerMetrics.updateCustomerMetricsForNewOrder(order, customerEmail, userId);
+            
+            console.log('📊 Customer metrics calculated:', {
+              email: customerEmail,
+              totalOrders: metrics.totalOrders,
+              totalSpent: metrics.totalSpent,
+              timeSinceLastPurchase: metrics.timeSinceLastPurchase,
+              purchaseFrequency: metrics.purchaseFrequency
+            });
+            
+            // Get shipping address info for Klaviyo
+            const orderShippingAddress = order.shipping_address || shippingAddress || {};
+            
+            // Prepare customer data for Klaviyo sync with metrics
+            const customerData = {
+              email: customerEmail,
+              firstName: order.customer_first_name || customer.name?.split(' ')[0] || '',
+              lastName: order.customer_last_name || customer.name?.split(' ').slice(1).join(' ') || '',
+              phone: order.customer_phone || customer.phone || '',
+              city: orderShippingAddress.city || '',
+              state: orderShippingAddress.state || orderShippingAddress.province || '',
+              country: orderShippingAddress.country || 'US',
+              totalOrders: metrics.totalOrders,
+              totalSpent: metrics.totalSpent,
+              averageOrderValue: metrics.averageOrderValue,
+              firstOrderDate: metrics.firstOrderDate,
+              lastOrderDate: metrics.lastOrderDate,
+              // Add new customer metrics
+              lifetimeValue: metrics.lifetimeValue,
+              timeSinceLastPurchase: metrics.timeSinceLastPurchase,
+              purchaseFrequency: metrics.purchaseFrequency,
+              averageDaysBetweenOrders: metrics.averageDaysBetweenOrders,
+              yearsSinceFirstOrder: metrics.yearsSinceFirstOrder,
+              marketingOptIn: true // Default to opt-in for customers who place orders
+            };
+            
+            // Sync to Klaviyo
+            const klaviyoSyncResult = await klaviyoClient.syncCustomerToKlaviyo(customerData);
+            
+            if (klaviyoSyncResult.success) {
+              console.log('✅ Customer metrics synced to Klaviyo successfully');
+            } else {
+              console.error('⚠️ Failed to sync customer metrics to Klaviyo:', klaviyoSyncResult.error);
+            }
+            
+            // Also track "Placed Order" event in Klaviyo
+            try {
+              await klaviyoClient.trackEvent(customerEmail, 'Placed Order', {
+                order_id: order.id,
+                order_number: order.order_number,
+                order_value: parseFloat(order.total_price || 0),
+                currency: 'USD',
+                items: order.items?.map(item => ({
+                  product_name: item.product_name,
+                  product_id: item.product_id,
+                  quantity: item.quantity,
+                  price: parseFloat(item.total_price || 0)
+                })) || []
+              });
+              console.log('✅ Placed Order event tracked in Klaviyo');
+            } catch (eventError) {
+              console.error('⚠️ Failed to track Placed Order event in Klaviyo:', eventError);
+            }
+          }
+        } catch (metricsError) {
+          console.error('⚠️ Failed to calculate/sync customer metrics (order still processed):', metricsError);
+        }
+      }
+
       // Send email notification for new order
       if (order?.id) {
         try {

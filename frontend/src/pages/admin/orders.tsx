@@ -1684,7 +1684,7 @@ export default function AdminOrders() {
 
       // Create receipt HTML content
       const receiptHTML = `
-        <div id="receipt-content" style="display: none;">
+        <div id="receipt-content" class="receipt-hidden">
           <div class="receipt-print-container">
             <div class="logo-container">
               <img src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1749591682/Black_Logo_grwgfd.svg" 
@@ -1765,17 +1765,97 @@ export default function AdminOrders() {
        const printStyles = `
          <style id="receipt-print-styles">
            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
-           @media print {
-             body * { visibility: hidden; }
-             #receipt-content, #receipt-content * { visibility: visible !important; }
-             #receipt-content {
-               position: absolute;
-               left: 0;
+             #receipt-content.receipt-hidden {
+               position: fixed;
+               left: -9999px;
                top: 0;
-               width: 100%;
-               display: block !important;
+               width: auto;
+               height: auto;
+               overflow: visible;
+               visibility: hidden;
              }
-             .qr-container, .qr-container *, .qr-code, .items-section, .items-section *, .product-name, .receipt-content, .receipt-content *, .customer-info, .order-box, .summary, .tracking-info, .separator, .item-row, .item-qty, .item-price, .item-specs, .item-spacer {
+           @media print {
+             @page {
+               size: 80mm auto;
+               margin: 2mm;
+             }
+             * {
+               -webkit-print-color-adjust: exact !important;
+               print-color-adjust: exact !important;
+               color-adjust: exact !important;
+             }
+             html, body {
+               background: white !important;
+               margin: 0 !important;
+               padding: 0 !important;
+               width: 100% !important;
+               height: auto !important;
+             }
+             body > *:not(#receipt-content) {
+               display: none !important;
+             }
+             #receipt-content.receipt-hidden,
+             #receipt-content {
+               display: block !important;
+               visibility: visible !important;
+               position: absolute !important;
+               left: 0 !important;
+               top: 0 !important;
+               width: 100% !important;
+               height: auto !important;
+               margin: 0 !important;
+               padding: 0 !important;
+               opacity: 1 !important;
+               overflow: visible !important;
+             }
+             #receipt-content * {
+               visibility: visible !important;
+               opacity: 1 !important;
+             }
+             #receipt-content .receipt-print-container,
+             #receipt-content .receipt-print-container * {
+               position: static !important;
+               left: auto !important;
+               top: auto !important;
+               display: block !important;
+               visibility: visible !important;
+             }
+             #receipt-content .info-row,
+             #receipt-content .summary-row,
+             #receipt-content .item-row {
+               display: flex !important;
+               visibility: visible !important;
+             }
+             #receipt-content span {
+               display: inline !important;
+             }
+             #receipt-content .info-row span,
+             #receipt-content .summary-row span,
+             #receipt-content .item-row span {
+               display: inline-block !important;
+             }
+             .receipt-print-container {
+               display: block !important;
+               visibility: visible !important;
+               position: relative !important;
+               font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+               font-size: 10px;
+               line-height: 1.3;
+               margin: 0 auto;
+               padding: 5px 8px;
+               width: 80mm;
+               max-width: 80mm;
+               min-height: auto;
+               background: white !important;
+               color: black !important;
+               font-weight: 400;
+               box-sizing: border-box;
+             }
+             .receipt-print-container * {
+               color: inherit;
+               background: transparent;
+             }
+             .qr-container, .qr-container *, .qr-code, .items-section, .items-section *, .product-name, .customer-info, .order-box, .summary, .tracking-info, .separator, .item-qty, .item-price, .item-specs, .item-spacer {
                visibility: visible !important;
                display: block !important;
              }
@@ -1789,24 +1869,12 @@ export default function AdminOrders() {
              }
              .info-row, .summary-row, .item-row {
                display: flex !important;
-             }
-             .receipt-print-container {
-               font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-               font-size: 11px;
-               line-height: 1.4;
-               margin: 0 auto;
-               padding: 4px 12px 40px 12px;
-               width: 80mm;
-               max-width: 80mm;
-               background: white;
-               color: black;
-               font-weight: 400;
-               box-sizing: border-box;
+               visibility: visible !important;
              }
              .logo-container {
                text-align: center;
-               margin-bottom: 15px;
-               padding: 6px 0;
+               margin-bottom: 10px;
+               padding: 4px 0;
                border-bottom: 1px solid #eee;
              }
              .logo-img { 
@@ -1823,40 +1891,40 @@ export default function AdminOrders() {
              }
              .receipt-content {
                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-               font-size: 11px;
-               line-height: 1.4;
+               font-size: 10px;
+               line-height: 1.3;
                color: #333;
                margin: 0;
                padding: 0;
              }
              .receipt-header {
-               font-size: 10px;
+               font-size: 9px;
                color: #666;
-               margin-bottom: 12px;
+               margin-bottom: 8px;
              }
              .order-box {
                text-align: center;
-               margin: 12px 0;
+               margin: 8px 0;
                border: 1px solid #333;
-               padding: 8px;
+               padding: 6px;
              }
              .order-border {
-               font-size: 10px;
+               font-size: 9px;
                color: #666;
-               margin-bottom: 4px;
+               margin-bottom: 3px;
              }
              .order-number {
                font-weight: 500;
                color: #000;
              }
              .customer-info {
-               margin: 12px 0;
+               margin: 8px 0;
              }
              .info-row {
                display: flex;
                justify-content: space-between;
-               margin-bottom: 4px;
-               font-size: 11px;
+               margin-bottom: 3px;
+               font-size: 10px;
              }
              .label {
                font-weight: 600;
@@ -1871,14 +1939,14 @@ export default function AdminOrders() {
                color: #000;
              }
              .separator {
-               margin: 12px 0;
+               margin: 8px 0;
                color: #666;
                font-family: monospace;
                width: 100%;
                text-align: left;
                overflow: hidden;
-               font-size: 11px;
-               letter-spacing: 0.5px;
+               font-size: 9px;
+               letter-spacing: 0.3px;
              }
              .product-name {
                font-weight: 600;
@@ -1886,13 +1954,13 @@ export default function AdminOrders() {
                margin: 0;
                padding: 0;
                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-               font-size: 11px;
-               line-height: 1.4;
+               font-size: 10px;
+               line-height: 1.3;
              }
              .items-section {
                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-               font-size: 11px;
-               line-height: 1.4;
+               font-size: 10px;
+               line-height: 1.3;
                margin: 0;
                padding: 0;
                color: #333;
@@ -1900,8 +1968,8 @@ export default function AdminOrders() {
              .item-row {
                display: flex;
                justify-content: space-between;
-               margin: 2px 0 8px 0;
-               font-size: 11px;
+               margin: 2px 0 4px 0;
+               font-size: 10px;
                color: #666;
              }
              .item-qty {
@@ -1913,43 +1981,43 @@ export default function AdminOrders() {
              }
              .item-specs {
                margin-left: 8px;
-               font-size: 10px;
+               font-size: 8px;
                color: #666;
-               margin-bottom: 4px;
+               margin-bottom: 3px;
              }
              .item-spacer {
-               height: 8px;
+               height: 4px;
              }
              .summary {
-               margin: 12px 0;
+               margin: 8px 0;
              }
              .summary-row {
                display: flex;
                justify-content: space-between;
-               margin-bottom: 4px;
-               font-size: 11px;
+               margin-bottom: 3px;
+               font-size: 10px;
                color: #333;
              }
              .total-row {
                font-weight: 600;
                color: #000;
-               margin-top: 8px;
+               margin-top: 6px;
              }
              .tracking-info {
-               margin: 12px 0;
-               font-size: 11px;
+               margin: 8px 0;
+               font-size: 9px;
                color: #333;
              }
              .qr-container {
                text-align: center;
-               margin-top: 20px;
-               padding: 10px 0 30px 0;
+               margin-top: 12px;
+               padding: 6px 0 20px 0;
                page-break-inside: avoid;
              }
              .qr-text {
                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-               font-size: 10px;
-               margin: 0 0 8px 0;
+               font-size: 8px;
+               margin: 0 0 6px 0;
                color: #666;
                font-weight: 400;
                visibility: visible !important;
@@ -1958,8 +2026,8 @@ export default function AdminOrders() {
              .qr-code {
                display: block !important;
                visibility: visible !important;
-               width: 80px;
-               height: 80px;
+               width: 60px;
+               height: 60px;
                margin: 0 auto 8px auto;
                -webkit-print-color-adjust: exact;
                color-adjust: exact;
@@ -1968,16 +2036,12 @@ export default function AdminOrders() {
              }
              .qr-url {
                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-               font-size: 9px;
+               font-size: 8px;
                margin: 0 0 30px 0;
                color: #666;
                font-weight: 400;
                visibility: visible !important;
                display: block !important;
-             }
-             @page {
-               size: 80mm auto;
-               margin: 2mm;
              }
            }
          </style>

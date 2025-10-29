@@ -125,7 +125,15 @@ class KlaviyoClient {
           first_order_date: profileData.firstOrderDate || null,
           last_order_date: profileData.lastOrderDate || null,
           marketing_source: 'Sticker Shuttle Website',
-          customer_type: profileData.totalOrders > 1 ? 'returning' : 'new'
+          customer_type: profileData.totalOrders > 1 ? 'returning' : 'new',
+          // Customer metrics for segmentation
+          lifetime_value: profileData.lifetimeValue || profileData.totalSpent || 0,
+          time_since_last_purchase: profileData.timeSinceLastPurchase !== null && profileData.timeSinceLastPurchase !== undefined 
+            ? profileData.timeSinceLastPurchase 
+            : null,
+          purchase_frequency: profileData.purchaseFrequency || 0,
+          average_days_between_orders: profileData.averageDaysBetweenOrders || 0,
+          years_since_first_order: profileData.yearsSinceFirstOrder || 0
         }
       };
 

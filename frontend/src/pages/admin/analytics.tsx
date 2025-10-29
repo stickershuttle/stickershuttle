@@ -28,6 +28,16 @@ const GET_ANALYTICS_DATA = gql`
           newCustomers
           existingCustomers
           newSignups
+          yearToDateTotal
+          averageLifetimeValue
+          averagePurchaseFrequency
+          siteViews
+          mostPopularPage
+          churnByMonths {
+            months
+            churnRate
+            customersLost
+          }
         }
         dailySales {
           date
@@ -107,7 +117,13 @@ export default function AdminAnalytics() {
     monthProjection: true,
     avgLTV: true,
     newCustomers: true,
-    existingCustomers: true
+    existingCustomers: true,
+    yearToDateTotal: true,
+    purchaseFrequency: true,
+    siteViews: true,
+    mostPopularPage: true,
+    churnByMonths: true,
+    proofToDelivery: true
   });
 
   // Always fetch 1 year of data for comprehensive monthly analysis
@@ -359,7 +375,13 @@ export default function AdminAnalytics() {
               <>
                 {viewMode === 'overview' ? (
                   <>
-                    {/* Row 1: Current Month Summary Cards */}
+                    {/* Section 1: Month Overview */}
+                    <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      Month Overview
+                    </h2>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
                       <div className={`glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02] relative ${!cardVisibility.monthlyRevenue ? 'blur-sm opacity-50' : ''}`}>
                         <div className="flex items-center justify-between mb-2">
@@ -441,7 +463,7 @@ export default function AdminAnalytics() {
                             <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                             </svg>
-                            <span className="text-xs text-gray-400 uppercase tracking-wider">New Customer Orders</span>
+                            <span className="text-xs text-gray-400 uppercase tracking-wider">New Customers</span>
                           </div>
                           <button
                             onClick={() => toggleCardVisibility('newCustomers')}
@@ -466,26 +488,26 @@ export default function AdminAnalytics() {
                               {data?.summary?.newCustomers || 0}
                             </p>
                             <p className="text-xs mt-1 text-green-400">
-                              First-time buyers
+                              First-time buyers this month
                             </p>
                           </div>
                         </div>
                       </div>
 
-                      <div className={`glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02] relative ${!cardVisibility.existingCustomers ? 'blur-sm opacity-50' : ''}`}>
+                      <div className={`glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02] relative ${!cardVisibility.monthProjection ? 'blur-sm opacity-50' : ''}`}>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            <svg className="w-4 h-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                             </svg>
-                            <span className="text-xs text-gray-400 uppercase tracking-wider">Repeat Customer Orders</span>
+                            <span className="text-xs text-gray-400 uppercase tracking-wider">Month Projection</span>
                           </div>
                           <button
-                            onClick={() => toggleCardVisibility('existingCustomers')}
+                            onClick={() => toggleCardVisibility('monthProjection')}
                             className="p-1 rounded transition-colors hover:bg-white/10"
-                            title={cardVisibility.existingCustomers ? 'Hide data' : 'Show data'}
+                            title={cardVisibility.monthProjection ? 'Hide data' : 'Show data'}
                           >
-                            {cardVisibility.existingCustomers ? (
+                            {cardVisibility.monthProjection ? (
                               <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -500,19 +522,225 @@ export default function AdminAnalytics() {
                         <div className="flex items-end justify-between">
                           <div>
                             <p className="text-lg md:text-2xl font-bold text-white transition-all duration-200 hover:scale-105">
-                              {data?.summary?.existingCustomers || 0}
+                              {formatCurrency(data?.summary?.currentMonthProjection || 0)}
                             </p>
-                            <p className="text-xs mt-1 text-blue-400">
-                              Orders from repeat customers
+                            <p className="text-xs mt-1 text-yellow-400">
+                              Month-end forecast
                             </p>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Row 2: Operational Metrics */}
+                    {/* Section 2: Advanced Metrics */}
+                    <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      Advanced Metrics
+                    </h2>
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 mb-6">
+                      {/* LTV */}
+                      <div className={`glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02] relative ${!cardVisibility.avgLTV ? 'blur-sm opacity-50' : ''}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="text-xs text-gray-400 uppercase tracking-wider">LTV</span>
+                          </div>
+                          <button
+                            onClick={() => toggleCardVisibility('avgLTV')}
+                            className="p-1 rounded transition-colors hover:bg-white/10"
+                            title={cardVisibility.avgLTV ? 'Hide data' : 'Show data'}
+                          >
+                            {cardVisibility.avgLTV ? (
+                              <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-3 h-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                        <div className="flex items-end justify-between">
+                          <div>
+                            <p className="text-lg md:text-2xl font-bold text-white transition-all duration-200 hover:scale-105">
+                              {formatCurrency(data?.summary?.averageLifetimeValue || 0)}
+                            </p>
+                            <p className="text-xs mt-1 text-emerald-400">
+                              Lifetime Value
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Purchase Frequency */}
+                      <div className={`glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02] relative ${!cardVisibility.purchaseFrequency ? 'blur-sm opacity-50' : ''}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="text-xs text-gray-400 uppercase tracking-wider">Purchase Frequency</span>
+                          </div>
+                          <button
+                            onClick={() => toggleCardVisibility('purchaseFrequency')}
+                            className="p-1 rounded transition-colors hover:bg-white/10"
+                            title={cardVisibility.purchaseFrequency ? 'Hide data' : 'Show data'}
+                          >
+                            {cardVisibility.purchaseFrequency ? (
+                              <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-3 h-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                        <div className="flex items-end justify-between">
+                          <div>
+                            <p className="text-lg md:text-2xl font-bold text-white transition-all duration-200 hover:scale-105">
+                              {data?.summary?.averagePurchaseFrequency ? `${Math.round(data.summary.averagePurchaseFrequency)} days` : 'N/A'}
+                            </p>
+                            <p className="text-xs mt-1" style={{ color: '#c084fc' }}>
+                              Between orders
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Site Views */}
+                      <div className={`glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02] relative ${!cardVisibility.siteViews ? 'blur-sm opacity-50' : ''}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            <span className="text-xs text-gray-400 uppercase tracking-wider">Site Views</span>
+                          </div>
+                          <button
+                            onClick={() => toggleCardVisibility('siteViews')}
+                            className="p-1 rounded transition-colors hover:bg-white/10"
+                            title={cardVisibility.siteViews ? 'Hide data' : 'Show data'}
+                          >
+                            {cardVisibility.siteViews ? (
+                              <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-3 h-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                        <div className="flex items-end justify-between">
+                          <div>
+                            <p className="text-lg md:text-2xl font-bold text-white transition-all duration-200 hover:scale-105">
+                              {(data?.summary?.siteViews ?? 0).toLocaleString()}
+                            </p>
+                            <p className="text-xs mt-1" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+                              Total views
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Most Popular Page */}
+                      <div className={`glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02] relative ${!cardVisibility.mostPopularPage ? 'blur-sm opacity-50' : ''}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            <span className="text-xs text-gray-400 uppercase tracking-wider">Most Popular Page</span>
+                          </div>
+                          <button
+                            onClick={() => toggleCardVisibility('mostPopularPage')}
+                            className="p-1 rounded transition-colors hover:bg-white/10"
+                            title={cardVisibility.mostPopularPage ? 'Hide data' : 'Show data'}
+                          >
+                            {cardVisibility.mostPopularPage ? (
+                              <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-3 h-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                        <div className="flex items-end justify-between">
+                          <div>
+                            <p className="text-sm md:text-lg font-bold text-white transition-all duration-200 hover:scale-105">
+                              {data?.summary?.mostPopularPage || '/products'}
+                            </p>
+                            <p className="text-xs mt-1 text-cyan-400">
+                              Top visited
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Churn by Months */}
+                      <div className={`glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02] relative ${!cardVisibility.churnByMonths ? 'blur-sm opacity-50' : ''}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                            </svg>
+                            <span className="text-xs text-gray-400 uppercase tracking-wider">Churn Rate</span>
+                          </div>
+                          <button
+                            onClick={() => toggleCardVisibility('churnByMonths')}
+                            className="p-1 rounded transition-colors hover:bg-white/10"
+                            title={cardVisibility.churnByMonths ? 'Hide data' : 'Show data'}
+                          >
+                            {cardVisibility.churnByMonths ? (
+                              <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-3 h-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                        <div className="flex items-end justify-between">
+                          <div>
+                            <p className="text-lg md:text-2xl font-bold text-white transition-all duration-200 hover:scale-105">
+                              {data?.summary?.churnByMonths?.[0]?.churnRate ? formatPercentage(data.summary.churnByMonths[0].churnRate) : 'N/A'}
+                            </p>
+                            <p className="text-xs mt-1 text-red-400">
+                              1 month churn
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 3: Proof Overview */}
+                    <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Proof Overview
+                    </h2>
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4 mb-6">
-                      {/* Order to Delivery Time */}
+                      {/* Order to Delivery */}
                       <div className={`glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02] relative ${!cardVisibility.orderToDelivery ? 'blur-sm opacity-50' : ''}`}>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
@@ -550,6 +778,7 @@ export default function AdminAnalytics() {
                         </div>
                       </div>
 
+                      {/* Proof Time */}
                       <div className={`glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02] relative ${!cardVisibility.proofTime ? 'blur-sm opacity-50' : ''}`}>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
@@ -587,10 +816,11 @@ export default function AdminAnalytics() {
                         </div>
                       </div>
 
+                      {/* Approval Rate */}
                       <div className={`glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02] relative ${!cardVisibility.approvalRate ? 'blur-sm opacity-50' : ''}`}>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <span className="text-xs text-gray-400 uppercase tracking-wider">Approval Rate</span>
@@ -617,16 +847,61 @@ export default function AdminAnalytics() {
                             <p className="text-lg md:text-2xl font-bold text-white transition-all duration-200 hover:scale-105">
                               {formatPercentage(data?.proofMetrics?.proofApprovalRate || 0)}
                             </p>
-                            <p className="text-xs mt-1" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-                              {data?.proofMetrics?.proofsApproved || 0} of {data?.proofMetrics?.totalProofs || 0}
+                            <p className="text-xs mt-1 text-green-400">
+                              {data?.proofMetrics?.proofsApproved || 0} of {data?.proofMetrics?.totalProofs || 0} approved
                             </p>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Row 3: Additional Metrics */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+                    {/* Section 4: Year to Date Overview */}
+                    <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      Year to Date Overview
+                    </h2>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4 mb-6">
+                      {/* YTD Total */}
+                      <div className={`glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02] relative ${!cardVisibility.yearToDateTotal ? 'blur-sm opacity-50' : ''}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="text-xs text-gray-400 uppercase tracking-wider">Year to Date Total</span>
+                          </div>
+                          <button
+                            onClick={() => toggleCardVisibility('yearToDateTotal')}
+                            className="p-1 rounded transition-colors hover:bg-white/10"
+                            title={cardVisibility.yearToDateTotal ? 'Hide data' : 'Show data'}
+                          >
+                            {cardVisibility.yearToDateTotal ? (
+                              <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-3 h-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                        <div className="flex items-end justify-between">
+                          <div>
+                            <p className="text-lg md:text-2xl font-bold text-white transition-all duration-200 hover:scale-105">
+                              {formatCurrency(data?.summary?.yearToDateTotal || 0)}
+                            </p>
+                            <p className="text-xs mt-1 text-emerald-400">
+                              Total revenue YTD
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Daily Average Revenue */}
                       <div className={`glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02] relative ${!cardVisibility.dailyAvgRevenue ? 'blur-sm opacity-50' : ''}`}>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
@@ -664,6 +939,7 @@ export default function AdminAnalytics() {
                         </div>
                       </div>
 
+                      {/* Daily Average Orders */}
                       <div className={`glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02] relative ${!cardVisibility.dailyAvgOrders ? 'blur-sm opacity-50' : ''}`}>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
@@ -696,84 +972,6 @@ export default function AdminAnalytics() {
                             </p>
                             <p className="text-xs mt-1 text-cyan-400">
                               Orders per day
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className={`glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02] relative ${!cardVisibility.monthProjection ? 'blur-sm opacity-50' : ''}`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <svg className="w-4 h-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                            </svg>
-                            <span className="text-xs text-gray-400 uppercase tracking-wider">{new Date().toLocaleDateString('en-US', { month: 'short' })} Projection</span>
-                          </div>
-                          <button
-                            onClick={() => toggleCardVisibility('monthProjection')}
-                            className="p-1 rounded transition-colors hover:bg-white/10"
-                            title={cardVisibility.monthProjection ? 'Hide data' : 'Show data'}
-                          >
-                            {cardVisibility.monthProjection ? (
-                              <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
-                            ) : (
-                              <svg className="w-3 h-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                              </svg>
-                            )}
-                          </button>
-                        </div>
-                        <div className="flex items-end justify-between">
-                          <div>
-                            <p className="text-lg md:text-2xl font-bold text-white transition-all duration-200 hover:scale-105">
-                              {formatCurrency(data?.summary?.currentMonthProjection || 0)}
-                            </p>
-                            <p className="text-xs mt-1 text-yellow-400">
-                              Month-end forecast
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className={`glass-container p-4 md:p-6 transition-all duration-200 hover:scale-[1.02] relative ${!cardVisibility.avgLTV ? 'blur-sm opacity-50' : ''}`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                            </svg>
-                            <span className="text-xs text-gray-400 uppercase tracking-wider">Avg LTV</span>
-                          </div>
-                          <button
-                            onClick={() => toggleCardVisibility('avgLTV')}
-                            className="p-1 rounded transition-colors hover:bg-white/10"
-                            title={cardVisibility.avgLTV ? 'Hide data' : 'Show data'}
-                          >
-                            {cardVisibility.avgLTV ? (
-                              <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
-                            ) : (
-                              <svg className="w-3 h-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                              </svg>
-                            )}
-                          </button>
-                        </div>
-                        <div className="flex items-end justify-between">
-                          <div>
-                            <p className="text-lg md:text-2xl font-bold text-white transition-all duration-200 hover:scale-105">
-                              {formatCurrency(
-                                data?.customerAnalytics?.length > 0 
-                                  ? data.customerAnalytics.reduce((sum: number, customer: any) => sum + (customer.lifetimeValue || 0), 0) / data.customerAnalytics.length
-                                  : 0
-                              )}
-                            </p>
-                            <p className="text-xs mt-1 text-emerald-400">
-                              Customer lifetime value
                             </p>
                           </div>
                         </div>
