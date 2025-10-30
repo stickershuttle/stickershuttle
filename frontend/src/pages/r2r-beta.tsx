@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Head from 'next/head';
 import { loadRealPricingData, calculateRealPrice, calculateSquareInches, BasePriceRow, QuantityDiscountRow } from '@/utils/real-pricing';
 
 interface CalculationResult {
@@ -454,6 +455,15 @@ export default function MaterialCostCalculator() {
 
   return (
     <>
+      <Head>
+        <title>r2r - Roll to Roll Calculator</title>
+        <meta property="og:title" content="r2r - Roll to Roll Calculator" />
+        <meta property="og:type" content="website" />
+        <meta property="og:image" content="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1761858013/r2rlogo_hjdg7f.jpg" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="r2r - Roll to Roll Calculator" />
+        <meta name="twitter:image" content="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1761858013/r2rlogo_hjdg7f.jpg" />
+      </Head>
       <style jsx global>{`
         body {
           margin: 0;
