@@ -403,6 +403,16 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
             </svg>
           )
         });
+      } else if (segments[1] === 'material-cost-calculator') {
+        breadcrumbs.push({
+          label: 'Material Cost Calculator',
+          href: '/admin/material-cost-calculator',
+          icon: (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+          )
+        });
       }
     }
     
@@ -975,8 +985,40 @@ export default function AdminLayout({ children, title = "Admin Dashboard - Stick
                   </a>
                 )}
 
+                {/* Tools Section */}
+                <div className="mb-2 mt-8">
+                  <h3 className="text-xs uppercase tracking-wider text-gray-500 font-semibold px-3 mb-3">Tools</h3>
+                </div>
 
-
+                {/* Material Cost Calculator */}
+                <a
+                  href={isBannershipOnlyAdmin ? "#" : "/admin/material-cost-calculator"}
+                  onClick={(e) => isBannershipOnlyAdmin && e.preventDefault()}
+                  className={`group flex items-center px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
+                    isBannershipOnlyAdmin 
+                      ? 'text-gray-600 cursor-not-allowed opacity-40' 
+                      : router.asPath.startsWith('/admin/material-cost-calculator')
+                        ? 'text-white bg-emerald-500/15 border-l-3 border-emerald-500'
+                        : 'text-gray-400 hover:text-white border-l-3 border-transparent'
+                  }`}
+                  onMouseEnter={(e) => {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/material-cost-calculator')) {
+                      e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
+                      e.currentTarget.style.color = '#6EE7B7';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isBannershipOnlyAdmin && !router.asPath.startsWith('/admin/material-cost-calculator')) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = '';
+                    }
+                  }}
+                >
+                  <svg className="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                  Material Cost Calculator
+                </a>
 
 
 

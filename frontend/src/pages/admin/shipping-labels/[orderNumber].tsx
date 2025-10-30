@@ -1065,15 +1065,17 @@ export default function ShippingLabels() {
                       Shipping Address
                     </h3>
                     <div className="text-sm text-gray-300 space-y-1">
-                      <p className="font-medium text-white">
-                        {order.shippingAddress.first_name} {order.shippingAddress.last_name}
-                      </p>
+                      {(order.shippingAddress.first_name || order.shippingAddress.last_name) && (
+                        <p className="font-medium text-white">
+                          {[order.shippingAddress.first_name, order.shippingAddress.last_name].filter(Boolean).join(' ')}
+                        </p>
+                      )}
                       {order.shippingAddress.company && (
                         <p>{order.shippingAddress.company}</p>
                       )}
                       <p>{order.shippingAddress.address1 || order.shippingAddress.line1}</p>
-                      {order.shippingAddress.address2 && (
-                        <p>{order.shippingAddress.address2}</p>
+                      {(order.shippingAddress.address2 || order.shippingAddress.line2) && (
+                        <p>{order.shippingAddress.address2 || order.shippingAddress.line2}</p>
                       )}
                       <p>
                         {[

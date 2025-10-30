@@ -6081,7 +6081,7 @@ export default function AdminOrders() {
                         <div className={`text-sm space-y-1 ${selectedOrder.is_blind_shipment ? 'text-blue-100' : 'text-gray-300'}`}>
                           {(selectedOrder.shippingAddress.first_name || selectedOrder.shippingAddress.last_name) && (
                             <p className={`font-medium ${selectedOrder.is_blind_shipment ? 'text-blue-200' : 'text-white'}`}>
-                              {selectedOrder.shippingAddress.first_name} {selectedOrder.shippingAddress.last_name}
+                              {[selectedOrder.shippingAddress.first_name, selectedOrder.shippingAddress.last_name].filter(Boolean).join(' ')}
                             </p>
                           )}
                           {selectedOrder.shippingAddress.company && (
