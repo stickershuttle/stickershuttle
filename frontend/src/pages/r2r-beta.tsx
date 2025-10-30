@@ -46,6 +46,9 @@ export default function MaterialCostCalculator() {
   const [showPackaging, setShowPackaging] = useState<boolean>(false);
   const [showPromo, setShowPromo] = useState<boolean>(false);
   const [logoAnimate, setLogoAnimate] = useState<boolean>(false);
+  // Simple page password gate
+  const [isAuthed, setIsAuthed] = useState<boolean>(false);
+  const [passwordInput, setPasswordInput] = useState<string>('');
   // Editable costs (UI overrides)
   const [packagingCustomCost, setPackagingCustomCost] = useState<number | null>(null);
   const [editingPackagingCost, setEditingPackagingCost] = useState<boolean>(false);
@@ -151,6 +154,17 @@ export default function MaterialCostCalculator() {
 
   // Load persisted settings from localStorage (per-browser, no login)
   useEffect(() => {
+    // Auth gate check
+    try {
+      const rawAuth = typeof window !== 'undefined' ? localStorage.getItem('r2r:auth') : null;
+      if (rawAuth) {
+        const a = JSON.parse(rawAuth || '{}');
+        if (a.expiresAt && Date.now() < Number(a.expiresAt)) {
+          setIsAuthed(true);
+        }
+      }
+    } catch {}
+
     try {
       const raw = typeof window !== 'undefined' ? localStorage.getItem('r2r:settings') : null;
       if (!raw) return;
@@ -318,10 +332,8 @@ export default function MaterialCostCalculator() {
     }
 
     // Calculate how many stickers fit per row
-    // Use derived usable width from roll width unless user overrides
-    const effectiveUsableWidth = customUsableWidth
-      ? usableWidthInches
-      : Math.max(0, rollWidthInches - LEFT_MARGIN - RIGHT_MARGIN);
+    // Use the configured usable width directly
+    const effectiveUsableWidth = usableWidthInches;
     // Formula: (usable_width + spacing) / (sticker_width + spacing)
     const stickersPerRow = Math.floor((effectiveUsableWidth + spacingInches) / (width + spacingInches));
 
@@ -462,6 +474,57 @@ export default function MaterialCostCalculator() {
           animation: logo-pulse 1s ease-in-out;
         }
       `}</style>
+      {!isAuthed ? (
+        <div className="min-h-screen" style={{ background: '#FFF8F0', margin: 0, padding: 0 }}>
+      <div className="p-6">
+            <div className="max-w-[480px] mx-auto mt-16">
+              <div className="mb-6 flex items-center justify-center">
+                <img
+                  src="https://res.cloudinary.com/dxcnvqk6b/image/upload/v1761853379/r2rlogo_wlsj6i.svg"
+                  alt="R2R Logo"
+                  className={`h-16 transition-transform ${logoAnimate ? 'logo-animate' : ''}`}
+                />
+              </div>
+              <div className="rounded-xl p-6" style={{ background: '#F5EDE3', border: '1px solid rgba(139, 117, 93, 0.2)', boxShadow: 'rgba(0, 0, 0, 0.1) 0px 4px 16px' }}>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Enter Password</label>
+                <input
+                  type="password"
+                  className="w-full px-4 py-3 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400/60 transition-all"
+                  style={{ background: '#EAE0D5', border: '1px solid rgba(139, 117, 93, 0.3)' }}
+                  placeholder="Password"
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      if (passwordInput === 'SubstanceRox67!') {
+                        setIsAuthed(true);
+                        try {
+                          localStorage.setItem('r2r:auth', JSON.stringify({ expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 }));
+                        } catch {}
+                      }
+                    }
+                  }}
+                />
+                    <button
+                      type="button"
+                  className="mt-4 w-full px-4 py-2 rounded-md border border-amber-300 text-amber-800 hover:bg-amber-100 text-sm"
+                  onClick={() => {
+                    if (passwordInput === 'SubstanceRox67!') {
+                      setIsAuthed(true);
+                      try {
+                        localStorage.setItem('r2r:auth', JSON.stringify({ expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 }));
+                      } catch {}
+                    }
+                  }}
+                >
+                  Unlock
+                    </button>
+                <p className="mt-3 text-xs text-gray-500">Access is remembered for 30 days in this browser.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
       <div className="min-h-screen" style={{ background: '#FFF8F0', margin: 0, padding: 0 }}>
       <div className="p-6">
         <div className="max-w-[1600px] mx-auto">
@@ -472,8 +535,8 @@ export default function MaterialCostCalculator() {
               alt="R2R Logo" 
               className={`h-16 transition-transform ${logoAnimate ? 'logo-animate' : ''}`}
             />
-                    <button
-                      type="button"
+                          <button
+                            type="button"
               className="px-4 py-2 rounded-md border border-amber-300 text-amber-800 hover:bg-amber-100 text-sm"
               onClick={() => {
                 try {
@@ -499,9 +562,9 @@ export default function MaterialCostCalculator() {
               }}
             >
               Reset to defaults
-                    </button>
-          </div>
-          
+                          </button>
+                </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Input Section */}
                       <div
@@ -821,14 +884,14 @@ export default function MaterialCostCalculator() {
                         </span>
                       ) : (
                         <span className="text-gray-800 font-medium inline-flex items-center gap-2">
-                          <span>{(customUsableWidth ? usableWidthInches : Math.max(0, rollWidthInches - LEFT_MARGIN - RIGHT_MARGIN))}"</span>
+                          <span>{usableWidthInches}"</span>
                           <button
                             type="button"
                             aria-label="Edit usable width"
                             className="w-5 h-5 rounded hover:bg-amber-100 flex items-center justify-center"
                             onClick={() => {
                               setEditingUsable(true);
-                              setTempUsable(String(customUsableWidth ? usableWidthInches : Math.max(0, rollWidthInches - LEFT_MARGIN - RIGHT_MARGIN)));
+                              setTempUsable(String(usableWidthInches));
                             }}
                           >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-700"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
@@ -1266,12 +1329,13 @@ export default function MaterialCostCalculator() {
                 </div>
               )}
             </div>
-          </div>
+                  </div>
 
           {/* Removed large presets block; presets moved above sticker size inputs */}
-        </div>
-      </div>
-    </div>
+                      </div>
+                      </div>
+                      </div>
+      )}
     </>
   );
 }
